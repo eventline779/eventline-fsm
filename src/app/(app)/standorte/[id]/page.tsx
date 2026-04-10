@@ -120,42 +120,13 @@ export default function StandortDetailPage() {
     loadAll();
   }
 
-  async function createJobFromTask(task: MaintenanceTaskWithPhoto) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Kunde ermitteln - vom Standort oder ersten aktiven Kunden
-    let customerId = location?.customer_id;
-    if (!customerId) {
-      const { data: customers } = await supabase.from("customers").select("id").eq("is_active", true).limit(1).single();
-      customerId = customers?.id || null;
-    }
-
-    if (!customerId) {
-      toast.error("Bitte zuerst einen Kunden anlegen");
-      return;
-    }
-
-    const { data: job, error } = await supabase.from("jobs").insert({
-      title: `Instandhaltung: ${task.title}`,
-      description: [
-        task.description,
-        location ? `Standort: ${location.name}` : null,
-        task.photo_url ? `Foto vorhanden` : null,
-      ].filter(Boolean).join("\n"),
-      status: "offen",
-      priority: "normal",
-      customer_id: customerId,
-      location_id: id,
-      created_by: user?.id,
-    }).select("id").single();
-
-    if (error) {
-      toast.error("Fehler: " + error.message);
-      return;
-    }
-
-    toast.success("Auftrag erstellt aus Instandhaltung");
-    router.push(`/auftraege/${job.id}`);
+  function createJobFromTask(task: MaintenanceTaskWithPhoto) {
+    const params = new URLSearchParams();
+    params.set("title", `Instandhaltung: ${task.title}`);
+    if (task.description) params.set("description", task.description);
+    if (id) params.set("location_id", id as string);
+    if (location?.customer_id) params.set("customer_id", location.customer_id);
+    router.push(`/auftraege/neu?${params.toString()}`);
   }
 
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});

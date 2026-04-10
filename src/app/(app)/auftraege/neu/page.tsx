@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,17 +14,18 @@ import { toast } from "sonner";
 
 export default function NeuerAuftragPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [form, setForm] = useState({
-    title: "",
-    description: "",
+    title: searchParams.get("title") || "",
+    description: searchParams.get("description") || "",
     priority: "normal" as JobPriority,
-    customer_id: "",
-    location_id: "",
+    customer_id: searchParams.get("customer_id") || "",
+    location_id: searchParams.get("location_id") || "",
     project_lead_id: "",
     start_date: "",
     end_date: "",
