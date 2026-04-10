@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { jsPDF } from "jspdf";
+import LOGO_BASE64 from "@/lib/logo-base64";
 
 interface TimeRange {
   date: string;
@@ -35,16 +36,24 @@ export async function GET(
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 20;
 
+  // Logo rechts oben
+  try {
+    const logoWidth = 45;
+    const logoHeight = logoWidth / 4.32;
+    doc.addImage(LOGO_BASE64, "PNG", pageWidth - 14 - logoWidth, 10, logoWidth, logoHeight);
+  } catch {}
+
   // Titel
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.text("Einsatzrapport", 14, y);
 
   if (job?.job_number) {
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text(`#${job.job_number}`, pageWidth - 14, y, { align: "right" });
+    doc.text(`#${job.job_number}`, 14, y + 7);
     doc.setTextColor(0);
+    y += 4;
   }
 
   y += 10;
