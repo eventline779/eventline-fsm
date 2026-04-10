@@ -10,16 +10,30 @@ interface TimeRange {
   pause: number;
 }
 
-function generatePDF(report: any, job: any, customer: any, location: any): Buffer {
+interface ReportPhoto {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  sort_order: number;
+}
+
+async function generatePDF(
+  report: any,
+  job: any,
+  customer: any,
+  location: any,
+  photos: { base64: string; caption: string | null }[],
+  signatures: { tech: string | null; client: string | null }
+): Promise<Buffer> {
   const timeRanges: TimeRange[] = report.time_ranges || [];
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 20;
 
+  // Titel
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.text("Einsatzrapport", 14, y);
-
   if (job?.job_number) {
     doc.setFontSize(12);
     doc.setTextColor(150);
@@ -32,6 +46,7 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
   doc.setLineWidth(0.5);
   doc.line(14, y, pageWidth - 14, y);
 
+  // Auftragsdaten
   y += 8;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
@@ -44,7 +59,6 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
   doc.text("Kunde:", 14, y);
   doc.setFont("helvetica", "normal");
   doc.text(customer?.name || "-", 55, y);
-
   if (customer?.address_street) {
     y += 5;
     doc.text(`${customer.address_street}, ${customer.address_zip || ""} ${customer.address_city || ""}`, 55, y);
@@ -82,7 +96,6 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
     let totalMin = 0;
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-
     for (const tr of timeRanges) {
       y += 5;
       const dateStr = new Date(tr.date + "T12:00:00").toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
@@ -98,7 +111,6 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
       doc.text(`${tr.pause} Min`, 115, y);
       doc.text(`${workH}h ${workM > 0 ? workM + "m" : ""}`.trim(), 145, y);
     }
-
     y += 3;
     doc.setDrawColor(200);
     doc.line(14, y, pageWidth - 14, y);
@@ -117,10 +129,12 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
     doc.text(new Date(report.report_date).toLocaleDateString("de-CH"), 55, y);
   }
 
+  // Trennlinie
   y += 8;
   doc.setDrawColor(220);
   doc.line(14, y, pageWidth - 14, y);
 
+  // Arbeitsbeschreibung
   y += 8;
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -158,7 +172,77 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
     y += issueLines.length * 5 + 4;
   }
 
-  y = Math.max(y + 10, 220);
+  // Fotos
+  if (photos.length > 0) {
+    // Neue Seite für Fotos wenn wenig Platz
+    if (y > 180) {
+      doc.addPage();
+      y = 20;
+    } else {
+      y += 8;
+      doc.setDrawColor(220);
+      doc.line(14, y, pageWidth - 14, y);
+      y += 8;
+    }
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Fotos (${photos.length})`, 14, y);
+    y += 8;
+
+    const imgWidth = 80;
+    const imgHeight = 60;
+    let col = 0;
+
+    for (const photo of photos) {
+      // Neue Seite wenn kein Platz mehr
+      if (y + imgHeight + 10 > 280) {
+        doc.addPage();
+        y = 20;
+        col = 0;
+      }
+
+      const x = col === 0 ? 14 : 108;
+
+      try {
+        doc.addImage(photo.base64, "JPEG", x, y, imgWidth, imgHeight);
+      } catch {
+        // Foto konnte nicht eingefügt werden
+        doc.setDrawColor(200);
+        doc.rect(x, y, imgWidth, imgHeight);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text("Foto nicht verfügbar", x + 20, y + 30);
+        doc.setTextColor(0);
+      }
+
+      if (photo.caption) {
+        doc.setFontSize(7);
+        doc.setTextColor(100);
+        doc.text(doc.splitTextToSize(photo.caption, imgWidth)[0], x, y + imgHeight + 4);
+        doc.setTextColor(0);
+      }
+
+      col++;
+      if (col >= 2) {
+        col = 0;
+        y += imgHeight + (photo.caption ? 10 : 6);
+      }
+    }
+
+    if (col !== 0) {
+      y += imgHeight + 10;
+    }
+  }
+
+  // Unterschriften - neue Seite wenn nötig
+  if (y > 220) {
+    doc.addPage();
+    y = 20;
+  } else {
+    y = Math.max(y + 10, 220);
+  }
+
   doc.setDrawColor(220);
   doc.line(14, y, pageWidth - 14, y);
   y += 8;
@@ -168,6 +252,14 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
   doc.text("Service-Techniker:", 14, y);
   doc.setFont("helvetica", "normal");
   doc.text(report.technician_name || "-", 14, y + 5);
+
+  // Techniker Signatur
+  if (signatures.tech) {
+    try {
+      doc.addImage(signatures.tech, "PNG", 14, y + 8, 60, 10);
+    } catch {}
+  }
+
   doc.setDrawColor(180);
   doc.line(14, y + 20, 90, y + 20);
   doc.setFontSize(8);
@@ -180,17 +272,30 @@ function generatePDF(report: any, job: any, customer: any, location: any): Buffe
   doc.text("Kunde / Auftraggeber:", 110, y);
   doc.setFont("helvetica", "normal");
   doc.text(report.client_name || "-", 110, y + 5);
+
+  // Kunden Signatur
+  if (signatures.client) {
+    try {
+      doc.addImage(signatures.client, "PNG", 110, y + 8, 60, 10);
+    } catch {}
+  }
+
   doc.line(110, y + 20, pageWidth - 14, y + 20);
   doc.setFontSize(8);
   doc.setTextColor(150);
   doc.text("Unterschrift Kunde", 110, y + 24);
 
-  doc.setTextColor(150);
-  doc.setFontSize(7);
-  doc.text(
-    "EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel · Tel: 055 556 62 61 · www.eventline-basel.com",
-    pageWidth / 2, 285, { align: "center" }
-  );
+  // Footer auf jeder Seite
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setTextColor(150);
+    doc.setFontSize(7);
+    doc.text(
+      "EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel · Tel: 055 556 62 61 · www.eventline-basel.com",
+      pageWidth / 2, 285, { align: "center" }
+    );
+  }
 
   return Buffer.from(doc.output("arraybuffer"));
 }
@@ -219,8 +324,56 @@ export async function POST(
   const jobNumber = job?.job_number || "?";
   const customerName = customer?.name || "Unbekannt";
 
-  // PDF direkt generieren (kein interner HTTP-Call)
-  const pdfBuffer = generatePDF(report, job, customer, location);
+  // Fotos laden
+  const photoImages: { base64: string; caption: string | null }[] = [];
+  const { data: reportPhotos } = await supabase
+    .from("report_photos")
+    .select("*")
+    .eq("report_id", id)
+    .order("sort_order");
+
+  if (reportPhotos) {
+    for (const photo of reportPhotos as ReportPhoto[]) {
+      try {
+        const { data: fileData } = await supabase.storage.from("documents").download(photo.storage_path);
+        if (fileData) {
+          const buffer = Buffer.from(await fileData.arrayBuffer());
+          const ext = photo.storage_path.split(".").pop()?.toLowerCase() || "jpg";
+          const mime = ext === "png" ? "image/png" : "image/jpeg";
+          photoImages.push({
+            base64: `data:${mime};base64,${buffer.toString("base64")}`,
+            caption: photo.caption,
+          });
+        }
+      } catch {}
+    }
+  }
+
+  // Unterschriften laden
+  const signatures: { tech: string | null; client: string | null } = { tech: null, client: null };
+
+  if (report.technician_signature_url) {
+    try {
+      const { data } = await supabase.storage.from("documents").download(report.technician_signature_url);
+      if (data) {
+        const buffer = Buffer.from(await data.arrayBuffer());
+        signatures.tech = `data:image/png;base64,${buffer.toString("base64")}`;
+      }
+    } catch {}
+  }
+
+  if (report.signature_url) {
+    try {
+      const { data } = await supabase.storage.from("documents").download(report.signature_url);
+      if (data) {
+        const buffer = Buffer.from(await data.arrayBuffer());
+        signatures.client = `data:image/png;base64,${buffer.toString("base64")}`;
+      }
+    } catch {}
+  }
+
+  // PDF generieren
+  const pdfBuffer = await generatePDF(report, job, customer, location, photoImages, signatures);
 
   // PDF in Supabase Storage speichern
   const pdfPath = `rapporte/Rapport_${jobNumber}_${id}.pdf`;
@@ -231,7 +384,7 @@ export async function POST(
 
   await supabase.from("service_reports").update({ pdf_url: pdfPath }).eq("id", id);
 
-  // PDF als Dokument am Auftrag anhängen
+  // Dokument am Auftrag
   const { data: existingDoc } = await supabase
     .from("documents")
     .select("id")
@@ -277,7 +430,7 @@ export async function POST(
               <p style="margin: 0 0 16px;">Der Auftrag <strong>#${jobNumber} – ${job?.title || ""}</strong> wurde abgeschlossen.</p>
               <div style="background: #f5f5f5; padding: 14px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 0 0 16px;">
                 <p style="margin: 0 0 4px; font-weight: 600;">Kunde: ${customerName}</p>
-                <p style="margin: 0; color: #666; font-size: 14px;">Einsatzrapport im Anhang als PDF</p>
+                <p style="margin: 0; color: #666; font-size: 14px;">Einsatzrapport im Anhang als PDF${photoImages.length > 0 ? ` (inkl. ${photoImages.length} Foto${photoImages.length > 1 ? "s" : ""})` : ""}</p>
               </div>
               <p style="margin: 0 0 8px;">Bitte Rechnung stellen.</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;" />
@@ -295,11 +448,7 @@ export async function POST(
 
       return NextResponse.json({ success: true, emailSent: true });
     } catch (emailError: any) {
-      return NextResponse.json({
-        success: true,
-        emailSent: false,
-        emailError: emailError.message,
-      });
+      return NextResponse.json({ success: true, emailSent: false, emailError: emailError.message });
     }
   }
 
