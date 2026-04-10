@@ -1,0 +1,319 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
+import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
+import {
+  ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
+  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+
+export default function AuftragDetailPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [job, setJob] = useState<Job | null>(null);
+  const [assignments, setAssignments] = useState<JobAssignment[]>([]);
+  const [appointments, setAppointments] = useState<JobAppointment[]>([]);
+  const [documents, setDocuments] = useState<DocType[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  // Appointment form
+  const [showApptForm, setShowApptForm] = useState(false);
+  const [apptForm, setApptForm] = useState({ title: "", date: "", time: "", assigned_to: "", description: "" });
+
+  useEffect(() => { loadAll(); }, [id]);
+
+  async function loadAll() {
+    const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
+      supabase.from("jobs").select("*, customer:customers(name), location:locations(name), project_lead:profiles!project_lead_id(full_name)").eq("id", id).single(),
+      supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
+      supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
+      supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
+      supabase.from("service_reports").select("*, creator:profiles!created_by(full_name)").eq("job_id", id).order("created_at", { ascending: false }),
+    ]);
+    if (jobRes.data) setJob(jobRes.data as unknown as Job);
+    if (assignRes.data) setAssignments(assignRes.data as unknown as JobAssignment[]);
+    if (apptRes.data) setAppointments(apptRes.data as unknown as JobAppointment[]);
+    if (docRes.data) setDocuments(docRes.data as DocType[]);
+    if (profRes.data) setProfiles(profRes.data as Profile[]);
+    if (repRes.data) setReports(repRes.data);
+  }
+
+  async function updateStatus(newStatus: JobStatus) {
+    if (newStatus === "abgeschlossen") {
+      // Bei Abschluss → weiterleiten zum Rapport-Formular mit Job vorausgewählt
+      await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
+      toast.success("Auftrag abgeschlossen – Einsatzrapport ausfüllen");
+      router.push(`/rapporte/neu?job_id=${id}`);
+      return;
+    }
+    await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
+    toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
+    loadAll();
+  }
+
+  async function addAppointment(e: React.FormEvent) {
+    e.preventDefault();
+    const startTime = apptForm.date && apptForm.time
+      ? `${apptForm.date}T${apptForm.time}`
+      : apptForm.date
+        ? `${apptForm.date}T00:00`
+        : new Date().toISOString();
+    await supabase.from("job_appointments").insert({
+      job_id: id,
+      title: apptForm.title,
+      start_time: startTime,
+      assigned_to: apptForm.assigned_to || null,
+      description: apptForm.description || null,
+    });
+    setApptForm({ title: "", date: "", time: "", assigned_to: "", description: "" });
+    setShowApptForm(false);
+    loadAll();
+    toast.success("Termin hinzugefügt");
+  }
+
+  async function toggleAppointment(apptId: string, isDone: boolean) {
+    await supabase.from("job_appointments").update({ is_done: !isDone }).eq("id", apptId);
+    loadAll();
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    for (const file of Array.from(files)) {
+      const path = `jobs/${id}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
+      if (uploadError) { toast.error("Upload fehlgeschlagen: " + uploadError.message); continue; }
+      await supabase.from("documents").insert({
+        name: file.name, storage_path: path, file_size: file.size, mime_type: file.type,
+        job_id: id as string, uploaded_by: user.id,
+      });
+    }
+    toast.success("Datei(en) hochgeladen");
+    loadAll();
+    setUploading(false);
+    e.target.value = "";
+  }
+
+  if (!job) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
+
+  const customer = job.customer as unknown as { name: string } | undefined;
+  const location = job.location as unknown as { name: string } | undefined;
+  const projectLead = (job as unknown as { project_lead: { full_name: string } | null }).project_lead;
+
+  // Status transition buttons
+  const statusActions: { from: JobStatus[]; to: JobStatus; label: string; icon: React.ReactNode; color: string }[] = [
+    { from: ["entwurf"], to: "offen", label: "Freigeben", icon: <CheckCircle className="h-4 w-4" />, color: "bg-purple-600 hover:bg-purple-700 text-white" },
+    { from: ["offen", "entwurf"], to: "geplant", label: "Planen", icon: <Calendar className="h-4 w-4" />, color: "bg-blue-600 hover:bg-blue-700 text-white" },
+    { from: ["offen", "geplant"], to: "in_arbeit", label: "Starten", icon: <Play className="h-4 w-4" />, color: "bg-yellow-600 hover:bg-yellow-700 text-white" },
+    { from: ["in_arbeit", "geplant"], to: "abgeschlossen", label: "Abschliessen", icon: <CheckCircle className="h-4 w-4" />, color: "bg-green-600 hover:bg-green-700 text-white" },
+    { from: ["entwurf", "offen", "geplant", "in_arbeit"], to: "storniert", label: "Stornieren", icon: <XCircle className="h-4 w-4" />, color: "bg-gray-600 hover:bg-gray-700 text-white" },
+  ];
+
+  const availableActions = statusActions.filter((a) => a.from.includes(job.status));
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            {job.job_number && <span className="text-sm font-mono text-muted-foreground">#{job.job_number}</span>}
+            <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
+          </div>
+          <div className="flex items-center gap-3 mt-1">
+            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>{JOB_STATUS[job.status].label}</span>
+            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>{JOB_PRIORITY[job.priority].label}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Status Actions */}
+      {availableActions.length > 0 && (
+        <Card className="bg-white">
+          <CardContent className="p-4 flex flex-wrap gap-2">
+            {availableActions.map((a) => (
+              <Button key={a.to} onClick={() => updateStatus(a.to)} size="sm" className={a.color}>
+                {a.icon}<span className="ml-1.5">{a.label}</span>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Info */}
+      <Card className="bg-white">
+        <CardContent className="p-5 space-y-3">
+          {customer && <div className="flex items-center gap-2 text-sm"><User className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Kunde:</span> {customer.name}</div>}
+          {location && <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Standort:</span> {location.name}</div>}
+          {projectLead && <div className="flex items-center gap-2 text-sm"><UserCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Projektleiter:</span> {projectLead.full_name}</div>}
+          {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Zeitraum:</span> {new Date(job.start_date).toLocaleDateString("de-CH")} {job.end_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH")}` : ""}</div>}
+          {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
+          {job.notes && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground italic">{job.notes}</p></div>}
+        </CardContent>
+      </Card>
+
+      {/* Zugewiesene Techniker */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Zugewiesene Techniker ({assignments.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {assignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">Keine Techniker zugewiesen.</p>
+          ) : (
+            <div className="space-y-2">
+              {assignments.map((a) => {
+                const prof = a.profile as unknown as { full_name: string; role: string } | undefined;
+                return (
+                  <div key={a.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50">
+                    <div className="h-8 w-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold">{prof?.full_name?.charAt(0) || "?"}</div>
+                    <span className="text-sm font-medium">{prof?.full_name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Termine */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Calendar className="h-4 w-4" />Termine ({appointments.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}><Plus className="h-4 w-4 mr-1" />Termin</Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {showApptForm && (
+            <form onSubmit={addAppointment} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+              <Input placeholder="Termin-Titel *" value={apptForm.title} onChange={(e) => setApptForm({ ...apptForm, title: e.target.value })} required />
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={apptForm.date} onChange={(e) => setApptForm({ ...apptForm, date: e.target.value })} className="mt-1" required /></div>
+                <div><label className="text-xs font-medium">Uhrzeit</label><Input type="time" value={apptForm.time} onChange={(e) => setApptForm({ ...apptForm, time: e.target.value })} className="mt-1" /></div>
+              </div>
+              <select value={apptForm.assigned_to} onChange={(e) => setApptForm({ ...apptForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+                <option value="">Zuweisen an (optional)...</option>
+                {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              </select>
+              <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowApptForm(false)}>Abbrechen</Button>
+                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Termin erstellen</Button>
+              </div>
+            </form>
+          )}
+          {appointments.length === 0 && !showApptForm && <p className="text-sm text-muted-foreground py-2">Keine Termine.</p>}
+          {appointments.map((appt) => {
+            const assignee = (appt as unknown as { assignee: { full_name: string } | null }).assignee;
+            return (
+              <div key={appt.id} className={`flex items-center justify-between p-3 rounded-xl border ${appt.is_done ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <button onClick={() => toggleAppointment(appt.id, appt.is_done)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${appt.is_done ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
+                    {appt.is_done && <Check className="h-4 w-4" />}
+                  </button>
+                  <div className="min-w-0">
+                    <span className={`font-medium text-sm ${appt.is_done ? "line-through text-muted-foreground" : ""}`}>{appt.title}</span>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(appt.start_time).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      {assignee && <span className="flex items-center gap-1"><User className="h-3 w-3" />{assignee.full_name}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Einsatzrapporte */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Einsatzrapporte ({reports.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {reports.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">Noch keine Rapporte für diesen Auftrag.</p>
+          ) : (
+            <div className="space-y-2">
+              {reports.map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Rapport vom {new Date(r.report_date).toLocaleDateString("de-CH")}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {r.creator?.full_name} · {r.status === "abgeschlossen" ? "Abgeschlossen" : "Entwurf"}
+                    </p>
+                  </div>
+                  <a href={`/api/reports/${r.id}/pdf`} download={`Rapport_${r.report_date}.pdf`}>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-1" />PDF
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dokumente / PDFs */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Upload className="h-4 w-4" />Dokumente ({documents.length})</CardTitle>
+          <div>
+            <input type="file" id="jobFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" className="hidden" onChange={handleFileUpload} />
+            <Button size="sm" variant="outline" onClick={() => document.getElementById("jobFileUpload")?.click()} disabled={uploading}>
+              <Upload className="h-4 w-4 mr-1" />{uploading ? "Laden..." : "Hochladen"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">Keine Dokumente. Klicke auf "Hochladen" um PDFs/Dateien anzuhängen.</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">{doc.file_size ? (doc.file_size / 1024).toFixed(0) + " KB" : ""} · {new Date(doc.created_at).toLocaleDateString("de-CH")}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    const { data } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
+                    if (data?.signedUrl) {
+                      const a = document.createElement("a");
+                      a.href = data.signedUrl;
+                      a.download = doc.name;
+                      a.click();
+                    }
+                  }}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

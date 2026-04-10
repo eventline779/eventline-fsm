@@ -1,0 +1,187 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
+import type { Job, JobStatus } from "@/types";
+import Link from "next/link";
+import {
+  Plus,
+  Search,
+  ClipboardList,
+  Calendar,
+  MapPin,
+  User,
+} from "lucide-react";
+
+export default function AuftraegePage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<JobStatus | "all">("all");
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => { loadJobs(); }, []);
+
+  async function loadJobs() {
+    const { data } = await supabase
+      .from("jobs")
+      .select("*, customer:customers(name), location:locations(name)")
+      .neq("is_deleted", true)
+      .order("created_at", { ascending: false });
+    if (data) setJobs(data as unknown as Job[]);
+    setLoading(false);
+  }
+
+  const filtered = jobs.filter((j) => {
+    const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = filterStatus === "all" || j.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Aufträge</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {jobs.length} {jobs.length === 1 ? "Auftrag" : "Aufträge"} gesamt
+          </p>
+        </div>
+        <Link href="/auftraege/neu">
+          <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Neuer Auftrag
+          </Button>
+        </Link>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Aufträge suchen..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-white border-gray-200"
+          />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterStatus("all")}
+            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+              filterStatus === "all"
+                ? "bg-black text-white border-black"
+                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            Alle
+          </button>
+          {(Object.keys(JOB_STATUS) as JobStatus[]).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+                filterStatus === status
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {JOB_STATUS[status].label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Job List */}
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse bg-white">
+              <CardContent className="p-5">
+                <div className="h-5 bg-gray-200 rounded w-1/2 mb-3" />
+                <div className="h-4 bg-gray-100 rounded w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="border-dashed bg-white">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+              <ClipboardList className="h-7 w-7 text-gray-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 text-lg">
+              {search || filterStatus !== "all" ? "Keine Ergebnisse" : "Noch keine Aufträge"}
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {search || filterStatus !== "all"
+                ? "Versuche andere Filter."
+                : "Erstelle deinen ersten Auftrag."}
+            </p>
+            {!search && filterStatus === "all" && (
+              <Link href="/auftraege/neu">
+                <Button className="mt-5 bg-red-600 hover:bg-red-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ersten Auftrag erstellen
+                </Button>
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((job) => (
+            <Link key={job.id} href={`/auftraege/${job.id}`}>
+            <Card className="bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">#{job.job_number}</span>}
+                      <h3 className="font-semibold text-gray-900 truncate">{job.title}</h3>
+                      <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                        {JOB_STATUS[job.status].label}
+                      </span>
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
+                        {JOB_PRIORITY[job.priority].label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                      {(job.customer as unknown as { name: string })?.name && (
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5" />
+                          {(job.customer as unknown as { name: string }).name}
+                        </span>
+                      )}
+                      {(job.location as unknown as { name: string })?.name && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {(job.location as unknown as { name: string }).name}
+                        </span>
+                      )}
+                      {job.start_date && (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {new Date(job.start_date).toLocaleDateString("de-CH")}
+                        </span>
+                      )}
+                    </div>
+                    {job.description && (
+                      <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

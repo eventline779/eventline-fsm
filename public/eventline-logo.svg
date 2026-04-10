@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 80" fill="none">
+  <!-- EVENTLINE text in heavy condensed block style -->
+  <text x="0" y="62" font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-size="72" letter-spacing="-3" fill="currentColor">
+    <tspan>EVENTL</tspan>
+  </text>
+  <!-- Red I stroke -->
+  <rect x="310" y="8" width="10" height="54" fill="#E53935" rx="1"/>
+  <!-- I and NE -->
+  <text x="305" y="62" font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-size="72" letter-spacing="-3" fill="currentColor">
+    <tspan>INE</tspan>
+  </text>
+</svg>

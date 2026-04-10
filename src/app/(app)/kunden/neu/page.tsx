@@ -1,0 +1,229 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CUSTOMER_TYPES } from "@/lib/constants";
+import type { CustomerType } from "@/types";
+import { ArrowLeft, Save, Building2, User, Globe } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+
+export default function NeuerKundePage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    type: "company" as CustomerType,
+    email: "",
+    phone: "",
+    address_street: "",
+    address_zip: "",
+    address_city: "",
+    notes: "",
+  });
+
+  function update(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    const { error } = await supabase.from("customers").insert({
+      name: form.name,
+      type: form.type,
+      email: form.email || null,
+      phone: form.phone || null,
+      address_street: form.address_street || null,
+      address_zip: form.address_zip || null,
+      address_city: form.address_city || null,
+      notes: form.notes || null,
+    });
+
+    if (error) {
+      toast.error("Fehler beim Speichern: " + error.message);
+      setSaving(false);
+      return;
+    }
+
+    toast.success("Kunde erfolgreich erstellt");
+    router.push("/kunden");
+  }
+
+  const typeOptions: { value: CustomerType; label: string; icon: React.ReactNode }[] = [
+    { value: "company", label: "Firma", icon: <Building2 className="h-4 w-4" /> },
+    { value: "individual", label: "Privatperson", icon: <User className="h-4 w-4" /> },
+    { value: "organization", label: "Organisation", icon: <Globe className="h-4 w-4" /> },
+  ];
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/kunden">
+          <button className="p-2 rounded-lg hover:bg-white transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Neuer Kunde</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Kundendaten erfassen
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Typ */}
+        <Card className="bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Kundentyp</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-2">
+              {typeOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => update("type", opt.value)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    form.type === opt.value
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200"
+                  }`}
+                >
+                  {opt.icon}
+                  <span className="text-xs font-medium">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Kontaktdaten */}
+        <Card className="bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Kontaktdaten</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                placeholder={form.type === "company" ? "Firmenname" : "Vor- und Nachname"}
+                value={form.name}
+                onChange={(e) => update("name", e.target.value)}
+                className="mt-1.5 bg-gray-50 border-gray-200"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email">E-Mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="mail@beispiel.ch"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  className="mt-1.5 bg-gray-50 border-gray-200"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Telefon</Label>
+                <Input
+                  id="phone"
+                  placeholder="+41 ..."
+                  value={form.phone}
+                  onChange={(e) => update("phone", e.target.value)}
+                  className="mt-1.5 bg-gray-50 border-gray-200"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Adresse */}
+        <Card className="bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Adresse</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="street">Strasse</Label>
+              <Input
+                id="street"
+                placeholder="Strasse und Hausnummer"
+                value={form.address_street}
+                onChange={(e) => update("address_street", e.target.value)}
+                className="mt-1.5 bg-gray-50 border-gray-200"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="zip">PLZ</Label>
+                <Input
+                  id="zip"
+                  placeholder="4052"
+                  value={form.address_zip}
+                  onChange={(e) => update("address_zip", e.target.value)}
+                  className="mt-1.5 bg-gray-50 border-gray-200"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="city">Ort</Label>
+                <Input
+                  id="city"
+                  placeholder="Basel"
+                  value={form.address_city}
+                  onChange={(e) => update("address_city", e.target.value)}
+                  className="mt-1.5 bg-gray-50 border-gray-200"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notizen */}
+        <Card className="bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Notizen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              placeholder="Optionale Notizen zum Kunden..."
+              value={form.notes}
+              onChange={(e) => update("notes", e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              rows={3}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Submit */}
+        <div className="flex gap-3 pt-2">
+          <Link href="/kunden" className="flex-1">
+            <Button type="button" variant="outline" className="w-full">
+              Abbrechen
+            </Button>
+          </Link>
+          <Button
+            type="submit"
+            disabled={!form.name || saving}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Speichern..." : "Kunde erstellen"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
