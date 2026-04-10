@@ -33,9 +33,9 @@ async function generatePDF(
 
   // Logo rechts oben
   try {
-    const logoWidth = 45;
+    const logoWidth = 70;
     const logoHeight = logoWidth / 4.32;
-    doc.addImage(LOGO_BASE64, "PNG", pageWidth - 14 - logoWidth, 10, logoWidth, logoHeight);
+    doc.addImage(LOGO_BASE64, "PNG", pageWidth - 14 - logoWidth, 12, logoWidth, logoHeight);
   } catch {}
 
   // Titel
