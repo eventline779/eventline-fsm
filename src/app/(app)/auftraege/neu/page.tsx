@@ -169,7 +169,7 @@ export default function NeuerAuftragPage() {
               <Label className="flex items-center gap-2"><UserCheck className="h-4 w-4" />Projektleiter</Label>
               <select value={form.project_lead_id} onChange={(e) => update("project_lead_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500">
                 <option value="">Projektleiter auswählen...</option>
-                {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name} ({p.role})</option>)}
+                {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
               </select>
             </div>
             <div>
@@ -181,7 +181,6 @@ export default function NeuerAuftragPage() {
                     <div className="h-8 w-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold">{p.full_name.charAt(0)}</div>
                     <div>
                       <span className="text-sm font-medium">{p.full_name}</span>
-                      <span className="text-xs text-muted-foreground ml-2">{p.role}</span>
                     </div>
                   </label>
                 ))}
