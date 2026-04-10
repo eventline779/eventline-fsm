@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignaturePad } from "@/components/signature-pad";
-import type { Job } from "@/types";
-import { ArrowLeft, Save, Plus, Trash2, Clock } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Camera, Image as ImageIcon, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -26,6 +25,12 @@ interface TimeRange {
   start: string;
   end: string;
   pause: number;
+}
+
+interface PhotoFile {
+  file: File;
+  preview: string;
+  caption: string;
 }
 
 export default function NeuerRapportPage() {
@@ -47,8 +52,11 @@ export default function NeuerRapportPage() {
   const [timeRanges, setTimeRanges] = useState<TimeRange[]>([
     { date: new Date().toISOString().split("T")[0], start: "08:00", end: "17:00", pause: 30 },
   ]);
+  const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [clientSignature, setClientSignature] = useState("");
   const [techSignature, setTechSignature] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -92,13 +100,12 @@ export default function NeuerRapportPage() {
     }
   }
 
+  // Zeiträume
   function addTimeRange() {
     const last = timeRanges[timeRanges.length - 1];
     setTimeRanges([...timeRanges, {
       date: last?.date || new Date().toISOString().split("T")[0],
-      start: "08:00",
-      end: "17:00",
-      pause: 30,
+      start: "08:00", end: "17:00", pause: 30,
     }]);
   }
 
@@ -132,6 +139,51 @@ export default function NeuerRapportPage() {
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     return `${h}h ${m > 0 ? m + "m" : ""}`.trim();
+  }
+
+  // Fotos
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    const newPhotos: PhotoFile[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      newPhotos.push({
+        file,
+        preview: URL.createObjectURL(file),
+        caption: "",
+      });
+    }
+    setPhotos((prev) => [...prev, ...newPhotos]);
+    e.target.value = "";
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  function updateCaption(index: number, caption: string) {
+    setPhotos((prev) => prev.map((p, i) => i === index ? { ...p, caption } : p));
+  }
+
+  async function uploadPhoto(photo: PhotoFile, reportId: string, sortOrder: number): Promise<boolean> {
+    const ext = photo.file.name.split(".").pop() || "jpg";
+    const path = `rapport-photos/${reportId}/${sortOrder}.${ext}`;
+    const { error } = await supabase.storage.from("documents").upload(path, photo.file, {
+      contentType: photo.file.type,
+    });
+    if (error) return false;
+
+    await supabase.from("report_photos").insert({
+      report_id: reportId,
+      storage_path: path,
+      caption: photo.caption || null,
+      sort_order: sortOrder,
+    });
+    return true;
   }
 
   async function uploadSignature(dataUrl: string, folder: string): Promise<string | null> {
@@ -173,6 +225,14 @@ export default function NeuerRapportPage() {
       toast.error("Fehler: " + error.message);
       setSaving(false);
       return;
+    }
+
+    // Fotos hochladen
+    if (report?.id && photos.length > 0) {
+      toast.info(`${photos.length} Foto(s) werden hochgeladen...`);
+      for (let i = 0; i < photos.length; i++) {
+        await uploadPhoto(photos[i], report.id, i);
+      }
     }
 
     toast.success("Rapport gespeichert – PDF wird generiert...");
@@ -222,7 +282,6 @@ export default function NeuerRapportPage() {
                 ))}
               </select>
             </div>
-
             {selectedJob && (
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
                 {selectedJob.job_number && <div className="text-xs"><span className="font-medium">Auftragsnr.:</span> #{selectedJob.job_number}</div>}
@@ -307,6 +366,86 @@ export default function NeuerRapportPage() {
           </CardContent>
         </Card>
 
+        {/* Fotos */}
+        <Card className="bg-white">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Fotos</CardTitle>
+              {photos.length > 0 && <span className="text-xs text-muted-foreground">{photos.length} Foto{photos.length !== 1 ? "s" : ""}</span>}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Foto-Vorschau */}
+            {photos.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {photos.map((photo, i) => (
+                  <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
+                    <div className="aspect-square relative">
+                      <img
+                        src={photo.preview}
+                        alt={`Foto ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Beschreibung..."
+                      value={photo.caption}
+                      onChange={(e) => updateCaption(i, e.target.value)}
+                      className="w-full px-2.5 py-2 text-xs border-t border-gray-100 bg-white focus:outline-none focus:bg-gray-50"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Foto-Buttons */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors"
+              >
+                <Camera className="h-5 w-5" />
+                Foto aufnehmen
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors"
+              >
+                <ImageIcon className="h-5 w-5" />
+                Aus Galerie
+              </button>
+            </div>
+
+            {/* Hidden File Inputs */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoSelect}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoSelect}
+              className="hidden"
+            />
+          </CardContent>
+        </Card>
+
         {/* Unterschriften */}
         <Card className="bg-white">
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Unterschriften</CardTitle></CardHeader>
@@ -318,9 +457,7 @@ export default function NeuerRapportPage() {
               </div>
               <SignaturePad label="Unterschrift Techniker" onSave={setTechSignature} />
             </div>
-
             <div className="border-t border-gray-100" />
-
             <div>
               <div className="mb-2">
                 <Label>Kunde / Auftraggeber</Label>
