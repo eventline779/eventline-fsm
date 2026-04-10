@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   try {
     const resend = new Resend(resendKey);
     await resend.emails.send({
-      from: "EVENTLINE FSM <onboarding@resend.dev>",
+      from: "EVENTLINE FSM <noreply@eventline-basel.com>",
       to: profile.email,
       subject: `Schicht zugeteilt: ${shift_title} am ${formattedDate}`,
       html: `

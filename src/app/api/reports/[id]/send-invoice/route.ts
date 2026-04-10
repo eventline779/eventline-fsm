@@ -76,8 +76,8 @@ export async function POST(
     try {
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: "EVENTLINE FSM <onboarding@resend.dev>",
-        to: "leo@eventline-basel.com",
+        from: "EVENTLINE FSM <noreply@eventline-basel.com>",
+        to: "buchhaltung@eventline-basel.com",
         subject: `Rechnung stellen #${jobNumber} – ${customerName}`,
         html: `
           <p>Hallo Buchhaltung,</p>
