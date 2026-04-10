@@ -123,6 +123,18 @@ export default function StandortDetailPage() {
   async function createJobFromTask(task: MaintenanceTaskWithPhoto) {
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Kunde ermitteln - vom Standort oder ersten aktiven Kunden
+    let customerId = location?.customer_id;
+    if (!customerId) {
+      const { data: customers } = await supabase.from("customers").select("id").eq("is_active", true).limit(1).single();
+      customerId = customers?.id || null;
+    }
+
+    if (!customerId) {
+      toast.error("Bitte zuerst einen Kunden anlegen");
+      return;
+    }
+
     const { data: job, error } = await supabase.from("jobs").insert({
       title: `Instandhaltung: ${task.title}`,
       description: [
@@ -132,7 +144,7 @@ export default function StandortDetailPage() {
       ].filter(Boolean).join("\n"),
       status: "offen",
       priority: "normal",
-      customer_id: location?.customer_id,
+      customer_id: customerId,
       location_id: id,
       created_by: user?.id,
     }).select("id").single();
@@ -146,10 +158,21 @@ export default function StandortDetailPage() {
     router.push(`/auftraege/${job.id}`);
   }
 
-  function getPhotoPublicUrl(path: string) {
-    const { data } = supabase.storage.from("documents").getPublicUrl(path);
-    return data.publicUrl;
-  }
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function loadPhotoUrls() {
+      const urls: Record<string, string> = {};
+      for (const t of tasks) {
+        if (t.photo_url) {
+          const { data } = supabase.storage.from("documents").getPublicUrl(t.photo_url);
+          urls[t.id] = data.publicUrl;
+        }
+      }
+      setPhotoUrls(urls);
+    }
+    if (tasks.length > 0) loadPhotoUrls();
+  }, [tasks]);
 
   if (!location) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
@@ -295,13 +318,13 @@ export default function StandortDetailPage() {
                       {t.completed_at && <span className="text-xs text-green-600">Erledigt: {new Date(t.completed_at).toLocaleDateString("de-CH")}</span>}
                     </div>
                     {/* Foto anzeigen */}
-                    {t.photo_url && (
+                    {t.photo_url && photoUrls[t.id] && (
                       <div className="mt-2">
                         <img
-                          src={getPhotoPublicUrl(t.photo_url)}
+                          src={photoUrls[t.id]}
                           alt="Foto"
                           className="h-24 w-auto rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(getPhotoPublicUrl(t.photo_url!), "_blank")}
+                          onClick={() => window.open(photoUrls[t.id], "_blank")}
                         />
                       </div>
                     )}
