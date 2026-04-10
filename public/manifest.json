@@ -1,0 +1,16 @@
+{
+  "name": "EVENTLINE FSM",
+  "short_name": "EVENTLINE",
+  "description": "Field Service Management - EVENTLINE GmbH",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/png"
+    }
+  ]
+}

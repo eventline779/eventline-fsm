@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EVENTLINE FSM",
   description: "Field Service Management - EVENTLINE GmbH Basel",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "EVENTLINE FSM",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({
