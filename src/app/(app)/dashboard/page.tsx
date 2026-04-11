@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   ClipboardList, Inbox, Clock, Users, ArrowRight, TrendingUp, Plus,
   Ticket, Check, X, ShoppingCart, Monitor, Wrench, HelpCircle,
+  LinkIcon, ExternalLink, Trash2,
 } from "lucide-react";
 import { JOB_PRIORITY } from "@/lib/constants";
 import type { Todo } from "@/types";
@@ -43,9 +44,16 @@ export default function DashboardPage() {
   const [myTodos, setMyTodos] = useState<Todo[]>([]);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [quickLinks, setQuickLinks] = useState<{ name: string; url: string }[]>([]);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkForm, setLinkForm] = useState({ name: "", url: "" });
   const supabase = createClient();
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const saved = localStorage.getItem("dashboard-links");
+    if (saved) { try { setQuickLinks(JSON.parse(saved)); } catch {} }
+    loadData();
+  }, []);
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -224,6 +232,67 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Schnelllinks */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><LinkIcon className="h-3.5 w-3.5" />Schnelllinks</h2>
+          <button onClick={() => setShowLinkForm(!showLinkForm)} className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1">
+            {showLinkForm ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+            {showLinkForm ? "Abbrechen" : "Link hinzufügen"}
+          </button>
+        </div>
+        {showLinkForm && (
+          <Card className="bg-white border-gray-100 mb-3">
+            <CardContent className="p-4">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                let url = linkForm.url.trim();
+                if (url && !url.startsWith("http")) url = "https://" + url;
+                const name = linkForm.name.trim() || new URL(url).hostname;
+                const updated = [...quickLinks, { name, url }];
+                setQuickLinks(updated);
+                localStorage.setItem("dashboard-links", JSON.stringify(updated));
+                setLinkForm({ name: "", url: "" });
+                setShowLinkForm(false);
+              }} className="flex gap-3">
+                <input value={linkForm.name} onChange={(e) => setLinkForm({ ...linkForm, name: e.target.value })} placeholder="Name (z.B. Dropbox)" className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20" />
+                <input value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} placeholder="https://..." className="flex-[2] px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20" required />
+                <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors">Hinzufügen</button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+        {quickLinks.length > 0 ? (
+          <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+            {quickLinks.map((link, i) => (
+              <Card key={i} className="bg-white border-gray-100 hover:shadow-sm transition-all group">
+                <CardContent className="p-3.5 flex items-center justify-between">
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <ExternalLink className="h-4 w-4" />
+                    </div>
+                    <span className="font-medium text-sm truncate">{link.name}</span>
+                  </a>
+                  <button onClick={() => {
+                    const updated = quickLinks.filter((_, j) => j !== i);
+                    setQuickLinks(updated);
+                    localStorage.setItem("dashboard-links", JSON.stringify(updated));
+                  }} className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : !showLinkForm && (
+          <Card className="bg-white border-gray-100 border-dashed">
+            <CardContent className="py-4 text-center">
+              <p className="text-sm text-muted-foreground">Noch keine Links. Füge häufig genutzte Links hinzu.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Stats */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
