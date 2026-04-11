@@ -84,6 +84,7 @@ export default function StandortDetailPage() {
       if (json.success) {
         toast.success("Notizen gespeichert");
         setEditingNotes(false);
+        setLocation({ ...location!, notes });
       } else {
         toast.error("Fehler: " + (json.error || "Unbekannt"));
       }
@@ -256,7 +257,11 @@ export default function StandortDetailPage() {
             </div>
           ) : notes ? (
             <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <p className="text-sm whitespace-pre-wrap">{notes}</p>
+              <p className="text-sm whitespace-pre-wrap">{notes.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                part.match(/^https?:\/\//) ? (
+                  <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
+                ) : part
+              )}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>
