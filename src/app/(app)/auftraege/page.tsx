@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
-import type { Job, JobStatus } from "@/types";
+import type { Job, JobStatus, Profile } from "@/types";
 import Link from "next/link";
 import {
   Plus,
@@ -15,31 +15,40 @@ import {
   Calendar,
   MapPin,
   User,
+  Users,
 } from "lucide-react";
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">("all");
+  const [filterPerson, setFilterPerson] = useState("all");
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
   useEffect(() => { loadJobs(); }, []);
 
   async function loadJobs() {
-    const { data } = await supabase
-      .from("jobs")
-      .select("*, customer:customers(name), location:locations(name)")
-      .neq("is_deleted", true)
-      .order("created_at", { ascending: false });
-    if (data) setJobs(data as unknown as Job[]);
+    const [jobsRes, profRes] = await Promise.all([
+      supabase
+        .from("jobs")
+        .select("*, customer:customers(name), location:locations(name), project_lead_id, assignments:job_assignments(profile_id)")
+        .neq("is_deleted", true)
+        .order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    ]);
+    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    if (profRes.data) setProfiles(profRes.data as Profile[]);
     setLoading(false);
   }
 
   const filtered = jobs.filter((j) => {
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesPerson = filterPerson === "all" || j.project_lead_id === filterPerson ||
+      (j.assignments as unknown as { profile_id: string }[])?.some((a) => a.profile_id === filterPerson);
+    return matchesSearch && matchesStatus && matchesPerson;
   });
 
   return (
@@ -60,15 +69,25 @@ export default function AuftraegePage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Aufträge suchen..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white border-gray-200"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Aufträge suchen..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 bg-white border-gray-200"
+            />
+          </div>
+          <select
+            value={filterPerson}
+            onChange={(e) => setFilterPerson(e.target.value)}
+            className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white"
+          >
+            <option value="all">Alle Personen</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </select>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
