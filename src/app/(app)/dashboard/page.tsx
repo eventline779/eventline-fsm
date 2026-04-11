@@ -50,15 +50,27 @@ export default function DashboardPage() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    const saved = localStorage.getItem("dashboard-links");
-    if (saved) { try { setQuickLinks(JSON.parse(saved)); } catch {} }
-    loadData();
-  }, []);
+  const [currentUserId, setCurrentUserId] = useState("");
+
+  useEffect(() => { loadData(); }, []);
+
+  async function saveLinksToServer(userId: string, links: { name: string; url: string }[]) {
+    await fetch("/api/user-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, quick_links: links }),
+    });
+  }
+
+  function updateLinks(newLinks: { name: string; url: string }[]) {
+    setQuickLinks(newLinks);
+    if (currentUserId) saveLinksToServer(currentUserId, newLinks);
+  }
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setCurrentUserId(user.id);
 
     const { data: profile } = await supabase.from("profiles").select("full_name, email, role").eq("id", user.id).single();
     if (profile) {
@@ -66,6 +78,28 @@ export default function DashboardPage() {
       setUserEmail(profile.email);
       setIsAdmin(profile.role === "admin");
     }
+
+    // Quick Links laden
+    try {
+      const linksRes = await fetch(`/api/user-settings?userId=${user.id}`);
+      const linksJson = await linksRes.json();
+      if (linksJson.quick_links?.length > 0) {
+        setQuickLinks(linksJson.quick_links);
+      } else {
+        // Migration: localStorage → DB
+        const saved = localStorage.getItem("dashboard-links");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed.length > 0) {
+              setQuickLinks(parsed);
+              await saveLinksToServer(user.id, parsed);
+              localStorage.removeItem("dashboard-links");
+            }
+          } catch {}
+        }
+      }
+    } catch {}
 
     const [jobsRes, anfragenRes, timeRes, kundenRes] = await Promise.all([
       supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", ["offen", "geplant", "in_arbeit"]),
@@ -262,8 +296,7 @@ export default function DashboardPage() {
                 if (url && !url.startsWith("http")) url = "https://" + url;
                 const name = linkForm.name.trim() || new URL(url).hostname;
                 const updated = [...quickLinks, { name, url }];
-                setQuickLinks(updated);
-                localStorage.setItem("dashboard-links", JSON.stringify(updated));
+                updateLinks(updated);
                 setLinkForm({ name: "", url: "" });
                 setShowLinkForm(false);
               }} className="flex gap-3">
