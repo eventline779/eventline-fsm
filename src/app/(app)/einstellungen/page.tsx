@@ -727,13 +727,13 @@ function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleR
               </span>
             </div>
             <div className="flex items-center gap-3 mt-0.5">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <a href={`mailto:${profile.email}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
                 <Mail className="h-3 w-3" />{profile.email}
-              </span>
+              </a>
               {profile.phone && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <a href={`tel:${profile.phone}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
                   <Phone className="h-3 w-3" />{profile.phone}
-                </span>
+                </a>
               )}
             </div>
           </div>

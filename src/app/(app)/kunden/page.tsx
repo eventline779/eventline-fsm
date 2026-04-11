@@ -162,16 +162,16 @@ export default function KundenPage() {
                   </div>
                   <div className="mt-4 space-y-1.5">
                     {customer.email && (
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <a href={`mailto:${customer.email}`} className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors">
                         <Mail className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{customer.email}</span>
-                      </div>
+                      </a>
                     )}
                     {customer.phone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <a href={`tel:${customer.phone}`} className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors">
                         <Phone className="h-3.5 w-3.5 shrink-0" />
                         <span>{customer.phone}</span>
-                      </div>
+                      </a>
                     )}
                     {customer.address_city && (
                       <div className="flex items-center gap-2 text-sm text-gray-500">

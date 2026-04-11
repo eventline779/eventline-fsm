@@ -162,8 +162,8 @@ export default function KundenDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {customer.email && <div className="flex items-center gap-3 text-sm"><Mail className="h-4 w-4 text-gray-400" />{customer.email}</div>}
-              {customer.phone && <div className="flex items-center gap-3 text-sm"><Phone className="h-4 w-4 text-gray-400" />{customer.phone}</div>}
+              {customer.email && <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm hover:text-blue-600 transition-colors"><Mail className="h-4 w-4 text-gray-400" />{customer.email}</a>}
+              {customer.phone && <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm hover:text-blue-600 transition-colors"><Phone className="h-4 w-4 text-gray-400" />{customer.phone}</a>}
               {customer.address_street && <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-gray-400" />{customer.address_street}, {customer.address_zip} {customer.address_city}</div>}
               {customer.notes && <div className="mt-3 p-3 rounded-lg bg-gray-50 text-sm text-gray-600">{customer.notes}</div>}
               {!customer.email && !customer.phone && !customer.address_street && !customer.notes && <p className="text-sm text-muted-foreground">Keine weiteren Daten hinterlegt.</p>}
