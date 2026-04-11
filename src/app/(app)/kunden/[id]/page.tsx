@@ -63,22 +63,33 @@ export default function KundenDetailPage() {
     loadData();
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   async function handleDelete() {
-    if (!confirm(`Kunde "${customer?.name}" wirklich löschen? Alle verknüpften Aufträge und Vermietungen werden ebenfalls gelöscht.`)) return;
+    setDeleting(true);
 
     // Verknüpfte Daten löschen
-    await supabase.from("job_assignments").delete().in("job_id",
-      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
-    );
-    await supabase.from("job_appointments").delete().in("job_id",
-      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
-    );
-    await supabase.from("service_reports").delete().in("job_id",
-      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
-    );
+    const { data: jobIds } = await supabase.from("jobs").select("id").eq("customer_id", id);
+    const ids = jobIds?.map((j: any) => j.id) || [];
+
+    if (ids.length > 0) {
+      await supabase.from("job_assignments").delete().in("job_id", ids);
+      await supabase.from("job_appointments").delete().in("job_id", ids);
+      await supabase.from("service_reports").delete().in("job_id", ids);
+      await supabase.from("documents").delete().in("job_id", ids);
+      await supabase.from("time_entries").delete().in("job_id", ids);
+    }
     await supabase.from("jobs").delete().eq("customer_id", id);
     await supabase.from("rental_requests").delete().eq("customer_id", id);
-    await supabase.from("customers").delete().eq("id", id);
+
+    const { error } = await supabase.from("customers").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      setDeleting(false);
+      return;
+    }
 
     toast.success("Kunde gelöscht");
     router.push("/kunden");
@@ -100,11 +111,27 @@ export default function KundenDetailPage() {
           <Button onClick={() => setEditing(!editing)} variant={editing ? "outline" : "default"} className={editing ? "" : "bg-red-600 hover:bg-red-700 text-white"}>
             {editing ? "Abbrechen" : "Bearbeiten"}
           </Button>
-          <Button onClick={handleDelete} variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700">
+          <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Löschen Bestätigung */}
+      {showDeleteConfirm && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-5">
+            <h3 className="font-semibold text-red-800">Kunde "{customer.name}" wirklich löschen?</h3>
+            <p className="text-sm text-red-600 mt-1">Alle verknüpften Aufträge, Vermietungen und Dokumente werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <div className="flex gap-3 mt-4">
+              <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="border-gray-200">Abbrechen</Button>
+              <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+                <Trash2 className="h-4 w-4 mr-2" />{deleting ? "Löschen..." : "Endgültig löschen"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Kundendaten */}
       <Card className="bg-white">
