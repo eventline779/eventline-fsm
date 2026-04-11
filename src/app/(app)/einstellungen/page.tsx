@@ -267,15 +267,17 @@ export default function EinstellungenPage() {
   const completed = timeEntries.filter((e) => e.clock_out);
 
   function exportCSV() {
-    const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Auftrag"]];
+    const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Kategorie", "Auftrag"]];
+    const catLabels: Record<string, string> = { buero: "Büro", planung: "Planung", einsatz: "Einsatz", transport: "Transport", meeting: "Meeting" };
     for (const e of completed) {
       const name = e.profile?.full_name || "Unbekannt";
       const date = formatDate(e.clock_in);
       const von = formatTime(e.clock_in);
       const bis = formatTime(e.clock_out!);
       const duration = formatDuration(e.clock_in, e.clock_out!, e.break_minutes);
+      const category = catLabels[(e as any).category] || "";
       const job = e.job?.title || "";
-      rows.push([name, date, von, bis, String(e.break_minutes), duration, job]);
+      rows.push([name, date, von, bis, String(e.break_minutes), duration, category, job]);
     }
     const csv = rows.map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
