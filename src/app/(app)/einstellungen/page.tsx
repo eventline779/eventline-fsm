@@ -23,6 +23,7 @@ import {
   Trash2,
   Download,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 type Tab = "team" | "zeiten" | "schichten" | "backup";
@@ -772,13 +773,13 @@ function TeamOverview({ profiles, supabase }: { profiles: Profile[]; supabase: a
     }
 
     const [jobsRes, apptsRes, timeRes] = await Promise.all([
-      supabase.from("job_assignments").select("profile_id, job:jobs(id, title, status, start_date, end_date, customer:customers(name))").gte("job:jobs.start_date", startDate).lte("job:jobs.start_date", endDate + "T23:59:59"),
-      supabase.from("job_appointments").select("assigned_to, title, start_time, end_time, is_done, job:jobs(title)").gte("start_time", startDate + "T00:00:00").lte("start_time", endDate + "T23:59:59"),
+      supabase.from("job_assignments").select("profile_id, job:jobs(id, title, status, start_date, end_date, customer:customers(name))"),
+      supabase.from("job_appointments").select("assigned_to, title, start_time, end_time, is_done, job_id, job:jobs(title)").gte("start_time", startDate + "T00:00:00").lte("start_time", endDate + "T23:59:59"),
       supabase.from("time_entries").select("profile_id, clock_in, clock_out, break_minutes").gte("clock_in", startDate + "T00:00:00").lte("clock_in", endDate + "T23:59:59").not("clock_out", "is", null),
     ]);
 
     // Auch Aufträge wo die Person Projektleiter ist
-    const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null).gte("start_date", startDate).lte("start_date", endDate + "T23:59:59");
+    const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null).neq("is_deleted", true);
 
     const result: Record<string, { jobs: any[]; appointments: any[]; hours: number }> = {};
 
@@ -910,15 +911,18 @@ function TeamOverview({ profiles, supabase }: { profiles: Profile[]; supabase: a
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Termine</p>
                   <div className="space-y-1">
                     {d.appointments.map((a: any, i: number) => (
-                      <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-sm ${a.is_done ? "bg-green-50" : "bg-gray-50"}`}>
-                        <div>
-                          <span className={`font-medium ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
-                          {a.job?.title && <span className="text-xs text-muted-foreground ml-2">({a.job.title})</span>}
+                      <Link key={i} href={a.job_id ? `/auftraege/${a.job_id}` : "#"}>
+                        <div className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer hover:shadow-sm transition-all ${a.is_done ? "bg-green-50" : "bg-gray-50"}`}>
+                          <div>
+                            <span className={`font-medium ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
+                            {a.job?.title && <span className="text-xs text-blue-600 ml-2">→ {a.job.title}</span>}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(a.start_time).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })} {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
+                            {a.end_time ? ` – ${new Date(a.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(a.start_time).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })} {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
