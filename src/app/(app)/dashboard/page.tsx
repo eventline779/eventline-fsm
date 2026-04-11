@@ -5,139 +5,115 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import {
-  ClipboardList,
-  Inbox,
-  Clock,
-  Users,
-  ArrowRight,
-  MapPin,
-  FileText,
-  Calendar,
-  TrendingUp,
-  Plus,
-  CheckSquare,
-  Ticket,
-  Check,
+  ClipboardList, Inbox, Clock, Users, ArrowRight, TrendingUp, Plus,
+  Ticket, Check, X, ShoppingCart, Monitor, Wrench, HelpCircle,
 } from "lucide-react";
 import { JOB_PRIORITY } from "@/lib/constants";
-import type { Todo, JobPriority } from "@/types";
+import type { Todo } from "@/types";
+import { toast } from "sonner";
 
-interface DashboardStats {
-  offeneAuftraege: number;
-  neueAnfragen: number;
-  aktiveTechniker: number;
-  kundenTotal: number;
-  offeneTickets: number;
+const CATEGORY_ICONS: Record<string, any> = {
+  bestellung: ShoppingCart,
+  it: Monitor,
+  reparatur: Wrench,
+  sonstiges: HelpCircle,
+};
+const CATEGORY_COLORS: Record<string, string> = {
+  bestellung: "bg-blue-50 text-blue-600",
+  it: "bg-red-50 text-red-600",
+  reparatur: "bg-orange-50 text-orange-600",
+  sonstiges: "bg-gray-100 text-gray-600",
+};
+
+interface TicketItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  created_by: string;
+  created_at: string;
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>({
-    offeneAuftraege: 0,
-    neueAnfragen: 0,
-    aktiveTechniker: 0,
-    kundenTotal: 0,
-    offeneTickets: 0,
-  });
+  const [stats, setStats] = useState({ offeneAuftraege: 0, neueAnfragen: 0, aktiveTechniker: 0, kundenTotal: 0 });
   const [userName, setUserName] = useState("");
-  const [myTodos, setMyTodos] = useState<(Todo & { assignee?: { full_name: string } })[]>([]);
-  const [userId, setUserId] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [myTodos, setMyTodos] = useState<Todo[]>([]);
+  const [tickets, setTickets] = useState<TicketItem[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
   const supabase = createClient();
 
-  useEffect(() => {
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .single();
-        if (profile) setUserName(profile.full_name.split(" ")[0]);
-      }
+  useEffect(() => { loadData(); }, []);
 
-      const [jobsRes, anfragenRes, timeRes, kundenRes, ticketsRes] = await Promise.all([
-        supabase
-          .from("jobs")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["offen", "geplant", "in_arbeit"]),
-        supabase
-          .from("rental_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "neu"),
-        supabase
-          .from("time_entries")
-          .select("id", { count: "exact", head: true })
-          .is("clock_out", null),
-        supabase
-          .from("customers")
-          .select("id", { count: "exact", head: true })
-          .eq("is_active", true),
-        supabase
-          .from("tickets")
-          .select("id", { count: "exact", head: true }),
-      ]);
+  async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      setStats({
-        offeneAuftraege: jobsRes.count ?? 0,
-        neueAnfragen: anfragenRes.count ?? 0,
-        aktiveTechniker: timeRes.count ?? 0,
-        kundenTotal: kundenRes.count ?? 0,
-        offeneTickets: ticketsRes.count ?? 0,
-      });
-
-      // Meine offenen Todos laden
-      if (user) {
-        setUserId(user.id);
-        const { data: todosData } = await supabase
-          .from("todos")
-          .select("*")
-          .eq("assigned_to", user.id)
-          .eq("status", "offen")
-          .order("created_at", { ascending: false })
-          .limit(5);
-        if (todosData) setMyTodos(todosData as unknown as Todo[]);
-      }
+    const { data: profile } = await supabase.from("profiles").select("full_name, email, role").eq("id", user.id).single();
+    if (profile) {
+      setUserName(profile.full_name.split(" ")[0]);
+      setUserEmail(profile.email);
+      setIsAdmin(profile.role === "admin");
     }
 
-    loadData();
-  }, []);
+    const [jobsRes, anfragenRes, timeRes, kundenRes] = await Promise.all([
+      supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", ["offen", "geplant", "in_arbeit"]),
+      supabase.from("rental_requests").select("id", { count: "exact", head: true }).eq("status", "neu"),
+      supabase.from("time_entries").select("id", { count: "exact", head: true }).is("clock_out", null),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true),
+    ]);
+
+    setStats({
+      offeneAuftraege: jobsRes.count ?? 0,
+      neueAnfragen: anfragenRes.count ?? 0,
+      aktiveTechniker: timeRes.count ?? 0,
+      kundenTotal: kundenRes.count ?? 0,
+    });
+
+    // Meine Todos
+    const { data: todosData } = await supabase
+      .from("todos").select("*").eq("assigned_to", user.id).eq("status", "offen")
+      .order("created_at", { ascending: false }).limit(5);
+    if (todosData) setMyTodos(todosData as unknown as Todo[]);
+
+    // Tickets laden
+    const { data: ticketsData } = await supabase
+      .from("tickets").select("*").order("created_at", { ascending: false });
+    if (ticketsData) setTickets(ticketsData as unknown as TicketItem[]);
+
+    // Profil-Namen laden
+    const { data: allProfiles } = await supabase.from("profiles").select("id, full_name, email");
+    if (allProfiles) {
+      const map: Record<string, string> = {};
+      allProfiles.forEach((p: any) => { map[p.id] = p.full_name; });
+      setProfiles(map);
+    }
+  }
+
+  async function handleTicket(ticket: TicketItem, action: "genehmigt" | "abgelehnt") {
+    try {
+      await fetch("/api/tickets/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: ticket.id, action, ticketTitle: ticket.title, createdBy: ticket.created_by }),
+      });
+      // Remove from list
+      await supabase.from("tickets").delete().eq("id", ticket.id);
+      setTickets(tickets.filter((t) => t.id !== ticket.id));
+      toast.success(action === "genehmigt" ? "Ticket genehmigt" : "Ticket abgelehnt");
+    } catch {
+      toast.error("Fehler beim Bearbeiten");
+    }
+  }
 
   const statCards = [
-    {
-      label: "Offene Aufträge",
-      value: stats.offeneAuftraege,
-      icon: ClipboardList,
-      iconBg: "bg-blue-50 text-blue-600",
-      href: "/auftraege",
-    },
-    {
-      label: "Neue Vermietungen",
-      value: stats.neueAnfragen,
-      icon: Inbox,
-      iconBg: "bg-amber-50 text-amber-600",
-      href: "/anfragen",
-    },
-    {
-      label: "Aktive Techniker",
-      value: stats.aktiveTechniker,
-      icon: Users,
-      iconBg: "bg-emerald-50 text-emerald-600",
-      href: "/zeiterfassung",
-    },
-    {
-      label: "Kunden",
-      value: stats.kundenTotal,
-      icon: TrendingUp,
-      iconBg: "bg-violet-50 text-violet-600",
-      href: "/kunden",
-    },
-    {
-      label: "Offene Tickets",
-      value: stats.offeneTickets,
-      icon: Ticket,
-      iconBg: "bg-red-50 text-red-600",
-      href: "/tickets",
-    },
+    { label: "Offene Aufträge", value: stats.offeneAuftraege, icon: ClipboardList, iconBg: "bg-blue-50 text-blue-600", href: "/auftraege" },
+    { label: "Neue Vermietungen", value: stats.neueAnfragen, icon: Inbox, iconBg: "bg-amber-50 text-amber-600", href: "/anfragen" },
+    { label: "Aktive Techniker", value: stats.aktiveTechniker, icon: Users, iconBg: "bg-emerald-50 text-emerald-600", href: "/zeiterfassung" },
+    { label: "Kunden", value: stats.kundenTotal, icon: TrendingUp, iconBg: "bg-violet-50 text-violet-600", href: "/kunden" },
+    { label: "Offene Tickets", value: tickets.length, icon: Ticket, iconBg: "bg-red-50 text-red-600", href: "/tickets" },
   ];
 
   const quickActions = [
@@ -147,13 +123,6 @@ export default function DashboardPage() {
     { href: "/zeiterfassung", label: "Einstempeln", icon: Clock, desc: "Zeit erfassen" },
   ];
 
-  const navLinks = [
-    { href: "/kalender", label: "Kalender", icon: Calendar, desc: "Termine & Planung" },
-    { href: "/rapporte/neu", label: "Neuer Rapport", icon: FileText, desc: "Einsatzbericht erstellen" },
-    { href: "/todos", label: "Todos", icon: CheckSquare, desc: "Aufgaben verwalten" },
-    { href: "/standorte", label: "Standorte", icon: MapPin, desc: "Locations verwalten" },
-  ];
-
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Guten Morgen" : hour < 17 ? "Guten Tag" : "Guten Abend";
 
@@ -161,56 +130,8 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {greeting}{userName ? `, ${userName}` : ""}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Hier ist deine Übersicht.
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-        {statCards.map((stat) => (
-          <Link key={stat.label} href={stat.href}>
-            <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${stat.iconBg}`}>
-                    <stat.icon className="h-4 w-4" />
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-gray-200 group-hover:text-gray-400 transition-colors" />
-                </div>
-                <div className="mt-3">
-                  <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                  <p className="text-xs font-medium text-muted-foreground mt-0.5">{stat.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-          Schnellaktionen
-        </h2>
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {quickActions.map((action) => (
-            <Link key={action.href} href={action.href}>
-              <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group h-full">
-                <CardContent className="p-4">
-                  <div className="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
-                    <Plus className="h-4 w-4" />
-                  </div>
-                  <h3 className="font-semibold mt-2.5 text-sm">{action.label}</h3>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{action.desc}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">{greeting}{userName ? `, ${userName}` : ""}</h1>
+        <p className="text-sm text-muted-foreground mt-1">Hier ist deine Übersicht.</p>
       </div>
 
       {/* Meine Todos */}
@@ -251,26 +172,94 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Further Navigation */}
-      <div>
-        <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-          Weitere Bereiche
-        </h2>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {navLinks.map((link) => (
-            <Link key={link.href} href={link.href}>
-              <Card className="bg-white border-gray-100 hover:shadow-sm hover:border-gray-200 transition-all cursor-pointer group">
-                <CardContent className="p-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
-                      <link.icon className="h-4 w-4" />
+      {/* Offene Tickets */}
+      {tickets.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Offene Tickets ({tickets.length})</h2>
+            <Link href="/tickets" className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1">Alle anzeigen <ArrowRight className="h-3 w-3" /></Link>
+          </div>
+          <div className="space-y-2">
+            {tickets.map((ticket) => {
+              const CatIcon = CATEGORY_ICONS[ticket.category] || HelpCircle;
+              const catColor = CATEGORY_COLORS[ticket.category] || CATEGORY_COLORS.sonstiges;
+              return (
+                <Card key={ticket.id} className="bg-white border-gray-100">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5 ${catColor}`}>
+                          <CatIcon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{ticket.title}</span>
+                            {ticket.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ticket.description}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Von {profiles[ticket.created_by] || "Unbekannt"} · {new Date(ticket.created_at).toLocaleDateString("de-CH")}</p>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleTicket(ticket, "genehmigt")}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium border border-green-200 hover:bg-green-100 transition-colors"
+                          >
+                            <Check className="h-3.5 w-3.5" />Genehmigen
+                          </button>
+                          <button
+                            onClick={() => handleTicket(ticket, "abgelehnt")}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />Ablehnen
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">{link.label}</h3>
-                      <p className="text-[11px] text-muted-foreground">{link.desc}</p>
-                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        {statCards.map((stat) => (
+          <Link key={stat.label} href={stat.href}>
+            <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className={`p-2 rounded-lg ${stat.iconBg}`}>
+                    <stat.icon className="h-4 w-4" />
                   </div>
                   <ArrowRight className="h-3.5 w-3.5 text-gray-200 group-hover:text-gray-400 transition-colors" />
+                </div>
+                <div className="mt-3">
+                  <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
+                  <p className="text-xs font-medium text-muted-foreground mt-0.5">{stat.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Schnellaktionen</h2>
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          {quickActions.map((action) => (
+            <Link key={action.href} href={action.href}>
+              <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group h-full">
+                <CardContent className="p-4">
+                  <div className="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <h3 className="font-semibold mt-2.5 text-sm">{action.label}</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{action.desc}</p>
                 </CardContent>
               </Card>
             </Link>
