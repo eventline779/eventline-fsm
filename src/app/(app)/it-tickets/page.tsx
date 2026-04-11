@@ -1,0 +1,135 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Send, Plus, X } from "lucide-react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+
+export default function ITTicketsPage() {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ subject: "", description: "", priority: "normal" });
+  const [sending, setSending] = useState(false);
+  const supabase = createClient();
+
+  async function submitTicket(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", user?.id).single();
+
+    try {
+      const res = await fetch("/api/it-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          reporter: profile?.full_name || "Unbekannt",
+          reporterEmail: profile?.email || "",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`IT-Ticket ${json.ticketNr} gesendet`);
+        setForm({ subject: "", description: "", priority: "normal" });
+        setShowForm(false);
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Senden");
+    }
+    setSending(false);
+  }
+
+  const priorityOptions = [
+    { value: "niedrig", label: "Niedrig", color: "bg-gray-100 text-gray-700" },
+    { value: "normal", label: "Normal", color: "bg-blue-100 text-blue-700" },
+    { value: "hoch", label: "Hoch", color: "bg-orange-100 text-orange-700" },
+    { value: "kritisch", label: "Kritisch", color: "bg-red-100 text-red-700" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">IT-Tickets</h1>
+          <p className="text-sm text-muted-foreground mt-1">IT-Probleme melden – Tickets gehen an Mischa Dittus (IT)</p>
+        </div>
+        <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
+          {showForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+          {showForm ? "Abbrechen" : "Neues Ticket"}
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card className="bg-white border-red-100">
+          <CardContent className="p-6">
+            <form onSubmit={submitTicket} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Betreff *</label>
+                <input
+                  value={form.subject}
+                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                  placeholder="z.B. Drucker funktioniert nicht, WLAN-Probleme..."
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Beschreibung *</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Beschreibe das Problem so genau wie möglich. Was hast du gemacht? Was passiert? Was sollte passieren?"
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  rows={5}
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Priorität</label>
+                <div className="flex gap-2 mt-1">
+                  {priorityOptions.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, priority: p.value })}
+                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.value ? p.color + " border-current" : "bg-white text-gray-500 border-gray-200"}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
+                <Button type="submit" disabled={sending || !form.subject || !form.description} className="bg-red-600 hover:bg-red-700 text-white">
+                  <Send className="h-4 w-4 mr-2" />{sending ? "Senden..." : "Ticket senden"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {!showForm && (
+        <Card className="bg-white border-dashed">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+              <AlertTriangle className="h-7 w-7 text-red-400" />
+            </div>
+            <h3 className="font-semibold text-lg">IT-Support</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              Hast du ein technisches Problem? Erstelle ein IT-Ticket und Mischa (IT) wird sich darum kümmern.
+            </p>
+            <Button onClick={() => setShowForm(true)} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />Neues Ticket erstellen
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

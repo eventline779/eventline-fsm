@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   X,
   Send,
+  GraduationCap,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -47,6 +48,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   FolderOpen,
   Settings,
   CheckSquare,
+  AlertTriangle,
+  GraduationCap,
 };
 
 interface SidebarProps {
