@@ -30,6 +30,7 @@ import {
   X,
   Send,
   GraduationCap,
+  Briefcase,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   CheckSquare,
   AlertTriangle,
   GraduationCap,
+  Briefcase,
 };
 
 interface SidebarProps {

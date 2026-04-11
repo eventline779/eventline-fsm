@@ -84,11 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "HR",
     items: [
-      { href: "/einstellungen", label: "Team", icon: "Users", simplified: true },
-      { href: "/einstellungen?tab=zeiten", label: "Stempelzeiten", icon: "Clock", simplified: true },
-      { href: "/einstellungen?tab=schichten", label: "Schichtplanung", icon: "CalendarClock", simplified: true },
-      { href: "/it-tickets", label: "IT-Tickets", icon: "AlertTriangle" },
-      { href: "/schulungen", label: "Schulungen", icon: "GraduationCap" },
+      { href: "/hr", label: "HR", icon: "Briefcase", simplified: true },
     ],
   },
 ];
