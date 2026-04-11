@@ -152,6 +152,13 @@ export default function AuftragDetailPage() {
     loadAll();
   }
 
+  async function deleteAppointment(apptId: string) {
+    if (!confirm("Termin wirklich löschen?")) return;
+    await supabase.from("job_appointments").delete().eq("id", apptId);
+    loadAll();
+    toast.success("Termin gelöscht");
+  }
+
   async function notifyAppointment(apptId: string) {
     toast.info("E-Mails werden gesendet...");
     try {
@@ -353,20 +360,30 @@ export default function AuftragDetailPage() {
                     </div>
                   </div>
                 </div>
-                {!appt.is_done && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!appt.is_done && (
+                    <button
+                      onClick={() => !notifiedAppts.has(appt.id) && notifyAppointment(appt.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        notifiedAppts.has(appt.id)
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      }`}
+                      title={notifiedAppts.has(appt.id) ? "E-Mail wurde gesendet" : "Termin-E-Mail an Kunde, Projektleiter und Techniker senden"}
+                    >
+                      {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                      {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
+                    </button>
+                  )}
                   <button
-                    onClick={() => !notifiedAppts.has(appt.id) && notifyAppointment(appt.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      notifiedAppts.has(appt.id)
-                        ? "bg-green-50 text-green-700 border-green-200"
-                        : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                    }`}
-                    title={notifiedAppts.has(appt.id) ? "E-Mail wurde gesendet" : "Termin-E-Mail an Kunde, Projektleiter und Techniker senden"}
+                    onClick={() => deleteAppointment(appt.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+                    title="Termin löschen"
                   >
-                    {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                    {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Löschen
                   </button>
-                )}
+                </div>
               </div>
             );
           })}
