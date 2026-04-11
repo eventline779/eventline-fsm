@@ -241,9 +241,16 @@ export default function StandortDetailPage() {
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen</CardTitle>
           {!editingNotes && (
-            <Button size="sm" variant="outline" onClick={() => setEditingNotes(true)}>
-              {notes ? "Bearbeiten" : <><Plus className="h-4 w-4 mr-1" />Hinzufügen</>}
-            </Button>
+            <div className="flex gap-2">
+              {notes && (
+                <Button size="sm" variant="outline" onClick={() => { setNotes(notes + "\n"); setEditingNotes(true); }}>
+                  <Plus className="h-4 w-4 mr-1" />Neue Notiz
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setEditingNotes(true)}>
+                {notes ? "Bearbeiten" : <><Plus className="h-4 w-4 mr-1" />Hinzufügen</>}
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>
