@@ -23,6 +23,10 @@ export const metadata: Metadata = {
     title: "EVENTLINE FSM",
     statusBarStyle: "black-translucent",
   },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
