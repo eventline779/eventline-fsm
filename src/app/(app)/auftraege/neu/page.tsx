@@ -225,8 +225,8 @@ export default function NeuerAuftragPage() {
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Zeitraum</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>Startdatum</Label><Input type="datetime-local" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
-              <div><Label>Enddatum</Label><Input type="datetime-local" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
+              <div><Label>Startdatum</Label><Input type="date" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
+              <div><Label>Enddatum</Label><Input type="date" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
             </div>
           </CardContent>
         </Card>
