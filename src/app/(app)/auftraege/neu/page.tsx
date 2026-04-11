@@ -48,7 +48,15 @@ export default function NeuerAuftragPage() {
   }, []);
 
   function update(field: string, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // Wenn Kunde gewählt wird und kein Standort gesetzt ist → Standort des Kunden nehmen
+      if (field === "customer_id" && value && !prev.location_id) {
+        const match = locations.find((l) => l.customer_id === value);
+        if (match) next.location_id = match.id;
+      }
+      return next;
+    });
   }
 
   function toggleTechnician(id: string) {
