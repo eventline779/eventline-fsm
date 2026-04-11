@@ -386,35 +386,52 @@ export default function AuftragDetailPage() {
                         {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
                       </button>
                       {notifyPopup === appt.id && (
-                        <div className="absolute right-0 top-full mt-2 z-20 w-80 bg-white rounded-xl shadow-lg border border-gray-200 p-4 space-y-3">
-                          <p className="text-sm font-medium text-gray-900">Terminbestätigung senden</p>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500">E-Mail 1 *</label>
-                            <input
-                              type="email"
-                              value={emailField1}
-                              onChange={(e) => setEmailField1(e.target.value)}
-                              placeholder="empfaenger@beispiel.ch"
-                              className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
+                        <>
+                          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} />
+                          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center gap-2">
+                                  <Send className="h-5 w-5 text-blue-500" />
+                                  <h2 className="font-semibold text-gray-900 dark:text-white">Terminbestätigung senden</h2>
+                                </div>
+                                <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                  <X className="h-4 w-4 text-gray-500" />
+                                </button>
+                              </div>
+                              <div className="p-6 space-y-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">E-Mail 1 *</label>
+                                  <input
+                                    type="email"
+                                    value={emailField1}
+                                    onChange={(e) => setEmailField1(e.target.value)}
+                                    placeholder="empfaenger@beispiel.ch"
+                                    className="mt-1.5 w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">E-Mail 2 (optional)</label>
+                                  <input
+                                    type="email"
+                                    value={emailField2}
+                                    onChange={(e) => setEmailField2(e.target.value)}
+                                    placeholder="weitere@beispiel.ch"
+                                    className="mt-1.5 w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white"
+                                  />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                  <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    Abbrechen
+                                  </button>
+                                  <button onClick={() => notifyAppointment(appt.id)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                                    <Send className="h-4 w-4" />Senden
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500">E-Mail 2</label>
-                            <input
-                              type="email"
-                              value={emailField2}
-                              onChange={(e) => setEmailField2(e.target.value)}
-                              placeholder="weitere@beispiel.ch"
-                              className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="flex-1 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Abbrechen</button>
-                            <button onClick={() => notifyAppointment(appt.id)} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-                              <Send className="h-3 w-3" />Senden
-                            </button>
-                          </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
