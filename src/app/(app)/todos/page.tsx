@@ -42,10 +42,31 @@ export default function TodosPage() {
       assigned_to: form.assigned_to || null,
       created_by: user?.id,
     });
+
+    // Bei "dringend" E-Mail an zugewiesene Person senden
+    if (form.priority === "dringend" && form.assigned_to) {
+      try {
+        await fetch("/api/todos/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description || null,
+            due_date: form.due_date || null,
+            assigned_to: form.assigned_to,
+          }),
+        });
+        toast.success("Dringendes Todo erstellt & E-Mail gesendet");
+      } catch {
+        toast.success("Todo erstellt (E-Mail fehlgeschlagen)");
+      }
+    } else {
+      toast.success("Todo erstellt");
+    }
+
     setForm({ title: "", description: "", priority: "normal", due_date: "", assigned_to: "" });
     setShowForm(false);
     loadData();
-    toast.success("Todo erstellt");
   }
 
   async function toggleTodo(id: string, currentStatus: string) {
