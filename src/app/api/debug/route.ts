@@ -5,34 +5,50 @@ export async function GET() {
   const supabase = createAdminClient();
 
   const now = new Date();
-  const monday = new Date(now);
-  const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  monday.setDate(now.getDate() - dayOfWeek);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const startDate = monday.toISOString().split("T")[0];
-  const endDate = sunday.toISOString().split("T")[0];
+  // Month range
+  const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
 
-  const [appts, events, profiles, assignments] = await Promise.all([
-    supabase.from("job_appointments").select("id, title, start_time, end_time, assigned_to, job_id, is_done"),
-    supabase.from("calendar_events").select("id, title, start_time, end_time, profile_id"),
-    supabase.from("profiles").select("id, full_name, email"),
-    supabase.from("job_assignments").select("profile_id, job_id"),
-  ]);
+  // Exact same queries as TeamOverview
+  const jobsRes = await supabase.from("job_assignments").select("profile_id, job:jobs(id, title, status, start_date, end_date, customer:customers(name))");
+  const apptsRes = await supabase.from("job_appointments").select("assigned_to, title, start_time, end_time, is_done, job_id, job:jobs(title)").gte("start_time", startDate + "T00:00:00").lte("start_time", endDate + "T23:59:59");
+  const leadJobs = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null);
+  const profiles = await supabase.from("profiles").select("id, full_name, role");
 
-  // Also check what the team page query returns
-  const weekAppts = await supabase
-    .from("job_appointments")
-    .select("assigned_to, title, start_time, end_time, is_done, job_id, job:jobs(title)")
-    .gte("start_time", startDate + "T00:00:00")
-    .lte("start_time", endDate + "T23:59:59");
+  // Build result same as TeamOverview
+  const result: Record<string, any> = {};
+  for (const p of (profiles.data || []) as any[]) {
+    const personJobs: any[] = [];
+    const seenJobIds = new Set<string>();
+
+    if (jobsRes.data) {
+      for (const a of jobsRes.data as any[]) {
+        if (a.profile_id === p.id && a.job && !seenJobIds.has(a.job.id)) {
+          personJobs.push(a.job);
+          seenJobIds.add(a.job.id);
+        }
+      }
+    }
+    if (leadJobs.data) {
+      for (const j of leadJobs.data as any[]) {
+        if (j.project_lead_id === p.id && !seenJobIds.has(j.id)) {
+          personJobs.push(j);
+          seenJobIds.add(j.id);
+        }
+      }
+    }
+    const personAppts = (apptsRes.data as any[] || []).filter((a: any) => a.assigned_to === p.id);
+
+    result[p.full_name] = { jobs: personJobs.length, appointments: personAppts.length, jobDetails: personJobs, apptDetails: personAppts };
+  }
 
   return NextResponse.json({
     dateRange: { startDate, endDate },
-    appointments: appts.data,
-    calendarEvents: events.data,
-    profiles: profiles.data,
-    jobAssignments: assignments.data,
-    weekAppointments: weekAppts.data,
+    jobsResError: jobsRes.error,
+    apptsResError: apptsRes.error,
+    jobsResCount: jobsRes.data?.length,
+    apptsResCount: apptsRes.data?.length,
+    leadJobsCount: leadJobs.data?.length,
+    perPerson: result,
   });
 }
