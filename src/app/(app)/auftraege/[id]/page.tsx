@@ -53,15 +53,44 @@ export default function AuftragDetailPage() {
   }
 
   async function updateStatus(newStatus: JobStatus) {
+    const wasEntwurf = job?.status === "entwurf";
+
     if (newStatus === "abgeschlossen") {
-      // Bei Abschluss → weiterleiten zum Rapport-Formular mit Job vorausgewählt
       await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
       toast.success("Auftrag abgeschlossen – Einsatzrapport ausfüllen");
       router.push(`/rapporte/neu?job_id=${id}`);
       return;
     }
+
     await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
+
+    // Wenn von Entwurf freigegeben → Schichten erstellen & Team benachrichtigen
+    if (wasEntwurf && newStatus !== "storniert" && job) {
+      const allPersons: string[] = [];
+      if (job.project_lead_id) allPersons.push(job.project_lead_id);
+      assignments.forEach((a) => {
+        if (!allPersons.includes(a.profile_id)) allPersons.push(a.profile_id);
+      });
+
+      if (allPersons.length > 0) {
+        try {
+          await fetch("/api/jobs/assign-notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              job_id: id,
+              profile_ids: allPersons,
+              job_title: job.title,
+              start_date: job.start_date || null,
+              end_date: job.end_date || null,
+            }),
+          });
+          toast.success("Team wurde benachrichtigt");
+        } catch {}
+      }
+    }
+
     loadAll();
   }
 
