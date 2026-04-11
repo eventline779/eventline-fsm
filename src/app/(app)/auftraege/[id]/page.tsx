@@ -30,7 +30,7 @@ export default function AuftragDetailPage() {
 
   // Appointment form
   const [showApptForm, setShowApptForm] = useState(false);
-  const [apptForm, setApptForm] = useState({ title: "", date: "", time: "", assigned_to: "", description: "" });
+  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", assigned_to: "", description: "" });
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -78,7 +78,7 @@ export default function AuftragDetailPage() {
       assigned_to: apptForm.assigned_to || null,
       description: apptForm.description || null,
     });
-    setApptForm({ title: "", date: "", time: "", assigned_to: "", description: "" });
+    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", assigned_to: "", description: "" });
     setShowApptForm(false);
     loadAll();
     toast.success("Termin hinzugefügt");
