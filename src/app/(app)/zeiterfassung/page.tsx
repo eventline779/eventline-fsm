@@ -33,7 +33,7 @@ export default function ZeiterfassungPage() {
     const [activeRes, entriesRes, jobsRes] = await Promise.all([
       supabase.from("time_entries").select("*").eq("profile_id", user.id).is("clock_out", null).single(),
       supabase.from("time_entries").select("*, job:jobs(title)").eq("profile_id", user.id).not("clock_out", "is", null).order("clock_in", { ascending: false }).limit(20),
-      supabase.from("jobs").select("id, title").in("status", ["offen", "geplant", "in_arbeit"]).order("title"),
+      supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("created_at", { ascending: false }),
     ]);
 
     if (activeRes.data) setActiveEntry(activeRes.data as TimeEntry);
@@ -149,7 +149,7 @@ export default function ZeiterfassungPage() {
               {/* Auftrag */}
               <select value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className="w-full max-w-sm mx-auto block h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20">
                 <option value="">Ohne Auftrag stempeln</option>
-                {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+                {jobs.map((j) => <option key={j.id} value={j.id}>INT-{(j as any).job_number} – {j.title}</option>)}
               </select>
 
               <Button onClick={clockIn} className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 text-lg rounded-xl">
