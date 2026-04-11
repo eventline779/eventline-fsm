@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [quickLinks, setQuickLinks] = useState<{ name: string; url: string }[]>([]);
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkForm, setLinkForm] = useState({ name: "", url: "" });
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -264,18 +265,41 @@ export default function DashboardPage() {
           </Card>
         )}
         {quickLinks.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
             {quickLinks.map((link, i) => (
-              <div key={i} className="flex items-center gap-1 group">
-                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
-                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=16`} alt="" className="h-4 w-4" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />{link.name}
+              <div
+                key={i}
+                draggable
+                onDragStart={() => setDragIndex(i)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (dragIndex === null || dragIndex === i) return;
+                  const updated = [...quickLinks];
+                  const [moved] = updated.splice(dragIndex, 1);
+                  updated.splice(i, 0, moved);
+                  setQuickLinks(updated);
+                  localStorage.setItem("dashboard-links", JSON.stringify(updated));
+                  setDragIndex(null);
+                }}
+                onDragEnd={() => setDragIndex(null)}
+                className={`relative group cursor-grab active:cursor-grabbing ${dragIndex === i ? "opacity-30" : ""}`}
+              >
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all text-center">
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=64`}
+                    alt={link.name}
+                    className="h-10 w-10 rounded-lg"
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=32`; }}
+                  />
+                  <span className="text-xs font-medium text-gray-700 truncate w-full">{link.name}</span>
                 </a>
-                <button onClick={() => {
+                <button onClick={(e) => {
+                  e.preventDefault();
                   const updated = quickLinks.filter((_, j) => j !== i);
                   setQuickLinks(updated);
                   localStorage.setItem("dashboard-links", JSON.stringify(updated));
-                }} className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                  <Trash2 className="h-3 w-3" />
+                }} className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-white border border-gray-200 shadow-sm text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100">
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
