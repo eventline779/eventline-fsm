@@ -268,7 +268,7 @@ export default function DashboardPage() {
             {quickLinks.map((link, i) => (
               <div key={i} className="flex items-center gap-1 group">
                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
-                  <ExternalLink className="h-3 w-3" />{link.name}
+                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=16`} alt="" className="h-4 w-4" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />{link.name}
                 </a>
                 <button onClick={() => {
                   const updated = quickLinks.filter((_, j) => j !== i);
