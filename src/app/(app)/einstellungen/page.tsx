@@ -773,13 +773,15 @@ function TeamOverview({ profiles, supabase }: { profiles: Profile[]; supabase: a
     }
 
     const [jobsRes, apptsRes, timeRes] = await Promise.all([
-      supabase.from("job_assignments").select("profile_id, job:jobs(id, title, status, start_date, end_date, customer:customers(name))"),
+      supabase.from("job_assignments").select("profile_id, job:jobs!inner(id, title, status, start_date, end_date, customer:customers(name))"),
       supabase.from("job_appointments").select("assigned_to, title, start_time, end_time, is_done, job_id, job:jobs(title)").gte("start_time", startDate + "T00:00:00").lte("start_time", endDate + "T23:59:59"),
       supabase.from("time_entries").select("profile_id, clock_in, clock_out, break_minutes").gte("clock_in", startDate + "T00:00:00").lte("clock_in", endDate + "T23:59:59").not("clock_out", "is", null),
     ]);
 
     // Auch Aufträge wo die Person Projektleiter ist
-    const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null).neq("is_deleted", true);
+    const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null);
+
+    console.log("Team data:", { jobsRes: jobsRes.data?.length, jobsError: jobsRes.error, apptsRes: apptsRes.data?.length, apptsError: apptsRes.error, leadJobs: leadJobs?.length, startDate, endDate });
 
     const result: Record<string, { jobs: any[]; appointments: any[]; hours: number }> = {};
 
