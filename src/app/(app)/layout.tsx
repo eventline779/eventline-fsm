@@ -153,14 +153,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       />
 
       <div className="flex-1 flex flex-col pb-20 md:pb-0">
-        {/* Mobile Header */}
-        <div className="md:hidden sticky top-0 z-30 bg-black/95 backdrop-blur-lg border-b border-white/10 px-4 py-3 flex items-center justify-between pt-[env(safe-area-inset-top)]">
-          <Logo size="sm" variant="light" />
-          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all">
-            <Bell className="h-5 w-5" />
-          </button>
-        </div>
-        <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
+        <main className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:p-8 md:pt-8 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>
 
       <MobileNav onMenuOpen={() => setMobileMenuOpen(true)} />
