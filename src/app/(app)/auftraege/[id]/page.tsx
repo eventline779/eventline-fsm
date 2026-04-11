@@ -10,7 +10,7 @@ import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
-  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download,
+  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -87,6 +87,25 @@ export default function AuftragDetailPage() {
   async function toggleAppointment(apptId: string, isDone: boolean) {
     await supabase.from("job_appointments").update({ is_done: !isDone }).eq("id", apptId);
     loadAll();
+  }
+
+  async function notifyAppointment(apptId: string) {
+    toast.info("E-Mails werden gesendet...");
+    try {
+      const res = await fetch("/api/appointments/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointment_id: apptId, job_id: id }),
+      });
+      const result = await res.json();
+      if (result.sentTo?.length > 0) {
+        toast.success(`E-Mail gesendet an: ${result.sentTo.join(", ")}`);
+      } else {
+        toast.error("Keine E-Mails gesendet — Empfänger haben keine E-Mail-Adresse");
+      }
+    } catch {
+      toast.error("Fehler beim Senden");
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -224,7 +243,7 @@ export default function AuftragDetailPage() {
             const assignee = (appt as unknown as { assignee: { full_name: string } | null }).assignee;
             return (
               <div key={appt.id} className={`flex items-center justify-between p-3 rounded-xl border ${appt.is_done ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <button onClick={() => toggleAppointment(appt.id, appt.is_done)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${appt.is_done ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
                     {appt.is_done && <Check className="h-4 w-4" />}
                   </button>
@@ -236,6 +255,16 @@ export default function AuftragDetailPage() {
                     </div>
                   </div>
                 </div>
+                {!appt.is_done && (
+                  <button
+                    onClick={() => notifyAppointment(appt.id)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
+                    title="Termin-E-Mail an Kunde, Projektleiter und Techniker senden"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Benachrichtigen
+                  </button>
+                )}
               </div>
             );
           })}

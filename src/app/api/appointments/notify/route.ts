@@ -1,0 +1,196 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import { NextResponse } from "next/server";
+import { Resend } from "resend";
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  const { appointment_id, job_id } = body;
+
+  if (!appointment_id || !job_id) {
+    return NextResponse.json({ error: "Fehlende Parameter" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+
+  // Auftrag mit Kunde, Standort, Projektleiter laden
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("*, customer:customers(name, email), location:locations(name), project_lead:profiles!project_lead_id(full_name, email)")
+    .eq("id", job_id)
+    .single();
+
+  if (!job) {
+    return NextResponse.json({ error: "Auftrag nicht gefunden" }, { status: 404 });
+  }
+
+  // Termin laden
+  const { data: appt } = await supabase
+    .from("job_appointments")
+    .select("*, assignee:profiles!assigned_to(full_name, email)")
+    .eq("id", appointment_id)
+    .single();
+
+  if (!appt) {
+    return NextResponse.json({ error: "Termin nicht gefunden" }, { status: 404 });
+  }
+
+  // Zugewiesene Techniker laden
+  const { data: assignments } = await supabase
+    .from("job_assignments")
+    .select("*, profile:profiles(full_name, email)")
+    .eq("job_id", job_id);
+
+  const customer = job.customer as any;
+  const location = job.location as any;
+  const projectLead = job.project_lead as any;
+  const assignee = appt.assignee as any;
+
+  const apptDate = new Date(appt.start_time).toLocaleDateString("de-CH", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+  const apptTime = new Date(appt.start_time).toLocaleTimeString("de-CH", {
+    hour: "2-digit", minute: "2-digit",
+  });
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return NextResponse.json({ success: false, reason: "Kein RESEND_API_KEY" });
+  }
+
+  const resend = new Resend(resendKey);
+  const sentTo: string[] = [];
+  const failed: string[] = [];
+
+  // E-Mail an Kunde
+  if (customer?.email) {
+    try {
+      await resend.emails.send({
+        from: "EVENTLINE GmbH <noreply@eventline-basel.com>",
+        to: customer.email,
+        subject: `Terminbestätigung: ${appt.title} – ${apptDate}`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto">
+            <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+              <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+            </div>
+            <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+              <p style="margin:0 0 12px">Guten Tag ${customer.name},</p>
+              <p style="margin:0 0 16px">Wir bestätigen Ihnen folgenden Termin:</p>
+              <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #ef4444;margin:0 0 16px">
+                <p style="margin:0 0 4px;font-weight:600;font-size:16px">${appt.title}</p>
+                <p style="margin:0 0 4px;color:#666">${apptDate} um ${apptTime} Uhr</p>
+                ${location ? `<p style="margin:0 0 4px;color:#666">Standort: ${location.name}</p>` : ""}
+                ${assignee ? `<p style="margin:0;color:#666">Techniker: ${assignee.full_name}</p>` : ""}
+              </div>
+              <p style="margin:0 0 8px">Auftrag: <strong>${job.title}</strong></p>
+              <p style="margin:0 0 8px;color:#999;font-size:13px">Bei Fragen erreichen Sie uns unter Tel. 055 556 62 61.</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+              <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
+            </div>
+          </div>
+        `,
+      });
+      sentTo.push(`Kunde: ${customer.email}`);
+    } catch { failed.push(customer.email); }
+  }
+
+  // E-Mail an Projektleiter
+  if (projectLead?.email) {
+    try {
+      await resend.emails.send({
+        from: "EVENTLINE FSM <noreply@eventline-basel.com>",
+        to: projectLead.email,
+        subject: `Termin: ${appt.title} – ${apptDate} (${customer?.name || "Kunde"})`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto">
+            <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+              <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+            </div>
+            <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+              <p style="margin:0 0 12px">Hallo ${projectLead.full_name},</p>
+              <p style="margin:0 0 16px">Termin-Benachrichtigung für deinen Auftrag:</p>
+              <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #3b82f6;margin:0 0 16px">
+                <p style="margin:0 0 4px;font-weight:600">${appt.title}</p>
+                <p style="margin:0 0 4px;color:#666">${apptDate} um ${apptTime} Uhr</p>
+                <p style="margin:0 0 4px;color:#666">Kunde: ${customer?.name || "-"}</p>
+                ${location ? `<p style="margin:0 0 4px;color:#666">Standort: ${location.name}</p>` : ""}
+                ${assignee ? `<p style="margin:0;color:#666">Zugewiesen an: ${assignee.full_name}</p>` : ""}
+              </div>
+              <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+              <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
+            </div>
+          </div>
+        `,
+      });
+      sentTo.push(`Projektleiter: ${projectLead.email}`);
+    } catch { failed.push(projectLead.email); }
+  }
+
+  // E-Mail an zugewiesenen Techniker (wenn nicht gleich Projektleiter)
+  if (assignee?.email && assignee.email !== projectLead?.email) {
+    try {
+      await resend.emails.send({
+        from: "EVENTLINE FSM <noreply@eventline-basel.com>",
+        to: assignee.email,
+        subject: `Termin zugeteilt: ${appt.title} – ${apptDate}`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto">
+            <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+              <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+            </div>
+            <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+              <p style="margin:0 0 12px">Hallo ${assignee.full_name},</p>
+              <p style="margin:0 0 16px">Dir wurde folgender Termin zugeteilt:</p>
+              <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #ef4444;margin:0 0 16px">
+                <p style="margin:0 0 4px;font-weight:600">${appt.title}</p>
+                <p style="margin:0 0 4px;color:#666">${apptDate} um ${apptTime} Uhr</p>
+                <p style="margin:0 0 4px;color:#666">Kunde: ${customer?.name || "-"}</p>
+                ${location ? `<p style="margin:0;color:#666">Standort: ${location.name}</p>` : ""}
+              </div>
+              <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+              <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
+            </div>
+          </div>
+        `,
+      });
+      sentTo.push(`Techniker: ${assignee.email}`);
+    } catch { failed.push(assignee.email); }
+  }
+
+  // Weitere zugewiesene Techniker
+  if (assignments) {
+    for (const a of assignments as any[]) {
+      const techEmail = a.profile?.email;
+      if (techEmail && techEmail !== projectLead?.email && techEmail !== assignee?.email) {
+        try {
+          await resend.emails.send({
+            from: "EVENTLINE FSM <noreply@eventline-basel.com>",
+            to: techEmail,
+            subject: `Termin: ${appt.title} – ${apptDate} (${customer?.name || ""})`,
+            html: `
+              <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto">
+                <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+                  <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+                </div>
+                <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+                  <p style="margin:0 0 12px">Hallo ${a.profile.full_name},</p>
+                  <p style="margin:0 0 16px">Termin-Info für Auftrag <strong>${job.title}</strong>:</p>
+                  <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #ef4444;margin:0 0 16px">
+                    <p style="margin:0 0 4px;font-weight:600">${appt.title}</p>
+                    <p style="margin:0 0 4px;color:#666">${apptDate} um ${apptTime} Uhr</p>
+                    ${location ? `<p style="margin:0;color:#666">Standort: ${location.name}</p>` : ""}
+                  </div>
+                  <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+                  <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
+                </div>
+              </div>
+            `,
+          });
+          sentTo.push(`Techniker: ${techEmail}`);
+        } catch { failed.push(techEmail); }
+      }
+    }
+  }
+
+  return NextResponse.json({ success: true, sentTo, failed });
+}
