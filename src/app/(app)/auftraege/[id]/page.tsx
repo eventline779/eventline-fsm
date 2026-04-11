@@ -33,7 +33,8 @@ export default function AuftragDetailPage() {
   const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
   const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
   const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
-  const [extraEmail, setExtraEmail] = useState("");
+  const [emailField1, setEmailField1] = useState("");
+  const [emailField2, setEmailField2] = useState("");
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -164,26 +165,29 @@ export default function AuftragDetailPage() {
     toast.success("Termin gelöscht");
   }
 
-  async function notifyAppointment(apptId: string, additionalEmail?: string) {
+  async function notifyAppointment(apptId: string) {
+    const emails = [emailField1, emailField2].filter((e) => e.trim() && e.includes("@"));
+    if (emails.length === 0) { toast.error("Mindestens eine E-Mail eingeben"); return; }
     toast.info("E-Mails werden gesendet...");
     try {
       const res = await fetch("/api/appointments/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: apptId, job_id: id, additional_email: additionalEmail || undefined }),
+        body: JSON.stringify({ appointment_id: apptId, job_id: id, send_to_emails: emails }),
       });
       const result = await res.json();
       if (result.sentTo?.length > 0) {
         toast.success(`E-Mail gesendet an: ${result.sentTo.join(", ")}`);
         setNotifiedAppts((prev) => new Set(prev).add(apptId));
       } else {
-        toast.error("Keine E-Mails gesendet — Empfänger haben keine E-Mail-Adresse");
+        toast.error("Keine E-Mails gesendet");
       }
     } catch {
       toast.error("Fehler beim Senden");
     }
     setNotifyPopup(null);
-    setExtraEmail("");
+    setEmailField1("");
+    setEmailField2("");
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -382,18 +386,31 @@ export default function AuftragDetailPage() {
                         {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
                       </button>
                       {notifyPopup === appt.id && (
-                        <div className="absolute right-0 top-full mt-2 z-20 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 space-y-3">
-                          <p className="text-xs font-medium text-gray-700">Zusätzliche E-Mail (optional)</p>
-                          <input
-                            type="email"
-                            value={extraEmail}
-                            onChange={(e) => setExtraEmail(e.target.value)}
-                            placeholder="z.B. kontakt@firma.ch"
-                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                          />
+                        <div className="absolute right-0 top-full mt-2 z-20 w-80 bg-white rounded-xl shadow-lg border border-gray-200 p-4 space-y-3">
+                          <p className="text-sm font-medium text-gray-900">Terminbestätigung senden</p>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500">E-Mail 1 *</label>
+                            <input
+                              type="email"
+                              value={emailField1}
+                              onChange={(e) => setEmailField1(e.target.value)}
+                              placeholder="empfaenger@beispiel.ch"
+                              className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500">E-Mail 2</label>
+                            <input
+                              type="email"
+                              value={emailField2}
+                              onChange={(e) => setEmailField2(e.target.value)}
+                              placeholder="weitere@beispiel.ch"
+                              className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                          </div>
                           <div className="flex gap-2">
-                            <button onClick={() => { setNotifyPopup(null); setExtraEmail(""); }} className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Abbrechen</button>
-                            <button onClick={() => notifyAppointment(appt.id, extraEmail)} className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                            <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="flex-1 px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Abbrechen</button>
+                            <button onClick={() => notifyAppointment(appt.id)} className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                               <Send className="h-3 w-3" />Senden
                             </button>
                           </div>
