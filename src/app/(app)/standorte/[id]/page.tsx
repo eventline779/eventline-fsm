@@ -136,6 +136,16 @@ export default function StandortDetailPage() {
     loadAll();
   }
 
+  async function deleteTask(task: MaintenanceTaskWithPhoto) {
+    if (!confirm("Arbeit wirklich löschen?")) return;
+    if (task.photo_url) {
+      await supabase.storage.from("documents").remove([task.photo_url]);
+    }
+    await supabase.from("maintenance_tasks").delete().eq("id", task.id);
+    loadAll();
+    toast.success("Arbeit gelöscht");
+  }
+
   function createJobFromTask(task: MaintenanceTaskWithPhoto) {
     const params = new URLSearchParams();
     params.set("title", `Instandhaltung: ${task.title}`);
@@ -349,17 +359,28 @@ export default function StandortDetailPage() {
                     )}
                   </div>
                 </div>
-                {/* Auftrag erstellen Button */}
-                {t.status === "offen" && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Auftrag erstellen Button */}
+                  {t.status === "offen" && (
+                    <button
+                      onClick={() => createJobFromTask(t)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
+                      title="Auftrag aus Instandhaltung erstellen"
+                    >
+                      <ClipboardList className="h-3.5 w-3.5" />
+                      Auftrag
+                    </button>
+                  )}
+                  {/* Löschen Button */}
                   <button
-                    onClick={() => createJobFromTask(t)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
-                    title="Auftrag aus Instandhaltung erstellen"
+                    onClick={() => deleteTask(t)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+                    title="Arbeit löschen"
                   >
-                    <ClipboardList className="h-3.5 w-3.5" />
-                    Auftrag
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Löschen
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ))}
