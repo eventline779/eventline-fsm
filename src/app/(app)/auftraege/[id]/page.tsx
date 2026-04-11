@@ -31,6 +31,7 @@ export default function AuftragDetailPage() {
   // Appointment form
   const [showApptForm, setShowApptForm] = useState(false);
   const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", assigned_to: "", description: "" });
+  const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -100,6 +101,7 @@ export default function AuftragDetailPage() {
       const result = await res.json();
       if (result.sentTo?.length > 0) {
         toast.success(`E-Mail gesendet an: ${result.sentTo.join(", ")}`);
+        setNotifiedAppts((prev) => new Set(prev).add(apptId));
       } else {
         toast.error("Keine E-Mails gesendet — Empfänger haben keine E-Mail-Adresse");
       }
@@ -257,12 +259,16 @@ export default function AuftragDetailPage() {
                 </div>
                 {!appt.is_done && (
                   <button
-                    onClick={() => notifyAppointment(appt.id)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
-                    title="Termin-E-Mail an Kunde, Projektleiter und Techniker senden"
+                    onClick={() => !notifiedAppts.has(appt.id) && notifyAppointment(appt.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      notifiedAppts.has(appt.id)
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    }`}
+                    title={notifiedAppts.has(appt.id) ? "E-Mail wurde gesendet" : "Termin-E-Mail an Kunde, Projektleiter und Techniker senden"}
                   >
-                    <Send className="h-3.5 w-3.5" />
-                    Benachrichtigen
+                    {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                    {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
                   </button>
                 )}
               </div>
