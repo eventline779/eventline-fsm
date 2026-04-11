@@ -265,7 +265,7 @@ export default function DashboardPage() {
           </Card>
         )}
         {quickLinks.length > 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          <div className="flex flex-wrap gap-2">
             {quickLinks.map((link, i) => (
               <div
                 key={i}
@@ -284,14 +284,8 @@ export default function DashboardPage() {
                 onDragEnd={() => setDragIndex(null)}
                 className={`relative group cursor-grab active:cursor-grabbing ${dragIndex === i ? "opacity-30" : ""}`}
               >
-                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all text-center">
-                  <img
-                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=64`}
-                    alt={link.name}
-                    className="h-10 w-10 rounded-lg"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=32`; }}
-                  />
-                  <span className="text-xs font-medium text-gray-700 truncate w-full">{link.name}</span>
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-gray-700 text-xs font-medium border border-gray-200 hover:shadow-sm hover:border-gray-300 transition-all">
+                  {link.name} <ExternalLink className="h-3 w-3 text-gray-400" />
                 </a>
                 <button onClick={(e) => {
                   e.preventDefault();
