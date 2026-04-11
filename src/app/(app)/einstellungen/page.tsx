@@ -74,6 +74,7 @@ export default function EinstellungenPage() {
 
   // Schichten
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [allUpcomingShifts, setAllUpcomingShifts] = useState<Shift[]>([]);
   const [shiftLoading, setShiftLoading] = useState(false);
   const [shiftDate, setShiftDate] = useState(new Date().toISOString().split("T")[0]);
   const [showShiftForm, setShowShiftForm] = useState(false);
@@ -141,15 +142,25 @@ export default function EinstellungenPage() {
     setShiftLoading(true);
     const dayStart = `${shiftDate}T00:00:00`;
     const dayEnd = `${shiftDate}T23:59:59`;
+    const today = new Date().toISOString();
 
-    const { data } = await supabase
-      .from("calendar_events")
-      .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
-      .gte("start_time", dayStart)
-      .lte("start_time", dayEnd)
-      .order("start_time");
+    const [dayRes, upcomingRes] = await Promise.all([
+      supabase
+        .from("calendar_events")
+        .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
+        .gte("start_time", dayStart)
+        .lte("start_time", dayEnd)
+        .order("start_time"),
+      supabase
+        .from("calendar_events")
+        .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
+        .gte("start_time", today)
+        .order("start_time")
+        .limit(20),
+    ]);
 
-    if (data) setShifts(data as unknown as Shift[]);
+    if (dayRes.data) setShifts(dayRes.data as unknown as Shift[]);
+    if (upcomingRes.data) setAllUpcomingShifts(upcomingRes.data as unknown as Shift[]);
     setShiftLoading(false);
   }
 
@@ -610,6 +621,42 @@ export default function EinstellungenPage() {
       {/* ===== TAB: SCHICHTPLANUNG ===== */}
       {tab === "schichten" && (
         <div className="space-y-6">
+          {/* Kommende Schichten */}
+          {allUpcomingShifts.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Kommende Schichten ({allUpcomingShifts.length})</h2>
+              <div className="space-y-2">
+                {allUpcomingShifts.map((s) => (
+                  <Card key={s.id} className="bg-white border-gray-100">
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-center min-w-[44px]">
+                          <div className="text-sm font-bold">{new Date(s.start_time).getDate()}</div>
+                          <div className="text-[9px] text-muted-foreground uppercase">{new Date(s.start_time).toLocaleDateString("de-CH", { month: "short" })}</div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{s.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatTime(s.start_time)} – {formatTime(s.end_time)}
+                            </span>
+                            {s.profile?.full_name && (
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {s.profile.full_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Date & Add */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
