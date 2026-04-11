@@ -25,6 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className="h-full antialiased">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      </head>
       <body className="min-h-full flex flex-col" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <ThemeProvider>
           <Suspense>{children}</Suspense>

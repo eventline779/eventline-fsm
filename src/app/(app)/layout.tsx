@@ -31,6 +31,11 @@ import {
   CheckSquare,
   Eye,
   EyeOff,
+  AlertTriangle,
+  GraduationCap,
+  Briefcase,
+  Ticket,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -48,6 +53,10 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   FolderOpen,
   Settings,
   CheckSquare,
+  AlertTriangle,
+  GraduationCap,
+  Briefcase,
+  Ticket,
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -143,15 +152,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onToggleSimplified={toggleSimplified}
       />
 
-      <div className="flex-1 flex flex-col pb-16 md:pb-0">
-        <main className="flex-1 p-5 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
+      <div className="flex-1 flex flex-col pb-20 md:pb-0">
+        {/* Mobile Header */}
+        <div className="md:hidden sticky top-0 z-30 bg-black/95 backdrop-blur-lg border-b border-white/10 px-4 py-3 flex items-center justify-between pt-[env(safe-area-inset-top)]">
+          <Logo size="sm" variant="light" />
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all">
+            <Bell className="h-5 w-5" />
+          </button>
+        </div>
+        <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>
 
       <MobileNav onMenuOpen={() => setMobileMenuOpen(true)} />
 
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="bg-gradient-to-b from-[#0a0a0a] to-[#111] text-white border-white/5 w-72 p-0">
+        <SheetContent side="left" className="bg-gradient-to-b from-[#0a0a0a] to-[#111] text-white border-white/5 w-[280px] p-0">
           <SheetHeader className="px-6 py-6 border-b border-white/5">
             <SheetTitle className="text-left">
               <Logo size="md" variant="light" />

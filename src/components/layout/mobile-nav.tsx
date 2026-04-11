@@ -26,32 +26,32 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 z-50">
-      <div className="flex items-center justify-around px-2 py-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/10 z-50 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-center justify-around px-1 pt-2 pb-1">
         {mobileItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
+          const isActive = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-1.5 rounded-md text-xs transition-colors",
+                "flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl text-[10px] font-medium transition-all min-w-[60px]",
                 isActive
                   ? "text-red-500"
-                  : "text-gray-400"
+                  : "text-gray-500 active:text-white"
               )}
             >
-              <item.icon className="h-5 w-5" />
-              {item.label}
+              <item.icon className={cn("h-5 w-5", isActive && "scale-110")} />
+              <span>{item.label}</span>
             </Link>
           );
         })}
         <button
           onClick={onMenuOpen}
-          className="flex flex-col items-center gap-1 px-3 py-1.5 text-gray-400 text-xs"
+          className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-gray-500 text-[10px] font-medium active:text-white min-w-[60px]"
         >
           <Menu className="h-5 w-5" />
-          Mehr
+          <span>Mehr</span>
         </button>
       </div>
     </nav>
