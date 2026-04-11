@@ -94,7 +94,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
 
           return (
             <div key={group.label}>
-              <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">
+              <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/40 uppercase">
                 {group.label}
               </p>
               <div className="space-y-0.5">
@@ -109,7 +109,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                         "group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
                         active
                           ? "bg-white/10 text-white shadow-sm backdrop-blur-sm"
-                          : "text-white/40 hover:text-white/90 hover:bg-white/[0.05]"
+                          : "text-white/70 hover:text-white hover:bg-white/[0.05]"
                       )}
                     >
                       {Icon && (
@@ -117,7 +117,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                           "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-200",
                           active
                             ? "bg-red-500/20 text-red-400"
-                            : "bg-white/[0.03] text-white/30 group-hover:text-white/60 group-hover:bg-white/[0.06]"
+                            : "bg-white/[0.06] text-white/50 group-hover:text-white/80 group-hover:bg-white/[0.1]"
                         )}>
                           <Icon className="h-4 w-4" />
                         </div>
@@ -139,14 +139,14 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
       <div className="px-3 mb-2 space-y-0.5">
         <button
           onClick={onToggleSimplified}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
         >
           {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
           {simplified ? "Alle Module anzeigen" : "Vereinfachte Ansicht"}
         </button>
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
         >
           {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
