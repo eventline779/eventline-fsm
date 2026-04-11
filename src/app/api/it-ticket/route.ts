@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   try {
     await resend.emails.send({
       from: "EVENTLINE FSM <noreply@eventline-basel.com>",
-      to: "mischa@eventline-basel.com",
+      to: ["mischa@eventline-basel.com", "leo@eventline-basel.com"],
       replyTo: reporterEmail || undefined,
       subject: `${p.emoji} IT-Ticket ${ticketNr}: ${subject}`,
       html: `

@@ -19,19 +19,32 @@ export default function ITTicketsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", user?.id).single();
 
+    // In tickets-Tabelle speichern
+    await supabase.from("tickets").insert({
+      title: form.subject,
+      description: form.description,
+      category: "it",
+      priority: form.priority === "kritisch" ? "dringend" : "normal",
+      created_by: user?.id,
+    });
+
+    // E-Mail an Leo + Mischa
     try {
-      const res = await fetch("/api/it-ticket", {
+      const res = await fetch("/api/tickets/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          title: form.subject,
+          description: form.description,
+          category: "it",
+          priority: form.priority === "kritisch" ? "dringend" : "normal",
           reporter: profile?.full_name || "Unbekannt",
           reporterEmail: profile?.email || "",
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(`IT-Ticket ${json.ticketNr} gesendet`);
+        toast.success("IT-Ticket erstellt & E-Mail gesendet");
         setForm({ subject: "", description: "", priority: "normal" });
         setShowForm(false);
       } else {
