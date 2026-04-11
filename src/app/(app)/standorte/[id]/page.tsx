@@ -26,9 +26,9 @@ export default function StandortDetailPage() {
   const [location, setLocation] = useState<Location | null>(null);
   const [contacts, setContacts] = useState<LocationContact[]>([]);
   const [tasks, setTasks] = useState<MaintenanceTaskWithPhoto[]>([]);
-  const [notes, setNotes] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string }[]>([]);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [newNote, setNewNote] = useState("");
 
   // Contact form
   const [showContactForm, setShowContactForm] = useState(false);
@@ -56,7 +56,6 @@ export default function StandortDetailPage() {
     ]);
     if (locRes.data) {
       setLocation(locRes.data as Location);
-      setNotes(locRes.data.notes || "");
       if (locRes.data.customer_id && custRes.data) {
         setLinkedCustomer((custRes.data as Customer[]).find((c) => c.id === locRes.data.customer_id) || null);
       }
@@ -64,6 +63,13 @@ export default function StandortDetailPage() {
     if (contRes.data) setContacts(contRes.data as LocationContact[]);
     if (taskRes.data) setTasks(taskRes.data as MaintenanceTaskWithPhoto[]);
     if (custRes.data) setCustomers(custRes.data as Customer[]);
+
+    // Load notes via API
+    try {
+      const notesRes = await fetch(`/api/locations/${id}/notes`);
+      const notesJson = await notesRes.json();
+      if (notesJson.notes) setNotesList(notesJson.notes);
+    } catch {}
   }
 
   async function linkCustomer(customerId: string) {
@@ -72,26 +78,42 @@ export default function StandortDetailPage() {
     loadAll();
   }
 
-  async function saveNotes() {
-    setSavingNotes(true);
+  async function addNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newNote.trim()) return;
     try {
       const res = await fetch(`/api/locations/${id}/notes`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ content: newNote }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success("Notizen gespeichert");
-        setEditingNotes(false);
-        setLocation({ ...location!, notes });
+        setNotesList(json.notes);
+        setNewNote("");
+        setShowNoteForm(false);
+        toast.success("Notiz hinzugefügt");
       } else {
         toast.error("Fehler: " + (json.error || "Unbekannt"));
       }
     } catch {
       toast.error("Fehler beim Speichern");
     }
-    setSavingNotes(false);
+  }
+
+  async function deleteNote(noteId: string) {
+    try {
+      const res = await fetch(`/api/locations/${id}/notes`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotesList(json.notes);
+        toast.success("Notiz gelöscht");
+      }
+    } catch {}
   }
 
   async function addContact(e: React.FormEvent) {
@@ -239,40 +261,36 @@ export default function StandortDetailPage() {
       {/* Notizen */}
       <Card className="bg-white">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen</CardTitle>
-          {!editingNotes && (
-            <div className="flex gap-2">
-              {notes && (
-                <Button size="sm" variant="outline" onClick={() => { setNotes(notes + "\n"); setEditingNotes(true); }}>
-                  <Plus className="h-4 w-4 mr-1" />Neue Notiz
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => setEditingNotes(true)}>
-                {notes ? "Bearbeiten" : <><Plus className="h-4 w-4 mr-1" />Hinzufügen</>}
-              </Button>
-            </div>
-          )}
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
+            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
+          </Button>
         </CardHeader>
-        <CardContent>
-          {editingNotes ? (
-            <div className="space-y-2">
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notizen zu diesem Standort..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={4} />
+        <CardContent className="space-y-3">
+          {showNoteForm && (
+            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { setEditingNotes(false); setNotes(location.notes || ""); }}>Abbrechen</Button>
-                <Button onClick={saveNotes} disabled={savingNotes} size="sm" className="bg-red-600 hover:bg-red-700 text-white">{savingNotes ? "Speichern..." : "Speichern"}</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
+                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
               </div>
-            </div>
-          ) : notes ? (
-            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <p className="text-sm whitespace-pre-wrap">{notes.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                part.match(/^https?:\/\//) ? (
-                  <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
-                ) : part
-              )}</p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>
+            </form>
           )}
+          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
+          {notesList.map((n) => (
+            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                  part.match(/^https?:\/\//) ? (
+                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
+                  ) : part
+                )}</p>
+                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+              </div>
+              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
