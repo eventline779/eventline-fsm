@@ -23,7 +23,10 @@ import {
   CheckSquare,
   Eye,
   EyeOff,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import type { Profile } from "@/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -51,6 +54,7 @@ interface SidebarProps {
 export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { theme, setTheme } = useTheme();
   const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
 
   const groups: NavGroup[] = profile.role === "admin"
@@ -131,14 +135,21 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
         })}
       </nav>
 
-      {/* Simplified Toggle */}
-      <div className="px-3 mb-2">
+      {/* Toggles */}
+      <div className="px-3 mb-2 space-y-0.5">
         <button
           onClick={onToggleSimplified}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
         >
           {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
           {simplified ? "Alle Module anzeigen" : "Vereinfachte Ansicht"}
+        </button>
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
+        >
+          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </button>
       </div>
 

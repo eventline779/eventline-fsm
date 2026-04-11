@@ -127,7 +127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     : [...NAV_GROUPS];
 
   return (
-    <div className="flex min-h-screen bg-[#f5f5f7]">
+    <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
         onSignOut={handleSignOut}

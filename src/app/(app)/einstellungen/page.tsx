@@ -21,6 +21,7 @@ import {
   Calendar,
   Plus,
   Trash2,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -265,6 +266,28 @@ export default function EinstellungenPage() {
   const activeNow = timeEntries.filter((e) => !e.clock_out);
   const completed = timeEntries.filter((e) => e.clock_out);
 
+  function exportCSV() {
+    const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Auftrag"]];
+    for (const e of completed) {
+      const name = e.profile?.full_name || "Unbekannt";
+      const date = formatDate(e.clock_in);
+      const von = formatTime(e.clock_in);
+      const bis = formatTime(e.clock_out!);
+      const duration = formatDuration(e.clock_in, e.clock_out!, e.break_minutes);
+      const job = e.job?.title || "";
+      rows.push([name, date, von, bis, String(e.break_minutes), duration, job]);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Zeiterfassung_${timeFilter}_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportiert");
+  }
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
     { key: "zeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" /> },
@@ -418,8 +441,9 @@ export default function EinstellungenPage() {
       {/* ===== TAB: STEMPELZEITEN ===== */}
       {tab === "zeiten" && (
         <div className="space-y-6">
-          {/* Filter */}
-          <div className="flex gap-2">
+          {/* Filter & Export */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex gap-2">
             {[
               { key: "heute", label: "Heute" },
               { key: "woche", label: "7 Tage" },
@@ -438,6 +462,12 @@ export default function EinstellungenPage() {
                 {f.label}
               </button>
             ))}
+            </div>
+            {completed.length > 0 && (
+              <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-sm font-medium transition-colors">
+                <Download className="h-4 w-4" />CSV Export
+              </button>
+            )}
           </div>
 
           {/* Aktuell eingestempelt */}
