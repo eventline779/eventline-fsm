@@ -32,6 +32,8 @@ export default function AuftragDetailPage() {
   const [showApptForm, setShowApptForm] = useState(false);
   const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
   const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
+  const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
+  const [extraEmail, setExtraEmail] = useState("");
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -162,13 +164,13 @@ export default function AuftragDetailPage() {
     toast.success("Termin gelöscht");
   }
 
-  async function notifyAppointment(apptId: string) {
+  async function notifyAppointment(apptId: string, additionalEmail?: string) {
     toast.info("E-Mails werden gesendet...");
     try {
       const res = await fetch("/api/appointments/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: apptId, job_id: id }),
+        body: JSON.stringify({ appointment_id: apptId, job_id: id, additional_email: additionalEmail || undefined }),
       });
       const result = await res.json();
       if (result.sentTo?.length > 0) {
@@ -180,6 +182,8 @@ export default function AuftragDetailPage() {
     } catch {
       toast.error("Fehler beim Senden");
     }
+    setNotifyPopup(null);
+    setExtraEmail("");
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -365,18 +369,37 @@ export default function AuftragDetailPage() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {!appt.is_done && (
-                    <button
-                      onClick={() => !notifiedAppts.has(appt.id) && notifyAppointment(appt.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        notifiedAppts.has(appt.id)
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                      }`}
-                      title={notifiedAppts.has(appt.id) ? "E-Mail wurde gesendet" : "Termin-E-Mail an Kunde, Projektleiter und Techniker senden"}
-                    >
-                      {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                      {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => !notifiedAppts.has(appt.id) && setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          notifiedAppts.has(appt.id)
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                        }`}
+                      >
+                        {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                        {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
+                      </button>
+                      {notifyPopup === appt.id && (
+                        <div className="absolute right-0 top-full mt-2 z-20 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 space-y-3">
+                          <p className="text-xs font-medium text-gray-700">Zusätzliche E-Mail (optional)</p>
+                          <input
+                            type="email"
+                            value={extraEmail}
+                            onChange={(e) => setExtraEmail(e.target.value)}
+                            placeholder="z.B. kontakt@firma.ch"
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => { setNotifyPopup(null); setExtraEmail(""); }} className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Abbrechen</button>
+                            <button onClick={() => notifyAppointment(appt.id, extraEmail)} className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                              <Send className="h-3 w-3" />Senden
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                   <button
                     onClick={() => deleteAppointment(appt.id)}
