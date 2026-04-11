@@ -74,8 +74,8 @@ export default function EinstellungenPage() {
 
   // Schichten
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [allUpcomingShifts, setAllUpcomingShifts] = useState<Shift[]>([]);
   const [shiftLoading, setShiftLoading] = useState(false);
+  const [shiftFilter, setShiftFilter] = useState("woche");
   const [shiftDate, setShiftDate] = useState(new Date().toISOString().split("T")[0]);
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [shiftForm, setShiftForm] = useState({
@@ -103,7 +103,7 @@ export default function EinstellungenPage() {
   useEffect(() => {
     if (tab === "zeiten") loadTimeEntries();
     if (tab === "schichten") loadShifts();
-  }, [tab, timeFilter, shiftDate]);
+  }, [tab, timeFilter, shiftFilter]);
 
   async function loadProfiles() {
     const { data } = await supabase.from("profiles").select("*").order("full_name");
@@ -140,27 +140,32 @@ export default function EinstellungenPage() {
 
   async function loadShifts() {
     setShiftLoading(true);
-    const dayStart = `${shiftDate}T00:00:00`;
-    const dayEnd = `${shiftDate}T23:59:59`;
-    const today = new Date().toISOString();
+    const now = new Date();
+    let startDate: string;
+    let endDate: string;
 
-    const [dayRes, upcomingRes] = await Promise.all([
-      supabase
-        .from("calendar_events")
-        .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
-        .gte("start_time", dayStart)
-        .lte("start_time", dayEnd)
-        .order("start_time"),
-      supabase
-        .from("calendar_events")
-        .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
-        .gte("start_time", today)
-        .order("start_time")
-        .limit(20),
-    ]);
+    if (shiftFilter === "woche") {
+      const dayOfWeek = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayOfWeek);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      startDate = monday.toISOString().split("T")[0] + "T00:00:00";
+      endDate = sunday.toISOString().split("T")[0] + "T23:59:59";
+    } else {
+      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01T00:00:00`;
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endDate = `${lastDay.toISOString().split("T")[0]}T23:59:59`;
+    }
 
-    if (dayRes.data) setShifts(dayRes.data as unknown as Shift[]);
-    if (upcomingRes.data) setAllUpcomingShifts(upcomingRes.data as unknown as Shift[]);
+    const { data } = await supabase
+      .from("calendar_events")
+      .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
+      .gte("start_time", startDate)
+      .lte("start_time", endDate)
+      .order("start_time");
+
+    if (data) setShifts(data as unknown as Shift[]);
     setShiftLoading(false);
   }
 
@@ -621,58 +626,25 @@ export default function EinstellungenPage() {
       {/* ===== TAB: SCHICHTPLANUNG ===== */}
       {tab === "schichten" && (
         <div className="space-y-6">
-          {/* Kommende Schichten */}
-          {allUpcomingShifts.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Kommende Schichten ({allUpcomingShifts.length})</h2>
-              <div className="space-y-2">
-                {allUpcomingShifts.map((s) => (
-                  <Card key={s.id} className="bg-white border-gray-100">
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="text-center min-w-[44px]">
-                          <div className="text-sm font-bold">{new Date(s.start_time).getDate()}</div>
-                          <div className="text-[9px] text-muted-foreground uppercase">{new Date(s.start_time).toLocaleDateString("de-CH", { month: "short" })}</div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{s.title}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTime(s.start_time)} – {formatTime(s.end_time)}
-                            </span>
-                            {s.profile?.full_name && (
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {s.profile.full_name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Date & Add */}
+          {/* Filter & Add */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Input
-                type="date"
-                value={shiftDate}
-                onChange={(e) => setShiftDate(e.target.value)}
-                className="bg-white border-gray-200 w-44"
-              />
-              <span className="text-sm text-muted-foreground">
-                {new Date(shiftDate + "T12:00:00").toLocaleDateString("de-CH", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-              </span>
+            <div className="flex gap-2">
+              {[
+                { key: "woche", label: "Diese Woche" },
+                { key: "monat", label: "Dieser Monat" },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setShiftFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    shiftFilter === f.key
+                      ? "bg-red-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
             <Button
               onClick={() => setShowShiftForm(!showShiftForm)}
@@ -742,93 +714,66 @@ export default function EinstellungenPage() {
             </Card>
           )}
 
-          {/* Shift List */}
+          {/* Schichten nach Tag gruppiert */}
           {shiftLoading ? (
             <LoadingSkeleton />
           ) : shifts.length === 0 ? (
             <Card className="bg-white border-dashed">
               <CardContent className="py-10 text-center">
                 <Calendar className="h-8 w-8 text-gray-300 mx-auto" />
-                <p className="mt-2 text-sm text-muted-foreground">Keine Schichten für diesen Tag.</p>
-                <Button
-                  onClick={() => setShowShiftForm(true)}
-                  variant="outline"
-                  className="mt-3 text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" /> Schicht erstellen
-                </Button>
+                <p className="mt-2 text-sm text-muted-foreground">Keine Schichten in diesem Zeitraum.</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {shifts.map((shift) => (
-                <Card key={shift.id} className="bg-white border-gray-100 hover:border-gray-200 transition-colors">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-sm font-bold">
-                        {shift.profile?.full_name?.charAt(0).toUpperCase() || <Calendar className="h-5 w-5" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-sm">{shift.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-                          </span>
-                          {shift.profile?.full_name && (
-                            <span className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {shift.profile.full_name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => deleteShift(shift.id)}
-                      className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="Schicht löschen"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </CardContent>
-                </Card>
+            <div className="space-y-4">
+              {Object.entries(
+                shifts.reduce<Record<string, Shift[]>>((acc, s) => {
+                  const day = new Date(s.start_time).toISOString().split("T")[0];
+                  if (!acc[day]) acc[day] = [];
+                  acc[day].push(s);
+                  return acc;
+                }, {})
+              ).map(([day, dayShifts]) => (
+                <div key={day}>
+                  <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                    {new Date(day + "T12:00:00").toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long" })}
+                  </h3>
+                  <div className="space-y-1.5">
+                    {dayShifts.map((shift) => (
+                      <Card key={shift.id} className="bg-white border-gray-100 hover:border-gray-200 transition-colors">
+                        <CardContent className="p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">
+                              {shift.profile?.full_name?.charAt(0).toUpperCase() || "?"}
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-sm">{shift.title}</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+                                </span>
+                                {shift.profile?.full_name && (
+                                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {shift.profile.full_name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => deleteShift(shift.id)}
+                            className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
               ))}
-            </div>
-          )}
-
-          {/* Team-Übersicht für den Tag */}
-          {profiles.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                Tagesübersicht Team
-              </h2>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {profiles.map((p) => {
-                  const personShifts = shifts.filter((s) => s.profile_id === p.id);
-                  return (
-                    <Card key={p.id} className={`border-gray-100 ${personShifts.length > 0 ? "bg-white" : "bg-gray-50"}`}>
-                      <CardContent className="p-3 flex items-center gap-3">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold ${personShifts.length > 0 ? "bg-red-500" : "bg-gray-300"}`}>
-                          {p.full_name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{p.full_name}</p>
-                          {personShifts.length > 0 ? (
-                            <p className="text-[11px] text-red-600">
-                              {personShifts.map((s) => `${formatTime(s.start_time)}–${formatTime(s.end_time)}`).join(", ")}
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-gray-400">Keine Schicht</p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
             </div>
           )}
         </div>
