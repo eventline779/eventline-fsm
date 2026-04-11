@@ -73,8 +73,12 @@ export default function StandortDetailPage() {
 
   async function saveNotes() {
     setSavingNotes(true);
-    await supabase.from("locations").update({ notes }).eq("id", id);
-    toast.success("Notizen gespeichert");
+    const { error } = await supabase.from("locations").update({ notes }).eq("id", id);
+    if (error) {
+      toast.error("Fehler beim Speichern: " + error.message);
+    } else {
+      toast.success("Notizen gespeichert");
+    }
     setSavingNotes(false);
   }
 
