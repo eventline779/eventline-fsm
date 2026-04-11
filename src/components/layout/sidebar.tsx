@@ -109,7 +109,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                         "group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
                         active
                           ? "bg-white/10 text-white shadow-sm backdrop-blur-sm"
-                          : "text-white/70 hover:text-white hover:bg-white/[0.05]"
+                          : "text-white/90 hover:text-white hover:bg-white/[0.05]"
                       )}
                     >
                       {Icon && (
@@ -117,7 +117,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                           "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-200",
                           active
                             ? "bg-red-500/20 text-red-400"
-                            : "bg-white/[0.06] text-white/50 group-hover:text-white/80 group-hover:bg-white/[0.1]"
+                            : "bg-white/[0.08] text-white/80"
                         )}>
                           <Icon className="h-4 w-4" />
                         </div>
