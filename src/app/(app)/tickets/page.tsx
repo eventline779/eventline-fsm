@@ -38,18 +38,27 @@ export default function TicketsPage() {
   const [sending, setSending] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketItem | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
-    const [ticketsRes, profRes] = await Promise.all([
-      supabase.from("tickets").select("*").order("created_at", { ascending: false }),
+    const { data: { user } } = await supabase.auth.getUser();
+    const [profRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("is_active", true),
     ]);
-    if (ticketsRes.data) setTickets(ticketsRes.data as unknown as TicketItem[]);
-    if (profRes.data) setProfiles(profRes.data as Profile[]);
+    if (profRes.data) {
+      setProfiles(profRes.data as Profile[]);
+      const me = (profRes.data as Profile[]).find((p) => p.id === user?.id);
+      if (me?.role === "admin") {
+        setIsAdmin(true);
+        const { data: ticketsData } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
+        if (ticketsData) setTickets(ticketsData as unknown as TicketItem[]);
+      }
+    }
   }
 
   function getProfileName(id: string) {
@@ -94,6 +103,7 @@ export default function TicketsPage() {
     setForm({ title: "", description: "", category: "bestellung", priority: "normal" });
     setShowForm(false);
     setSending(false);
+    if (!isAdmin) setSubmitted(true);
     loadData();
   }
 
@@ -207,12 +217,33 @@ export default function TicketsPage() {
     );
   }
 
+  // Nicht-Admin: nur Formular + Bestätigung
+  if (!isAdmin && submitted) {
+    return (
+      <div className="space-y-6">
+        <div><h1 className="text-2xl font-bold tracking-tight">Tickets</h1></div>
+        <Card className="bg-white">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+              <Send className="h-7 w-7 text-green-500" />
+            </div>
+            <h3 className="font-semibold text-lg">Ticket eingereicht</h3>
+            <p className="text-sm text-muted-foreground mt-1">Du bekommst eine E-Mail sobald dein Ticket bearbeitet wurde.</p>
+            <Button onClick={() => { setSubmitted(false); setShowForm(true); }} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />Weiteres Ticket erstellen
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tickets</h1>
-          <p className="text-sm text-muted-foreground mt-1">Bestellungen, IT-Probleme, Reparaturen – geht an Mischa & Leo</p>
+          <p className="text-sm text-muted-foreground mt-1">{isAdmin ? "Alle Tickets verwalten" : "Bestellungen, IT-Probleme, Reparaturen anfragen"}</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
           {showForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
@@ -261,42 +292,57 @@ export default function TicketsPage() {
         </Card>
       )}
 
-      {/* Ticket List */}
-      {tickets.length === 0 && !showForm ? (
+      {/* Ticket List - nur für Admins */}
+      {isAdmin && (
+        tickets.length === 0 && !showForm ? (
+          <Card className="bg-white border-dashed">
+            <CardContent className="py-16 text-center">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
+              <h3 className="font-semibold text-lg">Keine offenen Tickets</h3>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {tickets.map((t) => {
+              const cat = getCat(t.category);
+              return (
+                <Card key={t.id} className="bg-white hover:shadow-sm transition-all cursor-pointer" onClick={() => { setSelectedTicket(t); }}>
+                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${cat.color}`}>
+                        <cat.icon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{t.title}</span>
+                          {t.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                          <span>{getProfileName(t.created_by)}</span>
+                          <span>{new Date(t.created_at).toLocaleDateString("de-CH")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Nicht-Admin: Info wenn kein Formular offen */}
+      {!isAdmin && !showForm && (
         <Card className="bg-white border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
-            <h3 className="font-semibold text-lg">Noch keine Tickets</h3>
-            <p className="text-sm text-muted-foreground mt-1">Erstelle ein Ticket für Bestellungen, IT-Probleme oder Reparaturen.</p>
+            <h3 className="font-semibold text-lg">Ticket erstellen</h3>
+            <p className="text-sm text-muted-foreground mt-1">Bestellungen, IT-Probleme oder Reparaturen anfragen.</p>
+            <Button onClick={() => setShowForm(true)} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />Neues Ticket
+            </Button>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-2">
-          {tickets.map((t) => {
-            const cat = getCat(t.category);
-            return (
-              <Card key={t.id} className="bg-white hover:shadow-sm transition-all cursor-pointer" onClick={() => { setSelectedTicket(t); }}>
-                <CardContent className="p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${cat.color}`}>
-                      <cat.icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{t.title}</span>
-                        {t.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                        <span>{getProfileName(t.created_by)}</span>
-                        <span>{new Date(t.created_at).toLocaleDateString("de-CH")}</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
       )}
     </div>
   );

@@ -103,6 +103,12 @@ export default function DashboardPage() {
 
   async function handleTicket(ticket: TicketItem, action: "genehmigt" | "abgelehnt") {
     try {
+      // E-Mail an Ersteller senden
+      await fetch("/api/tickets/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: ticket.id, action, ticketTitle: ticket.title, createdBy: ticket.created_by }),
+      });
       // Push-Benachrichtigung an Ersteller
       await fetch("/api/notifications", {
         method: "POST",
@@ -117,7 +123,7 @@ export default function DashboardPage() {
       // Remove from list
       await supabase.from("tickets").delete().eq("id", ticket.id);
       setTickets(tickets.filter((t) => t.id !== ticket.id));
-      toast.success(action === "genehmigt" ? "Ticket genehmigt" : "Ticket abgelehnt");
+      toast.success(action === "genehmigt" ? "Ticket genehmigt — E-Mail gesendet" : "Ticket abgelehnt — E-Mail gesendet");
     } catch {
       toast.error("Fehler beim Bearbeiten");
     }
