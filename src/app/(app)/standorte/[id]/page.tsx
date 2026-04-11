@@ -10,7 +10,7 @@ import type { Location, LocationContact, MaintenanceTask, Customer } from "@/typ
 import {
   ArrowLeft, Plus, UserPlus, Wrench, Check, StickyNote, MapPin,
   Users, Phone, Mail, Trash2, Camera, Image as ImageIcon, X,
-  ClipboardList, Building2,
+  ClipboardList, Building2, FileText, Upload, Download,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -45,6 +45,11 @@ export default function StandortDetailPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
 
+  // Dokumente
+  const [docs, setDocs] = useState<{ name: string; path: string; uploaded_at: string }[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => { loadAll(); }, [id]);
 
   async function loadAll() {
@@ -70,6 +75,14 @@ export default function StandortDetailPage() {
       const notesJson = await notesRes.json();
       if (notesJson.notes) setNotesList(notesJson.notes);
     } catch {}
+
+    // Load documents from technical_details
+    if (locRes.data?.technical_details) {
+      try {
+        const parsed = JSON.parse(locRes.data.technical_details);
+        if (Array.isArray(parsed)) setDocs(parsed);
+      } catch {}
+    }
   }
 
   async function linkCustomer(customerId: string) {
@@ -114,6 +127,55 @@ export default function StandortDetailPage() {
         toast.success("Notiz gelöscht");
       }
     } catch {}
+  }
+
+  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc(true);
+    const ext = file.name.split(".").pop() || "pdf";
+    const path = `standorte/${id}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
+    if (error) {
+      toast.error("Upload fehlgeschlagen: " + error.message);
+      setUploadingDoc(false);
+      e.target.value = "";
+      return;
+    }
+    const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
+    await fetch(`/api/locations/${id}/notes`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: location?.notes }),
+    });
+    // Save docs list via admin API
+    await fetch(`/api/locations/${id}/docs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docs: newDocs }),
+    });
+    setDocs(newDocs);
+    toast.success("Dokument hochgeladen");
+    setUploadingDoc(false);
+    e.target.value = "";
+  }
+
+  async function deleteDoc(doc: { name: string; path: string }) {
+    if (!confirm(`"${doc.name}" wirklich löschen?`)) return;
+    await supabase.storage.from("documents").remove([doc.path]);
+    const newDocs = docs.filter((d) => d.path !== doc.path);
+    await fetch(`/api/locations/${id}/docs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docs: newDocs }),
+    });
+    setDocs(newDocs);
+    toast.success("Dokument gelöscht");
+  }
+
+  function openDoc(path: string) {
+    const { data } = supabase.storage.from("documents").getPublicUrl(path);
+    window.open(data.publicUrl, "_blank");
   }
 
   async function addContact(e: React.FormEvent) {
@@ -289,6 +351,35 @@ export default function StandortDetailPage() {
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
               <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Dokumente */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
+            <Upload className="h-4 w-4 mr-1" />{uploadingDoc ? "Hochladen..." : "PDF hochladen"}
+          </Button>
+          <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {docs.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Dokumente.</p>}
+          {docs.map((d) => (
+            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <button onClick={() => openDoc(d.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-600 transition-colors">
+                <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{d.name}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(d.uploaded_at).toLocaleDateString("de-CH")}</p>
+                </div>
+              </button>
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Öffnen"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Löschen"><Trash2 className="h-4 w-4" /></button>
+              </div>
             </div>
           ))}
         </CardContent>
