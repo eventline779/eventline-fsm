@@ -30,7 +30,7 @@ export default function AuftragDetailPage() {
 
   // Appointment form
   const [showApptForm, setShowApptForm] = useState(false);
-  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", assigned_to: "", description: "" });
+  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
   const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadAll(); }, [id]);
@@ -96,19 +96,47 @@ export default function AuftragDetailPage() {
 
   async function addAppointment(e: React.FormEvent) {
     e.preventDefault();
-    const startTime = apptForm.date && apptForm.time
-      ? `${apptForm.date}T${apptForm.time}`
-      : apptForm.date
-        ? `${apptForm.date}T00:00`
-        : new Date().toISOString();
+    const startTime = `${apptForm.date}T${apptForm.time || "00:00"}`;
+    const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}`;
+
     await supabase.from("job_appointments").insert({
       job_id: id,
       title: apptForm.title,
       start_time: startTime,
+      end_time: endTime,
       assigned_to: apptForm.assigned_to || null,
       description: apptForm.description || null,
     });
-    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", assigned_to: "", description: "" });
+
+    // Schicht erstellen für zugewiesene Person + alle Techniker des Auftrags
+    if (job && job.status !== "entwurf") {
+      const personIds: string[] = [];
+      if (apptForm.assigned_to) personIds.push(apptForm.assigned_to);
+      // Auch Projektleiter und zugewiesene Techniker
+      if (job.project_lead_id && !personIds.includes(job.project_lead_id)) personIds.push(job.project_lead_id);
+      assignments.forEach((a) => {
+        if (!personIds.includes(a.profile_id)) personIds.push(a.profile_id);
+      });
+
+      if (personIds.length > 0) {
+        try {
+          await fetch("/api/jobs/assign-notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              job_id: id,
+              profile_ids: personIds,
+              job_title: `${apptForm.title} (${job.title})`,
+              start_date: startTime,
+              end_date: endTime,
+            }),
+          });
+          toast.success("Schicht erstellt & Team benachrichtigt");
+        } catch {}
+      }
+    }
+
+    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
     setShowApptForm(false);
     loadAll();
     toast.success("Termin hinzugefügt");
@@ -287,9 +315,10 @@ export default function AuftragDetailPage() {
           {showApptForm && (
             <form onSubmit={addAppointment} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
               <Input placeholder="Termin-Titel *" value={apptForm.title} onChange={(e) => setApptForm({ ...apptForm, title: e.target.value })} required />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={apptForm.date} onChange={(e) => setApptForm({ ...apptForm, date: e.target.value })} className="mt-1" required /></div>
-                <div><label className="text-xs font-medium">Uhrzeit</label><Input type="time" value={apptForm.time} onChange={(e) => setApptForm({ ...apptForm, time: e.target.value })} className="mt-1" /></div>
+                <div><label className="text-xs font-medium">Von *</label><Input type="time" value={apptForm.time} onChange={(e) => setApptForm({ ...apptForm, time: e.target.value })} className="mt-1" required /></div>
+                <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={apptForm.end_time} onChange={(e) => setApptForm({ ...apptForm, end_time: e.target.value })} className="mt-1" required /></div>
               </div>
               <select value={apptForm.assigned_to} onChange={(e) => setApptForm({ ...apptForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
                 <option value="">Zuweisen an (optional)...</option>
@@ -314,7 +343,7 @@ export default function AuftragDetailPage() {
                   <div className="min-w-0">
                     <span className={`font-medium text-sm ${appt.is_done ? "line-through text-muted-foreground" : ""}`}>{appt.title}</span>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(appt.start_time).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(appt.start_time).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{appt.end_time ? ` – ${new Date(appt.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
                       {assignee && <span className="flex items-center gap-1"><User className="h-3 w-3" />{assignee.full_name}</span>}
                     </div>
                   </div>
