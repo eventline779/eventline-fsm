@@ -16,13 +16,18 @@ import {
   TrendingUp,
   Plus,
   CheckSquare,
+  Ticket,
+  Check,
 } from "lucide-react";
+import { JOB_PRIORITY } from "@/lib/constants";
+import type { Todo, JobPriority } from "@/types";
 
 interface DashboardStats {
   offeneAuftraege: number;
   neueAnfragen: number;
   aktiveTechniker: number;
   kundenTotal: number;
+  offeneTickets: number;
 }
 
 export default function DashboardPage() {
@@ -31,8 +36,11 @@ export default function DashboardPage() {
     neueAnfragen: 0,
     aktiveTechniker: 0,
     kundenTotal: 0,
+    offeneTickets: 0,
   });
   const [userName, setUserName] = useState("");
+  const [myTodos, setMyTodos] = useState<(Todo & { assignee?: { full_name: string } })[]>([]);
+  const [userId, setUserId] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -47,7 +55,7 @@ export default function DashboardPage() {
         if (profile) setUserName(profile.full_name.split(" ")[0]);
       }
 
-      const [jobsRes, anfragenRes, timeRes, kundenRes] = await Promise.all([
+      const [jobsRes, anfragenRes, timeRes, kundenRes, ticketsRes] = await Promise.all([
         supabase
           .from("jobs")
           .select("id", { count: "exact", head: true })
@@ -64,6 +72,9 @@ export default function DashboardPage() {
           .from("customers")
           .select("id", { count: "exact", head: true })
           .eq("is_active", true),
+        supabase
+          .from("tickets")
+          .select("id", { count: "exact", head: true }),
       ]);
 
       setStats({
@@ -71,7 +82,21 @@ export default function DashboardPage() {
         neueAnfragen: anfragenRes.count ?? 0,
         aktiveTechniker: timeRes.count ?? 0,
         kundenTotal: kundenRes.count ?? 0,
+        offeneTickets: ticketsRes.count ?? 0,
       });
+
+      // Meine offenen Todos laden
+      if (user) {
+        setUserId(user.id);
+        const { data: todosData } = await supabase
+          .from("todos")
+          .select("*")
+          .eq("assigned_to", user.id)
+          .eq("status", "offen")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (todosData) setMyTodos(todosData as unknown as Todo[]);
+      }
     }
 
     loadData();
@@ -106,6 +131,13 @@ export default function DashboardPage() {
       iconBg: "bg-violet-50 text-violet-600",
       href: "/kunden",
     },
+    {
+      label: "Offene Tickets",
+      value: stats.offeneTickets,
+      icon: Ticket,
+      iconBg: "bg-red-50 text-red-600",
+      href: "/tickets",
+    },
   ];
 
   const quickActions = [
@@ -138,7 +170,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
         {statCards.map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group">
@@ -179,6 +211,44 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </div>
+
+      {/* Meine Todos */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Meine Todos</h2>
+          <Link href="/todos" className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1">Alle anzeigen <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+        {myTodos.length === 0 ? (
+          <Card className="bg-white border-gray-100">
+            <CardContent className="py-6 text-center">
+              <p className="text-sm text-muted-foreground">Keine offenen Todos für dich.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {myTodos.map((todo) => (
+              <Card key={todo.id} className="bg-white border-gray-100 hover:shadow-sm transition-all">
+                <CardContent className="p-3.5 flex items-center gap-3">
+                  <button
+                    onClick={async () => {
+                      await supabase.from("todos").update({ status: "erledigt", completed_at: new Date().toISOString() }).eq("id", todo.id);
+                      setMyTodos(myTodos.filter((t) => t.id !== todo.id));
+                    }}
+                    className="flex items-center justify-center w-6 h-6 rounded-md border-2 border-gray-300 hover:border-red-400 shrink-0 transition-all"
+                  />
+                  <Link href="/todos" className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{todo.title}</span>
+                      <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
+                    </div>
+                    {todo.due_date && <p className="text-xs text-muted-foreground mt-0.5">Fällig: {new Date(todo.due_date).toLocaleDateString("de-CH")}</p>}
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Further Navigation */}
