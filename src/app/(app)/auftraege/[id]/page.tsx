@@ -10,7 +10,7 @@ import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
-  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send,
+  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send, X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
