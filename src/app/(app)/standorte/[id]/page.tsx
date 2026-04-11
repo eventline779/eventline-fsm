@@ -73,9 +73,11 @@ export default function StandortDetailPage() {
 
   async function saveNotes() {
     setSavingNotes(true);
-    const { error } = await supabase.from("locations").update({ notes }).eq("id", id);
+    const { error, data, count } = await supabase.from("locations").update({ notes }).eq("id", id).select();
     if (error) {
-      toast.error("Fehler beim Speichern: " + error.message);
+      toast.error("Fehler: " + error.message);
+    } else if (!data || data.length === 0) {
+      toast.error("Keine Berechtigung zum Speichern (RLS)");
     } else {
       toast.success("Notizen gespeichert");
     }
