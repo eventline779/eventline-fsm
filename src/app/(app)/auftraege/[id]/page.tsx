@@ -375,7 +375,7 @@ export default function AuftragDetailPage() {
                   {!appt.is_done && (
                     <div className="relative">
                       <button
-                        onClick={() => !notifiedAppts.has(appt.id) && setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
+                        onClick={() => setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                           notifiedAppts.has(appt.id)
                             ? "bg-green-50 text-green-700 border-green-200"
