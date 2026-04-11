@@ -104,19 +104,22 @@ export default function AuftragDetailPage() {
     const startTime = `${apptForm.date}T${apptForm.time || "00:00"}:00${tz}`;
     const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}:00${tz}`;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const assignedTo = apptForm.assigned_to || user?.id || null;
+
     await supabase.from("job_appointments").insert({
       job_id: id,
       title: apptForm.title,
       start_time: startTime,
       end_time: endTime,
-      assigned_to: apptForm.assigned_to || null,
+      assigned_to: assignedTo,
       description: apptForm.description || null,
     });
 
     // Schicht erstellen für zugewiesene Person + alle Techniker des Auftrags
-    if (job && job.status !== "entwurf") {
+    if (job) {
       const personIds: string[] = [];
-      if (apptForm.assigned_to) personIds.push(apptForm.assigned_to);
+      if (assignedTo) personIds.push(assignedTo);
       // Auch Projektleiter und zugewiesene Techniker
       if (job.project_lead_id && !personIds.includes(job.project_lead_id)) personIds.push(job.project_lead_id);
       assignments.forEach((a) => {
