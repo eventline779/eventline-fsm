@@ -28,6 +28,7 @@ export default function StandortDetailPage() {
   const [tasks, setTasks] = useState<MaintenanceTaskWithPhoto[]>([]);
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
 
   // Contact form
   const [showContactForm, setShowContactForm] = useState(false);
@@ -82,6 +83,7 @@ export default function StandortDetailPage() {
       const json = await res.json();
       if (json.success) {
         toast.success("Notizen gespeichert");
+        setEditingNotes(false);
       } else {
         toast.error("Fehler: " + (json.error || "Unbekannt"));
       }
@@ -235,10 +237,30 @@ export default function StandortDetailPage() {
 
       {/* Notizen */}
       <Card className="bg-white">
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen</CardTitle></CardHeader>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen</CardTitle>
+          {!editingNotes && (
+            <Button size="sm" variant="outline" onClick={() => setEditingNotes(true)}>
+              {notes ? "Bearbeiten" : <><Plus className="h-4 w-4 mr-1" />Hinzufügen</>}
+            </Button>
+          )}
+        </CardHeader>
         <CardContent>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notizen zu diesem Standort..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={4} />
-          <Button onClick={saveNotes} disabled={savingNotes} size="sm" className="mt-2 bg-red-600 hover:bg-red-700 text-white">{savingNotes ? "Speichern..." : "Notizen speichern"}</Button>
+          {editingNotes ? (
+            <div className="space-y-2">
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notizen zu diesem Standort..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={4} />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => { setEditingNotes(false); setNotes(location.notes || ""); }}>Abbrechen</Button>
+                <Button onClick={saveNotes} disabled={savingNotes} size="sm" className="bg-red-600 hover:bg-red-700 text-white">{savingNotes ? "Speichern..." : "Speichern"}</Button>
+              </div>
+            </div>
+          ) : notes ? (
+            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <p className="text-sm whitespace-pre-wrap">{notes}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>
+          )}
         </CardContent>
       </Card>
 
