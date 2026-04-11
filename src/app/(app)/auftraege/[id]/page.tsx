@@ -37,7 +37,7 @@ export default function AuftragDetailPage() {
 
   async function loadAll() {
     const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
-      supabase.from("jobs").select("*, customer:customers(name), location:locations(name), project_lead:profiles!project_lead_id(full_name)").eq("id", id).single(),
+      supabase.from("jobs").select("*, customer:customers(name), location:locations(name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name)").eq("id", id).single(),
       supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
       supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
       supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -135,7 +135,9 @@ export default function AuftragDetailPage() {
   if (!job) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
   const customer = job.customer as unknown as { name: string } | undefined;
-  const location = job.location as unknown as { name: string } | undefined;
+  const location = job.location as unknown as { name: string; address_street?: string; address_zip?: string; address_city?: string } | undefined;
+  const locationAddress = location ? [location.address_street, `${location.address_zip || ""} ${location.address_city || ""}`.trim()].filter(Boolean).join(", ") : "";
+  const mapsUrl = locationAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}` : location?.name ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.name)}` : "";
   const projectLead = (job as unknown as { project_lead: { full_name: string } | null }).project_lead;
 
   // Status transition buttons
@@ -183,7 +185,21 @@ export default function AuftragDetailPage() {
       <Card className="bg-white">
         <CardContent className="p-5 space-y-3">
           {customer && <div className="flex items-center gap-2 text-sm"><User className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Kunde:</span> {customer.name}</div>}
-          {location && <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Standort:</span> {location.name}</div>}
+          {location && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Standort:</span>
+                <span>{location.name}{locationAddress ? ` — ${locationAddress}` : ""}</span>
+              </div>
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Google Maps
+                </a>
+              )}
+            </div>
+          )}
           {projectLead && <div className="flex items-center gap-2 text-sm"><UserCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Projektleiter:</span> {projectLead.full_name}</div>}
           {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Zeitraum:</span> {new Date(job.start_date).toLocaleDateString("de-CH")} {job.end_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH")}` : ""}</div>}
           {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
