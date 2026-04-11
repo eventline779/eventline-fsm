@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Tab = "team" | "zeiten" | "schichten";
+type Tab = "team" | "zeiten" | "schichten" | "backup";
 
 const TEAM_PRESETS = [
   { name: "Dario", email: "dario@eventline-basel.com", role: "admin" as const },
@@ -57,7 +57,7 @@ interface Shift {
 export default function EinstellungenPage() {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(urlTab && ["team", "zeiten", "schichten"].includes(urlTab) ? urlTab : "team");
+  const [tab, setTab] = useState<Tab>(urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab) ? urlTab : "team");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -88,7 +88,7 @@ export default function EinstellungenPage() {
 
   // Sync tab from URL when navigating via sidebar
   useEffect(() => {
-    if (urlTab && ["team", "zeiten", "schichten"].includes(urlTab)) {
+    if (urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab)) {
       setTab(urlTab);
     } else if (!urlTab) {
       setTab("team");
@@ -290,10 +290,49 @@ export default function EinstellungenPage() {
     toast.success("CSV exportiert");
   }
 
+  async function exportTable(table: string, label: string) {
+    const { data, error } = await supabase.from(table).select("*");
+    if (error || !data || data.length === 0) {
+      toast.error(`Keine Daten in ${label}`);
+      return;
+    }
+    const headers = Object.keys(data[0]);
+    const rows = [headers.join(";")];
+    for (const row of data) {
+      rows.push(headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(";"));
+    }
+    const csv = "\uFEFF" + rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${label}_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${label} exportiert`);
+  }
+
+  async function exportAll() {
+    const tables = [
+      { table: "customers", label: "Kunden" },
+      { table: "jobs", label: "Auftraege" },
+      { table: "time_entries", label: "Zeiterfassung" },
+      { table: "service_reports", label: "Rapporte" },
+      { table: "locations", label: "Standorte" },
+      { table: "rental_requests", label: "Vermietungen" },
+      { table: "profiles", label: "Team" },
+    ];
+    for (const t of tables) {
+      await exportTable(t.table, t.label);
+    }
+    toast.success("Alle Daten exportiert!");
+  }
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
     { key: "zeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" /> },
     { key: "schichten", label: "Schichtplanung", icon: <Calendar className="h-4 w-4" /> },
+    { key: "backup", label: "Backup", icon: <Download className="h-4 w-4" /> },
   ];
 
   return (
@@ -745,6 +784,64 @@ export default function EinstellungenPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== TAB: BACKUP ===== */}
+      {tab === "backup" && (
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-muted-foreground">Exportiere alle Daten als CSV-Dateien für dein Backup oder die Buchhaltung.</p>
+          </div>
+
+          {/* Alle exportieren */}
+          <Card className="bg-white border-gray-100">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm">Komplett-Backup</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Alle Tabellen als separate CSV-Dateien herunterladen</p>
+                </div>
+                <Button onClick={exportAll} className="bg-red-600 hover:bg-red-700 text-white">
+                  <Download className="h-4 w-4 mr-2" />Alles exportieren
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Einzelne Tabellen */}
+          <div>
+            <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Einzelne Bereiche exportieren</h2>
+            <div className="space-y-2">
+              {[
+                { table: "customers", label: "Kunden", desc: "Alle Kundendaten mit Kontaktinfos" },
+                { table: "jobs", label: "Aufträge", desc: "Alle Aufträge mit Status und Details" },
+                { table: "time_entries", label: "Zeiterfassung", desc: "Alle Stempelzeiten aller Mitarbeiter" },
+                { table: "service_reports", label: "Rapporte", desc: "Alle Einsatzrapporte" },
+                { table: "locations", label: "Standorte", desc: "Alle Standorte und Adressen" },
+                { table: "rental_requests", label: "Vermietungen", desc: "Alle Vermietungsanfragen" },
+                { table: "profiles", label: "Team", desc: "Alle Teammitglieder" },
+                { table: "job_appointments", label: "Termine", desc: "Alle Auftrags-Termine" },
+                { table: "maintenance_tasks", label: "Instandhaltung", desc: "Alle Instandhaltungsarbeiten" },
+                { table: "calendar_events", label: "Schichten", desc: "Alle Kalendereinträge und Schichten" },
+              ].map((item) => (
+                <Card key={item.table} className="bg-white border-gray-100">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-sm">{item.label}</h3>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => exportTable(item.table, item.label)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-medium transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />CSV
+                    </button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
