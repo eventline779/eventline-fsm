@@ -63,6 +63,27 @@ export default function KundenDetailPage() {
     loadData();
   }
 
+  async function handleDelete() {
+    if (!confirm(`Kunde "${customer?.name}" wirklich löschen? Alle verknüpften Aufträge und Vermietungen werden ebenfalls gelöscht.`)) return;
+
+    // Verknüpfte Daten löschen
+    await supabase.from("job_assignments").delete().in("job_id",
+      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
+    );
+    await supabase.from("job_appointments").delete().in("job_id",
+      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
+    );
+    await supabase.from("service_reports").delete().in("job_id",
+      (await supabase.from("jobs").select("id").eq("customer_id", id)).data?.map((j: any) => j.id) || []
+    );
+    await supabase.from("jobs").delete().eq("customer_id", id);
+    await supabase.from("rental_requests").delete().eq("customer_id", id);
+    await supabase.from("customers").delete().eq("id", id);
+
+    toast.success("Kunde gelöscht");
+    router.push("/kunden");
+  }
+
   if (!customer) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
   const typeIcon = customer.type === "company" ? <Building2 className="h-5 w-5" /> : customer.type === "individual" ? <User className="h-5 w-5" /> : <Globe className="h-5 w-5" />;
@@ -75,9 +96,14 @@ export default function KundenDetailPage() {
           <h1 className="text-2xl font-bold tracking-tight">{customer.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
         </div>
-        <Button onClick={() => setEditing(!editing)} variant={editing ? "outline" : "default"} className={editing ? "" : "bg-red-600 hover:bg-red-700 text-white"}>
-          {editing ? "Abbrechen" : "Bearbeiten"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setEditing(!editing)} variant={editing ? "outline" : "default"} className={editing ? "" : "bg-red-600 hover:bg-red-700 text-white"}>
+            {editing ? "Abbrechen" : "Bearbeiten"}
+          </Button>
+          <Button onClick={handleDelete} variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Kundendaten */}
