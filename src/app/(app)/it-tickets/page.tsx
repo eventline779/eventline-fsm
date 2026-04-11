@@ -28,28 +28,24 @@ export default function ITTicketsPage() {
       created_by: user?.id,
     });
 
-    // E-Mail an Leo + Mischa
+    // Push-Benachrichtigung an Leo + Mischa
     try {
-      const res = await fetch("/api/tickets/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.subject,
-          description: form.description,
-          category: "it",
-          priority: form.priority === "kritisch" ? "dringend" : "normal",
-          reporter: profile?.full_name || "Unbekannt",
-          reporterEmail: profile?.email || "",
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("IT-Ticket erstellt & E-Mail gesendet");
-        setForm({ subject: "", description: "", priority: "normal" });
-        setShowForm(false);
-      } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      const { data: admins } = await supabase.from("profiles").select("id").in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
+      if (admins && admins.length > 0) {
+        await fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: admins.map((a: any) => a.id),
+            title: `💻 IT-Ticket: ${form.subject}`,
+            message: `Von ${profile?.full_name || "Unbekannt"} · ${form.priority === "kritisch" ? "Kritisch" : form.priority}`,
+            link: "/it-tickets",
+          }),
+        });
       }
+      toast.success("IT-Ticket erstellt");
+      setForm({ subject: "", description: "", priority: "normal" });
+      setShowForm(false);
     } catch {
       toast.error("Fehler beim Senden");
     }

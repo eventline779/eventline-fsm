@@ -103,10 +103,16 @@ export default function DashboardPage() {
 
   async function handleTicket(ticket: TicketItem, action: "genehmigt" | "abgelehnt") {
     try {
-      await fetch("/api/tickets/respond", {
+      // Push-Benachrichtigung an Ersteller
+      await fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketId: ticket.id, action, ticketTitle: ticket.title, createdBy: ticket.created_by }),
+        body: JSON.stringify({
+          userIds: [ticket.created_by],
+          title: action === "genehmigt" ? `✅ Ticket genehmigt: ${ticket.title}` : `❌ Ticket abgelehnt: ${ticket.title}`,
+          message: action === "genehmigt" ? "Deine Anfrage wird bearbeitet." : "Bei Fragen wende dich an die Geschäftsleitung.",
+          link: "/tickets",
+        }),
       });
       // Remove from list
       await supabase.from("tickets").delete().eq("id", ticket.id);

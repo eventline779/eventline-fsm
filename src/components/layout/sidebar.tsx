@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import type { Profile } from "@/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -178,6 +179,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
             </p>
             <p className="text-[11px] text-white/30 capitalize">{profile.role}</p>
           </div>
+          <NotificationBell />
           <button
             onClick={onSignOut}
             className="p-2 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/[0.05] transition-all duration-200"

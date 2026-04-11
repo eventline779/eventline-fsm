@@ -75,23 +75,22 @@ export default function TicketsPage() {
       // Table might not exist yet, send email anyway
     }
 
-    // Send email to Mischa + Leo
-    try {
-      await fetch("/api/tickets/notify", {
+    // Push-Benachrichtigung an Leo + Mischa
+    const { data: admins } = await supabase.from("profiles").select("id").in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
+    if (admins && admins.length > 0) {
+      await fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          category: form.category,
-          priority: form.priority,
-          reporter: profile?.full_name || "Unbekannt",
-          reporterEmail: profile?.email || "",
+          userIds: admins.map((a: any) => a.id),
+          title: `${form.priority === "dringend" ? "🚨 " : ""}Neues Ticket: ${form.title}`,
+          message: `Von ${profile?.full_name || "Unbekannt"} · ${form.category === "bestellung" ? "Bestellung" : form.category === "it" ? "IT-Problem" : form.category === "reparatur" ? "Reparatur" : "Sonstiges"}`,
+          link: "/tickets",
         }),
       });
-    } catch {}
+    }
 
-    toast.success("Ticket erstellt & E-Mail gesendet");
+    toast.success("Ticket erstellt");
     setForm({ title: "", description: "", category: "bestellung", priority: "normal" });
     setShowForm(false);
     setSending(false);
