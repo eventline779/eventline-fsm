@@ -622,160 +622,9 @@ export default function EinstellungenPage() {
         </div>
       )}
 
-      {/* ===== TAB: SCHICHTPLANUNG ===== */}
+      {/* ===== TAB: EINSATZÜBERSICHT ===== */}
       {tab === "schichten" && (
-        <div className="space-y-6">
-          {/* Filter & Add */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex gap-2">
-              {[
-                { key: "woche", label: "Diese Woche" },
-                { key: "monat", label: "Dieser Monat" },
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setShiftFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    shiftFilter === f.key
-                      ? "bg-red-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <Button
-              onClick={() => setShowShiftForm(!showShiftForm)}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {showShiftForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-              {showShiftForm ? "Abbrechen" : "Schicht erstellen"}
-            </Button>
-          </div>
-
-          {/* Shift Form */}
-          {showShiftForm && (
-            <Card className="border-red-100 shadow-sm">
-              <CardContent className="p-5">
-                <form onSubmit={createShift} className="space-y-4">
-                  <h3 className="font-semibold text-sm">Neue Schicht für {new Date(shiftDate + "T12:00:00").toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long" })}</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Bezeichnung</label>
-                      <Input
-                        placeholder="z.B. Frühschicht, Aufbau, Event"
-                        value={shiftForm.title}
-                        onChange={(e) => setShiftForm((f) => ({ ...f, title: e.target.value }))}
-                        className="mt-1.5 bg-gray-50 border-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Mitarbeiter</label>
-                      <select
-                        value={shiftForm.profile_id}
-                        onChange={(e) => setShiftForm((f) => ({ ...f, profile_id: e.target.value }))}
-                        className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
-                      >
-                        <option value="">Mitarbeiter wählen...</option>
-                        {profiles.map((p) => (
-                          <option key={p.id} value={p.id}>{p.full_name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Von</label>
-                      <Input
-                        type="time"
-                        value={shiftForm.start_time}
-                        onChange={(e) => setShiftForm((f) => ({ ...f, start_time: e.target.value }))}
-                        className="mt-1.5 bg-gray-50 border-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Bis</label>
-                      <Input
-                        type="time"
-                        value={shiftForm.end_time}
-                        onChange={(e) => setShiftForm((f) => ({ ...f, end_time: e.target.value }))}
-                        className="mt-1.5 bg-gray-50 border-gray-200"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-3 pt-1">
-                    <Button type="button" variant="outline" onClick={() => setShowShiftForm(false)} className="border-gray-200">Abbrechen</Button>
-                    <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white">Schicht erstellen</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Schichten nach Tag gruppiert */}
-          {shiftLoading ? (
-            <LoadingSkeleton />
-          ) : shifts.length === 0 ? (
-            <Card className="bg-white border-dashed">
-              <CardContent className="py-10 text-center">
-                <Calendar className="h-8 w-8 text-gray-300 mx-auto" />
-                <p className="mt-2 text-sm text-muted-foreground">Keine Schichten in diesem Zeitraum.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {Object.entries(
-                shifts.reduce<Record<string, Shift[]>>((acc, s) => {
-                  const day = new Date(s.start_time).toISOString().split("T")[0];
-                  if (!acc[day]) acc[day] = [];
-                  acc[day].push(s);
-                  return acc;
-                }, {})
-              ).map(([day, dayShifts]) => (
-                <div key={day}>
-                  <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                    {new Date(day + "T12:00:00").toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long" })}
-                  </h3>
-                  <div className="space-y-1.5">
-                    {dayShifts.map((shift) => (
-                      <Card key={shift.id} className="bg-white border-gray-100 hover:border-gray-200 transition-colors">
-                        <CardContent className="p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">
-                              {shift.profile?.full_name?.charAt(0).toUpperCase() || "?"}
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-sm">{shift.title}</h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-                                </span>
-                                {shift.profile?.full_name && (
-                                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {shift.profile.full_name}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => deleteShift(shift.id)}
-                            className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <TeamOverview profiles={profiles} supabase={supabase} />
       )}
 
       {/* ===== TAB: BACKUP ===== */}
@@ -893,6 +742,196 @@ function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleR
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function TeamOverview({ profiles, supabase }: { profiles: Profile[]; supabase: any }) {
+  const [data, setData] = useState<Record<string, { jobs: any[]; appointments: any[]; hours: number }>>({});
+  const [filter, setFilter] = useState("monat");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { loadOverview(); }, [filter]);
+
+  async function loadOverview() {
+    setLoading(true);
+    const now = new Date();
+    let startDate: string;
+    let endDate: string;
+
+    if (filter === "woche") {
+      const dayOfWeek = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayOfWeek);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      startDate = monday.toISOString().split("T")[0];
+      endDate = sunday.toISOString().split("T")[0];
+    } else {
+      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+    }
+
+    const [jobsRes, apptsRes, timeRes] = await Promise.all([
+      supabase.from("job_assignments").select("profile_id, job:jobs(id, title, status, start_date, end_date, customer:customers(name))").gte("job:jobs.start_date", startDate).lte("job:jobs.start_date", endDate + "T23:59:59"),
+      supabase.from("job_appointments").select("assigned_to, title, start_time, end_time, is_done, job:jobs(title)").gte("start_time", startDate + "T00:00:00").lte("start_time", endDate + "T23:59:59"),
+      supabase.from("time_entries").select("profile_id, clock_in, clock_out, break_minutes").gte("clock_in", startDate + "T00:00:00").lte("clock_in", endDate + "T23:59:59").not("clock_out", "is", null),
+    ]);
+
+    // Auch Aufträge wo die Person Projektleiter ist
+    const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null).gte("start_date", startDate).lte("start_date", endDate + "T23:59:59");
+
+    const result: Record<string, { jobs: any[]; appointments: any[]; hours: number }> = {};
+
+    for (const p of profiles) {
+      const personJobs: any[] = [];
+      const seenJobIds = new Set<string>();
+
+      // Jobs als Techniker
+      if (jobsRes.data) {
+        for (const a of jobsRes.data as any[]) {
+          if (a.profile_id === p.id && a.job && !seenJobIds.has(a.job.id)) {
+            personJobs.push(a.job);
+            seenJobIds.add(a.job.id);
+          }
+        }
+      }
+
+      // Jobs als Projektleiter
+      if (leadJobs) {
+        for (const j of leadJobs as any[]) {
+          if (j.project_lead_id === p.id && !seenJobIds.has(j.id)) {
+            personJobs.push(j);
+            seenJobIds.add(j.id);
+          }
+        }
+      }
+
+      // Termine
+      const personAppts = (apptsRes.data as any[] || []).filter((a: any) => a.assigned_to === p.id);
+
+      // Stunden
+      let totalMin = 0;
+      if (timeRes.data) {
+        for (const t of timeRes.data as any[]) {
+          if (t.profile_id === p.id && t.clock_out) {
+            totalMin += (new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime()) / 60000 - (t.break_minutes || 0);
+          }
+        }
+      }
+
+      result[p.id] = { jobs: personJobs, appointments: personAppts, hours: Math.round(totalMin / 60 * 10) / 10 };
+    }
+
+    setData(result);
+    setLoading(false);
+  }
+
+  if (loading) return <LoadingSkeleton />;
+
+  return (
+    <div className="space-y-6">
+      {/* Filter */}
+      <div className="flex gap-2">
+        {[
+          { key: "woche", label: "Diese Woche" },
+          { key: "monat", label: "Dieser Monat" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              filter === f.key ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Pro Person */}
+      {profiles.map((p) => {
+        const d = data[p.id] || { jobs: [], appointments: [], hours: 0 };
+        return (
+          <Card key={p.id} className="bg-white border-gray-100">
+            <CardContent className="p-5">
+              {/* Person Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold">
+                    {p.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{p.full_name}</h3>
+                    <p className="text-xs text-muted-foreground">{p.email}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold">{d.hours}h</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Gestempelt</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="p-2.5 rounded-lg bg-blue-50 text-center">
+                  <p className="text-lg font-bold text-blue-700">{d.jobs.length}</p>
+                  <p className="text-[10px] text-blue-600 font-medium">Aufträge</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-green-50 text-center">
+                  <p className="text-lg font-bold text-green-700">{d.appointments.length}</p>
+                  <p className="text-[10px] text-green-600 font-medium">Termine</p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-amber-50 text-center">
+                  <p className="text-lg font-bold text-amber-700">{d.hours}</p>
+                  <p className="text-[10px] text-amber-600 font-medium">Stunden</p>
+                </div>
+              </div>
+
+              {/* Aufträge */}
+              {d.jobs.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Aufträge</p>
+                  <div className="space-y-1">
+                    {d.jobs.map((j: any) => (
+                      <div key={j.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 text-sm">
+                        <span className="font-medium">{j.title}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${j.status === "abgeschlossen" ? "bg-green-100 text-green-700" : j.status === "in_arbeit" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}`}>
+                          {j.status === "offen" ? "Offen" : j.status === "geplant" ? "Geplant" : j.status === "in_arbeit" ? "In Arbeit" : j.status === "abgeschlossen" ? "Erledigt" : j.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Termine */}
+              {d.appointments.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Termine</p>
+                  <div className="space-y-1">
+                    {d.appointments.map((a: any, i: number) => (
+                      <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-sm ${a.is_done ? "bg-green-50" : "bg-gray-50"}`}>
+                        <div>
+                          <span className={`font-medium ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
+                          {a.job?.title && <span className="text-xs text-muted-foreground ml-2">({a.job.title})</span>}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(a.start_time).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })} {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {d.jobs.length === 0 && d.appointments.length === 0 && d.hours === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">Keine Einsätze in diesem Zeitraum</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 
