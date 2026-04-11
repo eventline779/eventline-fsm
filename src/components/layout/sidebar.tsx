@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { NotificationBell } from "@/components/layout/notification-bell";
+import { NotificationBell, useNotificationCounts } from "@/components/layout/notification-bell";
 import type { Profile } from "@/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -69,6 +69,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
+  const badgeCounts = useNotificationCounts();
 
 
   const groups: NavGroup[] = profile.role === "admin"
@@ -91,11 +92,12 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
 
   return (
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-gradient-to-b from-[#0a0a0a] to-[#111111] text-white h-screen sticky top-0 shadow-2xl">
-      {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/5">
+      {/* Logo + Glocke */}
+      <div className="px-6 py-6 border-b border-white/5 flex items-center justify-between">
         <Link href="/dashboard" className="block">
           <Logo size="md" variant="light" />
         </Link>
+        <NotificationBell />
       </div>
 
       {/* Navigation */}
@@ -137,7 +139,12 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                         </div>
                       )}
                       <span className="flex-1">{item.label}</span>
-                      {active && (
+                      {badgeCounts[item.href] > 0 && (
+                        <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                          {badgeCounts[item.href]}
+                        </span>
+                      )}
+                      {active && !badgeCounts[item.href] && (
                         <ChevronRight className="h-3 w-3 text-white/20" />
                       )}
                     </Link>
@@ -179,7 +186,6 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
             </p>
             <p className="text-[11px] text-white/30 capitalize">{profile.role}</p>
           </div>
-          <NotificationBell />
           <button
             onClick={onSignOut}
             className="p-2 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/[0.05] transition-all duration-200"
