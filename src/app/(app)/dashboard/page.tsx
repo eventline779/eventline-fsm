@@ -264,25 +264,20 @@ export default function DashboardPage() {
           </Card>
         )}
         {quickLinks.length > 0 ? (
-          <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-2">
             {quickLinks.map((link, i) => (
-              <Card key={i} className="bg-white border-gray-100 hover:shadow-sm transition-all group">
-                <CardContent className="p-3.5 flex items-center justify-between">
-                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
-                      <ExternalLink className="h-4 w-4" />
-                    </div>
-                    <span className="font-medium text-sm truncate">{link.name}</span>
-                  </a>
-                  <button onClick={() => {
-                    const updated = quickLinks.filter((_, j) => j !== i);
-                    setQuickLinks(updated);
-                    localStorage.setItem("dashboard-links", JSON.stringify(updated));
-                  }} className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </CardContent>
-              </Card>
+              <div key={i} className="flex items-center gap-1 group">
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
+                  <ExternalLink className="h-3 w-3" />{link.name}
+                </a>
+                <button onClick={() => {
+                  const updated = quickLinks.filter((_, j) => j !== i);
+                  setQuickLinks(updated);
+                  localStorage.setItem("dashboard-links", JSON.stringify(updated));
+                }} className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
             ))}
           </div>
         ) : !showLinkForm && (
