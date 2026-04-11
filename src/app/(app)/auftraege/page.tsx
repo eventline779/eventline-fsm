@@ -68,27 +68,53 @@ export default function AuftraegePage() {
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Aufträge suchen..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white border-gray-200"
-            />
-          </div>
-          <select
-            value={filterPerson}
-            onChange={(e) => setFilterPerson(e.target.value)}
-            className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white"
+      {/* Suche */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Aufträge suchen..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10 bg-white border-gray-200"
+        />
+      </div>
+
+      {/* Filter: Personen */}
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Personen</p>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterPerson("all")}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+              filterPerson === "all"
+                ? "bg-black text-white border-black"
+                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+            }`}
           >
-            <option value="all">Alle Personen</option>
-            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-          </select>
+            <Users className="h-3.5 w-3.5" />Alle
+          </button>
+          {profiles.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setFilterPerson(p.id === filterPerson ? "all" : p.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+                filterPerson === p.id
+                  ? "bg-red-600 text-white border-red-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${filterPerson === p.id ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                {p.full_name.charAt(0)}
+              </div>
+              {p.full_name.split(" ")[0]}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Filter: Status */}
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setFilterStatus("all")}
