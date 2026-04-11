@@ -73,6 +73,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   }
 
+  // Auto-Refresh alle 30 Sekunden
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     async function loadProfile() {
       const {
