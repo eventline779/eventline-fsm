@@ -186,7 +186,7 @@ export default function KundenDetailPage() {
               <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer">
                 <div>
                   <div className="flex items-center gap-2">
-                    {j.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded">#{j.job_number}</span>}
+                    {j.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded">INT-{j.job_number}</span>}
                     <span className="font-medium text-sm">{j.title}</span>
                     <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_STATUS[j.status].color}`}>{JOB_STATUS[j.status].label}</span>
                   </div>

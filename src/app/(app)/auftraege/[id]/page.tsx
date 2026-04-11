@@ -161,7 +161,7 @@ export default function AuftragDetailPage() {
         <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            {job.job_number && <span className="text-sm font-mono text-muted-foreground">#{job.job_number}</span>}
+            {job.job_number && <span className="text-sm font-mono text-muted-foreground">INT-{job.job_number}</span>}
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
           <div className="flex items-center gap-3 mt-1">

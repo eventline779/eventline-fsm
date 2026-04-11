@@ -261,7 +261,7 @@ export default function NeuerRapportPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Einsatzrapport</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {selectedJob?.job_number ? `Auftrag #${selectedJob.job_number}` : "Rapport erfassen"}
+            {selectedJob?.job_number ? `Auftrag INT-${selectedJob.job_number}` : "Rapport erfassen"}
           </p>
         </div>
       </div>
@@ -277,14 +277,14 @@ export default function NeuerRapportPage() {
                 <option value="">Auftrag auswählen...</option>
                 {jobs.map((j) => (
                   <option key={j.id} value={j.id}>
-                    {j.job_number ? `#${j.job_number} – ` : ""}{j.title}
+                    {j.job_number ? `INT-${j.job_number} – ` : ""}{j.title}
                   </option>
                 ))}
               </select>
             </div>
             {selectedJob && (
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-1">
-                {selectedJob.job_number && <div className="text-xs"><span className="font-medium">Auftragsnr.:</span> #{selectedJob.job_number}</div>}
+                {selectedJob.job_number && <div className="text-xs"><span className="font-medium">Auftragsnr.:</span> INT-{selectedJob.job_number}</div>}
                 {selectedJob.customer?.name && <div className="text-xs"><span className="font-medium">Kunde:</span> {selectedJob.customer.name}</div>}
                 {selectedJob.location?.name && <div className="text-xs"><span className="font-medium">Standort:</span> {selectedJob.location.name}</div>}
               </div>

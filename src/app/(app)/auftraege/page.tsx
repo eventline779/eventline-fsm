@@ -187,7 +187,7 @@ export default function AuftraegePage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3">
-                      {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">#{job.job_number}</span>}
+                      {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
                       <h3 className="font-semibold text-gray-900 truncate">{job.title}</h3>
                       <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
                         {JOB_STATUS[job.status].label}

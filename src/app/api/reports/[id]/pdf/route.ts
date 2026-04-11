@@ -51,7 +51,7 @@ export async function GET(
   if (job?.job_number) {
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text(`#${job.job_number}`, 14, y + 7);
+    doc.text(`INT-${job.job_number}`, 14, y + 7);
     doc.setTextColor(0);
     y += 4;
   }

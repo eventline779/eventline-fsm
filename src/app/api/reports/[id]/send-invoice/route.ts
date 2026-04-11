@@ -45,7 +45,7 @@ async function generatePDF(
   if (job?.job_number) {
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text(`#${job.job_number}`, 14, y + 7);
+    doc.text(`INT-${job.job_number}`, 14, y + 7);
     doc.setTextColor(0);
     y += 4;
   }
@@ -410,7 +410,7 @@ export async function POST(
 
     if (adminProfile) {
       await supabase.from("documents").insert({
-        name: `Einsatzrapport #${jobNumber}.pdf`,
+        name: `Einsatzrapport INT-${jobNumber}.pdf`,
         storage_path: pdfPath,
         file_size: pdfBuffer.length,
         mime_type: "application/pdf",
@@ -428,7 +428,7 @@ export async function POST(
       await resend.emails.send({
         from: "EVENTLINE FSM <noreply@eventline-basel.com>",
         to: "buchhaltung@eventline-basel.com",
-        subject: `Rechnung stellen #${jobNumber} – ${customerName}`,
+        subject: `Rechnung stellen INT-${jobNumber} – ${customerName}`,
         html: `
           <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto;">
             <div style="background: #1a1a1a; padding: 20px 24px; border-radius: 12px 12px 0 0;">
@@ -436,7 +436,7 @@ export async function POST(
             </div>
             <div style="background: white; padding: 24px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
               <p style="margin: 0 0 12px;">Hallo Buchhaltung,</p>
-              <p style="margin: 0 0 16px;">Der Auftrag <strong>#${jobNumber} – ${job?.title || ""}</strong> wurde abgeschlossen.</p>
+              <p style="margin: 0 0 16px;">Der Auftrag <strong>INT-${jobNumber} – ${job?.title || ""}</strong> wurde abgeschlossen.</p>
               <div style="background: #f5f5f5; padding: 14px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 0 0 16px;">
                 <p style="margin: 0 0 4px; font-weight: 600;">Kunde: ${customerName}</p>
                 <p style="margin: 0; color: #666; font-size: 14px;">Einsatzrapport im Anhang als PDF${photoImages.length > 0 ? ` (inkl. ${photoImages.length} Foto${photoImages.length > 1 ? "s" : ""})` : ""}</p>

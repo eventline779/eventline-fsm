@@ -61,7 +61,7 @@ export default function RapportePage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-3">
-                        {job?.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">#{job.job_number}</span>}
+                        {job?.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
                       <h3 className="font-semibold">{job?.title || "Ohne Auftrag"}</h3>
                         <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${r.status === "abgeschlossen" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                           {r.status === "abgeschlossen" ? "Abgeschlossen" : "Entwurf"}
