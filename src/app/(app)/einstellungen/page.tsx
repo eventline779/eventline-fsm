@@ -164,7 +164,6 @@ export default function EinstellungenPage() {
       .gte("start_time", startDate)
       .lte("start_time", endDate)
       .order("start_time");
-
     if (data) setShifts(data as unknown as Shift[]);
     setShiftLoading(false);
   }
