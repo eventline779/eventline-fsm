@@ -31,6 +31,8 @@ import {
   CheckSquare,
   Eye,
   EyeOff,
+  Sun,
+  Moon,
   AlertTriangle,
   GraduationCap,
   Briefcase,
@@ -39,6 +41,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { useTheme } from "next-themes";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -72,6 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { theme, setTheme } = useTheme();
   const supabase = createClient();
 
   function toggleSimplified() {
@@ -219,11 +223,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* Simplified Toggle */}
-          <div className="absolute bottom-[90px] left-3 right-3">
+          {/* Toggles */}
+          <div className="absolute bottom-[90px] left-3 right-3 space-y-0.5">
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
+            >
+              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </button>
             <button
               onClick={toggleSimplified}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
             >
               {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               {simplified ? "Alle Module" : "Vereinfacht"}
