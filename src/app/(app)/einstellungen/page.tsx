@@ -221,8 +221,8 @@ export default function EinstellungenPage() {
 
     const { error } = await supabase.from("calendar_events").insert({
       title: shiftTitle,
-      start_time: `${shiftDate}T${shiftForm.start_time}:00`,
-      end_time: `${shiftDate}T${shiftForm.end_time}:00`,
+      start_time: (() => { const o = -new Date().getTimezoneOffset(); const s = o >= 0 ? "+" : "-"; const h = String(Math.floor(Math.abs(o) / 60)).padStart(2, "0"); const m = String(Math.abs(o) % 60).padStart(2, "0"); return `${shiftDate}T${shiftForm.start_time}:00${s}${h}:${m}`; })(),
+      end_time: (() => { const o = -new Date().getTimezoneOffset(); const s = o >= 0 ? "+" : "-"; const h = String(Math.floor(Math.abs(o) / 60)).padStart(2, "0"); const m = String(Math.abs(o) % 60).padStart(2, "0"); return `${shiftDate}T${shiftForm.end_time}:00${s}${h}:${m}`; })(),
       profile_id: shiftForm.profile_id || null,
       color: "#ef4444",
       created_by: user?.id,

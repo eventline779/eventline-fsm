@@ -96,8 +96,13 @@ export default function AuftragDetailPage() {
 
   async function addAppointment(e: React.FormEvent) {
     e.preventDefault();
-    const startTime = `${apptForm.date}T${apptForm.time || "00:00"}`;
-    const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}`;
+    const tzOffset = -new Date().getTimezoneOffset();
+    const tzSign = tzOffset >= 0 ? "+" : "-";
+    const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
+    const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, "0");
+    const tz = `${tzSign}${tzHours}:${tzMins}`;
+    const startTime = `${apptForm.date}T${apptForm.time || "00:00"}:00${tz}`;
+    const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}:00${tz}`;
 
     await supabase.from("job_appointments").insert({
       job_id: id,
