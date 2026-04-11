@@ -6,11 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Location, LocationContact, MaintenanceTask } from "@/types";
+import type { Location, LocationContact, MaintenanceTask, Customer } from "@/types";
 import {
   ArrowLeft, Plus, UserPlus, Wrench, Check, StickyNote, MapPin,
   Users, Phone, Mail, Trash2, Camera, Image as ImageIcon, X,
-  ClipboardList,
+  ClipboardList, Building2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -41,18 +41,34 @@ export default function StandortDetailPage() {
   const taskCameraRef = useRef<HTMLInputElement>(null);
 
   const [taskFilter, setTaskFilter] = useState<"all" | "offen" | "erledigt">("all");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
 
   useEffect(() => { loadAll(); }, [id]);
 
   async function loadAll() {
-    const [locRes, contRes, taskRes] = await Promise.all([
+    const [locRes, contRes, taskRes, custRes] = await Promise.all([
       supabase.from("locations").select("*").eq("id", id).single(),
       supabase.from("location_contacts").select("*").eq("location_id", id).order("name"),
       supabase.from("maintenance_tasks").select("*").eq("location_id", id).order("created_at", { ascending: false }),
+      supabase.from("customers").select("*").eq("is_active", true).order("name"),
     ]);
-    if (locRes.data) { setLocation(locRes.data as Location); setNotes(locRes.data.notes || ""); }
+    if (locRes.data) {
+      setLocation(locRes.data as Location);
+      setNotes(locRes.data.notes || "");
+      if (locRes.data.customer_id && custRes.data) {
+        setLinkedCustomer((custRes.data as Customer[]).find((c) => c.id === locRes.data.customer_id) || null);
+      }
+    }
     if (contRes.data) setContacts(contRes.data as LocationContact[]);
     if (taskRes.data) setTasks(taskRes.data as MaintenanceTaskWithPhoto[]);
+    if (custRes.data) setCustomers(custRes.data as Customer[]);
+  }
+
+  async function linkCustomer(customerId: string) {
+    await supabase.from("locations").update({ customer_id: customerId || null }).eq("id", id);
+    toast.success(customerId ? "Kunde verknüpft" : "Kundenverknüpfung entfernt");
+    loadAll();
   }
 
   async function saveNotes() {
@@ -161,6 +177,38 @@ export default function StandortDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Kunde verknüpfen */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Building2 className="h-4 w-4" />Zugewiesener Kunde</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {linkedCustomer ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold text-sm">{linkedCustomer.name.charAt(0)}</div>
+                <div>
+                  <p className="font-medium text-sm">{linkedCustomer.name}</p>
+                  {linkedCustomer.address_city && <p className="text-xs text-muted-foreground">{linkedCustomer.address_zip} {linkedCustomer.address_city}</p>}
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => linkCustomer("")} className="text-xs text-red-500 border-red-200 hover:bg-red-50">Entfernen</Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <select
+                onChange={(e) => { if (e.target.value) linkCustomer(e.target.value); }}
+                className="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                defaultValue=""
+              >
+                <option value="">Kunde auswählen...</option>
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Notizen */}
       <Card className="bg-white">
