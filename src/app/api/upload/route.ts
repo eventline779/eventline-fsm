@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "File and path required" }, { status: 400 });
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: `Datei zu gross (${Math.round(file.size / 1024 / 1024)}MB). Max 10MB.` }, { status: 400 });
+    }
+
     const supabase = createAdminClient();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);

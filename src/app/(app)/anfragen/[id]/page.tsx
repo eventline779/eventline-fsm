@@ -83,10 +83,14 @@ export default function VermietungDetailPage() {
       formData.append("file", file);
       formData.append("path", filePath);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) return false;
       const json = await res.json();
-      return json.success;
-    } catch {
+      if (!json.success) {
+        toast.error("Upload-Fehler: " + (json.error || "Unbekannt"));
+        return false;
+      }
+      return true;
+    } catch (e: any) {
+      toast.error("Upload-Fehler: " + (e.message || "Netzwerkfehler"));
       return false;
     }
   }
