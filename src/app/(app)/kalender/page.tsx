@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Job, RentalRequest, JobAppointment } from "@/types";
+import type { Job, RentalRequest, JobAppointment, Profile } from "@/types";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,8 +15,12 @@ import {
   Calendar as CalIcon,
   User,
   CalendarClock,
+  Plus,
+  X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { JOB_STATUS, RENTAL_STATUS } from "@/lib/constants";
+import { toast } from "sonner";
 import Link from "next/link";
 
 interface CalendarItem {
@@ -41,15 +45,26 @@ export default function KalenderPage() {
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
   const [view, setView] = useState<View>("monat");
+  const [showForm, setShowForm] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [form, setForm] = useState({
+    title: "", date: new Date().toISOString().split("T")[0],
+    time: "08:00", end_time: "17:00", assigned_to: "", job_id: "",
+  });
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
-      const [jobsRes, rentalsRes, apptsRes] = await Promise.all([
+      const [jobsRes, rentalsRes, apptsRes, profRes, activeJobsRes] = await Promise.all([
         supabase.from("jobs").select("*, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
         supabase.from("rental_requests").select("*, customer:customers(name), location:locations(name)").not("event_date", "is", null),
         supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
+        supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
+        supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("created_at", { ascending: false }),
       ]);
+      if (profRes.data) setProfiles(profRes.data as Profile[]);
+      if (activeJobsRes.data) setJobs(activeJobsRes.data as unknown as Job[]);
 
       const calItems: CalendarItem[] = [];
 
@@ -155,6 +170,46 @@ export default function KalenderPage() {
     return d.getDay() === 0 || d.getDay() === 6;
   };
 
+  async function createAppointment(e: React.FormEvent) {
+    e.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    const tzOffset = -new Date().getTimezoneOffset();
+    const tzSign = tzOffset >= 0 ? "+" : "-";
+    const tzH = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
+    const tzM = String(Math.abs(tzOffset) % 60).padStart(2, "0");
+    const tz = `${tzSign}${tzH}:${tzM}`;
+
+    const assignedTo = form.assigned_to || user?.id || null;
+
+    await supabase.from("job_appointments").insert({
+      job_id: form.job_id || null,
+      title: form.title,
+      start_time: `${form.date}T${form.time}:00${tz}`,
+      end_time: `${form.date}T${form.end_time}:00${tz}`,
+      assigned_to: assignedTo,
+    });
+
+    // Benachrichtigung an zugewiesene Person
+    if (assignedTo && assignedTo !== user?.id) {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userIds: [assignedTo],
+          title: `Neuer Termin: ${form.title}`,
+          message: `${form.date} ${form.time}–${form.end_time}`,
+          link: form.job_id ? `/auftraege/${form.job_id}` : "/kalender",
+        }),
+      });
+    }
+
+    setForm({ title: "", date: new Date().toISOString().split("T")[0], time: "08:00", end_time: "17:00", assigned_to: "", job_id: "" });
+    setShowForm(false);
+    toast.success("Termin erstellt");
+    // Reload
+    window.location.reload();
+  }
+
   const typeConfig = {
     auftrag: { icon: <ClipboardList className="h-3.5 w-3.5" />, label: "Auftrag" },
     vermietung: { icon: <Inbox className="h-3.5 w-3.5" />, label: "Vermietung" },
@@ -197,6 +252,10 @@ export default function KalenderPage() {
           <p className="text-sm text-muted-foreground mt-1">Aufträge, Vermietungen & Termine</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
+            {showForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+            {showForm ? "Abbrechen" : "Termin"}
+          </Button>
           {/* View Toggle */}
           <div className="flex p-0.5 bg-gray-100 rounded-lg">
             <button
@@ -214,6 +273,42 @@ export default function KalenderPage() {
           </div>
         </div>
       </div>
+
+      {/* Termin erstellen */}
+      {showForm && (
+        <Card className="bg-white border-red-100">
+          <CardContent className="p-5">
+            <form onSubmit={createAppointment} className="space-y-4">
+              <Input placeholder="Titel (z.B. Büro, Übergabe, Meeting) *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-gray-50" required />
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="mt-1 bg-gray-50" required /></div>
+                <div><label className="text-xs font-medium">Von *</label><Input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="mt-1 bg-gray-50" required /></div>
+                <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} className="mt-1 bg-gray-50" required /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium">Zuweisen an</label>
+                  <select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+                    <option value="">Mir selbst</option>
+                    {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Auftrag (optional)</label>
+                  <select value={form.job_id} onChange={(e) => setForm({ ...form, job_id: e.target.value })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+                    <option value="">Kein Auftrag</option>
+                    {jobs.map((j) => <option key={j.id} value={j.id}>INT-{(j as any).job_number} – {j.title}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
+                <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white">Termin erstellen</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Monats-Statistik */}
       <div className="grid grid-cols-4 gap-3">
