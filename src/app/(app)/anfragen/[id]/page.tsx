@@ -77,19 +77,28 @@ export default function VermietungDetailPage() {
     loadData();
   }
 
+  async function uploadViaApi(file: File, filePath: string) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("path", filePath);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const json = await res.json();
+    return json.success;
+  }
+
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     const path = `vermietungen/${id}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
-    if (error) { toast.error("Upload fehlgeschlagen"); setUploading(false); e.target.value = ""; return; }
+    const ok = await uploadViaApi(file, path);
+    if (!ok) { toast.error("Upload fehlgeschlagen"); setUploading(false); e.target.value = ""; return; }
     const newDocs = [...docs, { name: file.name, path }];
     // Save docs in details field
     let details: any = {};
     try { details = JSON.parse(request.details || "{}"); } catch { details = { _text: request.details }; }
     details._docs = newDocs;
-    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    await fetch(`/api/rentals/update-details`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
     setDocs(newDocs);
     toast.success("Dokument hochgeladen");
     setUploading(false);
@@ -102,7 +111,7 @@ export default function VermietungDetailPage() {
     let details: any = {};
     try { details = JSON.parse(request.details || "{}"); } catch { details = {}; }
     details._docs = newDocs;
-    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    await fetch(`/api/rentals/update-details`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
     setDocs(newDocs);
     toast.success("Dokument gelöscht");
   }
@@ -117,13 +126,13 @@ export default function VermietungDetailPage() {
     if (!file) return;
     setUploadingContract(true);
     const path = `vermietungen/${id}/vertrag_${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
-    if (error) { toast.error("Upload fehlgeschlagen"); setUploadingContract(false); e.target.value = ""; return; }
+    const ok = await uploadViaApi(file, path);
+    if (!ok) { toast.error("Upload fehlgeschlagen"); setUploadingContract(false); e.target.value = ""; return; }
     const newDocs = [...contractDocs, { name: file.name, path }];
     let details: any = {};
     try { details = JSON.parse(request.details || "{}"); } catch { details = { _text: request.details }; }
     details._contractDocs = newDocs;
-    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    await fetch(`/api/rentals/update-details`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
     setContractDocs(newDocs);
     toast.success("Mietvertrag hochgeladen");
     setUploadingContract(false);
@@ -136,7 +145,7 @@ export default function VermietungDetailPage() {
     let details: any = {};
     try { details = JSON.parse(request.details || "{}"); } catch { details = {}; }
     details._contractDocs = newDocs;
-    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    await fetch(`/api/rentals/update-details`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
     setContractDocs(newDocs);
     toast.success("Dokument gelöscht");
   }
