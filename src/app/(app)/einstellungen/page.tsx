@@ -813,11 +813,7 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-blue-50 text-center">
-                  <p className="text-lg font-bold text-blue-700">{d.jobs.length}</p>
-                  <p className="text-[10px] text-blue-600 font-medium">Aufträge</p>
-                </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="p-2.5 rounded-lg bg-green-50 text-center">
                   <p className="text-lg font-bold text-green-700">{d.appointments.length}</p>
                   <p className="text-[10px] text-green-600 font-medium">Termine</p>
@@ -827,23 +823,6 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
                   <p className="text-[10px] text-amber-600 font-medium">Stunden</p>
                 </div>
               </div>
-
-              {/* Aufträge */}
-              {d.jobs.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Aufträge</p>
-                  <div className="space-y-1">
-                    {d.jobs.map((j: any) => (
-                      <div key={j.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 text-sm">
-                        <span className="font-medium">{j.title}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${j.status === "abgeschlossen" ? "bg-green-100 text-green-700" : j.status === "in_arbeit" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}`}>
-                          {j.status === "offen" ? "Offen" : j.status === "geplant" ? "Geplant" : j.status === "in_arbeit" ? "In Arbeit" : j.status === "abgeschlossen" ? "Erledigt" : j.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Termine */}
               {d.appointments.length > 0 && (
@@ -868,7 +847,7 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
                 </div>
               )}
 
-              {d.jobs.length === 0 && d.appointments.length === 0 && d.hours === 0 && (
+              {d.appointments.length === 0 && d.hours === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-2">Keine Einsätze in diesem Zeitraum</p>
               )}
             </CardContent>
