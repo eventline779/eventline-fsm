@@ -8,9 +8,7 @@ export async function POST(request: Request) {
   if (!resendKey) return NextResponse.json({ success: false, error: "Kein RESEND_API_KEY" });
 
   const resend = new Resend(resendKey);
-  const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-    : "https://eventline-fsm-usyk.vercel.app";
+  const baseUrl = "https://eventline-fsm-usyk.vercel.app";
 
   const confirmUrl = `${baseUrl}/api/rentals/confirm?id=${rentalId}&token=${Buffer.from(rentalId + "-confirm").toString("base64")}`;
 
