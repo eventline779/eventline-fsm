@@ -404,15 +404,12 @@ export default function KalenderPage() {
                               )}
                             </div>
                             <div className="mt-0.5 space-y-0.5">
-                              {dayItems.slice(0, 2).map((item) => (
+                              {dayItems.map((item) => (
                                 <div key={item.id} className={`px-1.5 py-0.5 text-[9px] font-semibold rounded border ${item.bgColor} ${item.color} truncate leading-tight`}>
                                   {item.time && <span className="opacity-70">{item.time} </span>}
                                   {item.title}
                                 </div>
                               ))}
-                              {dayItems.length > 2 && (
-                                <div className="text-[9px] text-gray-400 px-1 font-medium">+{dayItems.length - 2} mehr</div>
-                              )}
                             </div>
                           </>
                         )}
