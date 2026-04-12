@@ -192,16 +192,21 @@ export default function KalenderPage() {
       assigned_to: assignedTo,
     });
 
-    // Benachrichtigung an zugewiesene Person
+    // E-Mail an zugewiesene Person
     if (assignedTo && assignedTo !== user?.id) {
-      await fetch("/api/notifications", {
+      const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+      const selectedJob = jobs.find((j) => j.id === form.job_id);
+      await fetch("/api/appointments/assign-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userIds: [assignedTo],
-          title: `Neuer Termin: ${form.title}`,
-          message: `${form.date} ${form.time}–${form.end_time}`,
-          link: form.job_id ? `/auftraege/${form.job_id}` : "/kalender",
+          assignedTo,
+          title: form.title,
+          date: form.date,
+          time: form.time,
+          endTime: form.end_time,
+          jobTitle: (selectedJob as any)?.title || null,
+          creatorName: creator?.full_name || "Unbekannt",
         }),
       });
     }

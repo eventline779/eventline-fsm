@@ -118,17 +118,20 @@ export default function AuftragDetailPage() {
       description: apptForm.description || null,
     });
 
-    // Push-Benachrichtigung an zugewiesene Person
+    // E-Mail an zugewiesene Person
     if (assignedTo) {
       const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", (await supabase.auth.getUser()).data.user?.id).single();
-      await fetch("/api/notifications", {
+      await fetch("/api/appointments/assign-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userIds: [assignedTo],
-          title: `Neuer Termin: ${apptForm.title}`,
-          message: `${apptForm.date} ${apptForm.time}–${apptForm.end_time}${job ? ` · ${job.title}` : ""}`,
-          link: `/auftraege/${id}`,
+          assignedTo,
+          title: apptForm.title,
+          date: apptForm.date,
+          time: apptForm.time,
+          endTime: apptForm.end_time,
+          jobTitle: job?.title || null,
+          creatorName: creator?.full_name || "Unbekannt",
         }),
       });
     }
