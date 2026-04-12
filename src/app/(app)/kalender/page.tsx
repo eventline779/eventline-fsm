@@ -81,8 +81,8 @@ export default function KalenderPage() {
           const cust = (j.customer as unknown as { name: string })?.name;
           calItems.push({
             id: j.id, title: j.title, date: d, endDate: endD,
-            time: d.getHours() > 0 ? formatTime(d) : null,
-            endTime: endD && endD.getHours() > 0 ? formatTime(endD) : null,
+            time: null,
+            endTime: null,
             type: "auftrag", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200", dotColor: "bg-blue-500",
             link: `/auftraege/${j.id}`,
             meta: [cust, loc].filter(Boolean).join(" · "),
