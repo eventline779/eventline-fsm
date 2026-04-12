@@ -13,11 +13,15 @@ export async function POST(request: Request) {
   const confirmUrl = `${baseUrl}/api/rentals/confirm?id=${rentalId}&token=${Buffer.from(rentalId + "-confirm").toString("base64")}`;
 
   const formatDate = (d: string) => {
-    const date = new Date(d.includes("T") ? d : d + "T12:00:00");
+    if (!d) return "";
+    // Extract date part: "2026-04-13" from "2026-04-13T00:00:00+00:00" or "2026-04-13"
+    const datePart = d.split("T")[0];
+    const [y, m, day] = datePart.split("-").map(Number);
+    const date = new Date(y, m - 1, day, 12, 0, 0);
     return date.toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   };
-  const dateStr = eventDate ? formatDate(eventDate) : "";
-  const endDateStr = eventEndDate ? formatDate(eventEndDate) : "";
+  const dateStr = formatDate(eventDate);
+  const endDateStr = formatDate(eventEndDate);
 
   const docsHtml = pdfUrls && pdfUrls.length > 0
     ? `<div style="margin:16px 0">
