@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [quickLinks, setQuickLinks] = useState<{ name: string; url: string }[]>([]);
+  const [jobsOhneTermin, setJobsOhneTermin] = useState<{ id: string; title: string; job_number: number }[]>([]);
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkForm, setLinkForm] = useState({ name: "", url: "" });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -114,6 +115,14 @@ export default function DashboardPage() {
       aktiveTechniker: timeRes.count ?? 0,
       kundenTotal: kundenRes.count ?? 0,
     });
+
+    // Aufträge ohne Termine finden
+    const { data: activeJobs } = await supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true);
+    const { data: allAppts } = await supabase.from("job_appointments").select("job_id");
+    if (activeJobs && allAppts) {
+      const jobsWithAppts = new Set(allAppts.map((a: any) => a.job_id).filter(Boolean));
+      setJobsOhneTermin((activeJobs as any[]).filter((j) => !jobsWithAppts.has(j.id)));
+    }
 
     // Meine Todos
     const { data: todosData } = await supabase
@@ -226,6 +235,30 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Aufträge ohne Termin */}
+      {jobsOhneTermin.length > 0 && (
+        <div>
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5 text-orange-500" />Aufträge ohne Termin ({jobsOhneTermin.length})
+          </h2>
+          <div className="space-y-1">
+            {jobsOhneTermin.map((j) => (
+              <Link key={j.id} href={`/auftraege/${j.id}`}>
+                <Card className="bg-white border-orange-100 hover:shadow-sm transition-all">
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-orange-600">INT-{j.job_number}</span>
+                      <span className="font-medium text-sm">{j.title}</span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">Kein Termin</span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Offene Tickets */}
       {tickets.length > 0 && (
