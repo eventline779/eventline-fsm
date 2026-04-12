@@ -83,38 +83,26 @@ export default function AnfragenPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((req) => (
-            <Card key={req.id} className="bg-white hover:shadow-md transition-all">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold truncate">{(req.customer as unknown as { name: string })?.name}</h3>
-                      <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${RENTAL_STATUS[req.status].color}`}>{RENTAL_STATUS[req.status].label}</span>
+            <Link key={req.id} href={`/anfragen/${req.id}`}>
+              <Card className="bg-white hover:shadow-md transition-all cursor-pointer">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold truncate">{(req.customer as unknown as { name: string })?.name}</h3>
+                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${RENTAL_STATUS[req.status].color}`}>{RENTAL_STATUS[req.status].label}</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        {(req.location as unknown as { name: string })?.name && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{(req.location as unknown as { name: string }).name}</span>}
+                        {req.event_date && <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{new Date(req.event_date).toLocaleDateString("de-CH")}</span>}
+                        {req.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{req.guest_count} Pers.</span>}
+                      </div>
+                      {req.event_type && <p className="mt-1 text-sm text-muted-foreground">{req.event_type}</p>}
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      {(req.location as unknown as { name: string })?.name && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{(req.location as unknown as { name: string }).name}</span>}
-                      {req.event_date && <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{new Date(req.event_date).toLocaleDateString("de-CH")}</span>}
-                      {req.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{req.guest_count} Pers.</span>}
-                    </div>
-                    {req.event_type && <p className="mt-1 text-sm text-muted-foreground">{req.event_type}</p>}
                   </div>
-                  <div className="flex gap-2">
-                    {req.status === "neu" && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(req.id, "in_bearbeitung")}>Bearbeiten</Button>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(req.id, "bestaetigt")}>Bestätigen</Button>
-                      </>
-                    )}
-                    {req.status === "in_bearbeitung" && (
-                      <>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(req.id, "bestaetigt")}>Bestätigen</Button>
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(req.id, "abgelehnt")}>Ablehnen</Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
