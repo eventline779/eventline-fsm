@@ -35,6 +35,8 @@ export default function AuftragDetailPage() {
   const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
   const [emailField1, setEmailField1] = useState("");
   const [emailField2, setEmailField2] = useState("");
+  const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
+  const [deleteApptCode, setDeleteApptCode] = useState("");
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -142,9 +144,14 @@ export default function AuftragDetailPage() {
     loadAll();
   }
 
-  async function deleteAppointment(apptId: string) {
-    if (!confirm("Termin wirklich löschen?")) return;
-    await supabase.from("job_appointments").delete().eq("id", apptId);
+  async function deleteAppointment() {
+    if (deleteApptCode !== "5225" || !deleteApptTarget) {
+      toast.error("Falscher Code");
+      return;
+    }
+    await supabase.from("job_appointments").delete().eq("id", deleteApptTarget);
+    setDeleteApptTarget(null);
+    setDeleteApptCode("");
     loadAll();
     toast.success("Termin gelöscht");
   }
@@ -420,7 +427,7 @@ export default function AuftragDetailPage() {
                     </div>
                   )}
                   <button
-                    onClick={() => deleteAppointment(appt.id)}
+                    onClick={() => setDeleteApptTarget(appt.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
                     title="Termin löschen"
                   >
@@ -506,6 +513,33 @@ export default function AuftragDetailPage() {
           )}
         </CardContent>
       </Card>
+      {/* Delete Appointment Modal */}
+      {deleteApptTarget && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
+                <button onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <X className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-600 dark:text-gray-300">Der Termin wird unwiderruflich gelöscht.</p>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bestätigungscode eingeben</label>
+                  <Input value={deleteApptCode} onChange={(e) => setDeleteApptCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Abbrechen</button>
+                  <button onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-30">Endgültig löschen</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
