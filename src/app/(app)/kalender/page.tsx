@@ -60,7 +60,7 @@ export default function KalenderPage() {
   useEffect(() => {
     async function load() {
       const [jobsRes, rentalsRes, apptsRes, profRes, activeJobsRes] = await Promise.all([
-        supabase.from("jobs").select("*, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
+        supabase.from("jobs").select("*, job_number, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
         supabase.from("rental_requests").select("*, customer:customers(name), location:locations(name)").not("event_date", "is", null),
         supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
         supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
@@ -80,7 +80,7 @@ export default function KalenderPage() {
           const loc = (j.location as unknown as { name: string })?.name;
           const cust = (j.customer as unknown as { name: string })?.name;
           calItems.push({
-            id: j.id, title: j.title, date: d, endDate: endD,
+            id: j.id, title: `INT-${(j as any).job_number} ${j.title}`, date: d, endDate: endD,
             time: null,
             endTime: null,
             type: "auftrag", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200", dotColor: "bg-blue-500",
