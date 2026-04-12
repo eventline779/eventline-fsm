@@ -26,7 +26,7 @@ interface CalendarItem {
   endDate?: Date;
   time: string | null;
   endTime?: string | null;
-  type: "auftrag" | "vermietung" | "termin" | "schicht";
+  type: "auftrag" | "vermietung" | "termin";
   color: string;
   bgColor: string;
   dotColor: string;
@@ -45,11 +45,10 @@ export default function KalenderPage() {
 
   useEffect(() => {
     async function load() {
-      const [jobsRes, rentalsRes, apptsRes, shiftsRes] = await Promise.all([
+      const [jobsRes, rentalsRes, apptsRes] = await Promise.all([
         supabase.from("jobs").select("*, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
         supabase.from("rental_requests").select("*, customer:customers(name), location:locations(name)").not("event_date", "is", null),
-        supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title)").not("start_time", "is", null),
-        supabase.from("calendar_events").select("*, profile:profiles(full_name)"),
+        supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
       ]);
 
       const calItems: CalendarItem[] = [];
@@ -91,34 +90,19 @@ export default function KalenderPage() {
         }
       }
 
-      // Termine
+      // Termine (= Schichten/Einsätze)
       if (apptsRes.data) {
-        for (const a of apptsRes.data as unknown as (JobAppointment & { job: { title: string } })[]) {
+        for (const a of apptsRes.data as unknown as (JobAppointment & { job: { title: string; id: string } })[]) {
           const d = new Date(a.start_time);
+          const end = a.end_time ? new Date(a.end_time) : undefined;
           const assignee = (a as unknown as { assignee: { full_name: string } | null }).assignee;
           calItems.push({
             id: a.id, title: a.title, date: d,
             time: d.getHours() > 0 ? formatTime(d) : null,
+            endTime: end && end.getHours() > 0 ? formatTime(end) : null,
             type: "termin", color: "text-green-700", bgColor: "bg-green-50 border-green-200", dotColor: "bg-green-500",
-            meta: assignee?.full_name || a.job?.title || undefined,
-          });
-        }
-      }
-
-      // Schichten
-      if (shiftsRes.data) {
-        for (const s of shiftsRes.data as any[]) {
-          if (!s.start_time) continue;
-          const d = new Date(s.start_time);
-          const end = s.end_time ? new Date(s.end_time) : undefined;
-          const person = s.profile?.full_name;
-          calItems.push({
-            id: s.id, title: s.title || "Schicht", date: d,
-            time: formatTime(d),
-            endTime: end ? formatTime(end) : null,
-            type: "schicht", color: "text-red-700", bgColor: "bg-red-50 border-red-200", dotColor: "bg-red-500",
-            link: "/einstellungen?tab=schichten",
-            meta: person || undefined,
+            link: a.job_id ? `/auftraege/${a.job_id}` : undefined,
+            meta: [assignee?.full_name, a.job?.title].filter(Boolean).join(" · "),
           });
         }
       }
@@ -175,7 +159,6 @@ export default function KalenderPage() {
     auftrag: { icon: <ClipboardList className="h-3.5 w-3.5" />, label: "Auftrag" },
     vermietung: { icon: <Inbox className="h-3.5 w-3.5" />, label: "Vermietung" },
     termin: { icon: <CalIcon className="h-3.5 w-3.5" />, label: "Termin" },
-    schicht: { icon: <CalendarClock className="h-3.5 w-3.5" />, label: "Schicht" },
   };
 
   const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : [];
@@ -203,7 +186,6 @@ export default function KalenderPage() {
     auftraege: thisMonthItems.filter((i) => i.type === "auftrag").length,
     vermietungen: thisMonthItems.filter((i) => i.type === "vermietung").length,
     termine: thisMonthItems.filter((i) => i.type === "termin").length,
-    schichten: thisMonthItems.filter((i) => i.type === "schicht").length,
   };
 
   return (
@@ -212,7 +194,7 @@ export default function KalenderPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
-          <p className="text-sm text-muted-foreground mt-1">Aufträge, Vermietungen, Termine & Schichten</p>
+          <p className="text-sm text-muted-foreground mt-1">Aufträge, Vermietungen & Termine</p>
         </div>
         <div className="flex items-center gap-2">
           {/* View Toggle */}
@@ -239,7 +221,6 @@ export default function KalenderPage() {
           { label: "Aufträge", count: stats.auftraege, dot: "bg-blue-500" },
           { label: "Vermietungen", count: stats.vermietungen, dot: "bg-amber-500" },
           { label: "Termine", count: stats.termine, dot: "bg-green-500" },
-          { label: "Schichten", count: stats.schichten, dot: "bg-red-500" },
         ].map((s) => (
           <Card key={s.label} className="bg-white border-gray-100">
             <CardContent className="p-3 flex items-center gap-3">

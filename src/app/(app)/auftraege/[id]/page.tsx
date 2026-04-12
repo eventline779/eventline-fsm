@@ -68,7 +68,7 @@ export default function AuftragDetailPage() {
     await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
 
-    // Wenn von Entwurf freigegeben → Schichten erstellen & Team benachrichtigen
+    // Wenn von Entwurf freigegeben → Team benachrichtigen
     if (wasEntwurf && newStatus !== "storniert" && job) {
       const allPersons: string[] = [];
       if (job.project_lead_id) allPersons.push(job.project_lead_id);
@@ -77,20 +77,17 @@ export default function AuftragDetailPage() {
       });
 
       if (allPersons.length > 0) {
-        try {
-          await fetch("/api/jobs/assign-notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              job_id: id,
-              profile_ids: allPersons,
-              job_title: job.title,
-              start_date: job.start_date || null,
-              end_date: job.end_date || null,
-            }),
-          });
-          toast.success("Team wurde benachrichtigt");
-        } catch {}
+        await fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: allPersons,
+            title: `Auftrag freigegeben: ${job.title}`,
+            message: "Der Auftrag wurde vom Entwurf freigegeben.",
+            link: `/auftraege/${id}`,
+          }),
+        });
+        toast.success("Team wurde benachrichtigt");
       }
     }
 
@@ -119,32 +116,19 @@ export default function AuftragDetailPage() {
       description: apptForm.description || null,
     });
 
-    // Schicht erstellen für zugewiesene Person + alle Techniker des Auftrags
-    if (job) {
-      const personIds: string[] = [];
-      if (assignedTo) personIds.push(assignedTo);
-      // Auch Projektleiter und zugewiesene Techniker
-      if (job.project_lead_id && !personIds.includes(job.project_lead_id)) personIds.push(job.project_lead_id);
-      assignments.forEach((a) => {
-        if (!personIds.includes(a.profile_id)) personIds.push(a.profile_id);
+    // Push-Benachrichtigung an zugewiesene Person
+    if (assignedTo) {
+      const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", (await supabase.auth.getUser()).data.user?.id).single();
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userIds: [assignedTo],
+          title: `Neuer Termin: ${apptForm.title}`,
+          message: `${apptForm.date} ${apptForm.time}–${apptForm.end_time}${job ? ` · ${job.title}` : ""}`,
+          link: `/auftraege/${id}`,
+        }),
       });
-
-      if (personIds.length > 0) {
-        try {
-          await fetch("/api/jobs/assign-notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              job_id: id,
-              profile_ids: personIds,
-              job_title: `${apptForm.title} (${job.title})`,
-              start_date: startTime,
-              end_date: endTime,
-            }),
-          });
-          toast.success("Schicht erstellt & Team benachrichtigt");
-        } catch {}
-      }
     }
 
     setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
