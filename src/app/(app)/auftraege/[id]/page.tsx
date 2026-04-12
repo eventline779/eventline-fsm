@@ -300,6 +300,25 @@ export default function AuftragDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Warnung: Kein Termin */}
+      {appointments.length === 0 && job && !["abgeschlossen", "storniert"].includes(job.status) && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 shrink-0">
+            <Calendar className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-red-700">Kein Termin geplant</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              {job.start_date ? (() => {
+                const days = Math.ceil((new Date(job.start_date).getTime() - Date.now()) / 86400000);
+                return days > 0 ? `Auftrag beginnt in ${days} Tag${days === 1 ? "" : "en"}` : days === 0 ? "Auftrag beginnt heute" : `Auftrag hat vor ${Math.abs(days)} Tag${Math.abs(days) === 1 ? "" : "en"} begonnen`;
+              })() : "Kein Startdatum gesetzt"}
+              {" · Bitte Termin erstellen"}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Termine */}
       <Card className="bg-white">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">

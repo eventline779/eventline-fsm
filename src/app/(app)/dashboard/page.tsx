@@ -236,8 +236,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Aufträge ohne Termin */}
-      {jobsOhneTermin.length > 0 && (
+      {/* Aufträge ohne Termin - nur für Leo */}
+      {jobsOhneTermin.length > 0 && userEmail === "leo@eventline-basel.com" && (
         <div>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <ClipboardList className="h-3.5 w-3.5 text-orange-500" />Aufträge ohne Termin ({jobsOhneTermin.length})
