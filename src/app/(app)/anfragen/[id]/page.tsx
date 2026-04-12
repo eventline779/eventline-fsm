@@ -28,6 +28,15 @@ export default function VermietungDetailPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Mietvertrag
+  const [showContract, setShowContract] = useState(false);
+  const [contractEmail, setContractEmail] = useState("");
+  const [contractMessage, setContractMessage] = useState("");
+  const [sendingContract, setSendingContract] = useState(false);
+  const [contractDocs, setContractDocs] = useState<{ name: string; path: string }[]>([]);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const contractFileRef = useRef<HTMLInputElement>(null);
+
   // Termin erstellen
   const [showTermin, setShowTermin] = useState(false);
   const [terminForm, setTerminForm] = useState({ title: "", date: "", time: "08:00", end_time: "17:00", assigned_to: "" });
@@ -43,6 +52,7 @@ export default function VermietungDetailPage() {
     if (data) {
       setRequest(data);
       setOfferEmail(data.customer?.email || "");
+      setContractEmail(data.customer?.email || "");
       // Parse services from notes
       let services = "";
       try { const parsed = JSON.parse(data.notes); services = parsed.services || ""; } catch {}
@@ -52,6 +62,7 @@ export default function VermietungDetailPage() {
         try {
           const parsed = JSON.parse(data.details);
           if (parsed._docs) setDocs(parsed._docs);
+          if (parsed._contractDocs) setContractDocs(parsed._contractDocs);
         } catch {}
       }
     }
@@ -99,6 +110,70 @@ export default function VermietungDetailPage() {
   function openFile(path: string) {
     const { data } = supabase.storage.from("documents").getPublicUrl(path);
     window.open(data.publicUrl, "_blank");
+  }
+
+  async function uploadContractDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingContract(true);
+    const path = `vermietungen/${id}/vertrag_${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
+    if (error) { toast.error("Upload fehlgeschlagen"); setUploadingContract(false); e.target.value = ""; return; }
+    const newDocs = [...contractDocs, { name: file.name, path }];
+    let details: any = {};
+    try { details = JSON.parse(request.details || "{}"); } catch { details = { _text: request.details }; }
+    details._contractDocs = newDocs;
+    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    setContractDocs(newDocs);
+    toast.success("Mietvertrag hochgeladen");
+    setUploadingContract(false);
+    e.target.value = "";
+  }
+
+  async function deleteContractDoc(doc: { name: string; path: string }) {
+    await supabase.storage.from("documents").remove([doc.path]);
+    const newDocs = contractDocs.filter((d) => d.path !== doc.path);
+    let details: any = {};
+    try { details = JSON.parse(request.details || "{}"); } catch { details = {}; }
+    details._contractDocs = newDocs;
+    await supabase.from("rental_requests").update({ details: JSON.stringify(details) }).eq("id", id);
+    setContractDocs(newDocs);
+    toast.success("Dokument gelöscht");
+  }
+
+  async function sendContract() {
+    if (contractDocs.length === 0) { toast.error("Bitte zuerst Mietvertrag hochladen"); return; }
+    setSendingContract(true);
+    const pdfUrls = contractDocs.map((d) => {
+      const { data } = supabase.storage.from("documents").getPublicUrl(d.path);
+      return { name: d.name, url: data.publicUrl };
+    });
+
+    try {
+      const res = await fetch("/api/rentals/send-contract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: contractEmail,
+          message: contractMessage,
+          customerName: request.customer?.name,
+          locationName: request.location?.name,
+          eventDate: request.event_date,
+          eventEndDate: request.event_end_date,
+          pdfUrls,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Mietvertrag gesendet");
+        setShowContract(false);
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Senden");
+    }
+    setSendingContract(false);
   }
 
   async function sendOffer() {
@@ -224,6 +299,78 @@ export default function VermietungDetailPage() {
             <p className="text-sm text-red-700 mt-0.5">Diese Vermietung wurde abgelehnt.</p>
           </div>
         </div>
+      )}
+
+      {/* Mietvertrag - nach Bestätigung */}
+      {request.status === "bestaetigt" && (
+        <Card className="bg-white border-blue-100">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-blue-600 flex items-center gap-2"><FileText className="h-4 w-4" />Mietvertrag</CardTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => contractFileRef.current?.click()} disabled={uploadingContract}>
+                <Upload className="h-4 w-4 mr-1" />{uploadingContract ? "Hochladen..." : "PDF hochladen"}
+              </Button>
+              {contractDocs.length > 0 && (
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowContract(true)}>
+                  <Send className="h-4 w-4 mr-1" />Vertrag senden
+                </Button>
+              )}
+            </div>
+            <input ref={contractFileRef} type="file" accept=".pdf,.doc,.docx" onChange={uploadContractDoc} className="hidden" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {contractDocs.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Mietvertrag als PDF hochladen, dann an den Kunden senden.</p>}
+            {contractDocs.map((d) => (
+              <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
+                <button onClick={() => openFile(d.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-700 transition-colors">
+                  <FileText className="h-5 w-5 text-blue-500 shrink-0" />
+                  <span className="font-medium text-sm truncate">{d.name}</span>
+                </button>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <button onClick={() => openFile(d.path)} className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-400 hover:text-blue-600"><Download className="h-4 w-4" /></button>
+                  <button onClick={() => deleteContractDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Vertrag senden Modal */}
+      {showContract && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowContract(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Mietvertrag senden</h2>
+                <button onClick={() => setShowContract(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="text-sm font-medium">E-Mail *</label>
+                  <Input value={contractEmail} onChange={(e) => setContractEmail(e.target.value)} className="mt-1.5" required />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Nachricht (optional)</label>
+                  <textarea value={contractMessage} onChange={(e) => setContractMessage(e.target.value)} placeholder="z.B. Bitte den Vertrag unterschrieben zurücksenden..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Angehängte Verträge:</p>
+                  {contractDocs.map((d) => (
+                    <p key={d.path} className="text-xs text-blue-600 flex items-center gap-1"><FileText className="h-3 w-3" />{d.name}</p>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowContract(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={sendContract} disabled={sendingContract} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                    <Send className="h-4 w-4" />{sendingContract ? "Senden..." : "Vertrag senden"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Details */}
