@@ -70,28 +70,6 @@ export default function AuftragDetailPage() {
     await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
 
-    // Wenn von Entwurf freigegeben → Team benachrichtigen
-    if (wasEntwurf && newStatus !== "storniert" && job) {
-      const allPersons: string[] = [];
-      if (job.project_lead_id) allPersons.push(job.project_lead_id);
-      assignments.forEach((a) => {
-        if (!allPersons.includes(a.profile_id)) allPersons.push(a.profile_id);
-      });
-
-      if (allPersons.length > 0) {
-        await fetch("/api/notifications", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userIds: allPersons,
-            title: `Auftrag freigegeben: ${job.title}`,
-            message: "Der Auftrag wurde vom Entwurf freigegeben.",
-            link: `/auftraege/${id}`,
-          }),
-        });
-        toast.success("Team wurde benachrichtigt");
-      }
-    }
 
     loadAll();
   }

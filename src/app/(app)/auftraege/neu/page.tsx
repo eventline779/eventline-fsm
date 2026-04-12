@@ -98,29 +98,6 @@ export default function NeuerAuftragPage() {
       );
     }
 
-    // Schichten erstellen & benachrichtigen (wenn nicht Entwurf)
-    if (job && form.start_date) {
-      const allPersons = [...assignedTechnicians];
-      if (form.project_lead_id && !allPersons.includes(form.project_lead_id)) {
-        allPersons.push(form.project_lead_id);
-      }
-      if (allPersons.length > 0) {
-        try {
-          await fetch("/api/jobs/assign-notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              job_id: job.id,
-              profile_ids: allPersons,
-              job_title: form.title,
-              start_date: form.start_date,
-              end_date: form.end_date || null,
-            }),
-          });
-        } catch {}
-      }
-    }
-
     toast.success("Auftrag erfolgreich erstellt");
     router.push("/auftraege");
   }
