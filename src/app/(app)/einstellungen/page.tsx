@@ -828,30 +828,53 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
                 </div>
               </div>
 
-              {/* Termine */}
-              {d.appointments.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Termine</p>
-                  <div className="space-y-1">
-                    {d.appointments.map((a: any, i: number) => (
-                      <Link key={i} href={a.job_id ? `/auftraege/${a.job_id}` : "#"}>
-                        <div className={`flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer hover:shadow-sm transition-all ${a.is_done ? "bg-green-50" : "bg-gray-50"}`}>
-                          <div>
-                            <span className={`font-medium ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
-                            {a.job?.title && <span className="text-xs text-blue-600 ml-2">→ {a.job.title}</span>}
+              {/* Termine als Wochenansicht */}
+              {d.appointments.length > 0 ? (() => {
+                const days = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+                const fullDays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+                const byDay: Record<string, any[]> = {};
+                for (const a of d.appointments) {
+                  const date = new Date(a.start_time);
+                  const key = date.toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
+                  if (!byDay[key]) byDay[key] = [];
+                  byDay[key].push(a);
+                }
+                const sortedDays = Object.entries(byDay).sort((a, b) => {
+                  const dateA = new Date(a[1][0].start_time).getTime();
+                  const dateB = new Date(b[1][0].start_time).getTime();
+                  return dateA - dateB;
+                });
+                return (
+                  <div className="space-y-2">
+                    {sortedDays.map(([day, appts]) => {
+                      const isToday = new Date(appts[0].start_time).toDateString() === new Date().toDateString();
+                      return (
+                        <div key={day} className={`rounded-xl border ${isToday ? "border-red-200 bg-red-50/30" : "border-gray-100"}`}>
+                          <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-red-600" : "text-muted-foreground"} border-b ${isToday ? "border-red-100" : "border-gray-100"}`}>
+                            {day}{isToday ? " · Heute" : ""}
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(a.start_time).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })} {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
-                            {a.end_time ? ` – ${new Date(a.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}
-                          </span>
+                          <div className="divide-y divide-gray-50">
+                            {appts.map((a: any, i: number) => (
+                              <Link key={i} href={a.job_id ? `/auftraege/${a.job_id}` : "#"}>
+                                <div className="flex items-center justify-between px-3 py-2 hover:bg-gray-50/50 transition-colors">
+                                  <div className="min-w-0">
+                                    <span className={`font-medium text-sm ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
+                                    {a.job?.title && <span className="text-xs text-blue-600 ml-2">→ {a.job.title}</span>}
+                                  </div>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">
+                                    {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
+                                    {a.end_time ? ` – ${new Date(a.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                                  </span>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
                         </div>
-                      </Link>
-                    ))}
+                      );
+                    })}
                   </div>
-                </div>
-              )}
-
-              {d.appointments.length === 0 && d.hours === 0 && (
+                );
+              })() : d.hours === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-2">Keine Einsätze in diesem Zeitraum</p>
               )}
             </CardContent>
