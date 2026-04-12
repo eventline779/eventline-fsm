@@ -200,6 +200,32 @@ export default function VermietungDetailPage() {
         </div>
       </div>
 
+      {/* Bestätigt Banner */}
+      {request.status === "bestaetigt" && (
+        <div className="flex items-center gap-4 p-5 rounded-xl bg-green-50 border-2 border-green-200">
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 shrink-0">
+            <CheckCircle className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <p className="font-bold text-green-800 text-lg">Kunde hat bestätigt</p>
+            <p className="text-sm text-green-700 mt-0.5">Die Vermietung wurde vom Kunden verbindlich bestätigt. Bitte Übergabe- und Rücknahme-Termine erstellen.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Abgelehnt Banner */}
+      {request.status === "abgelehnt" && (
+        <div className="flex items-center gap-4 p-5 rounded-xl bg-red-50 border-2 border-red-200">
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-red-100 shrink-0">
+            <X className="h-6 w-6 text-red-600" />
+          </div>
+          <div>
+            <p className="font-bold text-red-800 text-lg">Abgelehnt</p>
+            <p className="text-sm text-red-700 mt-0.5">Diese Vermietung wurde abgelehnt.</p>
+          </div>
+        </div>
+      )}
+
       {/* Details */}
       <Card className="bg-white">
         <CardContent className="p-5 space-y-3">

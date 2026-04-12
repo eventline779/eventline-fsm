@@ -84,7 +84,7 @@ export default function AnfragenPage() {
         <div className="space-y-3">
           {filtered.map((req) => (
             <Link key={req.id} href={`/anfragen/${req.id}`}>
-              <Card className="bg-white hover:shadow-md transition-all cursor-pointer">
+              <Card className={`hover:shadow-md transition-all cursor-pointer ${req.status === "bestaetigt" ? "bg-green-50 border-green-200" : req.status === "abgelehnt" ? "bg-red-50/50 border-red-100 opacity-60" : "bg-white"}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
