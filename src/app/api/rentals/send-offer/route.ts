@@ -12,12 +12,12 @@ export async function POST(request: Request) {
 
   const confirmUrl = `${baseUrl}/api/rentals/confirm?id=${rentalId}&token=${Buffer.from(rentalId + "-confirm").toString("base64")}`;
 
-  const dateStr = eventDate
-    ? new Date(eventDate + "T12:00:00").toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : "";
-  const endDateStr = eventEndDate
-    ? new Date(eventEndDate + "T12:00:00").toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : "";
+  const formatDate = (d: string) => {
+    const date = new Date(d.includes("T") ? d : d + "T12:00:00");
+    return date.toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  };
+  const dateStr = eventDate ? formatDate(eventDate) : "";
+  const endDateStr = eventEndDate ? formatDate(eventEndDate) : "";
 
   const docsHtml = pdfUrls && pdfUrls.length > 0
     ? `<div style="margin:16px 0">
