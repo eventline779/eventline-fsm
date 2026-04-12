@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   const { data: leadJobs } = await supabase.from("jobs").select("id, title, status, start_date, end_date, project_lead_id, customer:customers(name)").not("project_lead_id", "is", null);
 
-  const result: Record<string, { jobs: any[]; appointments: any[]; hours: number }> = {};
+  const result: Record<string, { jobs: any[]; appointments: any[]; hours: number; plannedHours: number }> = {};
 
   for (const p of (profiles || []) as any[]) {
     const personJobs: any[] = [];
@@ -58,16 +58,30 @@ export async function GET(request: NextRequest) {
 
     const personAppts = (apptsRes.data as any[] || []).filter((a: any) => a.assigned_to === p.id);
 
-    let totalMin = 0;
+    // Geplante Stunden aus Terminen berechnen
+    let plannedMin = 0;
+    for (const a of personAppts) {
+      if (a.start_time && a.end_time) {
+        plannedMin += (new Date(a.end_time).getTime() - new Date(a.start_time).getTime()) / 60000;
+      }
+    }
+
+    // Gestempelte Stunden
+    let workedMin = 0;
     if (timeRes.data) {
       for (const t of timeRes.data as any[]) {
         if (t.profile_id === p.id && t.clock_out) {
-          totalMin += (new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime()) / 60000 - (t.break_minutes || 0);
+          workedMin += (new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime()) / 60000 - (t.break_minutes || 0);
         }
       }
     }
 
-    result[p.id] = { jobs: personJobs, appointments: personAppts, hours: Math.round(totalMin / 60 * 10) / 10 };
+    result[p.id] = {
+      jobs: personJobs,
+      appointments: personAppts,
+      hours: Math.round(workedMin / 60 * 10) / 10,
+      plannedHours: Math.round(plannedMin / 60 * 10) / 10,
+    };
   }
 
   return NextResponse.json({ profiles, data: result });

@@ -747,7 +747,7 @@ function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleR
 }
 
 function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
-  const [data, setData] = useState<Record<string, { jobs: any[]; appointments: any[]; hours: number }>>({});
+  const [data, setData] = useState<Record<string, { jobs: any[]; appointments: any[]; hours: number; plannedHours?: number }>>({});
   const [filter, setFilter] = useState("monat");
   const [loading, setLoading] = useState(true);
   const [serverProfiles, setServerProfiles] = useState<Profile[]>(profiles);
@@ -813,14 +813,18 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="p-2.5 rounded-lg bg-green-50 text-center">
                   <p className="text-lg font-bold text-green-700">{d.appointments.length}</p>
                   <p className="text-[10px] text-green-600 font-medium">Termine</p>
                 </div>
+                <div className="p-2.5 rounded-lg bg-blue-50 text-center">
+                  <p className="text-lg font-bold text-blue-700">{d.plannedHours || 0}h</p>
+                  <p className="text-[10px] text-blue-600 font-medium">Geplant</p>
+                </div>
                 <div className="p-2.5 rounded-lg bg-amber-50 text-center">
-                  <p className="text-lg font-bold text-amber-700">{d.hours}</p>
-                  <p className="text-[10px] text-amber-600 font-medium">Stunden</p>
+                  <p className="text-lg font-bold text-amber-700">{d.hours}h</p>
+                  <p className="text-[10px] text-amber-600 font-medium">Gestempelt</p>
                 </div>
               </div>
 
