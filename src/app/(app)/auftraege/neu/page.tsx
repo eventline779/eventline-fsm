@@ -67,6 +67,12 @@ export default function NeuerAuftragPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (form.start_date && form.end_date && form.end_date < form.start_date) {
+      toast.error("Enddatum darf nicht vor dem Startdatum liegen");
+      return;
+    }
+
     setSaving(true);
 
     const { data: { user } } = await supabase.auth.getUser();
