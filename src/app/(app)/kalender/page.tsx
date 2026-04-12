@@ -278,14 +278,14 @@ export default function KalenderPage() {
                 {/* Wochentage */}
                 <div className="grid grid-cols-7 mb-1">
                   {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d, i) => (
-                    <div key={d} className={`text-center text-[11px] font-semibold py-2 ${i >= 5 ? "text-gray-300" : "text-gray-400"}`}>
+                    <div key={d} className={`text-center text-[11px] font-semibold py-2 ${i >= 5 ? "text-gray-300 dark:text-gray-600" : "text-gray-400 dark:text-gray-400"}`}>
                       {d}
                     </div>
                   ))}
                 </div>
 
                 {/* Tage Grid */}
-                <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
+                <div className="grid grid-cols-7 gap-px bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700">
                   {days.map((day, i) => {
                     const dayItems = day ? getItemsForDay(day) : [];
                     const isSelected = day === selectedDay;
@@ -294,11 +294,11 @@ export default function KalenderPage() {
                       <div
                         key={i}
                         onClick={() => day && setSelectedDay(day === selectedDay ? null : day)}
-                        className={`min-h-[80px] p-1.5 bg-white transition-all cursor-pointer ${
-                          !day ? "bg-gray-50/50" :
-                          isSelected ? "bg-red-50 ring-2 ring-red-400 ring-inset z-10" :
-                          isWeekend(day) ? "bg-gray-50/30 hover:bg-gray-50" :
-                          "hover:bg-gray-50"
+                        className={`min-h-[80px] p-1.5 bg-white dark:bg-gray-900 transition-all cursor-pointer ${
+                          !day ? "bg-gray-50/50 dark:bg-gray-900/50" :
+                          isSelected ? "bg-red-50 dark:bg-red-950 ring-2 ring-red-400 ring-inset z-10" :
+                          isWeekend(day) ? "bg-gray-50/30 dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800" :
+                          "hover:bg-gray-50 dark:hover:bg-gray-800"
                         }`}
                       >
                         {day && (
@@ -306,8 +306,8 @@ export default function KalenderPage() {
                             <div className="flex items-center justify-between">
                               <span className={`inline-flex items-center justify-center w-6 h-6 text-[11px] font-semibold rounded-full ${
                                 isToday(day) ? "bg-red-500 text-white" :
-                                isWeekend(day) ? "text-gray-300" :
-                                "text-gray-600"
+                                isWeekend(day) ? "text-gray-300 dark:text-gray-500" :
+                                "text-gray-600 dark:text-gray-300"
                               }`}>
                                 {day}
                               </span>
@@ -321,7 +321,7 @@ export default function KalenderPage() {
                             </div>
                             <div className="mt-0.5 space-y-0.5">
                               {dayItems.slice(0, 2).map((item) => (
-                                <div key={item.id} className={`px-1.5 py-0.5 text-[9px] font-medium rounded border ${item.bgColor} ${item.color} truncate leading-tight`}>
+                                <div key={item.id} className={`px-1.5 py-0.5 text-[9px] font-semibold rounded border ${item.bgColor} ${item.color} truncate leading-tight`}>
                                   {item.time && <span className="opacity-70">{item.time} </span>}
                                   {item.title}
                                 </div>
