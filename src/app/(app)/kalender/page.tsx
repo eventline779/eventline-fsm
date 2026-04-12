@@ -531,7 +531,7 @@ export default function KalenderPage() {
                               </span>
                             )}
                           </div>
-                          <p className="font-medium text-sm mt-1.5">{item.title}</p>
+                          <p className="font-medium text-sm mt-1.5 text-gray-900">{item.title}</p>
                           {item.meta && (
                             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                               <MapPin className="h-3 w-3" />{item.meta}
