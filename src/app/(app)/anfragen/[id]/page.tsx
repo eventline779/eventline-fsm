@@ -20,7 +20,6 @@ export default function VermietungDetailPage() {
   const supabase = createClient();
   const [request, setRequest] = useState<any>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [conflicts, setConflicts] = useState<any[]>([]);
   const [showOffer, setShowOffer] = useState(false);
   const [offerEmail, setOfferEmail] = useState("");
   const [offerMessage, setOfferMessage] = useState("");
@@ -47,26 +46,6 @@ export default function VermietungDetailPage() {
       // Parse services from notes
       let services = "";
       try { const parsed = JSON.parse(data.notes); services = parsed.services || ""; } catch {}
-
-      // Check conflicts
-      if (data.location_id && data.event_date) {
-        const { data: existing } = await supabase
-          .from("rental_requests")
-          .select("id, event_date, event_end_date, customer:customers(name)")
-          .eq("location_id", data.location_id)
-          .neq("id", id)
-          .neq("status", "abgelehnt");
-        if (existing) {
-          const start = new Date(data.event_date).getTime();
-          const end = data.event_end_date ? new Date(data.event_end_date).getTime() : start;
-          const c = existing.filter((e: any) => {
-            const eStart = new Date(e.event_date).getTime();
-            const eEnd = e.event_end_date ? new Date(e.event_end_date).getTime() : eStart;
-            return eStart <= end && eEnd >= start;
-          });
-          setConflicts(c);
-        }
-      }
 
       // Load docs
       if (data.details) {
@@ -220,25 +199,6 @@ export default function VermietungDetailPage() {
           <p className="text-sm text-muted-foreground mt-0.5">{request.location?.name || "Keine Location"}</p>
         </div>
       </div>
-
-      {/* Verfügbarkeit */}
-      {conflicts.length > 0 ? (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-          <div>
-            <p className="font-semibold text-sm text-red-700">Raum belegt!</p>
-            <p className="text-xs text-red-600 mt-0.5">{conflicts.length} andere Vermietung(en) am gleichen Datum</p>
-          </div>
-        </div>
-      ) : request.event_date && request.location_id && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
-          <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
-          <div>
-            <p className="font-semibold text-sm text-green-700">Raum verfügbar</p>
-            <p className="text-xs text-green-600 mt-0.5">{request.location?.name} ist am gewünschten Datum frei</p>
-          </div>
-        </div>
-      )}
 
       {/* Details */}
       <Card className="bg-white">
