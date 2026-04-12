@@ -751,6 +751,8 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
   const [filter, setFilter] = useState("monat");
   const [loading, setLoading] = useState(true);
   const [serverProfiles, setServerProfiles] = useState<Profile[]>(profiles);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archivedJobs, setArchivedJobs] = useState<any[]>([]);
 
   useEffect(() => { loadOverview(); }, [filter]);
 
@@ -764,6 +766,14 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
     } catch (e) {
       console.error("Team overview error:", e);
     }
+
+    // Archiv laden
+    try {
+      const archiveRes = await fetch("/api/team-overview?filter=archiv");
+      const archiveJson = await archiveRes.json();
+      if (archiveJson.archivedJobs) setArchivedJobs(archiveJson.archivedJobs);
+    } catch {}
+
     setLoading(false);
   }
 
@@ -789,8 +799,41 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
         ))}
       </div>
 
+      {/* Archiv Toggle */}
+      {archivedJobs.length > 0 && (
+        <button
+          onClick={() => setShowArchive(!showArchive)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showArchive ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+        >
+          Archiv ({archivedJobs.length})
+        </button>
+      )}
+
+      {/* Archiv */}
+      {showArchive && archivedJobs.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Abgeschlossene Aufträge</p>
+          {archivedJobs.map((j: any) => (
+            <Link key={j.id} href={`/auftraege/${j.id}`}>
+              <Card className="bg-white border-gray-100 hover:shadow-sm transition-all opacity-70">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-gray-400">INT-{j.job_number}</span>
+                    <span className="font-medium text-sm">{j.title}</span>
+                    {j.customer?.name && <span className="text-xs text-muted-foreground">· {j.customer.name}</span>}
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${j.status === "abgeschlossen" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                    {j.status === "abgeschlossen" ? "Erledigt" : "Storniert"}
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Pro Person */}
-      {serverProfiles.map((p) => {
+      {!showArchive && serverProfiles.map((p) => {
         const d = data[p.id] || { jobs: [], appointments: [], hours: 0 };
         return (
           <Card key={p.id} className="bg-white border-gray-100">

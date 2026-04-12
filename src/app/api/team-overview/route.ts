@@ -84,5 +84,17 @@ export async function GET(request: NextRequest) {
     };
   }
 
+  // Archiv: abgeschlossene Aufträge
+  if (filter === "archiv") {
+    const { data: archived } = await supabase
+      .from("jobs")
+      .select("id, title, job_number, status, start_date, end_date, customer:customers(name)")
+      .in("status", ["abgeschlossen", "storniert"])
+      .neq("is_deleted", true)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    return NextResponse.json({ archivedJobs: archived || [] });
+  }
+
   return NextResponse.json({ profiles, data: result });
 }
