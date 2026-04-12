@@ -91,11 +91,11 @@ export default function NeueAnfragePage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Startdatum</Label>
-                <Input type="datetime-local" value={form.event_date} onChange={(e) => update("event_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+                <Input type="date" value={form.event_date} onChange={(e) => update("event_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
               </div>
               <div>
                 <Label>Enddatum</Label>
-                <Input type="datetime-local" value={form.event_end_date} onChange={(e) => update("event_end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+                <Input type="date" value={form.event_end_date} onChange={(e) => update("event_end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
