@@ -17,6 +17,7 @@ import {
   CalendarClock,
   Plus,
   X,
+  Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { JOB_STATUS, RENTAL_STATUS } from "@/lib/constants";
@@ -48,6 +49,8 @@ export default function KalenderPage() {
   const [showForm, setShowForm] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteCode, setDeleteCode] = useState("");
   const [form, setForm] = useState({
     title: "", date: new Date().toISOString().split("T")[0],
     time: "08:00", end_time: "17:00", assigned_to: "", job_id: "",
@@ -515,7 +518,7 @@ export default function KalenderPage() {
                   <div className="space-y-2">
                     {selectedDayItems.map((item) => {
                       const content = (
-                        <div className={`p-3 rounded-xl border ${item.bgColor} ${item.link ? "hover:shadow-sm cursor-pointer" : ""} transition-all`}>
+                        <div className={`p-3 rounded-xl border ${item.bgColor} ${item.link ? "hover:shadow-sm cursor-pointer" : ""} transition-all group/item`}>
                           <div className="flex items-center gap-2">
                             <span className={item.color}>{typeConfig[item.type].icon}</span>
                             <span className={`text-[10px] font-semibold uppercase tracking-wider ${item.color}`}>
@@ -533,6 +536,11 @@ export default function KalenderPage() {
                             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                               <MapPin className="h-3 w-3" />{item.meta}
                             </p>
+                          )}
+                          {item.type === "termin" && (
+                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(item.id); }} className="mt-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 text-red-600 text-[10px] font-medium border border-red-200 hover:bg-red-100 transition-colors">
+                              <Trash2 className="h-3 w-3" />Löschen
+                            </button>
                           )}
                         </div>
                       );
@@ -564,6 +572,39 @@ export default function KalenderPage() {
           </Card>
         </div>
       </div>
+      {/* Delete Modal */}
+      {deleteTarget && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
+                <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <X className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-600 dark:text-gray-300">Der Termin wird unwiderruflich gelöscht.</p>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bestätigungscode eingeben</label>
+                  <Input value={deleteCode} onChange={(e) => setDeleteCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Abbrechen</button>
+                  <button onClick={async () => {
+                    if (deleteCode !== "5225") { toast.error("Falscher Code"); return; }
+                    await supabase.from("job_appointments").delete().eq("id", deleteTarget);
+                    setDeleteTarget(null); setDeleteCode("");
+                    toast.success("Termin gelöscht");
+                    window.location.reload();
+                  }} disabled={deleteCode.length < 4} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-30">Endgültig löschen</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
