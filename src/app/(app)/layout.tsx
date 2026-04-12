@@ -86,11 +86,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   }
 
-  // Auto-Refresh alle 30 Sekunden
+  // Auto-Refresh alle 10 Sekunden
   useEffect(() => {
     const interval = setInterval(() => {
       router.refresh();
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
