@@ -78,12 +78,17 @@ export default function VermietungDetailPage() {
   }
 
   async function uploadViaApi(file: File, filePath: string) {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", filePath);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const json = await res.json();
-    return json.success;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", filePath);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) return false;
+      const json = await res.json();
+      return json.success;
+    } catch {
+      return false;
+    }
   }
 
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
