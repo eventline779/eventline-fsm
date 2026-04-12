@@ -37,11 +37,24 @@ export default function KundenPage() {
       toast.error("Falscher Code");
       return;
     }
-    await supabase.from("customers").delete().eq("id", deleteTarget.id);
-    setCustomers(customers.filter((c) => c.id !== deleteTarget.id));
+    try {
+      const res = await fetch("/api/customers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: deleteTarget.id, code: deleteCode }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setCustomers(customers.filter((c) => c.id !== deleteTarget.id));
+        toast.success(`${deleteTarget.name} gelöscht`);
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Löschen");
+    }
     setDeleteTarget(null);
     setDeleteCode("");
-    toast.success(`${deleteTarget.name} gelöscht`);
   }
 
   const filtered = customers.filter((c) => {
