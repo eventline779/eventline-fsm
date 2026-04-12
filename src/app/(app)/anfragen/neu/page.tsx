@@ -19,7 +19,7 @@ export default function NeueAnfragePage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [form, setForm] = useState({
-    customer_id: "", location_id: "", event_date: "", event_end_date: "", event_type: "", guest_count: "", details: "", notes: "",
+    customer_id: "", location_id: "", event_date: "", event_end_date: "", event_type: "", guest_count: "", details: "", notes: "", services: "",
   });
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function NeueAnfragePage() {
       event_type: form.event_type || null,
       guest_count: form.guest_count ? parseInt(form.guest_count) : null,
       details: form.details || null,
-      notes: form.notes || null,
+      notes: form.services ? JSON.stringify({ services: form.services, notes: form.notes }) : (form.notes || null),
       created_by: user?.id,
     });
     if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
@@ -107,6 +107,10 @@ export default function NeueAnfragePage() {
             <div>
               <Label>Veranstaltungstyp</Label>
               <Input placeholder="z.B. Konzert, Firmenanlass, Theater..." value={form.event_type} onChange={(e) => update("event_type", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+            </div>
+            <div>
+              <Label>Erweiterte Dienstleistungen</Label>
+              <textarea placeholder="z.B. Tontechnik, Lichttechnik, Reinigung, Catering..." value={form.services} onChange={(e) => update("services", e.target.value)} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={2} />
             </div>
             <div>
               <Label>Details</Label>
