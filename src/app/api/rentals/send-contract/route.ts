@@ -28,7 +28,8 @@ export async function POST(request: Request) {
 
   try {
     await resend.emails.send({
-      from: "EVENTLINE GmbH <noreply@eventline-basel.com>",
+      from: "EVENTLINE GmbH <leo@eventline-basel.com>",
+      replyTo: "leo@eventline-basel.com",
       to: email,
       subject: `Mietvertrag: ${locationName || "Location"} – ${dateStr}`,
       html: `
