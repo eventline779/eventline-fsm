@@ -6,7 +6,7 @@ export type JobPriority = "niedrig" | "normal" | "hoch" | "dringend";
 
 export type CustomerType = "company" | "individual" | "organization";
 
-export type RentalStatus = "neu" | "in_bearbeitung" | "bestaetigt" | "abgelehnt";
+export type RentalStatus = "neu" | "konditionen_gesendet" | "konditionen_bestaetigt" | "angebot_gesendet" | "in_bearbeitung" | "bestaetigt" | "abgelehnt";
 
 export type ReportStatus = "entwurf" | "abgeschlossen";
 

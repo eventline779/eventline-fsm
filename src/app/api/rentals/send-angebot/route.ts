@@ -10,12 +10,10 @@ export async function POST(request: Request) {
   const resend = new Resend(resendKey);
   const baseUrl = "https://eventline-fsm-usyk.vercel.app";
 
-  const type = "konditionen"; // Konditionen-Bestätigung
-  const confirmUrl = `${baseUrl}/api/rentals/confirm?id=${rentalId}&token=${Buffer.from(rentalId + "-confirm").toString("base64")}&type=${type}`;
+  const confirmUrl = `${baseUrl}/api/rentals/confirm?id=${rentalId}&token=${Buffer.from(rentalId + "-confirm").toString("base64")}&type=angebot`;
 
   const formatDate = (d: string) => {
     if (!d) return "";
-    // Extract date part: "2026-04-13" from "2026-04-13T00:00:00+00:00" or "2026-04-13"
     const datePart = d.split("T")[0];
     const [y, m, day] = datePart.split("-").map(Number);
     const date = new Date(y, m - 1, day, 12, 0, 0);
@@ -36,7 +34,7 @@ export async function POST(request: Request) {
       from: "EVENTLINE GmbH <leo@eventline-basel.com>",
       replyTo: "leo@eventline-basel.com",
       to: email,
-      subject: `Mietkonditionen: ${locationName || "Location"} – ${dateStr}`,
+      subject: `Angebot: ${locationName || "Location"} – ${dateStr}`,
       html: `
         <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
           <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
@@ -44,7 +42,7 @@ export async function POST(request: Request) {
           </div>
           <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
             <p style="margin:0 0 12px">Guten Tag${customerName ? " " + customerName : ""},</p>
-            <p style="margin:0 0 16px">Vielen Dank für Ihre Anfrage. Anbei finden Sie unsere Mietkonditionen:</p>
+            <p style="margin:0 0 16px">Vielen Dank für die Bestätigung unserer Konditionen. Anbei erhalten Sie unser Angebot:</p>
 
             <div style="background:#f8f9fa;padding:16px;border-radius:8px;border-left:4px solid #3b82f6;margin:0 0 16px">
               <p style="margin:0 0 4px;font-weight:600;font-size:16px;color:#1a1a1a">${locationName || "Location"}</p>
@@ -57,14 +55,14 @@ export async function POST(request: Request) {
 
             <div style="text-align:center;margin:24px 0">
               <a href="${confirmUrl}" style="display:inline-block;background:#16a34a;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
-                ✅ Konditionen bestätigen
+                ✅ Angebot verbindlich annehmen
               </a>
             </div>
 
-            <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button bestätigen Sie die Konditionen.</p>
+            <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button nehmen Sie das Angebot verbindlich an.</p>
 
             <hr style="border:none;border-top:1px solid #eee;margin:20px 0"/>
-            <p style="margin:0;color:#999;font-size:13px">Bei Fragen erreichen Sie uns unter <a href="mailto:info@eventline-basel.com" style="color:#3b82f6">info@eventline-basel.com</a></p>
+            <p style="margin:0;color:#999;font-size:13px">Bei Fragen erreichen Sie uns unter <a href="mailto:leo@eventline-basel.com" style="color:#3b82f6">leo@eventline-basel.com</a></p>
             <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
             <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
           </div>

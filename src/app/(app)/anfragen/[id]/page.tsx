@@ -16,17 +16,20 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 const STEPS = [
-  { key: "anfrage", label: "Anfrage", desc: "Anfrage prüfen" },
-  { key: "angebot", label: "Angebot", desc: "Konditionen senden" },
-  { key: "bestaetigung", label: "Bestätigung", desc: "Kunde bestätigt" },
-  { key: "vertrag", label: "Vertrag", desc: "Mietvertrag senden" },
-  { key: "termine", label: "Termine", desc: "Übergabe planen" },
+  { key: "konditionen", label: "Konditionen", desc: "Konditionen senden" },
+  { key: "konditionenBestaetigung", label: "Bestätigung", desc: "Kunde bestätigt" },
+  { key: "angebot", label: "Angebot", desc: "Angebot senden" },
+  { key: "angebotAnnahme", label: "Annahme", desc: "Kunde nimmt an" },
+  { key: "vertragTermine", label: "Vertrag", desc: "Vertrag & Termine" },
 ];
 
 function getStep(status: string): number {
-  if (status === "neu") return 0;            // Schritt 1: Anfrage prüfen
-  if (status === "in_bearbeitung") return 2; // Schritt 3: Warten auf Bestätigung
-  if (status === "bestaetigt") return 3;     // Schritt 4: Vertrag senden
+  if (status === "neu") return 0;                     // Schritt 1: Konditionen hochladen & senden
+  if (status === "konditionen_gesendet") return 1;    // Schritt 2: Warten auf Bestätigung Konditionen
+  if (status === "konditionen_bestaetigt") return 2;  // Schritt 3: Angebot senden
+  if (status === "angebot_gesendet") return 3;        // Schritt 4: Warten auf Annahme Angebot
+  if (status === "in_bearbeitung") return 1;          // Legacy: wie konditionen_gesendet
+  if (status === "bestaetigt") return 4;              // Schritt 5: Vertrag & Termine
   if (status === "abgelehnt") return -1;
   return 0;
 }
@@ -74,6 +77,15 @@ export default function VermietungDetailPage() {
   const [uploadingContract, setUploadingContract] = useState(false);
   const contractFileRef = useRef<HTMLInputElement>(null);
 
+  // Angebot (Schritt 3)
+  const [showAngebot, setShowAngebot] = useState(false);
+  const [angebotEmail, setAngebotEmail] = useState("");
+  const [angebotMessage, setAngebotMessage] = useState("");
+  const [sendingAngebot, setSendingAngebot] = useState(false);
+  const [angebotDocs, setAngebotDocs] = useState<{ name: string; path: string }[]>([]);
+  const [uploadingAngebot, setUploadingAngebot] = useState(false);
+  const angebotFileRef = useRef<HTMLInputElement>(null);
+
   // Termin
   const [showTermin, setShowTermin] = useState(false);
   const [terminForm, setTerminForm] = useState({ title: "", date: "", time: "08:00", end_time: "17:00", assigned_to: "" });
@@ -94,11 +106,13 @@ export default function VermietungDetailPage() {
     if (data) {
       setRequest(data);
       setOfferEmail(data.customer?.email || "");
+      setAngebotEmail(data.customer?.email || "");
       setContractEmail(data.customer?.email || "");
       if (data.details) {
         try {
           const parsed = JSON.parse(data.details);
           if (parsed._docs) setDocs(parsed._docs);
+          if (parsed._angebotDocs) setAngebotDocs(parsed._angebotDocs);
           if (parsed._contractDocs) setContractDocs(parsed._contractDocs);
         } catch {}
       }
@@ -125,11 +139,12 @@ export default function VermietungDetailPage() {
     } catch (e: any) { toast.error("Upload-Fehler: " + (e.message || "Netzwerkfehler")); return false; }
   }
 
-  async function saveDetails(newDocs: any[], newContractDocs: any[]) {
+  async function saveDetails(newDocs: any[], newContractDocs: any[], newAngebotDocs?: any[]) {
     let details: any = {};
     try { details = JSON.parse(request.details || "{}"); } catch { details = { _text: request.details }; }
     details._docs = newDocs;
     details._contractDocs = newContractDocs;
+    if (newAngebotDocs !== undefined) details._angebotDocs = newAngebotDocs;
     await fetch("/api/rentals/update-details", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
   }
 
@@ -185,10 +200,43 @@ export default function VermietungDetailPage() {
       const res = await fetch("/api/rentals/send-offer", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rentalId: id, email: offerEmail, message: offerMessage, customerName: request.customer?.name, locationName: request.location?.name, eventDate: request.event_date, eventEndDate: request.event_end_date, pdfUrls }) });
       const json = await res.json();
-      if (json.success) { toast.success("Angebot gesendet"); setShowOffer(false); updateStatus("in_bearbeitung"); }
+      if (json.success) { toast.success("Konditionen gesendet"); setShowOffer(false); updateStatus("konditionen_gesendet"); }
       else toast.error("Fehler: " + (json.error || "Unbekannt"));
     } catch { toast.error("Fehler beim Senden"); }
     setSendingOffer(false);
+  }
+
+  async function uploadAngebotDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploadingAngebot(true);
+    const path = `vermietungen/${id}/angebot_${Date.now()}_${file.name}`;
+    const ok = await uploadViaApi(file, path);
+    if (!ok) { setUploadingAngebot(false); e.target.value = ""; return; }
+    const newDocs = [...angebotDocs, { name: file.name, path }];
+    await saveDetails(docs, contractDocs, newDocs);
+    setAngebotDocs(newDocs);
+    toast.success("Angebot-Dokument hochgeladen");
+    setUploadingAngebot(false); e.target.value = "";
+  }
+
+  async function deleteAngebotDoc(doc: { name: string; path: string }) {
+    await supabase.storage.from("documents").remove([doc.path]);
+    const newDocs = angebotDocs.filter((d) => d.path !== doc.path);
+    await saveDetails(docs, contractDocs, newDocs);
+    setAngebotDocs(newDocs); toast.success("Dokument gelöscht");
+  }
+
+  async function sendAngebot() {
+    setSendingAngebot(true);
+    const pdfUrls = angebotDocs.map((d) => { const { data } = supabase.storage.from("documents").getPublicUrl(d.path); return { name: d.name, url: data.publicUrl }; });
+    try {
+      const res = await fetch("/api/rentals/send-angebot", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rentalId: id, email: angebotEmail, message: angebotMessage, customerName: request.customer?.name, locationName: request.location?.name, eventDate: request.event_date, eventEndDate: request.event_end_date, pdfUrls }) });
+      const json = await res.json();
+      if (json.success) { toast.success("Angebot gesendet"); setShowAngebot(false); updateStatus("angebot_gesendet"); }
+      else toast.error("Fehler: " + (json.error || "Unbekannt"));
+    } catch { toast.error("Fehler beim Senden"); }
+    setSendingAngebot(false);
   }
 
   async function sendContract() {
@@ -245,9 +293,7 @@ export default function VermietungDetailPage() {
 
   if (!request) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  // Schritt berechnen: wenn Status "neu" aber schon Dokumente hochgeladen → Schritt 2
-  const baseStep = getStep(request.status);
-  const currentStep = (request.status === "neu" && docs.length > 0) ? 1 : baseStep;
+  const currentStep = getStep(request.status);
   let services = "";
   try { const parsed = JSON.parse(request.notes); services = parsed.services || ""; } catch {}
 
@@ -315,24 +361,24 @@ export default function VermietungDetailPage() {
       {/* Alle 5 Schritte immer sichtbar */}
       {request.status !== "abgelehnt" && (
         <div className="space-y-3">
-          {/* SCHRITT 1: Konditionen hochladen */}
-          <Card className={`transition-all ${currentStep > 0 ? "bg-green-50/50 border-green-200" : currentStep === 0 ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          {/* SCHRITT 1: Konditionen senden */}
+          {(() => { const s = 0; const done = currentStep > s; const active = currentStep === s; return (
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 0 ? "bg-green-500 text-white" : currentStep === 0 ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {currentStep > 0 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">1</span>}
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">1</span>}
                 </div>
-                <span className={currentStep > 0 ? "text-green-700" : currentStep === 0 ? "text-blue-700" : "text-gray-400"}>Anfrage prüfen</span>
-                {currentStep > 0 && <span className="text-xs text-green-600 ml-auto">Erledigt</span>}
+                <span className={done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}>Konditionen senden</span>
+                {done && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
               </CardTitle>
             </CardHeader>
-            {currentStep === 0 && (
+            {active && (
               <CardContent className="space-y-3 pt-1">
-                <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen und dann weiter zum Angebot.</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Dokumente</p>
+                  <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen</p>
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF hochladen"}
+                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF"}
                   </Button>
                   <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
                 </div>
@@ -343,154 +389,172 @@ export default function VermietungDetailPage() {
                   </div>
                 ))}
                 <div className="flex gap-2 pt-1">
+                  <Button size="sm" onClick={() => setShowOffer(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Konditionen an Kunde senden</Button>
                   <Button size="sm" variant="outline" onClick={() => updateStatus("abgelehnt")}><X className="h-4 w-4 mr-1" />Ablehnen</Button>
                 </div>
               </CardContent>
             )}
           </Card>
+          ); })()}
 
-          {/* SCHRITT 2: Angebot an Kunde senden */}
-          <Card className={`transition-all ${currentStep > 1 ? "bg-green-50/50 border-green-200" : currentStep === 1 ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          {/* SCHRITT 2: Kunde bestätigt Konditionen */}
+          {(() => { const s = 1; const done = currentStep > s; const active = currentStep === s; return (
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 1 ? "bg-green-500 text-white" : currentStep === 1 ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {currentStep > 1 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">2</span>}
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">2</span>}
                 </div>
-                <span className={currentStep > 1 ? "text-green-700" : currentStep === 1 ? "text-blue-700" : "text-gray-400"}>Angebot senden</span>
-                {currentStep > 1 && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
+                <span className={done ? "text-green-700" : active ? "text-amber-700" : "text-gray-400"}>Bestätigung Konditionen</span>
+                {done && <span className="text-xs text-green-600 ml-auto">Bestätigt</span>}
               </CardTitle>
             </CardHeader>
-            {currentStep === 1 && (
-              <CardContent className="space-y-3 pt-1">
-                {docs.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Angehängte Dokumente:</p>
-                    {docs.map((d) => (
-                      <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                        <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
-                        <button onClick={() => deleteDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Weitere Dokumente hinzufügen</p>
-                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF"}
-                  </Button>
-                  <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={() => setShowOffer(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Angebot an Kunde senden</Button>
+            {active && (
+              <CardContent className="pt-1">
+                <div className="flex items-center gap-3">
+                  <div className="animate-pulse w-3 h-3 rounded-full bg-amber-400" />
+                  <p className="text-sm font-medium text-amber-800">Warten auf Bestätigung der Konditionen...</p>
+                  <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus("konditionen_bestaetigt")}><Check className="h-4 w-4 mr-1" />Manuell bestätigen</Button>
                 </div>
               </CardContent>
             )}
           </Card>
+          ); })()}
 
-          {/* SCHRITT 3: Bestätigung */}
-          <Card className={`transition-all ${currentStep > 2 ? "bg-green-50/50 border-green-200" : currentStep === 2 ? "bg-amber-50 border-amber-200 shadow-sm" : currentStep > 0 && currentStep <= 2 ? "bg-white border-blue-100" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          {/* SCHRITT 3: Angebot senden */}
+          {(() => { const s = 2; const done = currentStep > s; const active = currentStep === s; return (
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 2 ? "bg-green-500 text-white" : currentStep === 2 ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {currentStep > 2 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">3</span>}
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">3</span>}
                 </div>
-                <span className={currentStep > 2 ? "text-green-700" : currentStep === 2 ? "text-amber-700" : "text-gray-400"}>Bestätigung vom Kunden</span>
-                {currentStep > 2 && <span className="text-xs text-green-600 ml-auto">Bestätigt</span>}
+                <span className={done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}>Angebot senden</span>
+                {done && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
               </CardTitle>
             </CardHeader>
-            {request.status === "in_bearbeitung" && (
+            {active && (
+              <CardContent className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">Angebot als PDF hochladen</p>
+                  <Button size="sm" variant="outline" onClick={() => angebotFileRef.current?.click()} disabled={uploadingAngebot}>
+                    <Upload className="h-4 w-4 mr-1" />{uploadingAngebot ? "..." : "PDF"}
+                  </Button>
+                  <input ref={angebotFileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadAngebotDoc} className="hidden" />
+                </div>
+                {angebotDocs.map((d) => (
+                  <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                    <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
+                    <button onClick={() => deleteAngebotDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" onClick={() => setShowAngebot(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Angebot an Kunde senden</Button>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+          ); })()}
+
+          {/* SCHRITT 4: Kunde nimmt Angebot an */}
+          {(() => { const s = 3; const done = currentStep > s; const active = currentStep === s; return (
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+            <CardHeader className="pb-2 pt-4 px-5">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">4</span>}
+                </div>
+                <span className={done ? "text-green-700" : active ? "text-amber-700" : "text-gray-400"}>Angebot Annahme</span>
+                {done && <span className="text-xs text-green-600 ml-auto">Angenommen</span>}
+              </CardTitle>
+            </CardHeader>
+            {active && (
               <CardContent className="pt-1">
                 <div className="flex items-center gap-3">
                   <div className="animate-pulse w-3 h-3 rounded-full bg-amber-400" />
-                  <p className="text-sm font-medium text-amber-800">Warten auf Bestätigung vom Kunden...</p>
+                  <p className="text-sm font-medium text-amber-800">Warten auf Annahme des Angebots...</p>
                   <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus("bestaetigt")}><Check className="h-4 w-4 mr-1" />Manuell bestätigen</Button>
                 </div>
               </CardContent>
             )}
           </Card>
+          ); })()}
 
-          {/* SCHRITT 4: Vertrag */}
-          <Card className={`transition-all ${currentStep > 3 ? "bg-green-50/50 border-green-200" : currentStep === 3 ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          {/* SCHRITT 5: Vertrag & Termine */}
+          {(() => { const s = 4; const done = currentStep > s; const active = currentStep === s; return (
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-green-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 3 ? "bg-green-500 text-white" : currentStep === 3 ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {currentStep > 3 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">4</span>}
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"}`}>
+                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">5</span>}
                 </div>
-                <span className={currentStep > 3 ? "text-green-700" : currentStep === 3 ? "text-blue-700" : "text-gray-400"}>Mietvertrag senden</span>
-                {currentStep > 3 && <span className="text-xs text-green-600 ml-auto">Erledigt</span>}
+                <span className={active ? "text-green-700" : "text-gray-400"}>Vertrag & Termine</span>
               </CardTitle>
             </CardHeader>
-            {currentStep >= 3 && (
-              <CardContent className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Mietvertrag als PDF hochladen</p>
-                  <Button size="sm" variant="outline" onClick={() => contractFileRef.current?.click()} disabled={uploadingContract}>
-                    <Upload className="h-4 w-4 mr-1" />{uploadingContract ? "..." : "PDF"}
-                  </Button>
-                  <input ref={contractFileRef} type="file" accept=".pdf,.doc,.docx" onChange={uploadContractDoc} className="hidden" />
-                </div>
-                {contractDocs.map((d) => (
-                  <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-100">
-                    <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-700"><FileText className="h-4 w-4 text-blue-500" />{d.name}</button>
-                    <button onClick={() => deleteContractDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
-                {contractDocs.length > 0 && (
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowContract(true)}>
-                    <Send className="h-4 w-4 mr-1" />Vertrag an Kunde senden
-                  </Button>
-                )}
-              </CardContent>
-            )}
-          </Card>
-
-          {/* SCHRITT 5: Termine */}
-          <Card className={`transition-all ${currentStep > 4 ? "bg-green-50/50 border-green-200" : currentStep === 4 ? "bg-white border-green-200 shadow-sm" : currentStep >= 3 ? "bg-white border-gray-100" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 4 ? "bg-green-500 text-white" : currentStep >= 3 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {currentStep > 4 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">5</span>}
-                </div>
-                <span className={currentStep >= 3 ? "text-green-700" : "text-gray-400"}>Termine planen</span>
-              </CardTitle>
-            </CardHeader>
-            {currentStep >= 3 && (
-              <CardContent className="space-y-3 pt-1">
-                {!showTermin ? (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Übergabe ${request.customer?.name}`, date: request.event_date?.split("T")[0] || "" }); }}>
-                      <Calendar className="h-4 w-4 mr-1" />Übergabe-Termin
+            {active && (
+              <CardContent className="space-y-4 pt-1">
+                {/* Vertrag */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Mietvertrag</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Mietvertrag als PDF hochladen</p>
+                    <Button size="sm" variant="outline" onClick={() => contractFileRef.current?.click()} disabled={uploadingContract}>
+                      <Upload className="h-4 w-4 mr-1" />{uploadingContract ? "..." : "PDF"}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Rücknahme ${request.customer?.name}`, date: request.event_end_date?.split("T")[0] || request.event_date?.split("T")[0] || "" }); }}>
-                      <Calendar className="h-4 w-4 mr-1" />Rücknahme-Termin
-                    </Button>
+                    <input ref={contractFileRef} type="file" accept=".pdf,.doc,.docx" onChange={uploadContractDoc} className="hidden" />
                   </div>
-                ) : (
-                  <form onSubmit={createTermin} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-                    <Input placeholder="Titel *" value={terminForm.title} onChange={(e) => setTerminForm({ ...terminForm, title: e.target.value })} required />
-                    <div className="grid grid-cols-3 gap-3">
-                      <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1" required /></div>
-                      <div><label className="text-xs font-medium">Von *</label><Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1" required /></div>
-                      <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1" required /></div>
+                  {contractDocs.map((d) => (
+                    <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-100">
+                      <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-700"><FileText className="h-4 w-4 text-blue-500" />{d.name}</button>
+                      <button onClick={() => deleteContractDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
-                    <select value={terminForm.assigned_to} onChange={(e) => setTerminForm({ ...terminForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
-                      <option value="">Techniker zuweisen...</option>
-                      {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                    </select>
+                  ))}
+                  {contractDocs.length > 0 && (
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowContract(true)}>
+                      <Send className="h-4 w-4 mr-1" />Vertrag an Kunde senden
+                    </Button>
+                  )}
+                </div>
+                {/* Termine */}
+                <div className="space-y-3 border-t pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Termine</p>
+                  {!showTermin ? (
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => setShowTermin(false)}>Abbrechen</Button>
-                      <Button type="submit" size="sm" className="bg-green-600 hover:bg-green-700 text-white">Termin erstellen</Button>
+                      <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Übergabe ${request.customer?.name}`, date: request.event_date?.split("T")[0] || "" }); }}>
+                        <Calendar className="h-4 w-4 mr-1" />Übergabe-Termin
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Rücknahme ${request.customer?.name}`, date: request.event_end_date?.split("T")[0] || request.event_date?.split("T")[0] || "" }); }}>
+                        <Calendar className="h-4 w-4 mr-1" />Rücknahme-Termin
+                      </Button>
                     </div>
-                  </form>
-                )}
+                  ) : (
+                    <form onSubmit={createTermin} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+                      <Input placeholder="Titel *" value={terminForm.title} onChange={(e) => setTerminForm({ ...terminForm, title: e.target.value })} required />
+                      <div className="grid grid-cols-3 gap-3">
+                        <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1" required /></div>
+                        <div><label className="text-xs font-medium">Von *</label><Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1" required /></div>
+                        <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1" required /></div>
+                      </div>
+                      <select value={terminForm.assigned_to} onChange={(e) => setTerminForm({ ...terminForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+                        <option value="">Techniker zuweisen...</option>
+                        {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                      </select>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setShowTermin(false)}>Abbrechen</Button>
+                        <Button type="submit" size="sm" className="bg-green-600 hover:bg-green-700 text-white">Termin erstellen</Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </CardContent>
             )}
           </Card>
+          ); })()}
         </div>
       )}
 
       {/* Modals */}
-      <Modal show={showOffer} onClose={() => setShowOffer(false)} title="Angebot senden">
+      <Modal show={showOffer} onClose={() => setShowOffer(false)} title="Konditionen senden">
         <div><label className="text-sm font-medium">E-Mail *</label><Input value={offerEmail} onChange={(e) => setOfferEmail(e.target.value)} className="mt-1.5" /></div>
         <div><label className="text-sm font-medium">Nachricht</label><textarea value={offerMessage} onChange={(e) => setOfferMessage(e.target.value)} placeholder="Persönliche Nachricht..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
         {docs.length > 0 && <div className="text-xs text-muted-foreground">{docs.length} Dokument(e) angehängt</div>}
@@ -498,6 +562,17 @@ export default function VermietungDetailPage() {
         <div className="flex gap-3">
           <button onClick={() => setShowOffer(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
           <button onClick={sendOffer} disabled={!offerEmail || sendingOffer} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{sendingOffer ? "Senden..." : "Senden"}</button>
+        </div>
+      </Modal>
+
+      <Modal show={showAngebot} onClose={() => setShowAngebot(false)} title="Angebot senden">
+        <div><label className="text-sm font-medium">E-Mail *</label><Input value={angebotEmail} onChange={(e) => setAngebotEmail(e.target.value)} className="mt-1.5" /></div>
+        <div><label className="text-sm font-medium">Nachricht</label><textarea value={angebotMessage} onChange={(e) => setAngebotMessage(e.target.value)} placeholder="Persönliche Nachricht zum Angebot..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
+        {angebotDocs.length > 0 && <div className="text-xs text-muted-foreground">{angebotDocs.length} Dokument(e) angehängt</div>}
+        <p className="text-xs text-muted-foreground">Kunde erhält E-Mail mit Angebot und Annahme-Link.</p>
+        <div className="flex gap-3">
+          <button onClick={() => setShowAngebot(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={sendAngebot} disabled={!angebotEmail || sendingAngebot} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{sendingAngebot ? "Senden..." : "Senden"}</button>
         </div>
       </Modal>
 
