@@ -102,7 +102,7 @@ export default function KalenderPage() {
             id: r.id, title: `Vermietung: ${cust || "Unbekannt"}`, date: d, endDate: endD,
             time: d.getHours() > 0 ? formatTime(d) : null,
             type: "vermietung", color: "text-amber-700", bgColor: "bg-amber-50 border-amber-200", dotColor: "bg-amber-500",
-            link: `/anfragen`,
+            link: `/anfragen/${r.id}`,
             meta: [loc, r.guest_count ? `${r.guest_count} Pers.` : null].filter(Boolean).join(" · "),
           });
         }
