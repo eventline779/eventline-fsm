@@ -45,7 +45,7 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [quickLinks, setQuickLinks] = useState<{ name: string; url: string }[]>([]);
-  const [jobsOhneTermin, setJobsOhneTermin] = useState<{ id: string; title: string; job_number: number }[]>([]);
+  const [jobsOhneTermin, setJobsOhneTermin] = useState<{ id: string; title: string; job_number: number; start_date: string | null }[]>([]);
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkForm, setLinkForm] = useState({ name: "", url: "" });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -116,12 +116,12 @@ export default function DashboardPage() {
       kundenTotal: kundenRes.count ?? 0,
     });
 
-    // Aufträge ohne Termine finden
-    const { data: activeJobs } = await supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true);
+    // Aufträge ohne Termine finden — nur die nächsten 3 nach Startdatum
+    const { data: activeJobs } = await supabase.from("jobs").select("id, title, job_number, start_date").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true, nullsFirst: false });
     const { data: allAppts } = await supabase.from("job_appointments").select("job_id");
     if (activeJobs && allAppts) {
       const jobsWithAppts = new Set(allAppts.map((a: any) => a.job_id).filter(Boolean));
-      setJobsOhneTermin((activeJobs as any[]).filter((j) => !jobsWithAppts.has(j.id)));
+      setJobsOhneTermin((activeJobs as any[]).filter((j) => !jobsWithAppts.has(j.id)).slice(0, 3));
     }
 
     // Meine Todos
@@ -237,11 +237,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Aufträge ohne Termin - nur für Leo */}
-      {jobsOhneTermin.length > 0 && userEmail === "leo@eventline-basel.com" && (
+      {jobsOhneTermin.length > 0 && (
         <div>
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <ClipboardList className="h-3.5 w-3.5 text-orange-500" />Aufträge ohne Termin ({jobsOhneTermin.length})
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <ClipboardList className="h-3.5 w-3.5 text-orange-500" />Nächste Aufträge ohne Termin
+            </h2>
+            <Link href="/auftraege" className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1">Alle anzeigen <ArrowRight className="h-3 w-3" /></Link>
+          </div>
           <div className="space-y-1">
             {jobsOhneTermin.map((j) => (
               <Link key={j.id} href={`/auftraege/${j.id}`}>
@@ -251,7 +254,10 @@ export default function DashboardPage() {
                       <span className="text-xs font-mono text-orange-600">INT-{j.job_number}</span>
                       <span className="font-medium text-sm">{j.title}</span>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">Kein Termin</span>
+                    <div className="flex items-center gap-2">
+                      {j.start_date && <span className="text-[10px] text-muted-foreground">bis {new Date(j.start_date).toLocaleDateString("de-CH")}</span>}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">Kein Termin</span>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
