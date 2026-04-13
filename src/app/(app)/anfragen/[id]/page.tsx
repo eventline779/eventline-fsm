@@ -96,7 +96,11 @@ export default function VermietungDetailPage() {
   const [deleteError, setDeleteError] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => { loadData(); }, [id]);
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, [id]);
 
   async function loadData() {
     const { data } = await supabase

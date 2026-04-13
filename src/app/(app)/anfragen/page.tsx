@@ -17,7 +17,11 @@ export default function AnfragenPage() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => { loadRequests(); }, []);
+  useEffect(() => {
+    loadRequests();
+    const interval = setInterval(loadRequests, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadRequests() {
     const { data } = await supabase
