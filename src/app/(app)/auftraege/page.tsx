@@ -188,53 +188,62 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment;
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`}>
-            <Card className={`bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group ${noTermin ? "border-l-4 border-l-amber-400" : ""}`}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3">
-                      {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
-                      <h3 className="font-semibold text-gray-900 truncate">{job.title}</h3>
-                      <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                        {JOB_STATUS[job.status].label}
-                      </span>
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
-                        {JOB_PRIORITY[job.priority].label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      {(job.customer as unknown as { name: string })?.name && (
-                        <span className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5" />
-                          {(job.customer as unknown as { name: string }).name}
+            <div className="flex items-stretch gap-2">
+              {/* Linke Seite: Termin-Status */}
+              <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
+                {noTermin ? (
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <Calendar className="h-4 w-4 text-green-500" />
+                )}
+              </div>
+              <Card className="bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
+                        <h3 className="font-semibold truncate">{job.title}</h3>
+                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                          {JOB_STATUS[job.status].label}
                         </span>
-                      )}
-                      {(job.location as unknown as { name: string })?.name && (
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {(job.location as unknown as { name: string }).name}
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
+                          {JOB_PRIORITY[job.priority].label}
                         </span>
-                      )}
-                      {job.start_date && (
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {new Date(job.start_date).toLocaleDateString("de-CH")}
-                        </span>
-                      )}
-                    </div>
-                    {noTermin && (
-                      <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg w-fit border border-amber-200">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH")}` : ""}
                       </div>
-                    )}
-                    {job.description && (
-                      <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
-                    )}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        {(job.customer as unknown as { name: string })?.name && (
+                          <span className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5" />
+                            {(job.customer as unknown as { name: string }).name}
+                          </span>
+                        )}
+                        {(job.location as unknown as { name: string })?.name && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {(job.location as unknown as { name: string }).name}
+                          </span>
+                        )}
+                        {job.start_date && (
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {new Date(job.start_date).toLocaleDateString("de-CH")}
+                          </span>
+                        )}
+                      </div>
+                      {noTermin && (
+                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH")}` : ""}
+                        </p>
+                      )}
+                      {job.description && (
+                        <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
             </Link>
             );
           })}
