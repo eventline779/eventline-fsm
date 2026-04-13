@@ -70,6 +70,20 @@ export default function TodosPage() {
           link: "/todos",
         }),
       });
+      // Bei dringend: zusätzlich E-Mail senden
+      if (form.priority === "dringend") {
+        await fetch("/api/todos/urgent-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assignedTo: form.assigned_to,
+            title: form.title,
+            description: form.description || null,
+            dueDate: form.due_date || null,
+            creatorName: creator?.full_name || "Unbekannt",
+          }),
+        });
+      }
     }
     toast.success("Todo erstellt");
 
