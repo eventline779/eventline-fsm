@@ -31,6 +31,24 @@ function getStep(status: string): number {
   return 0;
 }
 
+function Modal({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  if (!show) return null;
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="font-semibold text-gray-900 dark:text-white">{title}</h2>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+          </div>
+          <div className="p-6 space-y-4">{children}</div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function VermietungDetailPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -230,22 +248,6 @@ export default function VermietungDetailPage() {
   const currentStep = getStep(request.status);
   let services = "";
   try { const parsed = JSON.parse(request.notes); services = parsed.services || ""; } catch {}
-
-  // Modal component
-  const Modal = ({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) => !show ? null : (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="font-semibold text-gray-900 dark:text-white">{title}</h2>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-          </div>
-          <div className="p-6 space-y-4">{children}</div>
-        </div>
-      </div>
-    </>
-  );
 
   return (
     <div className="space-y-6 max-w-3xl">
