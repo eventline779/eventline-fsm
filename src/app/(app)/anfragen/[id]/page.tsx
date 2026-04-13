@@ -503,8 +503,10 @@ export default function VermietungDetailPage() {
         <div>
           <label className="text-sm font-medium">Passwort eingeben</label>
           <Input
-            type="password"
-            placeholder="Passwort"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="4-stelliger Code"
             value={deletePassword}
             onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(false); }}
             className={`mt-1.5 ${deleteError ? "border-red-500 focus:ring-red-500" : ""}`}
