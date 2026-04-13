@@ -237,7 +237,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Aufträge ohne Termin - nur für Leo */}
-      {jobsOhneTermin.length > 0 && (
+      {jobsOhneTermin.length > 0 && userEmail === "leo@eventline-basel.com" && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
