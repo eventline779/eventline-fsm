@@ -203,17 +203,26 @@ export default function VermietungDetailPage() {
   }
 
   async function deleteRequest() {
-    if (deletePassword !== "5225") { setDeleteError(true); return; }
+    if (!deletePassword) return;
     setDeleting(true);
-    // Dokumente aus Storage löschen
-    const allDocs = [...docs, ...contractDocs];
-    if (allDocs.length > 0) {
-      await supabase.storage.from("documents").remove(allDocs.map((d) => d.path));
+    try {
+      const res = await fetch("/api/rentals/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, code: deletePassword }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Vermietung gelöscht");
+        router.push("/anfragen");
+      } else {
+        setDeleteError(true);
+        setDeleting(false);
+      }
+    } catch {
+      toast.error("Fehler beim Löschen");
+      setDeleting(false);
     }
-    // Vermietung löschen
-    await supabase.from("rental_requests").delete().eq("id", id);
-    toast.success("Vermietung gelöscht");
-    router.push("/anfragen");
   }
 
   if (!request) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
@@ -502,14 +511,15 @@ export default function VermietungDetailPage() {
         </div>
         <div>
           <label className="text-sm font-medium">Passwort eingeben</label>
-          <Input
+          <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
+            autoComplete="off"
             placeholder="4-stelliger Code"
             value={deletePassword}
             onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(false); }}
-            className={`mt-1.5 ${deleteError ? "border-red-500 focus:ring-red-500" : ""}`}
+            className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-white dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`}
           />
           {deleteError && <p className="text-xs text-red-600 mt-1">Falsches Passwort</p>}
         </div>
