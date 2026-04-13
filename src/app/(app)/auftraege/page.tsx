@@ -16,6 +16,7 @@ import {
   MapPin,
   User,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function AuftraegePage() {
@@ -33,7 +34,7 @@ export default function AuftraegePage() {
     const [jobsRes, profRes] = await Promise.all([
       supabase
         .from("jobs")
-        .select("*, customer:customers(name), location:locations(name), project_lead_id, assignments:job_assignments(profile_id)")
+        .select("*, customer:customers(name), location:locations(name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)")
         .neq("is_deleted", true)
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
@@ -180,9 +181,14 @@ export default function AuftraegePage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((job) => (
+          {filtered.map((job) => {
+            const appointments = (job as any).appointments as { id: string; start_time: string }[] | null;
+            const hasAppointment = appointments && appointments.length > 0;
+            const isActive = !["abgeschlossen", "storniert"].includes(job.status);
+            const noTermin = isActive && !hasAppointment;
+            return (
             <Link key={job.id} href={`/auftraege/${job.id}`}>
-            <Card className="bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group">
+            <Card className={`bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group ${noTermin ? "border-l-4 border-l-amber-400" : ""}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -216,6 +222,12 @@ export default function AuftraegePage() {
                         </span>
                       )}
                     </div>
+                    {noTermin && (
+                      <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg w-fit border border-amber-200">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH")}` : ""}
+                      </div>
+                    )}
                     {job.description && (
                       <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                     )}
@@ -224,7 +236,8 @@ export default function AuftraegePage() {
               </CardContent>
             </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
