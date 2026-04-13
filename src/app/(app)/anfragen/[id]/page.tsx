@@ -245,7 +245,9 @@ export default function VermietungDetailPage() {
 
   if (!request) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  const currentStep = getStep(request.status);
+  // Schritt berechnen: wenn Status "neu" aber schon Dokumente hochgeladen → Schritt 2
+  const baseStep = getStep(request.status);
+  const currentStep = (request.status === "neu" && docs.length > 0) ? 1 : baseStep;
   let services = "";
   try { const parsed = JSON.parse(request.notes); services = parsed.services || ""; } catch {}
 
@@ -313,7 +315,7 @@ export default function VermietungDetailPage() {
       {/* Alle 5 Schritte immer sichtbar */}
       {request.status !== "abgelehnt" && (
         <div className="space-y-3">
-          {/* SCHRITT 1: Anfrage prüfen */}
+          {/* SCHRITT 1: Konditionen hochladen */}
           <Card className={`transition-all ${currentStep > 0 ? "bg-green-50/50 border-green-200" : currentStep === 0 ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -326,10 +328,11 @@ export default function VermietungDetailPage() {
             </CardHeader>
             {currentStep === 0 && (
               <CardContent className="space-y-3 pt-1">
+                <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen und dann weiter zum Angebot.</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen</p>
+                  <p className="text-sm font-medium">Dokumente</p>
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF"}
+                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF hochladen"}
                   </Button>
                   <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
                 </div>
@@ -340,42 +343,45 @@ export default function VermietungDetailPage() {
                   </div>
                 ))}
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={() => setShowOffer(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Angebot an Kunde senden</Button>
                   <Button size="sm" variant="outline" onClick={() => updateStatus("abgelehnt")}><X className="h-4 w-4 mr-1" />Ablehnen</Button>
                 </div>
               </CardContent>
             )}
           </Card>
 
-          {/* SCHRITT 2: Angebot senden */}
+          {/* SCHRITT 2: Angebot an Kunde senden */}
           <Card className={`transition-all ${currentStep > 1 ? "bg-green-50/50 border-green-200" : currentStep === 1 ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${currentStep > 1 ? "bg-green-500 text-white" : currentStep === 1 ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
                   {currentStep > 1 ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">2</span>}
                 </div>
-                <span className={currentStep > 1 ? "text-green-700" : currentStep === 1 ? "text-blue-700" : "text-gray-400"}>Angebot & Konditionen</span>
+                <span className={currentStep > 1 ? "text-green-700" : currentStep === 1 ? "text-blue-700" : "text-gray-400"}>Angebot senden</span>
                 {currentStep > 1 && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
               </CardTitle>
             </CardHeader>
             {currentStep === 1 && (
               <CardContent className="space-y-3 pt-1">
+                {docs.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Angehängte Dokumente:</p>
+                    {docs.map((d) => (
+                      <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+                        <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
+                        <button onClick={() => deleteDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen</p>
+                  <p className="text-sm text-muted-foreground">Weitere Dokumente hinzufügen</p>
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF"}
                   </Button>
                   <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
                 </div>
-                {docs.map((d) => (
-                  <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                    <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
-                    <button onClick={() => deleteDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={() => setShowOffer(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Angebot an Kunde senden</Button>
-                  <Button size="sm" variant="outline" onClick={() => updateStatus("abgelehnt")}><X className="h-4 w-4 mr-1" />Ablehnen</Button>
                 </div>
               </CardContent>
             )}
