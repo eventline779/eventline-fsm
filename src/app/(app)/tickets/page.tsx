@@ -136,7 +136,7 @@ export default function TicketsPage() {
     const file = e.target.files?.[0];
     if (!file || !selectedTicket) return;
     setUploading(true);
-    const path = `tickets/${selectedTicket.id}/${Date.now()}_${file.name}`;
+    const path = `tickets/${selectedTicket.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) { toast.error("Upload fehlgeschlagen"); setUploading(false); e.target.value = ""; return; }
     const newAttachments = [...(selectedTicket.attachments || []), { name: file.name, path, uploaded_at: new Date().toISOString() }];

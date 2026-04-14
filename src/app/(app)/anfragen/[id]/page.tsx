@@ -155,7 +155,7 @@ export default function VermietungDetailPage() {
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
-    const path = `vermietungen/${id}/${Date.now()}_${file.name}`;
+    const path = `vermietungen/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const ok = await uploadViaApi(file, path);
     if (!ok) { setUploading(false); e.target.value = ""; return; }
     const newDocs = [...docs, { name: file.name, path }];
@@ -175,7 +175,7 @@ export default function VermietungDetailPage() {
   async function uploadContractDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     setUploadingContract(true);
-    const path = `vermietungen/${id}/vertrag_${Date.now()}_${file.name}`;
+    const path = `vermietungen/${id}/vertrag_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const ok = await uploadViaApi(file, path);
     if (!ok) { setUploadingContract(false); e.target.value = ""; return; }
     const newDocs = [...contractDocs, { name: file.name, path }];
@@ -213,7 +213,7 @@ export default function VermietungDetailPage() {
   async function uploadAngebotDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     setUploadingAngebot(true);
-    const path = `vermietungen/${id}/angebot_${Date.now()}_${file.name}`;
+    const path = `vermietungen/${id}/angebot_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const ok = await uploadViaApi(file, path);
     if (!ok) { setUploadingAngebot(false); e.target.value = ""; return; }
     const newDocs = [...angebotDocs, { name: file.name, path }];

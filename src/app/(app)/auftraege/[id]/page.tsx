@@ -173,7 +173,8 @@ export default function AuftragDetailPage() {
     if (!user) { setUploading(false); return; }
 
     for (const file of Array.from(files)) {
-      const path = `jobs/${id}/${Date.now()}_${file.name}`;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `jobs/${id}/${Date.now()}_${safeName}`;
       try {
         const formData = new FormData();
         formData.append("file", file);

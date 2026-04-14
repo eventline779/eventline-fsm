@@ -134,7 +134,7 @@ export default function StandortDetailPage() {
     if (!file) return;
     setUploadingDoc(true);
     const ext = file.name.split(".").pop() || "pdf";
-    const path = `standorte/${id}/${Date.now()}_${file.name}`;
+    const path = `standorte/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) {
       toast.error("Upload fehlgeschlagen: " + error.message);

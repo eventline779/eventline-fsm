@@ -149,7 +149,7 @@ export default function TodosPage() {
     const file = e.target.files?.[0];
     if (!file || !selectedTodo) return;
     setUploading(true);
-    const path = `todos/${selectedTodo.id}/${Date.now()}_${file.name}`;
+    const path = `todos/${selectedTodo.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) {
       toast.error("Upload fehlgeschlagen: " + error.message);

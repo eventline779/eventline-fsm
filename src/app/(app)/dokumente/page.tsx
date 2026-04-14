@@ -31,7 +31,7 @@ export default function DokumentePage() {
     if (!user) return;
 
     for (const file of Array.from(files)) {
-      const path = `${user.id}/${Date.now()}_${file.name}`;
+      const path = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
       if (uploadError) { toast.error("Upload fehlgeschlagen: " + uploadError.message); continue; }
 
