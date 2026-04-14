@@ -30,7 +30,7 @@ export default function AuftragDetailPage() {
 
   // Appointment form
   const [showApptForm, setShowApptForm] = useState(false);
-  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
+  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: [] as string[], description: "" });
   const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
   const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
   const [emailField1, setEmailField1] = useState("");
@@ -85,39 +85,42 @@ export default function AuftragDetailPage() {
     const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}:00${tz}`;
 
     const { data: { user } } = await supabase.auth.getUser();
-    const assignedTo = apptForm.assigned_to || user?.id || null;
+    const assignees = apptForm.assigned_to.length > 0 ? apptForm.assigned_to : [user?.id || ""];
 
-    await supabase.from("job_appointments").insert({
+    const rows = assignees.map((personId) => ({
       job_id: id,
       title: apptForm.title,
       start_time: startTime,
       end_time: endTime,
-      assigned_to: assignedTo,
+      assigned_to: personId,
       description: apptForm.description || null,
-    });
+    }));
+    await supabase.from("job_appointments").insert(rows);
 
-    // E-Mail an zugewiesene Person
-    if (assignedTo) {
-      const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", (await supabase.auth.getUser()).data.user?.id).single();
-      await fetch("/api/appointments/assign-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assignedTo,
-          title: apptForm.title,
-          date: apptForm.date,
-          time: apptForm.time,
-          endTime: apptForm.end_time,
-          jobTitle: job?.title || null,
-          creatorName: creator?.full_name || "Unbekannt",
-        }),
-      });
+    // E-Mail an zugewiesene Personen
+    const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    for (const personId of assignees) {
+      if (personId && personId !== user?.id) {
+        await fetch("/api/appointments/assign-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assignedTo: personId,
+            title: apptForm.title,
+            date: apptForm.date,
+            time: apptForm.time,
+            endTime: apptForm.end_time,
+            jobTitle: job?.title || null,
+            creatorName: creator?.full_name || "Unbekannt",
+          }),
+        });
+      }
     }
 
-    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: "", description: "" });
+    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: [], description: "" });
     setShowApptForm(false);
     loadAll();
-    toast.success("Termin hinzugefügt");
+    toast.success(`Termin für ${assignees.length} Person${assignees.length > 1 ? "en" : ""} erstellt`);
   }
 
   async function toggleAppointment(apptId: string, isDone: boolean) {
@@ -334,10 +337,28 @@ export default function AuftragDetailPage() {
                 <div><label className="text-xs font-medium">Von *</label><Input type="time" value={apptForm.time} onChange={(e) => setApptForm({ ...apptForm, time: e.target.value })} className="mt-1" required /></div>
                 <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={apptForm.end_time} onChange={(e) => setApptForm({ ...apptForm, end_time: e.target.value })} className="mt-1" required /></div>
               </div>
-              <select value={apptForm.assigned_to} onChange={(e) => setApptForm({ ...apptForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
-                <option value="">Zuweisen an (optional)...</option>
-                {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-              </select>
+              <div>
+                <label className="text-xs font-medium">Zuweisen an {apptForm.assigned_to.length > 0 && <span className="text-red-500">({apptForm.assigned_to.length})</span>}</label>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {profiles.map((p) => {
+                    const selected = apptForm.assigned_to.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-red-600 text-white border-red-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300"}`}
+                      >
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                          {p.full_name.charAt(0)}
+                        </div>
+                        {p.full_name.split(" ")[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+                {apptForm.assigned_to.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst</p>}
+              </div>
               <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowApptForm(false)}>Abbrechen</Button>
