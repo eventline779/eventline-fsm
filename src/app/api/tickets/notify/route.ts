@@ -9,7 +9,7 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
 };
 
 export async function POST(request: Request) {
-  const { title, description, category, priority, reporter, reporterEmail } = await request.json();
+  const { title, description, category, priority, reporter, reporterEmail, emails: customEmails } = await request.json();
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return NextResponse.json({ success: false, error: "Kein RESEND_API_KEY" });
@@ -60,7 +60,9 @@ export async function POST(request: Request) {
   try {
     await resend.emails.send({
       from: "EVENTLINE FSM <noreply@eventline-basel.com>",
-      to: ["mischa@eventline-basel.com", "leo@eventline-basel.com"],
+      to: customEmails || (category === "bestellung"
+        ? ["mischa@eventline-basel.com", "leo@eventline-basel.com"]
+        : ["mischa@eventline-basel.com"]),
       replyTo: reporterEmail || undefined,
       subject: `${isDringend ? "🚨 DRINGEND: " : ""}${cat.emoji} Ticket ${ticketNr}: ${title}`,
       html,

@@ -85,7 +85,10 @@ export default function TicketsPage() {
     }
 
     // Push-Benachrichtigung an Leo + Mischa
-    const { data: admins } = await supabase.from("profiles").select("id").in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
+    const notifyEmails = form.category === "bestellung"
+      ? ["leo@eventline-basel.com", "mischa@eventline-basel.com"]
+      : ["mischa@eventline-basel.com"];
+    const { data: admins } = await supabase.from("profiles").select("id").in("email", notifyEmails);
     if (admins && admins.length > 0) {
       await fetch("/api/notifications", {
         method: "POST",
@@ -98,6 +101,20 @@ export default function TicketsPage() {
         }),
       });
     }
+
+    // E-Mail an Mischa (+ Leo bei Bestellungen)
+    await fetch("/api/tickets/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: form.title,
+        description: form.description,
+        category: form.category,
+        priority: form.priority,
+        reporter: profile?.full_name || "Unbekannt",
+        reporterEmail: profile?.email,
+      }),
+    });
 
     toast.success("Ticket erstellt");
     setForm({ title: "", description: "", category: "bestellung", priority: "normal" });
