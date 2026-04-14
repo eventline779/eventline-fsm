@@ -170,16 +170,22 @@ export default function AuftragDetailPage() {
     if (!files || files.length === 0) return;
     setUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setUploading(false); return; }
 
     for (const file of Array.from(files)) {
       const path = `jobs/${id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
-      if (uploadError) { toast.error("Upload fehlgeschlagen: " + uploadError.message); continue; }
-      await supabase.from("documents").insert({
-        name: file.name, storage_path: path, file_size: file.size, mime_type: file.type,
-        job_id: id as string, uploaded_by: user.id,
-      });
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("path", path);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const json = await res.json();
+        if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); continue; }
+        await supabase.from("documents").insert({
+          name: file.name, storage_path: path, file_size: file.size, mime_type: file.type,
+          job_id: id as string, uploaded_by: user.id,
+        });
+      } catch (err: any) { toast.error("Upload-Fehler: " + (err.message || "Netzwerkfehler")); continue; }
     }
     toast.success("Datei(en) hochgeladen");
     loadAll();
