@@ -32,6 +32,7 @@ import {
   GraduationCap,
   Briefcase,
   Ticket,
+  DoorOpen,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   GraduationCap,
   Briefcase,
   Ticket,
+  DoorOpen,
 };
 
 interface SidebarProps {

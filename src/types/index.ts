@@ -224,6 +224,41 @@ export interface Todo {
   job?: Job;
 }
 
+export interface Room {
+  id: string;
+  name: string;
+  address_street: string | null;
+  address_zip: string | null;
+  address_city: string | null;
+  capacity: number | null;
+  technical_details: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoomContact {
+  id: string;
+  room_id: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface RoomPrice {
+  id: string;
+  room_id: string;
+  label: string;
+  amount: number;
+  currency: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface EmailTemplate {
   id: string;
   name: string;

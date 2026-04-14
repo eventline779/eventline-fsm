@@ -82,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/rapporte", label: "Rapporte", icon: "FileText" },
       { href: "/standorte", label: "Standorte", icon: "MapPin" },
+      { href: "/raeume", label: "Räume", icon: "DoorOpen" },
       { href: "/dokumente", label: "Dokumente", icon: "FolderOpen" },
     ],
   },
