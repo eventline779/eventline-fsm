@@ -40,6 +40,12 @@ export default function RaumDetailPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docRef = useRef<HTMLInputElement>(null);
 
+  // Löschen
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteCode, setDeleteCode] = useState("");
+  const [deleteError, setDeleteError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Tech details edit
   const [editingTech, setEditingTech] = useState(false);
   const [techText, setTechText] = useState("");
@@ -168,6 +174,29 @@ export default function RaumDetailPage() {
     window.open(data.publicUrl, "_blank");
   }
 
+  async function deleteRoom() {
+    if (!deleteCode) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/rooms/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, code: deleteCode }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Raum gelöscht");
+        router.push("/raeume");
+      } else {
+        setDeleteError(true);
+        setDeleting(false);
+      }
+    } catch {
+      toast.error("Fehler beim Löschen");
+      setDeleting(false);
+    }
+  }
+
   if (!room) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
   return (
@@ -182,6 +211,9 @@ export default function RaumDetailPage() {
             {room.capacity ? ` · ${room.capacity} Personen` : ""}
           </p>
         </div>
+        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 ml-auto" onClick={() => { setShowDelete(true); setDeleteCode(""); setDeleteError(false); }}>
+          <Trash2 className="h-4 w-4 mr-1" />Löschen
+        </Button>
       </div>
 
       {/* Technische Details */}
@@ -346,6 +378,38 @@ export default function RaumDetailPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Löschen Modal */}
+      {showDelete && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowDelete(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white">Raum löschen</h2>
+                <button onClick={() => setShowDelete(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <Trash2 className="h-5 w-5 text-red-600 shrink-0" />
+                  <p className="text-sm text-red-800">Dieser Raum wird unwiderruflich gelöscht — inkl. Kontakte, Preise und Dokumente.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Code eingeben</label>
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-white dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`} />
+                  {deleteError && <p className="text-xs text-red-600 mt-1">Falscher Code</p>}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDelete(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={deleteRoom} disabled={!deleteCode || deleting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                    <Trash2 className="h-4 w-4" />{deleting ? "Löschen..." : "Endgültig löschen"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
