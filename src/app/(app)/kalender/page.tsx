@@ -53,7 +53,7 @@ export default function KalenderPage() {
   const [deleteCode, setDeleteCode] = useState("");
   const [form, setForm] = useState({
     title: "", date: new Date().toISOString().split("T")[0],
-    time: "08:00", end_time: "17:00", assigned_to: "", job_id: "",
+    time: "08:00", end_time: "17:00", assigned_to: [] as string[], job_id: "",
   });
   const supabase = createClient();
 
@@ -182,39 +182,43 @@ export default function KalenderPage() {
     const tzM = String(Math.abs(tzOffset) % 60).padStart(2, "0");
     const tz = `${tzSign}${tzH}:${tzM}`;
 
-    const assignedTo = form.assigned_to || user?.id || null;
+    // Wenn niemand ausgewählt → mir selbst zuweisen
+    const assignees = form.assigned_to.length > 0 ? form.assigned_to : [user?.id || ""];
 
-    await supabase.from("job_appointments").insert({
+    // Für jede Person einen Termin erstellen
+    const rows = assignees.map((personId) => ({
       job_id: form.job_id || null,
       title: form.title,
       start_time: `${form.date}T${form.time}:00${tz}`,
       end_time: `${form.date}T${form.end_time}:00${tz}`,
-      assigned_to: assignedTo,
-    });
+      assigned_to: personId,
+    }));
+    await supabase.from("job_appointments").insert(rows);
 
-    // E-Mail an zugewiesene Person
-    if (assignedTo && assignedTo !== user?.id) {
-      const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
-      const selectedJob = jobs.find((j) => j.id === form.job_id);
-      await fetch("/api/appointments/assign-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assignedTo,
-          title: form.title,
-          date: form.date,
-          time: form.time,
-          endTime: form.end_time,
-          jobTitle: (selectedJob as any)?.title || null,
-          creatorName: creator?.full_name || "Unbekannt",
-        }),
-      });
+    // E-Mail an zugewiesene Personen (nicht an mich selbst)
+    const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    const selectedJob = jobs.find((j) => j.id === form.job_id);
+    for (const personId of assignees) {
+      if (personId && personId !== user?.id) {
+        await fetch("/api/appointments/assign-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assignedTo: personId,
+            title: form.title,
+            date: form.date,
+            time: form.time,
+            endTime: form.end_time,
+            jobTitle: (selectedJob as any)?.title || null,
+            creatorName: creator?.full_name || "Unbekannt",
+          }),
+        });
+      }
     }
 
-    setForm({ title: "", date: new Date().toISOString().split("T")[0], time: "08:00", end_time: "17:00", assigned_to: "", job_id: "" });
+    setForm({ title: "", date: new Date().toISOString().split("T")[0], time: "08:00", end_time: "17:00", assigned_to: [], job_id: "" });
     setShowForm(false);
-    toast.success("Termin erstellt");
-    // Reload
+    toast.success(`Termin für ${assignees.length} Person${assignees.length > 1 ? "en" : ""} erstellt`);
     window.location.reload();
   }
 
@@ -293,13 +297,28 @@ export default function KalenderPage() {
                 <div><label className="text-xs font-medium">Von *</label><Input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="mt-1 bg-gray-50" required /></div>
                 <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} className="mt-1 bg-gray-50" required /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-medium">Zuweisen an</label>
-                  <select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                    <option value="">Mir selbst</option>
-                    {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                  </select>
+                  <label className="text-xs font-medium">Zuweisen an {form.assigned_to.length > 0 && <span className="text-red-500">({form.assigned_to.length})</span>}</label>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {profiles.map((p) => {
+                      const selected = form.assigned_to.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setForm({ ...form, assigned_to: selected ? form.assigned_to.filter((id) => id !== p.id) : [...form.assigned_to, p.id] })}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-red-600 text-white border-red-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300"}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                            {p.full_name.charAt(0)}
+                          </div>
+                          {p.full_name.split(" ")[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.assigned_to.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst zuweisen</p>}
                 </div>
                 <div>
                   <label className="text-xs font-medium">Auftrag (optional)</label>
