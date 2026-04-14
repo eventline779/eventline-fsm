@@ -34,6 +34,7 @@ import {
   Ticket,
   DoorOpen,
   Receipt,
+  TrendingUp,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Ticket,
   DoorOpen,
   Receipt,
+  TrendingUp,
 };
 
 interface SidebarProps {

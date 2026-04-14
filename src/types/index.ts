@@ -224,6 +224,27 @@ export interface Todo {
   job?: Job;
 }
 
+export type VertriebStatus = "offen" | "kontaktiert" | "gespraech" | "gewonnen" | "abgesagt";
+export type VertriebPriority = "top" | "gut" | "mittel";
+
+export interface VertriebContact {
+  id: string;
+  nr: number;
+  firma: string;
+  branche: string | null;
+  ansprechperson: string | null;
+  position: string | null;
+  email: string | null;
+  telefon: string | null;
+  event_typ: string | null;
+  status: VertriebStatus;
+  datum_kontakt: string | null;
+  notizen: string | null;
+  prioritaet: VertriebPriority;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Room {
   id: string;
   name: string;

@@ -66,6 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true },
       { href: "/anfragen", label: "Vermietungen", icon: "Inbox" },
       { href: "/kunden", label: "Kunden", icon: "Users" },
+      { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
     ],
   },
   {
