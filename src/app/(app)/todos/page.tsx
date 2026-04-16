@@ -367,7 +367,7 @@ export default function TodosPage() {
             const assignee = (todo as unknown as { assignee: { full_name: string } | null }).assignee;
             const overdue = todo.status === "offen" && todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
             return (
-              <Card key={todo.id} className={`transition-all cursor-pointer ${overdue ? "bg-red-50/70 border-red-200" : "bg-white"} ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
+              <Card key={todo.id} className={`transition-all cursor-pointer ${overdue ? "bg-red-100 border-red-400" : "bg-white"} ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <button onClick={(e) => { e.stopPropagation(); toggleTodo(todo.id, todo.status); }} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${todo.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
