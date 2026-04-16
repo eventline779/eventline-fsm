@@ -365,8 +365,9 @@ export default function TodosPage() {
         <div className="space-y-2">
           {filtered.map((todo) => {
             const assignee = (todo as unknown as { assignee: { full_name: string } | null }).assignee;
+            const overdue = todo.status === "offen" && todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
             return (
-              <Card key={todo.id} className={`bg-white transition-all cursor-pointer ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
+              <Card key={todo.id} className={`transition-all cursor-pointer ${overdue ? "bg-red-50/70 border-red-200" : "bg-white"} ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <button onClick={(e) => { e.stopPropagation(); toggleTodo(todo.id, todo.status); }} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${todo.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
@@ -378,7 +379,7 @@ export default function TodosPage() {
                         <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-1">
-                        {todo.due_date && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3 w-3" />{new Date(todo.due_date).toLocaleDateString("de-CH")}</span>}
+                        {todo.due_date && <span className={`flex items-center gap-1 text-xs ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}><Calendar className="h-3 w-3" />{overdue ? "Überfällig: " : ""}{new Date(todo.due_date).toLocaleDateString("de-CH")}</span>}
                         {assignee && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="h-3 w-3" />{assignee.full_name}</span>}
                       </div>
                     </div>
