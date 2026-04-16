@@ -191,7 +191,13 @@ export default function TodosPage() {
 
   const filtered = todos
     .filter((t) => filter === "all" || t.status === filter)
-    .filter((t) => !personFilter || t.assigned_to === personFilter);
+    .filter((t) => !personFilter || t.assigned_to === personFilter)
+    .sort((a, b) => {
+      if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    });
   const openCount = todos.filter((t) => t.status === "offen").length;
 
   const priorities: { value: JobPriority; label: string }[] = [
