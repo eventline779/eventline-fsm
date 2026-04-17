@@ -33,12 +33,24 @@ export default function ZeiterfassungPage() {
     const [activeRes, entriesRes, jobsRes] = await Promise.all([
       supabase.from("time_entries").select("*").eq("profile_id", user.id).is("clock_out", null).single(),
       supabase.from("time_entries").select("*, job:jobs(title)").eq("profile_id", user.id).not("clock_out", "is", null).order("clock_in", { ascending: false }).limit(20),
-      supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("created_at", { ascending: false }),
+      supabase.from("jobs").select("id, title, job_number, start_date, end_date").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true }),
     ]);
 
     if (activeRes.data) setActiveEntry(activeRes.data as TimeEntry);
     if (entriesRes.data) setEntries(entriesRes.data as unknown as TimeEntry[]);
-    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    if (jobsRes.data) {
+      // Nur Aufträge aus dem aktuellen Monat (Zeitraum berührt den aktuellen Monat)
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+      const filtered = (jobsRes.data as any[]).filter((j) => {
+        if (!j.start_date) return false;
+        const start = new Date(j.start_date).getTime();
+        const end = j.end_date ? new Date(j.end_date).getTime() : start;
+        return start <= monthEnd && end >= monthStart;
+      });
+      setJobs(filtered as unknown as Job[]);
+    }
     setLoading(false);
   }, []);
 
