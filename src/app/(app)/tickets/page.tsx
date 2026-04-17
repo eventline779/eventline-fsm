@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Profile } from "@/types";
 import {
   Plus, Ticket, ShoppingCart, Monitor, Wrench, HelpCircle,
-  ArrowLeft, Upload, FileText, Image as ImageIcon, Trash2, Download, X, Send,
+  ArrowLeft, Upload, FileText, Image as ImageIcon, Trash2, Download, X, Send, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -132,6 +132,34 @@ export default function TicketsPage() {
     toast.success("Ticket gelöscht");
   }
 
+  async function completeTicket(ticket: TicketItem) {
+    if (!confirm("Ticket als erledigt markieren? Der Ersteller wird benachrichtigt.")) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const me = profiles.find((p) => p.id === user?.id);
+    try {
+      const res = await fetch("/api/tickets/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          createdBy: ticket.created_by,
+          completedBy: me?.full_name || "Unbekannt",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Ticket erledigt — Ersteller wurde benachrichtigt");
+        setSelectedTicket(null);
+        loadData();
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Erledigen");
+    }
+  }
+
   async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !selectedTicket) return;
@@ -191,9 +219,14 @@ export default function TicketsPage() {
             <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
               <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
             </div>
-            <button onClick={() => deleteTicket(selectedTicket.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-200 hover:bg-red-100 transition-colors">
-              <Trash2 className="h-4 w-4" />Ticket löschen
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => completeTicket(selectedTicket)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 text-green-700 text-sm font-medium border border-green-200 hover:bg-green-100 transition-colors">
+                <Check className="h-4 w-4" />Als erledigt markieren
+              </button>
+              <button onClick={() => deleteTicket(selectedTicket.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-200 hover:bg-red-100 transition-colors">
+                <Trash2 className="h-4 w-4" />Löschen
+              </button>
+            </div>
           </CardContent>
         </Card>
 

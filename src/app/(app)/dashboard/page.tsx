@@ -144,6 +144,31 @@ export default function DashboardPage() {
     }
   }
 
+  async function completeTicket(ticket: TicketItem) {
+    if (!confirm("Ticket als erledigt markieren? Der Ersteller wird benachrichtigt.")) return;
+    try {
+      const res = await fetch("/api/tickets/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          createdBy: ticket.created_by,
+          completedBy: userName,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTickets(tickets.filter((t) => t.id !== ticket.id));
+        toast.success("Ticket erledigt — Ersteller wurde benachrichtigt");
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Erledigen");
+    }
+  }
+
   async function handleTicket(ticket: TicketItem, action: "genehmigt" | "abgelehnt") {
     try {
       // E-Mail an Ersteller senden
@@ -294,7 +319,13 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     {isAdmin && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => completeTicket(ticket)}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                        >
+                          <Check className="h-4 w-4" />Erledigt
+                        </button>
                         <button
                           onClick={() => handleTicket(ticket, "genehmigt")}
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-sm font-medium border border-green-200 hover:bg-green-100 transition-colors"
