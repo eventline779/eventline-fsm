@@ -10,7 +10,7 @@ import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
-  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send, X,
+  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send, X, StickyNote,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -38,6 +38,11 @@ export default function AuftragDetailPage() {
   const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
   const [deleteApptCode, setDeleteApptCode] = useState("");
 
+  // Notizen
+  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string; author?: string }[]>([]);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [newNote, setNewNote] = useState("");
+
   useEffect(() => { loadAll(); }, [id]);
 
   async function loadAll() {
@@ -49,12 +54,49 @@ export default function AuftragDetailPage() {
       supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
       supabase.from("service_reports").select("*, creator:profiles!created_by(full_name)").eq("job_id", id).order("created_at", { ascending: false }),
     ]);
-    if (jobRes.data) setJob(jobRes.data as unknown as Job);
+    if (jobRes.data) {
+      setJob(jobRes.data as unknown as Job);
+      // Notizen aus JSON parsen
+      if (jobRes.data.notes) {
+        try {
+          const parsed = JSON.parse(jobRes.data.notes);
+          if (Array.isArray(parsed._notes)) setNotesList(parsed._notes);
+          else setNotesList([]);
+        } catch {
+          // Alte Notiz im Textformat → als eine Notiz einlesen
+          setNotesList([{ id: "legacy", content: jobRes.data.notes, created_at: jobRes.data.created_at }]);
+        }
+      } else setNotesList([]);
+    }
     if (assignRes.data) setAssignments(assignRes.data as unknown as JobAssignment[]);
     if (apptRes.data) setAppointments(apptRes.data as unknown as JobAppointment[]);
     if (docRes.data) setDocuments(docRes.data as DocType[]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     if (repRes.data) setReports(repRes.data);
+  }
+
+  async function saveNotes(notes: typeof notesList) {
+    await supabase.from("jobs").update({ notes: JSON.stringify({ _notes: notes }) }).eq("id", id);
+  }
+
+  async function addNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newNote.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    const updated = [{ id: crypto.randomUUID(), content: newNote, created_at: new Date().toISOString(), author: profile?.full_name }, ...notesList];
+    await saveNotes(updated);
+    setNotesList(updated);
+    setNewNote("");
+    setShowNoteForm(false);
+    toast.success("Notiz hinzugefügt");
+  }
+
+  async function deleteNote(noteId: string) {
+    const updated = notesList.filter((n) => n.id !== noteId);
+    await saveNotes(updated);
+    setNotesList(updated);
+    toast.success("Notiz gelöscht");
   }
 
   async function updateStatus(newStatus: JobStatus) {
@@ -282,7 +324,45 @@ export default function AuftragDetailPage() {
           {projectLead && <div className="flex items-center gap-2 text-sm"><UserCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Projektleiter:</span> {projectLead.full_name}</div>}
           {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Zeitraum:</span> {new Date(job.start_date).toLocaleDateString("de-CH")} {job.end_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH")}` : ""}</div>}
           {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
-          {job.notes && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground italic">{job.notes}</p></div>}
+        </CardContent>
+      </Card>
+
+      {/* Notizen */}
+      <Card className="bg-white">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
+            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {showNoteForm && (
+            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required autoFocus />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
+                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+              </div>
+            </form>
+          )}
+          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
+          {notesList.map((n) => (
+            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                  part.match(/^https?:\/\//) ? (
+                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
+                  ) : part
+                )}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {n.author ? `${n.author} · ` : ""}
+                  {new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
