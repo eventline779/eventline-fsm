@@ -44,12 +44,25 @@ export default function AuftraegePage() {
     setLoading(false);
   }
 
+  const now = new Date().getTime();
   const filtered = jobs.filter((j) => {
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
     const matchesPerson = filterPerson === "all" || j.project_lead_id === filterPerson ||
       (j.assignments as unknown as { profile_id: string }[])?.some((a) => a.profile_id === filterPerson);
     return matchesSearch && matchesStatus && matchesPerson;
+  }).sort((a, b) => {
+    const aDate = a.start_date ? new Date(a.start_date).getTime() : Infinity;
+    const bDate = b.start_date ? new Date(b.start_date).getTime() : Infinity;
+    const aPast = aDate < now;
+    const bPast = bDate < now;
+    // Vergangene nach unten, kommende nach oben
+    if (aPast && !bPast) return 1;
+    if (!aPast && bPast) return -1;
+    // Kommende: nächstes zuerst
+    if (!aPast && !bPast) return aDate - bDate;
+    // Vergangene: neuestes zuerst
+    return bDate - aDate;
   });
 
   return (
