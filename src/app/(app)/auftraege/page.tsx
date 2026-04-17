@@ -44,7 +44,9 @@ export default function AuftraegePage() {
     setLoading(false);
   }
 
-  const now = new Date().getTime();
+  // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayMs = todayStart.getTime();
   const filtered = jobs.filter((j) => {
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
@@ -52,17 +54,17 @@ export default function AuftraegePage() {
       (j.assignments as unknown as { profile_id: string }[])?.some((a) => a.profile_id === filterPerson);
     return matchesSearch && matchesStatus && matchesPerson;
   }).sort((a, b) => {
-    const aDate = a.start_date ? new Date(a.start_date).getTime() : Infinity;
-    const bDate = b.start_date ? new Date(b.start_date).getTime() : Infinity;
-    const aPast = aDate < now;
-    const bPast = bDate < now;
-    // Vergangene nach unten, kommende nach oben
+    // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
+    const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
+    const bRef = b.end_date ? new Date(b.end_date).getTime() : b.start_date ? new Date(b.start_date).getTime() : Infinity;
+    const aPast = aRef < todayMs;
+    const bPast = bRef < todayMs;
     if (aPast && !bPast) return 1;
     if (!aPast && bPast) return -1;
-    // Kommende: nächstes zuerst
-    if (!aPast && !bPast) return aDate - bDate;
-    // Vergangene: neuestes zuerst
-    return bDate - aDate;
+    const aSort = a.start_date ? new Date(a.start_date).getTime() : Infinity;
+    const bSort = b.start_date ? new Date(b.start_date).getTime() : Infinity;
+    if (!aPast && !bPast) return aSort - bSort;
+    return bSort - aSort;
   });
 
   return (
