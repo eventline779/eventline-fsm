@@ -18,6 +18,9 @@ import {
   Plus,
   X,
   Trash2,
+  Link as LinkIcon,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { JOB_STATUS, RENTAL_STATUS } from "@/lib/constants";
@@ -51,6 +54,8 @@ export default function KalenderPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteCode, setDeleteCode] = useState("");
+  const [showSync, setShowSync] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
     title: "", date: new Date().toISOString().split("T")[0],
     time: "08:00", end_time: "17:00", assigned_to: [] as string[], job_id: "",
@@ -264,6 +269,9 @@ export default function KalenderPage() {
           <p className="text-sm text-muted-foreground mt-1">Aufträge, Vermietungen & Termine</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setShowSync(true)} variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+            <LinkIcon className="h-4 w-4 mr-1" />Google Kalender
+          </Button>
           <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
             {showForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
             {showForm ? "Abbrechen" : "Termin"}
@@ -593,6 +601,60 @@ export default function KalenderPage() {
           </Card>
         </div>
       </div>
+      {/* Google Kalender Sync Modal */}
+      {showSync && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSync(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2"><LinkIcon className="h-4 w-4" />Google Kalender verbinden</h2>
+                <button onClick={() => setShowSync(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">Mit diesem Link kannst du alle Aufträge, Vermietungen und Termine in deinen Google Kalender einbinden. Google aktualisiert ihn automatisch alle paar Stunden.</p>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Kalender-Link</label>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <input
+                      readOnly
+                      value="https://eventline-fsm-usyk.vercel.app/api/calendar/feed?token=eventline-cal-5225"
+                      className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 font-mono"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("https://eventline-fsm-usyk.vercel.app/api/calendar/feed?token=eventline-cal-5225");
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Kopiert!" : "Kopieren"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-sm font-semibold mb-2">So einbinden in Google Kalender:</h3>
+                  <ol className="text-xs text-gray-700 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
+                    <li>Öffne <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">calendar.google.com</a></li>
+                    <li>Links bei "Weitere Kalender" auf das <strong>+</strong> klicken</li>
+                    <li>Wähle <strong>"Per URL"</strong></li>
+                    <li>Füge den oberen Link ein und klicke <strong>"Kalender hinzufügen"</strong></li>
+                    <li>Fertig! Der Kalender erscheint in deiner Liste</li>
+                  </ol>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">Hinweis: Dieser Link ist privat. Gib ihn nicht an Aussenstehende weiter.</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Delete Modal */}
       {deleteTarget && (
         <>
