@@ -124,10 +124,10 @@ export default function DashboardPage() {
       setJobsOhneTermin((activeJobs as any[]).filter((j) => !jobsWithAppts.has(j.id)).slice(0, 3));
     }
 
-    // Meine Todos
+    // Meine Todos — nach Fälligkeitsdatum sortiert (überfällige/nächste zuerst, dann ohne Datum)
     const { data: todosData } = await supabase
       .from("todos").select("*").eq("assigned_to", user.id).eq("status", "offen")
-      .order("created_at", { ascending: false }).limit(5);
+      .order("due_date", { ascending: true, nullsFirst: false }).limit(5);
     if (todosData) setMyTodos(todosData as unknown as Todo[]);
 
     // Tickets laden
@@ -237,26 +237,33 @@ export default function DashboardPage() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {myTodos.map((todo) => (
-              <Card key={todo.id} className="bg-white border-gray-100 hover:shadow-sm transition-all">
-                <CardContent className="p-3.5 flex items-center gap-3">
-                  <button
-                    onClick={async () => {
-                      await supabase.from("todos").update({ status: "erledigt", completed_at: new Date().toISOString() }).eq("id", todo.id);
-                      setMyTodos(myTodos.filter((t) => t.id !== todo.id));
-                    }}
-                    className="flex items-center justify-center w-6 h-6 rounded-md border-2 border-gray-300 hover:border-red-400 shrink-0 transition-all"
-                  />
-                  <Link href="/todos" className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{todo.title}</span>
-                      <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
-                    </div>
-                    {todo.due_date && <p className="text-xs text-muted-foreground mt-0.5">Fällig: {new Date(todo.due_date).toLocaleDateString("de-CH")}</p>}
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
+            {myTodos.map((todo) => {
+              const overdue = todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
+              return (
+                <Card key={todo.id} className={`hover:shadow-sm transition-all ${overdue ? "bg-red-100 border-red-400" : "bg-white border-gray-100"}`}>
+                  <CardContent className="p-3.5 flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        await supabase.from("todos").update({ status: "erledigt", completed_at: new Date().toISOString() }).eq("id", todo.id);
+                        setMyTodos(myTodos.filter((t) => t.id !== todo.id));
+                      }}
+                      className="flex items-center justify-center w-6 h-6 rounded-md border-2 border-gray-300 hover:border-red-400 shrink-0 transition-all"
+                    />
+                    <Link href="/todos" className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{todo.title}</span>
+                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
+                      </div>
+                      {todo.due_date && (
+                        <p className={`text-xs mt-0.5 ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                          {overdue ? "Überfällig: " : "Fällig: "}{new Date(todo.due_date).toLocaleDateString("de-CH")}
+                        </p>
+                      )}
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
