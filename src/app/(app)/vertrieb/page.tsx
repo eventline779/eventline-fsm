@@ -30,9 +30,9 @@ const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; c
 
 const STEPS = [
   { nr: 1, label: "Offen", action: "Kontakt aufnehmen" },
-  { nr: 2, label: "Kontaktiert", action: "Weiter zu Schritt 3" },
-  { nr: 3, label: "Schritt 3", action: "Weiter zu Schritt 4" },
-  { nr: 4, label: "Schritt 4", action: "Weiter zu Schritt 5" },
+  { nr: 2, label: "Kontaktiert", action: "Weiter zu Finalisierung" },
+  { nr: 3, label: "Finalisierung", action: "Weiter zu Operations" },
+  { nr: 4, label: "Operations", action: "Weiter zu Schritt 5" },
   { nr: 5, label: "Gewonnen", action: "Abschliessen" },
 ];
 
@@ -79,6 +79,17 @@ export default function VertriebPage() {
   const [showLostModal, setShowLostModal] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [lostTargetId, setLostTargetId] = useState<string | null>(null);
+  // Schritt 2: Buchhaltungs-Benachrichtigung
+  const [showBuchhaltung, setShowBuchhaltung] = useState(false);
+  const [buchhaltungMessage, setBuchhaltungMessage] = useState("");
+  const [sendingBuchhaltung, setSendingBuchhaltung] = useState(false);
+  // Schritt 3: Finalisierung
+  const [showVerbesserung, setShowVerbesserung] = useState(false);
+  const [verbesserungText, setVerbesserungText] = useState("");
+  const [offertePdf, setOffertePdf] = useState<{ name: string; path: string } | null>(null);
+  const [uploadingOfferte, setUploadingOfferte] = useState(false);
+  const [sendingVerbesserung, setSendingVerbesserung] = useState(false);
+  const [sendingBestaetigung, setSendingBestaetigung] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -181,6 +192,7 @@ export default function VertriebPage() {
       bedarf: details.bedarf || {},
       create_customer: false,
     });
+    setOffertePdf(details.offerte_pdf || null);
     setShowForm(true);
   }
 
@@ -295,6 +307,145 @@ export default function VertriebPage() {
     load();
   }
 
+  function currentContactWithDetails() {
+    if (!editingId) return null;
+    const c = contacts.find((x) => x.id === editingId);
+    if (!c) return null;
+    let details: any = {};
+    try {
+      const parsed = JSON.parse(c.notizen || "{}");
+      if (parsed && parsed._details) details = parsed._details;
+    } catch {}
+    return { ...c, details };
+  }
+
+  async function sendBuchhaltungsBenachrichtigung() {
+    const c = currentContactWithDetails();
+    if (!c) return;
+    setSendingBuchhaltung(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    try {
+      const res = await fetch("/api/vertrieb/buchhaltung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "benachrichtigung",
+          contact: c,
+          message: buchhaltungMessage,
+          senderName: profile?.full_name || "Unbekannt",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Buchhaltung benachrichtigt");
+        setShowBuchhaltung(false);
+        setBuchhaltungMessage("");
+      } else {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      }
+    } catch {
+      toast.error("Fehler beim Senden");
+    }
+    setSendingBuchhaltung(false);
+  }
+
+  async function uploadOfferte(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !editingId) return;
+    setUploadingOfferte(true);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `vertrieb/${editingId}/offerte_${Date.now()}_${safeName}`;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", path);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); setUploadingOfferte(false); e.target.value = ""; return; }
+      setOffertePdf({ name: file.name, path });
+      // In notizen speichern
+      const c = contacts.find((c) => c.id === editingId);
+      if (c) {
+        let obj: any = {};
+        try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+        if (!obj._details) obj._details = {};
+        obj._details.offerte_pdf = { name: file.name, path };
+        await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+        load();
+      }
+      toast.success("Offerte hochgeladen");
+    } catch { toast.error("Upload fehlgeschlagen"); }
+    setUploadingOfferte(false);
+    e.target.value = "";
+  }
+
+  async function sendVerbesserung() {
+    const c = currentContactWithDetails();
+    if (!c || !verbesserungText.trim()) { toast.error("Text ist erforderlich"); return; }
+    setSendingVerbesserung(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    try {
+      const res = await fetch("/api/vertrieb/buchhaltung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "verbesserung",
+          contact: c,
+          message: verbesserungText,
+          senderName: profile?.full_name || "Unbekannt",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Verbesserungs-Vorschlag gesendet");
+        setShowVerbesserung(false);
+        setVerbesserungText("");
+      } else toast.error("Fehler: " + (json.error || "Unbekannt"));
+    } catch { toast.error("Fehler beim Senden"); }
+    setSendingVerbesserung(false);
+  }
+
+  async function sendOffertenBestaetigung() {
+    const c = currentContactWithDetails();
+    if (!c) return;
+    setSendingBestaetigung(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+    // PDF aus Storage als base64 holen
+    let pdfBase64: string | null = null;
+    let pdfName: string | null = null;
+    const offertePath = c.details?.offerte_pdf?.path;
+    if (offertePath) {
+      const { data: fileData } = await supabase.storage.from("documents").download(offertePath);
+      if (fileData) {
+        const arrayBuffer = await fileData.arrayBuffer();
+        pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+        pdfName = c.details.offerte_pdf.name;
+      }
+    }
+    try {
+      const res = await fetch("/api/vertrieb/buchhaltung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "offerte_bestaetigt",
+          contact: c,
+          message: "Die Offerte wurde bestätigt und kann verrechnet werden.",
+          senderName: profile?.full_name || "Unbekannt",
+          pdfBase64,
+          pdfName,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Offerten-Bestätigung gesendet");
+      } else toast.error("Fehler: " + (json.error || "Unbekannt"));
+    } catch { toast.error("Fehler beim Senden"); }
+    setSendingBestaetigung(false);
+  }
+
   async function updatePriority(id: string, prioritaet: VertriebPriority) {
     await supabase.from("vertrieb_contacts").update({ prioritaet }).eq("id", id);
     setContacts(contacts.map((c) => c.id === id ? { ...c, prioritaet } : c));
@@ -354,6 +505,75 @@ export default function VertriebPage() {
       </div>
 
       {/* Form */}
+      {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
+      {showBuchhaltung && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowBuchhaltung(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-blue-600" />Benachrichtigung Buchhaltung</h2>
+                <button onClick={() => setShowBuchhaltung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — alle Verrechnungs-Infos werden automatisch mitgeschickt.</p>
+                <div>
+                  <label className="text-sm font-medium">Zusätzliche Nachricht (optional)</label>
+                  <textarea
+                    value={buchhaltungMessage}
+                    onChange={(e) => setBuchhaltungMessage(e.target.value)}
+                    placeholder="z.B. Bitte Angebot erstellen bis..."
+                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    rows={4}
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowBuchhaltung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={sendBuchhaltungsBenachrichtigung} disabled={sendingBuchhaltung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                    <Mail className="h-4 w-4" />{sendingBuchhaltung ? "Senden..." : "Senden"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Verbesserungs-Modal (Schritt 3) */}
+      {showVerbesserung && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowVerbesserung(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-orange-600" />Verbesserungs-Vorschlag</h2>
+                <button onClick={() => setShowVerbesserung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — was soll an der Offerte verbessert werden?</p>
+                <div>
+                  <label className="text-sm font-medium">Verbesserungen *</label>
+                  <textarea
+                    value={verbesserungText}
+                    onChange={(e) => setVerbesserungText(e.target.value)}
+                    placeholder="z.B. Preis anpassen, Leistungen ergänzen, Datum ändern..."
+                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                    rows={5}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowVerbesserung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={sendVerbesserung} disabled={!verbesserungText.trim() || sendingVerbesserung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
+                    <Mail className="h-4 w-4" />{sendingVerbesserung ? "Senden..." : "Senden"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Verloren-Modal */}
       {showLostModal && (
         <>
@@ -460,9 +680,15 @@ export default function VertriebPage() {
                     })}
                   </div>
                   <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
-                    {editingStep < 5 && (
+                    {/* Standard Weiter-Button (ausser Schritt 2 und 3 die haben spezielle Aktionen) */}
+                    {editingStep === 1 && (
                       <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <ArrowRight className="h-4 w-4 mr-1" />{STEPS[editingStep - 1].action}
+                        <ArrowRight className="h-4 w-4 mr-1" />Kontakt aufnehmen
+                      </Button>
+                    )}
+                    {editingStep === 4 && (
+                      <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Schritt 5
                       </Button>
                     )}
                     {editingStep === 5 && form.status !== "gewonnen" && (
@@ -472,6 +698,66 @@ export default function VertriebPage() {
                     )}
                     <Button type="button" size="sm" variant="outline" onClick={() => openLostModal(editingId)} className="text-red-600 border-red-200 hover:bg-red-50">
                       <AlertTriangle className="h-4 w-4 mr-1" />Auftrag verloren
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* SCHRITT 2: Benachrichtigung Buchhaltung */}
+              {editingId && editingStep === 2 && form.status !== "abgesagt" && (
+                <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200 space-y-3">
+                  <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5"><Mail className="h-4 w-4" />Schritt 2: Benachrichtigung Buchhaltung</p>
+                  <p className="text-xs text-blue-700">Sende eine E-Mail an die Buchhaltung mit allen Verrechnungs-Infos. Du kannst noch eine eigene Nachricht hinzufügen.</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button type="button" size="sm" onClick={() => setShowBuchhaltung(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Mail className="h-4 w-4 mr-1" />Benachrichtigung senden
+                    </Button>
+                    <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
+                      <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Finalisierung
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* SCHRITT 3: Finalisierung */}
+              {editingId && editingStep === 3 && form.status !== "abgesagt" && (
+                <div className="p-4 rounded-xl bg-orange-50 border-2 border-orange-200 space-y-3">
+                  <p className="text-sm font-semibold text-orange-800 flex items-center gap-1.5"><Filter className="h-4 w-4" />Schritt 3: Finalisierung</p>
+                  <div>
+                    <label className="text-xs font-medium">Offerte als PDF</label>
+                    {offertePdf ? (
+                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-white border border-orange-200">
+                        <span className="text-sm truncate">{offertePdf.name}</span>
+                        <button type="button" onClick={async () => {
+                          await supabase.storage.from("documents").remove([offertePdf.path]);
+                          const c = contacts.find((c) => c.id === editingId);
+                          if (c) {
+                            let obj: any = {};
+                            try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+                            if (obj._details) delete obj._details.offerte_pdf;
+                            await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+                          }
+                          setOffertePdf(null);
+                          load();
+                          toast.success("PDF entfernt");
+                        }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    ) : (
+                      <label className="mt-1.5 flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-orange-300 bg-white text-sm text-orange-700 cursor-pointer hover:border-orange-500 transition-colors">
+                        <Plus className="h-4 w-4" />{uploadingOfferte ? "Hochladen..." : "Offerte PDF hochladen"}
+                        <input type="file" accept=".pdf" onChange={uploadOfferte} className="hidden" disabled={uploadingOfferte} />
+                      </label>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap pt-2 border-t border-orange-200">
+                    <Button type="button" size="sm" onClick={() => setShowVerbesserung(true)} variant="outline" className="text-orange-700 border-orange-300 hover:bg-orange-100">
+                      <Mail className="h-4 w-4 mr-1" />Verbesserungs-Nachricht
+                    </Button>
+                    <Button type="button" size="sm" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="bg-green-600 hover:bg-green-700 text-white">
+                      <Check className="h-4 w-4 mr-1" />{sendingBestaetigung ? "Senden..." : "Offerte bestätigt"}
+                    </Button>
+                    <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Operations
                     </Button>
                   </div>
                 </div>
