@@ -243,6 +243,8 @@ export interface VertriebContact {
   notizen: string | null;
   prioritaet: VertriebPriority;
   kategorie: VertriebKategorie;
+  step: number;
+  verloren_grund: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import type { VertriebContact, VertriebStatus, VertriebPriority, VertriebKategorie } from "@/types";
-import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search, Building2, PartyPopper } from "lucide-react";
+import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search, Building2, PartyPopper, ArrowRight, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_OPTIONS: { value: VertriebStatus; label: string; color: string }[] = [
@@ -26,6 +26,14 @@ const PRIORITY_OPTIONS: { value: VertriebPriority; label: string; color: string 
 const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; color: string }[] = [
   { value: "verwaltung", label: "Verwaltungs-Anfragen", icon: Building2, color: "bg-blue-100 text-blue-700 border-blue-200" },
   { value: "veranstaltung", label: "Veranstaltungen", icon: PartyPopper, color: "bg-purple-100 text-purple-700 border-purple-200" },
+];
+
+const STEPS = [
+  { nr: 1, label: "Offen", action: "Kontakt aufnehmen" },
+  { nr: 2, label: "Kontaktiert", action: "Weiter zu Schritt 3" },
+  { nr: 3, label: "Schritt 3", action: "Weiter zu Schritt 4" },
+  { nr: 4, label: "Schritt 4", action: "Weiter zu Schritt 5" },
+  { nr: 5, label: "Gewonnen", action: "Abschliessen" },
 ];
 
 const BEDARF_BEREICHE = [
@@ -65,8 +73,12 @@ export default function VertriebPage() {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStep, setEditingStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [showLostModal, setShowLostModal] = useState(false);
+  const [lostReason, setLostReason] = useState("");
+  const [lostTargetId, setLostTargetId] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -145,6 +157,7 @@ export default function VertriebPage() {
 
   function openEdit(c: VertriebContact) {
     setEditingId(c.id);
+    setEditingStep(c.step || 1);
     // Details aus notizen parsen (wenn JSON)
     let details: any = {};
     let freieNotiz = c.notizen || "";
@@ -242,6 +255,46 @@ export default function VertriebPage() {
     setContacts(contacts.map((c) => c.id === id ? { ...c, status } : c));
   }
 
+  async function advanceStep() {
+    if (!editingId) return;
+    const next = Math.min(editingStep + 1, 5);
+    // Status-Mapping: Step 1=offen, Step 2=kontaktiert, Step 3-4=gespraech, Step 5=gewonnen
+    const newStatus: VertriebStatus =
+      next === 5 ? "gewonnen" :
+      next === 2 ? "kontaktiert" :
+      next >= 3 ? "gespraech" : "offen";
+    await supabase.from("vertrieb_contacts").update({
+      step: next,
+      status: newStatus,
+      datum_kontakt: new Date().toISOString().split("T")[0],
+    }).eq("id", editingId);
+    setEditingStep(next);
+    setForm((f) => ({ ...f, status: newStatus, datum_kontakt: new Date().toISOString().split("T")[0] }));
+    toast.success(`Schritt ${next}: ${STEPS[next - 1].label}`);
+    load();
+  }
+
+  function openLostModal(id: string) {
+    setLostTargetId(id);
+    setLostReason("");
+    setShowLostModal(true);
+  }
+
+  async function markLost() {
+    if (!lostTargetId || !lostReason.trim()) { toast.error("Grund ist erforderlich"); return; }
+    await supabase.from("vertrieb_contacts").update({
+      status: "abgesagt",
+      verloren_grund: lostReason.trim(),
+    }).eq("id", lostTargetId);
+    toast.success("Auftrag als verloren markiert");
+    setShowLostModal(false);
+    setLostTargetId(null);
+    setLostReason("");
+    setShowForm(false);
+    setEditingId(null);
+    load();
+  }
+
   async function updatePriority(id: string, prioritaet: VertriebPriority) {
     await supabase.from("vertrieb_contacts").update({ prioritaet }).eq("id", id);
     setContacts(contacts.map((c) => c.id === id ? { ...c, prioritaet } : c));
@@ -301,6 +354,41 @@ export default function VertriebPage() {
       </div>
 
       {/* Form */}
+      {/* Verloren-Modal */}
+      {showLostModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowLostModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-red-600" />Auftrag verloren</h2>
+                <button onClick={() => setShowLostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">Gib einen Grund an, warum der Auftrag verloren wurde.</p>
+                <div>
+                  <label className="text-sm font-medium">Grund *</label>
+                  <textarea
+                    value={lostReason}
+                    onChange={(e) => setLostReason(e.target.value)}
+                    placeholder="z.B. Zu teuer, Konkurrenz gewählt, kein Budget..."
+                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                    rows={3}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowLostModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={markLost} disabled={!lostReason.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                    <AlertTriangle className="h-4 w-4" />Als verloren markieren
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Kategorie-Picker */}
       {showCategoryPicker && (
         <>
@@ -350,6 +438,58 @@ export default function VertriebPage() {
                 </div>
                 <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
               </div>
+
+              {/* Step-Progress nur beim Bearbeiten */}
+              {editingId && form.status !== "abgesagt" && (
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+                  <div className="flex items-center gap-0">
+                    {STEPS.map((s, i) => {
+                      const done = editingStep > s.nr;
+                      const active = editingStep === s.nr;
+                      return (
+                        <div key={s.nr} className="flex items-center flex-1">
+                          <div className="flex flex-col items-center w-full relative">
+                            {i > 0 && <div className={`absolute top-3 right-1/2 w-full h-0.5 -z-10 ${done ? "bg-green-400" : "bg-gray-300"}`} />}
+                            <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white ring-4 ring-blue-100" : "bg-gray-200 text-gray-400"}`}>
+                              {done ? <Check className="h-4 w-4" /> : <span className="text-xs font-bold">{s.nr}</span>}
+                            </div>
+                            <p className={`text-[10px] font-semibold mt-1.5 text-center ${done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}`}>{s.label}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
+                    {editingStep < 5 && (
+                      <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <ArrowRight className="h-4 w-4 mr-1" />{STEPS[editingStep - 1].action}
+                      </Button>
+                    )}
+                    {editingStep === 5 && form.status !== "gewonnen" && (
+                      <Button type="button" size="sm" onClick={advanceStep} className="bg-green-600 hover:bg-green-700 text-white">
+                        <Check className="h-4 w-4 mr-1" />Als gewonnen markieren
+                      </Button>
+                    )}
+                    <Button type="button" size="sm" variant="outline" onClick={() => openLostModal(editingId)} className="text-red-600 border-red-200 hover:bg-red-50">
+                      <AlertTriangle className="h-4 w-4 mr-1" />Auftrag verloren
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Verloren-Banner */}
+              {editingId && form.status === "abgesagt" && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border-2 border-red-200">
+                  <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
+                  <div>
+                    <p className="font-bold text-red-800">Auftrag verloren</p>
+                    {(() => {
+                      const c = contacts.find((c) => c.id === editingId);
+                      return c?.verloren_grund && <p className="text-sm text-red-700 mt-0.5">Grund: {c.verloren_grund}</p>;
+                    })()}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-medium">Firma *</label>
