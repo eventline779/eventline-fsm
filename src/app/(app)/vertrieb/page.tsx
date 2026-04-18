@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ const emptyForm = {
 const VERTRIEB_PASSWORD = "788596";
 
 export default function VertriebPage() {
+  const router = useRouter();
   const [unlocked, setUnlocked] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
@@ -90,6 +92,16 @@ export default function VertriebPage() {
   const [uploadingOfferte, setUploadingOfferte] = useState(false);
   const [sendingVerbesserung, setSendingVerbesserung] = useState(false);
   const [sendingBestaetigung, setSendingBestaetigung] = useState(false);
+  // Termin (Schritt 2)
+  const [showTerminModal, setShowTerminModal] = useState(false);
+  const [terminType, setTerminType] = useState<"kunde" | "telefon">("kunde");
+  const [terminForm, setTerminForm] = useState({ date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "10:00", note: "" });
+  const [savingTermin, setSavingTermin] = useState(false);
+  // Auftrag erstellen (Schritt 4)
+  const [showAuftragModal, setShowAuftragModal] = useState(false);
+  const [auftragForm, setAuftragForm] = useState({ title: "", priority: "normal", start_date: "", end_date: "", location_id: "" });
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [creatingAuftrag, setCreatingAuftrag] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -149,8 +161,12 @@ export default function VertriebPage() {
   }
 
   async function load() {
-    const { data } = await supabase.from("vertrieb_contacts").select("*").order("nr");
+    const [{ data }, locRes] = await Promise.all([
+      supabase.from("vertrieb_contacts").select("*").order("nr"),
+      supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
+    ]);
     if (data) setContacts(data as VertriebContact[]);
+    if (locRes.data) setLocations(locRes.data);
     setLoading(false);
   }
 
@@ -446,6 +462,137 @@ export default function VertriebPage() {
     setSendingBestaetigung(false);
   }
 
+  function openTerminModal(type: "kunde" | "telefon") {
+    setTerminType(type);
+    setTerminForm({ date: new Date().toISOString().split("T")[0], time: type === "telefon" ? "10:00" : "14:00", end_time: type === "telefon" ? "10:30" : "15:00", note: "" });
+    setShowTerminModal(true);
+  }
+
+  async function saveTermin() {
+    if (!editingId) return;
+    const c = contacts.find((x) => x.id === editingId);
+    if (!c) return;
+    setSavingTermin(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const tzOffset = -new Date().getTimezoneOffset();
+    const tzSign = tzOffset >= 0 ? "+" : "-";
+    const tzH = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
+    const tzM = String(Math.abs(tzOffset) % 60).padStart(2, "0");
+    const tz = `${tzSign}${tzH}:${tzM}`;
+    const title = `${terminType === "telefon" ? "📞 Telefon-Termin" : "👥 Kunden-Termin"}: ${c.firma}${c.ansprechperson ? ` (${c.ansprechperson})` : ""}`;
+    const description = [terminForm.note, c.telefon ? `Tel: ${c.telefon}` : "", c.email ? `E-Mail: ${c.email}` : ""].filter(Boolean).join("\n");
+    await supabase.from("job_appointments").insert({
+      job_id: null,
+      title,
+      description: description || null,
+      start_time: `${terminForm.date}T${terminForm.time}:00${tz}`,
+      end_time: `${terminForm.date}T${terminForm.end_time}:00${tz}`,
+      assigned_to: user?.id || null,
+    });
+    toast.success(`${terminType === "telefon" ? "Telefon" : "Kunden"}-Termin im Kalender erstellt`);
+    setShowTerminModal(false);
+    setSavingTermin(false);
+  }
+
+  function openAuftragModal() {
+    const c = currentContactWithDetails();
+    if (!c) return;
+    setAuftragForm({
+      title: c.event_typ || c.firma,
+      priority: "normal",
+      start_date: c.datum_kontakt || new Date().toISOString().split("T")[0],
+      end_date: "",
+      location_id: "",
+    });
+    setShowAuftragModal(true);
+  }
+
+  async function createAuftrag() {
+    const c = currentContactWithDetails();
+    if (!c) return;
+    setCreatingAuftrag(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
+
+    // Kunde finden oder erstellen
+    let customerId: string | null = null;
+    const { data: existingCust } = await supabase.from("customers").select("id").eq("name", c.firma).maybeSingle();
+    if (existingCust) {
+      customerId = existingCust.id;
+    } else {
+      const { data: newCust } = await supabase.from("customers").insert({
+        name: c.firma,
+        type: "company",
+        email: c.email || null,
+        phone: c.telefon || null,
+        notes: c.ansprechperson ? `Ansprechperson: ${c.ansprechperson}${c.position ? ` (${c.position})` : ""}` : null,
+      }).select("id").single();
+      customerId = newCust?.id || null;
+    }
+
+    if (!customerId) { toast.error("Kunde konnte nicht erstellt werden"); setCreatingAuftrag(false); return; }
+
+    // Auftrag erstellen
+    const details = c.details || {};
+    const descriptionParts: string[] = [];
+    if (details.infrastruktur) descriptionParts.push(`Infrastruktur: ${details.infrastruktur}`);
+    if (details.zielgruppe) descriptionParts.push(`Zielgruppe: ${details.zielgruppe}`);
+    if (details.programm) descriptionParts.push(`Programm: ${details.programm}`);
+    if (details.bedarf_vor_ort) descriptionParts.push(`Bedarf vor Ort: ${details.bedarf_vor_ort}`);
+    if (details.bedarf) {
+      const BEDARF_LABELS: Record<string, string> = { verwaltungsaufwand: "Verwaltungsaufwand", material: "Material", arbeiten: "Arbeiten", stunden: "Stunden", catering: "Catering", transport: "Transport", raum: "Raum" };
+      Object.entries(details.bedarf).forEach(([k, v]: any) => { descriptionParts.push(`${BEDARF_LABELS[k] || k}: ${v}`); });
+    }
+
+    const { data: newJob, error } = await supabase.from("jobs").insert({
+      title: auftragForm.title,
+      description: descriptionParts.join("\n\n") || null,
+      status: "geplant",
+      priority: auftragForm.priority,
+      customer_id: customerId,
+      location_id: auftragForm.location_id || details.location_id || null,
+      start_date: auftragForm.start_date || null,
+      end_date: auftragForm.end_date || auftragForm.start_date || null,
+      created_by: user?.id,
+    }).select("id, job_number, title").single();
+
+    if (error || !newJob) { toast.error("Auftrag-Fehler: " + (error?.message || "Unbekannt")); setCreatingAuftrag(false); return; }
+
+    // Auftrag-ID im Vertrieb-Eintrag speichern
+    let obj: any = {};
+    try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+    if (!obj._details) obj._details = {};
+    obj._details.job_id = newJob.id;
+    obj._details.job_number = newJob.job_number;
+    await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+
+    // E-Mail an Leo
+    try {
+      await fetch("/api/vertrieb/neuer-auftrag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobNumber: newJob.job_number,
+          jobId: newJob.id,
+          title: newJob.title,
+          firma: c.firma,
+          ansprechperson: c.ansprechperson,
+          email: c.email,
+          telefon: c.telefon,
+          startDate: auftragForm.start_date,
+          endDate: auftragForm.end_date,
+          creatorName: profile?.full_name || "Unbekannt",
+        }),
+      });
+    } catch {}
+
+    toast.success(`Auftrag INT-${newJob.job_number} erstellt — Leo benachrichtigt`);
+    setShowAuftragModal(false);
+    setCreatingAuftrag(false);
+    // Zu Auftrag navigieren für Schichtplanung
+    setTimeout(() => router.push(`/auftraege/${newJob.id}`), 600);
+  }
+
   async function updatePriority(id: string, prioritaet: VertriebPriority) {
     await supabase.from("vertrieb_contacts").update({ prioritaet }).eq("id", id);
     setContacts(contacts.map((c) => c.id === id ? { ...c, prioritaet } : c));
@@ -505,6 +652,107 @@ export default function VertriebPage() {
       </div>
 
       {/* Form */}
+      {/* Termin-Modal (Schritt 2) */}
+      {showTerminModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowTerminModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2">
+                  {terminType === "telefon" ? <Phone className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
+                  {terminType === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}
+                </h2>
+                <button onClick={() => setShowTerminModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Datum *</label>
+                  <Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1.5 bg-gray-50" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Von *</label>
+                    <Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1.5 bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Bis *</label>
+                    <Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1.5 bg-gray-50" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Notiz (optional)</label>
+                  <textarea value={terminForm.note} onChange={(e) => setTerminForm({ ...terminForm, note: e.target.value })} placeholder="Worum geht es?" className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={2} />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowTerminModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={saveTermin} disabled={savingTermin} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                    {savingTermin ? "Speichern..." : "Termin erstellen"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Auftrag-Modal (Schritt 4) */}
+      {showAuftragModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowAuftragModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold flex items-center gap-2"><Check className="h-4 w-4 text-green-600" />Auftrag erstellen</h2>
+                <button onClick={() => setShowAuftragModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">Der Auftrag wird mit allen Infos aus dem Lead erstellt. Leo wird per Email benachrichtigt.</p>
+                <div>
+                  <label className="text-sm font-medium">Titel *</label>
+                  <Input value={auftragForm.title} onChange={(e) => setAuftragForm({ ...auftragForm, title: e.target.value })} className="mt-1.5 bg-gray-50" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Startdatum</label>
+                    <Input type="date" value={auftragForm.start_date} onChange={(e) => setAuftragForm({ ...auftragForm, start_date: e.target.value })} className="mt-1.5 bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Enddatum</label>
+                    <Input type="date" value={auftragForm.end_date} onChange={(e) => setAuftragForm({ ...auftragForm, end_date: e.target.value })} className="mt-1.5 bg-gray-50" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Priorität</label>
+                    <select value={auftragForm.priority} onChange={(e) => setAuftragForm({ ...auftragForm, priority: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+                      <option value="niedrig">Niedrig</option>
+                      <option value="normal">Normal</option>
+                      <option value="hoch">Hoch</option>
+                      <option value="dringend">Dringend</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Location</label>
+                    <select value={auftragForm.location_id} onChange={(e) => setAuftragForm({ ...auftragForm, location_id: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+                      <option value="">— Keine —</option>
+                      {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowAuftragModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={createAuftrag} disabled={!auftragForm.title || creatingAuftrag} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                    <Check className="h-4 w-4" />{creatingAuftrag ? "Erstellen..." : "Auftrag erstellen"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
       {showBuchhaltung && (
         <>
@@ -703,18 +951,30 @@ export default function VertriebPage() {
                 </div>
               )}
 
-              {/* SCHRITT 2: Benachrichtigung Buchhaltung */}
+              {/* SCHRITT 2: Benachrichtigung Buchhaltung + Termine */}
               {editingId && editingStep === 2 && form.status !== "abgesagt" && (
                 <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200 space-y-3">
-                  <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5"><Mail className="h-4 w-4" />Schritt 2: Benachrichtigung Buchhaltung</p>
-                  <p className="text-xs text-blue-700">Sende eine E-Mail an die Buchhaltung mit allen Verrechnungs-Infos. Du kannst noch eine eigene Nachricht hinzufügen.</p>
+                  <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5"><Mail className="h-4 w-4" />Schritt 2: Kontaktiert</p>
+
                   <div className="flex gap-2 flex-wrap">
-                    <Button type="button" size="sm" onClick={() => setShowBuchhaltung(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                      <Mail className="h-4 w-4 mr-1" />Benachrichtigung senden
+                    <Button type="button" size="sm" onClick={() => openTerminModal("telefon")} variant="outline" className="bg-white">
+                      <Phone className="h-4 w-4 mr-1" />Telefon-Termin
                     </Button>
-                    <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
-                      <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Finalisierung
+                    <Button type="button" size="sm" onClick={() => openTerminModal("kunde")} variant="outline" className="bg-white">
+                      <Calendar className="h-4 w-4 mr-1" />Kunden-Termin
                     </Button>
+                  </div>
+
+                  <div className="pt-2 border-t border-blue-200">
+                    <p className="text-xs text-blue-700 mb-2">Buchhaltung mit allen Verrechnungs-Infos benachrichtigen:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button type="button" size="sm" onClick={() => setShowBuchhaltung(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Mail className="h-4 w-4 mr-1" />Benachrichtigung senden
+                      </Button>
+                      <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
+                        <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Finalisierung
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -760,6 +1020,42 @@ export default function VertriebPage() {
                       <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Operations
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {/* SCHRITT 4: Operations — Auftrag erstellen */}
+              {editingId && editingStep === 4 && form.status !== "abgesagt" && (
+                <div className="p-4 rounded-xl bg-green-50 border-2 border-green-200 space-y-3">
+                  <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5"><Check className="h-4 w-4" />Schritt 4: Operations</p>
+                  {(() => {
+                    const c = currentContactWithDetails();
+                    const jobNum = c?.details?.job_number;
+                    const jobId = c?.details?.job_id;
+                    if (jobNum && jobId) {
+                      return (
+                        <div className="p-3 rounded-lg bg-white border border-green-200 flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Auftrag erstellt</p>
+                            <p className="font-semibold text-sm"><span className="font-mono text-green-700">INT-{jobNum}</span></p>
+                          </div>
+                          <a href={`/auftraege/${jobId}`} className="text-sm text-blue-600 hover:underline font-medium">Auftrag öffnen → Schichtplan</a>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        <p className="text-xs text-green-700">Erstelle aus diesem Lead einen Auftrag. Leo wird automatisch benachrichtigt. Danach kannst du den Schichtplan machen.</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button type="button" size="sm" onClick={openAuftragModal} className="bg-green-600 hover:bg-green-700 text-white">
+                            <Plus className="h-4 w-4 mr-1" />Auftrag erstellen
+                          </Button>
+                          <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-green-700 border-green-300">
+                            <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Schritt 5
+                          </Button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 
