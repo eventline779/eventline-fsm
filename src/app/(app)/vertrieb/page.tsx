@@ -33,8 +33,7 @@ const STEPS = [
   { nr: 1, label: "Offen", action: "Kontakt aufnehmen" },
   { nr: 2, label: "Kontaktiert", action: "Weiter zu Finalisierung" },
   { nr: 3, label: "Finalisierung", action: "Weiter zu Operations" },
-  { nr: 4, label: "Operations", action: "Weiter zu Schritt 5" },
-  { nr: 5, label: "Gewonnen", action: "Abschliessen" },
+  { nr: 4, label: "Operations", action: "Auftrag erstellen" },
 ];
 
 const BEDARF_BEREICHE = [
@@ -285,10 +284,9 @@ export default function VertriebPage() {
 
   async function advanceStep() {
     if (!editingId) return;
-    const next = Math.min(editingStep + 1, 5);
-    // Status-Mapping: Step 1=offen, Step 2=kontaktiert, Step 3-4=gespraech, Step 5=gewonnen
+    const next = Math.min(editingStep + 1, 4);
+    // Status-Mapping: Step 1=offen, Step 2=kontaktiert, Step 3-4=gespraech
     const newStatus: VertriebStatus =
-      next === 5 ? "gewonnen" :
       next === 2 ? "kontaktiert" :
       next >= 3 ? "gespraech" : "offen";
     await supabase.from("vertrieb_contacts").update({
@@ -558,13 +556,16 @@ export default function VertriebPage() {
 
     if (error || !newJob) { toast.error("Auftrag-Fehler: " + (error?.message || "Unbekannt")); setCreatingAuftrag(false); return; }
 
-    // Auftrag-ID im Vertrieb-Eintrag speichern
+    // Auftrag-ID im Vertrieb-Eintrag speichern + Status auf gewonnen
     let obj: any = {};
     try { obj = JSON.parse(c.notizen || "{}"); } catch {}
     if (!obj._details) obj._details = {};
     obj._details.job_id = newJob.id;
     obj._details.job_number = newJob.job_number;
-    await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+    await supabase.from("vertrieb_contacts").update({
+      notizen: JSON.stringify(obj),
+      status: "gewonnen",
+    }).eq("id", editingId);
 
     // E-Mail an Leo
     try {
@@ -928,25 +929,33 @@ export default function VertriebPage() {
                     })}
                   </div>
                   <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
-                    {/* Standard Weiter-Button (ausser Schritt 2 und 3 die haben spezielle Aktionen) */}
+                    {/* Schritt 1: Kontakt aufnehmen */}
                     {editingStep === 1 && (
                       <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
                         <ArrowRight className="h-4 w-4 mr-1" />Kontakt aufnehmen
                       </Button>
                     )}
-                    {editingStep === 4 && (
-                      <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Schritt 5
+                    {/* Schritt 2-3-4 haben eigene Action-Bars im spezifischen Block */}
+                    {form.status !== "gewonnen" && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => openLostModal(editingId)} className="text-red-600 border-red-200 hover:bg-red-50">
+                        <AlertTriangle className="h-4 w-4 mr-1" />Auftrag verloren
                       </Button>
                     )}
-                    {editingStep === 5 && form.status !== "gewonnen" && (
-                      <Button type="button" size="sm" onClick={advanceStep} className="bg-green-600 hover:bg-green-700 text-white">
-                        <Check className="h-4 w-4 mr-1" />Als gewonnen markieren
-                      </Button>
-                    )}
-                    <Button type="button" size="sm" variant="outline" onClick={() => openLostModal(editingId)} className="text-red-600 border-red-200 hover:bg-red-50">
-                      <AlertTriangle className="h-4 w-4 mr-1" />Auftrag verloren
-                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Gewonnen-Banner */}
+              {editingId && form.status === "gewonnen" && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border-2 border-green-200">
+                  <Check className="h-6 w-6 text-green-600 shrink-0" />
+                  <div>
+                    <p className="font-bold text-green-800">Gewonnen · Auftrag erstellt</p>
+                    {(() => {
+                      const c = contacts.find((c) => c.id === editingId);
+                      const jobNum = (() => { try { return JSON.parse(c?.notizen || "{}")._details?.job_number; } catch { return null; } })();
+                      return jobNum && <p className="text-sm text-green-700 mt-0.5">INT-{jobNum}</p>;
+                    })()}
                   </div>
                 </div>
               )}
@@ -1048,9 +1057,6 @@ export default function VertriebPage() {
                         <div className="flex gap-2 flex-wrap">
                           <Button type="button" size="sm" onClick={openAuftragModal} className="bg-green-600 hover:bg-green-700 text-white">
                             <Plus className="h-4 w-4 mr-1" />Auftrag erstellen
-                          </Button>
-                          <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-green-700 border-green-300">
-                            <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Schritt 5
                           </Button>
                         </div>
                       </>
