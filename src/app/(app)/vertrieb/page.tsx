@@ -73,6 +73,7 @@ export default function VertriebPage() {
   const [filterKategorie, setFilterKategorie] = useState<VertriebKategorie | "all">("all");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [categoryPicked, setCategoryPicked] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingStep, setEditingStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
@@ -172,18 +173,19 @@ export default function VertriebPage() {
   function openNew() {
     setEditingId(null);
     setForm(emptyForm);
-    setShowCategoryPicker(true);
+    setCategoryPicked(false);
+    setShowForm(true);
   }
 
   function pickCategory(kategorie: VertriebKategorie) {
     setForm({ ...emptyForm, kategorie });
-    setShowCategoryPicker(false);
-    setShowForm(true);
+    setCategoryPicked(true);
   }
 
   function openEdit(c: VertriebContact) {
     setEditingId(c.id);
     setEditingStep(c.step || 1);
+    setCategoryPicked(true);
     // Details aus notizen parsen (wenn JSON)
     let details: any = {};
     let freieNotiz = c.notizen || "";
@@ -272,6 +274,7 @@ export default function VertriebPage() {
     }
     setShowForm(false);
     setEditingId(null);
+    setCategoryPicked(false);
     setForm(emptyForm);
     load();
     setSaving(false);
@@ -318,6 +321,7 @@ export default function VertriebPage() {
     setLostReason("");
     setShowForm(false);
     setEditingId(null);
+    setCategoryPicked(false);
     load();
   }
 
@@ -858,40 +862,42 @@ export default function VertriebPage() {
         </>
       )}
 
-      {/* Kategorie-Picker */}
-      {showCategoryPicker && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowCategoryPicker(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold">Was für ein Lead?</h2>
-                <button onClick={() => setShowCategoryPicker(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-3">
-                {KATEGORIE_OPTIONS.map((k) => {
-                  const Icon = k.icon;
-                  return (
-                    <button key={k.value} onClick={() => pickCategory(k.value)} className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all group">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${k.color}`}>
-                        <Icon className="h-6 w-6" />
-                      </div>
-                      <div className="text-left flex-1">
-                        <p className="font-semibold">{k.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {k.value === "verwaltung" ? "Verwaltungen, Immobilien, WEG-Anfragen" : "Sommerfeste, Jahresanlässe, Firmenevents"}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+      {showForm && !editingId && !categoryPicked && (
+        <Card className="bg-white border-red-100">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Was für ein Lead?</h3>
+              <button type="button" onClick={() => { setShowForm(false); setCategoryPicked(false); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
             </div>
-          </div>
-        </>
+            <div className="grid gap-3">
+              {KATEGORIE_OPTIONS.map((k) => {
+                const Icon = k.icon;
+                return (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => pickCategory(k.value)}
+                    className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-left"
+                  >
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${k.color}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold">{k.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {k.value === "verwaltung" ? "Verwaltungen, Immobilien, WEG-Anfragen" : "Sommerfeste, Jahresanlässe, Firmenevents"}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-400" />
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {showForm && (
+      {showForm && (editingId || categoryPicked) && (
         <Card className="bg-white border-red-100">
           <CardContent className="p-6">
             <form onSubmit={save} className="space-y-4">
@@ -905,7 +911,7 @@ export default function VertriebPage() {
                     return <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border ${k.color}`}><Icon className="h-3 w-3" />{k.label}</span>;
                   })()}
                 </div>
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
               </div>
 
               {/* Step-Progress nur beim Bearbeiten */}
@@ -1196,7 +1202,7 @@ export default function VertriebPage() {
                 <textarea value={form.notizen} onChange={(e) => setForm({ ...form, notizen: e.target.value })} className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Abbrechen</Button>
+                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }}>Abbrechen</Button>
                 <Button type="submit" disabled={!form.firma || saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Speichern..." : editingId ? "Aktualisieren" : "Erstellen"}</Button>
               </div>
             </form>
