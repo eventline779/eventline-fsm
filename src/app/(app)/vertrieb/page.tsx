@@ -1232,79 +1232,123 @@ export default function VertriebPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => {
             const statusConf = STATUS_OPTIONS.find((s) => s.value === c.status)!;
             const prioConf = PRIORITY_OPTIONS.find((p) => p.value === c.prioritaet)!;
+            const katConf = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
+            const KatIcon = katConf?.icon;
+            const currentStepNr = c.step || 1;
+            const stepLabel = STEPS.find((s) => s.nr === currentStepNr)?.label || "";
+            const isGewonnen = c.status === "gewonnen";
+            const isVerloren = c.status === "abgesagt";
+            // Job-Nummer ermitteln
+            let jobNumber: number | null = null;
+            try {
+              const parsed = JSON.parse(c.notizen || "{}");
+              jobNumber = parsed._details?.job_number || null;
+            } catch {}
             return (
-              <Card key={c.id} className="bg-white hover:shadow-md transition-all">
+              <Card
+                key={c.id}
+                onClick={() => openEdit(c)}
+                className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 group relative ${
+                  isGewonnen ? "bg-green-50 border-green-200" :
+                  isVerloren ? "bg-red-50/60 border-red-200 opacity-70" :
+                  "bg-white"
+                }`}
+              >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
+                  {/* Top row: Number, Firma, Category */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">#{c.nr}</span>
-                        <h3 className="font-semibold">{c.firma}</h3>
-                        {(() => {
-                          const k = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
-                          if (!k) return null;
-                          const Icon = k.icon;
-                          return <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border ${k.color}`}><Icon className="h-2.5 w-2.5" />{k.value === "verwaltung" ? "Verwaltung" : "Event"}</span>;
-                        })()}
-                        {c.branche && <span className="text-xs text-muted-foreground">· {c.branche}</span>}
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] font-mono text-muted-foreground">#{c.nr}</span>
+                        {katConf && KatIcon && (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border ${katConf.color}`}>
+                            <KatIcon className="h-2.5 w-2.5" />
+                            {c.kategorie === "verwaltung" ? "Verwaltung" : "Event"}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-                        {c.ansprechperson && <span>{c.ansprechperson}{c.position ? ` · ${c.position}` : ""}</span>}
-                        {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600"><Mail className="h-3 w-3" />{c.email}</a>}
-                        {c.telefon && <a href={`tel:${c.telefon}`} className="flex items-center gap-1 hover:text-blue-600"><Phone className="h-3 w-3" />{c.telefon}</a>}
-                      </div>
-                      {c.event_typ && <p className="text-xs text-muted-foreground mt-1">{c.event_typ}</p>}
-                      {c.datum_kontakt && <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><Calendar className="h-3 w-3" />Letzter Kontakt: {new Date(c.datum_kontakt).toLocaleDateString("de-CH")}</p>}
-                      {(() => {
-                        if (!c.notizen) return null;
-                        let freieNotiz = c.notizen;
-                        let details: any = {};
-                        try {
-                          const parsed = JSON.parse(c.notizen);
-                          if (parsed && typeof parsed === "object" && (parsed._text !== undefined || parsed._details)) {
-                            freieNotiz = parsed._text || "";
-                            details = parsed._details || {};
-                          }
-                        } catch {}
-                        const hasDetails = Object.keys(details).length > 0;
-                        return (
-                          <div className="mt-2 space-y-1.5">
-                            {hasDetails && (
-                              <div className="bg-gray-50 p-2.5 rounded-lg space-y-1 text-xs">
-                                {details.infrastruktur && <div><span className="font-semibold text-gray-700">Infrastruktur:</span> {details.infrastruktur}</div>}
-                                {details.ort && <div><span className="font-semibold text-gray-700">Ort:</span> {details.ort}</div>}
-                                {details.zielgruppe && <div><span className="font-semibold text-gray-700">Zielgruppe:</span> {details.zielgruppe}</div>}
-                                {details.programm && <div><span className="font-semibold text-gray-700">Programm:</span> {details.programm}</div>}
-                                {details.bedarf_vor_ort && <div><span className="font-semibold text-gray-700">Bedarf vor Ort:</span> {details.bedarf_vor_ort}</div>}
-                                {details.bedarf && Object.entries(details.bedarf).map(([k, v]: any) => {
-                                  const label = BEDARF_BEREICHE.find((b) => b.key === k)?.label || k;
-                                  return <div key={k}><span className="font-semibold text-gray-700">{label}:</span> {v}</div>;
-                                })}
-                              </div>
-                            )}
-                            {freieNotiz && <p className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-lg whitespace-pre-wrap">{freieNotiz}</p>}
-                          </div>
-                        );
-                      })()}
+                      <h3 className="font-semibold text-[15px] leading-tight truncate">{c.firma}</h3>
+                      {c.branche && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.branche}</p>}
                     </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <select value={c.status} onChange={(e) => updateStatus(c.id, e.target.value as VertriebStatus)} className={`text-xs font-medium px-2 py-1 rounded-lg border cursor-pointer ${statusConf.color}`}>
-                          {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
-                        <select value={c.prioritaet} onChange={(e) => updatePriority(c.id, e.target.value as VertriebPriority)} className={`text-xs font-medium px-2 py-1 rounded-lg border cursor-pointer ${prioConf.color}`}>
-                          {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500"><Edit2 className="h-4 w-4" /></button>
-                        <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteContact(c.id); }}
+                      className="p-1.5 rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Löschen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Contact info */}
+                  {(c.ansprechperson || c.email || c.telefon) && (
+                    <div className="space-y-0.5 mb-3 pb-3 border-b border-gray-100">
+                      {c.ansprechperson && (
+                        <p className="text-xs text-gray-700 truncate">{c.ansprechperson}{c.position ? ` · ${c.position}` : ""}</p>
+                      )}
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
+                        {c.email && <a onClick={(e) => e.stopPropagation()} href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 truncate max-w-[180px]"><Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span></a>}
+                        {c.telefon && <a onClick={(e) => e.stopPropagation()} href={`tel:${c.telefon}`} className="flex items-center gap-1 hover:text-blue-600"><Phone className="h-3 w-3" />{c.telefon}</a>}
                       </div>
                     </div>
+                  )}
+
+                  {/* Step progress bar */}
+                  {!isGewonnen && !isVerloren && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Schritt {currentStepNr}/4</span>
+                        <span className="text-[10px] text-gray-500">{stepLabel}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {STEPS.map((s) => (
+                          <div key={s.nr} className={`flex-1 h-1.5 rounded-full ${s.nr <= currentStepNr ? "bg-blue-500" : "bg-gray-200"}`} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Won/Lost Banner */}
+                  {isGewonnen && (
+                    <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-green-100 text-green-800 text-xs font-medium">
+                      <Check className="h-3.5 w-3.5" />
+                      Gewonnen{jobNumber ? ` · INT-${jobNumber}` : ""}
+                    </div>
+                  )}
+                  {isVerloren && (
+                    <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-100 text-red-800 text-xs font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Verloren{c.verloren_grund ? `: ${c.verloren_grund}` : ""}
+                    </div>
+                  )}
+
+                  {/* Status + Priority row */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <select
+                      value={c.status}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => updateStatus(c.id, e.target.value as VertriebStatus)}
+                      className={`text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer ${statusConf.color}`}
+                    >
+                      {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                    <select
+                      value={c.prioritaet}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => updatePriority(c.id, e.target.value as VertriebPriority)}
+                      className={`text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer ${prioConf.color}`}
+                    >
+                      {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                    {c.datum_kontakt && (
+                      <span className="ml-auto text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-2.5 w-2.5" />
+                        {new Date(c.datum_kontakt).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
