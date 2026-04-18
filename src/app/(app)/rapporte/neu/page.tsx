@@ -55,6 +55,8 @@ export default function NeuerRapportPage() {
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [clientSignature, setClientSignature] = useState("");
   const [techSignature, setTechSignature] = useState("");
+  const [signerType, setSignerType] = useState<"kunde" | "mieter">("kunde");
+  const [signerRole, setSignerRole] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,11 +73,14 @@ export default function NeuerRapportPage() {
           const found = jobList.find((j) => j.id === preselectedJobId);
           if (found) {
             setSelectedJob(found);
+            const locName = (found.location as any)?.name?.toLowerCase() || "";
+            const isOwnVenue = ["scala", "bau3", "barakuba"].some((v) => locName.includes(v));
             setForm((f) => ({
               ...f,
               job_id: preselectedJobId,
-              client_name: found.customer?.name || "",
+              client_name: isOwnVenue ? "" : (found.customer?.name || ""),
             }));
+            if (isOwnVenue) setSignerType("mieter");
           }
         }
       }
@@ -95,8 +100,11 @@ export default function NeuerRapportPage() {
     setForm((f) => ({ ...f, job_id: jobId }));
     const found = jobs.find((j) => j.id === jobId);
     setSelectedJob(found || null);
+    const locName = (found?.location as any)?.name?.toLowerCase() || "";
+    const isOwnVenue = ["scala", "bau3", "barakuba"].some((v) => locName.includes(v));
+    setSignerType(isOwnVenue ? "mieter" : "kunde");
     if (found?.customer?.name) {
-      setForm((f) => ({ ...f, job_id: jobId, client_name: found.customer?.name || "" }));
+      setForm((f) => ({ ...f, job_id: jobId, client_name: isOwnVenue ? "" : (found.customer?.name || "") }));
     }
   }
 
@@ -213,7 +221,7 @@ export default function NeuerRapportPage() {
       work_description: form.work_description,
       equipment_used: form.equipment_used || null,
       issues: form.issues || null,
-      client_name: form.client_name || null,
+      client_name: form.client_name ? (signerType === "mieter" && signerRole ? `${form.client_name} (${signerRole})` : form.client_name) : null,
       signature_url: clientSigPath,
       technician_name: form.technician_name || null,
       technician_signature_url: techSigPath,
@@ -459,11 +467,25 @@ export default function NeuerRapportPage() {
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <div className="mb-2">
-                <Label>Kunde / Auftraggeber</Label>
-                <Input placeholder="Name Kunde" value={form.client_name} onChange={(e) => update("client_name", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <button type="button" onClick={() => setSignerType("kunde")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "kunde" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+                  Kunde / Auftraggeber
+                </button>
+                <button type="button" onClick={() => setSignerType("mieter")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "mieter" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                  Mieter vor Ort
+                </button>
               </div>
-              <SignaturePad label="Unterschrift Kunde" onSave={setClientSignature} />
+              <div className="mb-2">
+                <Label>{signerType === "mieter" ? "Mieter / Person vor Ort" : "Kunde / Auftraggeber"}</Label>
+                <Input placeholder={signerType === "mieter" ? "Name Mieter vor Ort" : "Name Kunde"} value={form.client_name} onChange={(e) => update("client_name", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+              </div>
+              {signerType === "mieter" && (
+                <div className="mb-2">
+                  <Label>Funktion / Rolle (optional)</Label>
+                  <Input placeholder="z.B. Veranstalter, Produktionsleitung, Regie..." value={signerRole} onChange={(e) => setSignerRole(e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
+                </div>
+              )}
+              <SignaturePad label={signerType === "mieter" ? "Unterschrift Mieter vor Ort" : "Unterschrift Kunde"} onSave={setClientSignature} />
             </div>
           </CardContent>
         </Card>
