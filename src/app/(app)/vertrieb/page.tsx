@@ -54,8 +54,8 @@ const emptyForm = {
   infrastruktur: "", ort: "", zielgruppe: "", programm: "", bedarf_vor_ort: "",
   // Veranstaltung: pro Bereich ein Text
   bedarf: {} as Record<string, string>,
-  // Kontakt als Kunden speichern
-  create_customer: false,
+  // Kontakt als Kunden speichern (standardmässig aktiv)
+  create_customer: true,
 };
 
 const VERTRIEB_PASSWORD = "788596";
@@ -207,7 +207,7 @@ export default function VertriebPage() {
       programm: details.programm || "",
       bedarf_vor_ort: details.bedarf_vor_ort || "",
       bedarf: details.bedarf || {},
-      create_customer: false,
+      create_customer: false, // Beim Bearbeiten nicht nochmal anlegen
     });
     setOffertePdf(details.offerte_pdf || null);
     setShowForm(true);
@@ -1203,7 +1203,7 @@ export default function VertriebPage() {
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }}>Abbrechen</Button>
-                <Button type="submit" disabled={!form.firma || saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Speichern..." : editingId ? "Aktualisieren" : "Erstellen"}</Button>
+                <Button type="submit" disabled={!form.firma || saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</Button>
               </div>
             </form>
           </CardContent>
