@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import type { VertriebContact, VertriebStatus, VertriebPriority } from "@/types";
-import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search } from "lucide-react";
+import type { VertriebContact, VertriebStatus, VertriebPriority, VertriebKategorie } from "@/types";
+import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search, Building2, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_OPTIONS: { value: VertriebStatus; label: string; color: string }[] = [
@@ -23,10 +23,15 @@ const PRIORITY_OPTIONS: { value: VertriebPriority; label: string; color: string 
   { value: "mittel", label: "Mittel", color: "bg-gray-100 text-gray-600 border-gray-200" },
 ];
 
+const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; color: string }[] = [
+  { value: "verwaltung", label: "Verwaltungs-Anfragen", icon: Building2, color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "veranstaltung", label: "Veranstaltungen", icon: PartyPopper, color: "bg-purple-100 text-purple-700 border-purple-200" },
+];
+
 const emptyForm = {
   firma: "", branche: "", ansprechperson: "", position: "", email: "", telefon: "",
   event_typ: "", status: "offen" as VertriebStatus, datum_kontakt: "", notizen: "",
-  prioritaet: "mittel" as VertriebPriority,
+  prioritaet: "mittel" as VertriebPriority, kategorie: "veranstaltung" as VertriebKategorie,
 };
 
 const VERTRIEB_PASSWORD = "788596";
@@ -40,6 +45,8 @@ export default function VertriebPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<VertriebStatus | "all">("all");
   const [filterPriority, setFilterPriority] = useState<VertriebPriority | "all">("all");
+  const [filterKategorie, setFilterKategorie] = useState<VertriebKategorie | "all">("all");
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -111,6 +118,12 @@ export default function VertriebPage() {
   function openNew() {
     setEditingId(null);
     setForm(emptyForm);
+    setShowCategoryPicker(true);
+  }
+
+  function pickCategory(kategorie: VertriebKategorie) {
+    setForm({ ...emptyForm, kategorie });
+    setShowCategoryPicker(false);
     setShowForm(true);
   }
 
@@ -120,7 +133,7 @@ export default function VertriebPage() {
       firma: c.firma, branche: c.branche || "", ansprechperson: c.ansprechperson || "",
       position: c.position || "", email: c.email || "", telefon: c.telefon || "",
       event_typ: c.event_typ || "", status: c.status, datum_kontakt: c.datum_kontakt || "",
-      notizen: c.notizen || "", prioritaet: c.prioritaet,
+      notizen: c.notizen || "", prioritaet: c.prioritaet, kategorie: c.kategorie || "veranstaltung",
     });
     setShowForm(true);
   }
@@ -140,6 +153,7 @@ export default function VertriebPage() {
       datum_kontakt: form.datum_kontakt || null,
       notizen: form.notizen || null,
       prioritaet: form.prioritaet,
+      kategorie: form.kategorie,
     };
     if (editingId) {
       await supabase.from("vertrieb_contacts").update(payload).eq("id", editingId);
@@ -173,6 +187,7 @@ export default function VertriebPage() {
   }
 
   const filtered = contacts
+    .filter((c) => filterKategorie === "all" || c.kategorie === filterKategorie)
     .filter((c) => filterStatus === "all" || c.status === filterStatus)
     .filter((c) => filterPriority === "all" || c.prioritaet === filterPriority)
     .filter((c) => {
@@ -203,6 +218,10 @@ export default function VertriebPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Firma, Person oder Branche..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-white" />
         </div>
+        <select value={filterKategorie} onChange={(e) => setFilterKategorie(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+          <option value="all">Alle Kategorien</option>
+          {KATEGORIE_OPTIONS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+        </select>
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
           <option value="all">Alle Status</option>
           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label} ({statusCounts[s.value] || 0})</option>)}
@@ -214,12 +233,53 @@ export default function VertriebPage() {
       </div>
 
       {/* Form */}
+      {/* Kategorie-Picker */}
+      {showCategoryPicker && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowCategoryPicker(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold">Was für ein Lead?</h2>
+                <button onClick={() => setShowCategoryPicker(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+              </div>
+              <div className="p-6 space-y-3">
+                {KATEGORIE_OPTIONS.map((k) => {
+                  const Icon = k.icon;
+                  return (
+                    <button key={k.value} onClick={() => pickCategory(k.value)} className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all group">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${k.color}`}>
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="font-semibold">{k.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {k.value === "verwaltung" ? "Verwaltungen, Immobilien, WEG-Anfragen" : "Sommerfeste, Jahresanlässe, Firmenevents"}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {showForm && (
         <Card className="bg-white border-red-100">
           <CardContent className="p-6">
             <form onSubmit={save} className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{editingId ? "Kontakt bearbeiten" : "Neuer Kontakt"}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold">{editingId ? "Kontakt bearbeiten" : "Neuer Kontakt"}</h3>
+                  {(() => {
+                    const k = KATEGORIE_OPTIONS.find((o) => o.value === form.kategorie);
+                    if (!k) return null;
+                    const Icon = k.icon;
+                    return <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border ${k.color}`}><Icon className="h-3 w-3" />{k.label}</span>;
+                  })()}
+                </div>
                 <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
@@ -305,6 +365,12 @@ export default function VertriebPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">#{c.nr}</span>
                         <h3 className="font-semibold">{c.firma}</h3>
+                        {(() => {
+                          const k = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
+                          if (!k) return null;
+                          const Icon = k.icon;
+                          return <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border ${k.color}`}><Icon className="h-2.5 w-2.5" />{k.value === "verwaltung" ? "Verwaltung" : "Event"}</span>;
+                        })()}
                         {c.branche && <span className="text-xs text-muted-foreground">· {c.branche}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">

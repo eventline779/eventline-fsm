@@ -226,6 +226,7 @@ export interface Todo {
 
 export type VertriebStatus = "offen" | "kontaktiert" | "gespraech" | "gewonnen" | "abgesagt";
 export type VertriebPriority = "top" | "gut" | "mittel";
+export type VertriebKategorie = "verwaltung" | "veranstaltung";
 
 export interface VertriebContact {
   id: string;
@@ -241,6 +242,7 @@ export interface VertriebContact {
   datum_kontakt: string | null;
   notizen: string | null;
   prioritaet: VertriebPriority;
+  kategorie: VertriebKategorie;
   created_at: string;
   updated_at: string;
 }
