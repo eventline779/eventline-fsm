@@ -9,7 +9,7 @@ import { JOB_PRIORITY } from "@/lib/constants";
 import type { Todo, Profile, JobPriority } from "@/types";
 import {
   Plus, Check, CheckSquare, Calendar, User, Trash2,
-  ArrowLeft, Upload, FileText, Image as ImageIcon, X, Download,
+  ArrowLeft, Upload, FileText, Image as ImageIcon, X, Download, Archive,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,7 +23,7 @@ export default function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "offen" | "erledigt">("all");
+  const [filter, setFilter] = useState<"offen" | "erledigt">("offen");
   const [personFilter, setPersonFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", priority: "normal" as JobPriority, due_date: "", assigned_to: "" });
@@ -190,7 +190,7 @@ export default function TodosPage() {
   }
 
   const filtered = todos
-    .filter((t) => filter === "all" || t.status === filter)
+    .filter((t) => t.status === filter)
     .filter((t) => !personFilter || t.assigned_to === personFilter)
     .sort((a, b) => {
       if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
@@ -334,11 +334,12 @@ export default function TodosPage() {
 
       {/* Filter */}
       <div className="flex flex-wrap gap-2">
-        {(["all", "offen", "erledigt"] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === f ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
-            {f === "all" ? `Alle (${todos.length})` : f === "offen" ? `Offen (${openCount})` : `Erledigt (${todos.length - openCount})`}
-          </button>
-        ))}
+        <button onClick={() => setFilter("offen")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "offen" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+          Offen ({openCount})
+        </button>
+        <button onClick={() => setFilter("erledigt")} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "erledigt" ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-500 border-gray-200"}`}>
+          <Archive className="h-3 w-3" />Archiv ({todos.length - openCount})
+        </button>
         <span className="border-l border-gray-200 mx-1" />
         <select
           value={personFilter}
@@ -357,8 +358,8 @@ export default function TodosPage() {
         <Card className="bg-white border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><CheckSquare className="h-7 w-7 text-gray-400" /></div>
-            <h3 className="font-semibold text-lg">{filter === "erledigt" ? "Noch nichts erledigt" : "Keine offenen Todos"}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{filter === "all" && !personFilter ? "Erstelle dein erstes Todo." : ""}</p>
+            <h3 className="font-semibold text-lg">{filter === "erledigt" ? "Archiv ist leer" : "Keine offenen Todos"}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{filter === "offen" && !personFilter ? "Erstelle dein erstes Todo." : ""}</p>
           </CardContent>
         </Card>
       ) : (
