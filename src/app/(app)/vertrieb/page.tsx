@@ -249,10 +249,12 @@ export default function VertriebPage() {
       kategorie: form.kategorie,
     };
     if (editingId) {
-      await supabase.from("vertrieb_contacts").update(payload).eq("id", editingId);
+      const { error } = await supabase.from("vertrieb_contacts").update(payload).eq("id", editingId);
+      if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
       toast.success("Eintrag aktualisiert");
     } else {
-      await supabase.from("vertrieb_contacts").insert(payload);
+      const { error } = await supabase.from("vertrieb_contacts").insert(payload);
+      if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
       // Wenn gewünscht, auch als Kunde anlegen
       if (form.create_customer && form.firma) {
         const { data: existing } = await supabase.from("customers").select("id").eq("name", form.firma).maybeSingle();
