@@ -28,10 +28,26 @@ const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; c
   { value: "veranstaltung", label: "Veranstaltungen", icon: PartyPopper, color: "bg-purple-100 text-purple-700 border-purple-200" },
 ];
 
+const BEDARF_BEREICHE = [
+  { key: "verwaltungsaufwand", label: "Verwaltungsaufwand" },
+  { key: "material", label: "Material" },
+  { key: "arbeiten", label: "Arbeiten" },
+  { key: "stunden", label: "Stunden" },
+  { key: "catering", label: "Catering" },
+  { key: "transport", label: "Transport" },
+  { key: "raum", label: "Raum" },
+] as const;
+
 const emptyForm = {
   firma: "", branche: "", ansprechperson: "", position: "", email: "", telefon: "",
   event_typ: "", status: "offen" as VertriebStatus, datum_kontakt: "", notizen: "",
   prioritaet: "mittel" as VertriebPriority, kategorie: "veranstaltung" as VertriebKategorie,
+  // Verwaltung
+  infrastruktur: "", ort: "", zielgruppe: "", programm: "", bedarf_vor_ort: "",
+  // Veranstaltung: pro Bereich ein Text
+  bedarf: {} as Record<string, string>,
+  // Kontakt als Kunden speichern
+  create_customer: false,
 };
 
 const VERTRIEB_PASSWORD = "788596";
@@ -129,11 +145,28 @@ export default function VertriebPage() {
 
   function openEdit(c: VertriebContact) {
     setEditingId(c.id);
+    // Details aus notizen parsen (wenn JSON)
+    let details: any = {};
+    let freieNotiz = c.notizen || "";
+    try {
+      const parsed = JSON.parse(c.notizen || "{}");
+      if (parsed && typeof parsed === "object" && parsed._details) {
+        details = parsed._details;
+        freieNotiz = parsed._text || "";
+      }
+    } catch {}
     setForm({
       firma: c.firma, branche: c.branche || "", ansprechperson: c.ansprechperson || "",
       position: c.position || "", email: c.email || "", telefon: c.telefon || "",
       event_typ: c.event_typ || "", status: c.status, datum_kontakt: c.datum_kontakt || "",
-      notizen: c.notizen || "", prioritaet: c.prioritaet, kategorie: c.kategorie || "veranstaltung",
+      notizen: freieNotiz, prioritaet: c.prioritaet, kategorie: c.kategorie || "veranstaltung",
+      infrastruktur: details.infrastruktur || "",
+      ort: details.ort || "",
+      zielgruppe: details.zielgruppe || "",
+      programm: details.programm || "",
+      bedarf_vor_ort: details.bedarf_vor_ort || "",
+      bedarf: details.bedarf || {},
+      create_customer: false,
     });
     setShowForm(true);
   }
@@ -141,6 +174,24 @@ export default function VertriebPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+
+    // Details als JSON in notizen speichern (_text = freie Notiz, _details = kategorienspezifisch)
+    const details: any = {};
+    if (form.kategorie === "verwaltung") {
+      if (form.infrastruktur) details.infrastruktur = form.infrastruktur;
+      if (form.ort) details.ort = form.ort;
+      if (form.zielgruppe) details.zielgruppe = form.zielgruppe;
+      if (form.programm) details.programm = form.programm;
+      if (form.bedarf_vor_ort) details.bedarf_vor_ort = form.bedarf_vor_ort;
+    } else {
+      const filteredBedarf: Record<string, string> = {};
+      Object.entries(form.bedarf).forEach(([k, v]) => { if (v?.trim()) filteredBedarf[k] = v; });
+      if (Object.keys(filteredBedarf).length > 0) details.bedarf = filteredBedarf;
+    }
+    const notizenStored = (Object.keys(details).length > 0 || form.notizen)
+      ? JSON.stringify({ _text: form.notizen, _details: details })
+      : null;
+
     const payload = {
       firma: form.firma,
       branche: form.branche || null,
@@ -151,7 +202,7 @@ export default function VertriebPage() {
       event_typ: form.event_typ || null,
       status: form.status,
       datum_kontakt: form.datum_kontakt || null,
-      notizen: form.notizen || null,
+      notizen: notizenStored,
       prioritaet: form.prioritaet,
       kategorie: form.kategorie,
     };
@@ -160,7 +211,24 @@ export default function VertriebPage() {
       toast.success("Eintrag aktualisiert");
     } else {
       await supabase.from("vertrieb_contacts").insert(payload);
-      toast.success("Eintrag erstellt");
+      // Wenn gewünscht, auch als Kunde anlegen
+      if (form.create_customer && form.firma) {
+        const { data: existing } = await supabase.from("customers").select("id").eq("name", form.firma).maybeSingle();
+        if (!existing) {
+          await supabase.from("customers").insert({
+            name: form.firma,
+            type: "company",
+            email: form.email || null,
+            phone: form.telefon || null,
+            notes: form.ansprechperson ? `Ansprechperson: ${form.ansprechperson}${form.position ? ` (${form.position})` : ""}` : null,
+          });
+          toast.success("Eintrag erstellt · Kunde angelegt");
+        } else {
+          toast.success("Eintrag erstellt · Kunde existiert bereits");
+        }
+      } else {
+        toast.success("Eintrag erstellt");
+      }
     }
     setShowForm(false);
     setEditingId(null);
@@ -328,6 +396,73 @@ export default function VertriebPage() {
                   </select>
                 </div>
               </div>
+              {/* Kategorienspezifische Felder */}
+              {form.kategorie === "verwaltung" ? (
+                <div className="space-y-3 p-4 rounded-xl bg-blue-50/50 border border-blue-200 dark:bg-blue-950/30">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />Verwaltungs-Details</p>
+                  <div>
+                    <label className="text-xs font-medium">Gegebene Infrastruktur</label>
+                    <textarea value={form.infrastruktur} onChange={(e) => setForm({ ...form, infrastruktur: e.target.value })} placeholder="Was ist vor Ort vorhanden? Saal, Technik, Parkplätze..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Ort</label>
+                    <Input value={form.ort} onChange={(e) => setForm({ ...form, ort: e.target.value })} placeholder="Adresse oder Bezeichnung" className="mt-1 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Zielgruppe</label>
+                    <Input value={form.zielgruppe} onChange={(e) => setForm({ ...form, zielgruppe: e.target.value })} placeholder="Wer wird erreicht?" className="mt-1 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Programm</label>
+                    <textarea value={form.programm} onChange={(e) => setForm({ ...form, programm: e.target.value })} placeholder="Geplantes Programm / Ablauf..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Bedarf vor Ort</label>
+                    <textarea value={form.bedarf_vor_ort} onChange={(e) => setForm({ ...form, bedarf_vor_ort: e.target.value })} placeholder="Was muss zusätzlich beschafft/organisiert werden?" className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 p-4 rounded-xl bg-purple-50/50 border border-purple-200 dark:bg-purple-950/30">
+                  <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-1.5"><PartyPopper className="h-3.5 w-3.5" />Bedarf (Bereiche auswählen)</p>
+                  {BEDARF_BEREICHE.map((b) => {
+                    const active = form.bedarf[b.key] !== undefined;
+                    return (
+                      <div key={b.key}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = { ...form.bedarf };
+                            if (active) delete next[b.key]; else next[b.key] = "";
+                            setForm({ ...form, bedarf: next });
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active ? "bg-purple-600 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300"}`}
+                        >
+                          <span>{b.label}</span>
+                          <span className="text-xs">{active ? "−" : "+"}</span>
+                        </button>
+                        {active && (
+                          <textarea
+                            value={form.bedarf[b.key] || ""}
+                            onChange={(e) => setForm({ ...form, bedarf: { ...form.bedarf, [b.key]: e.target.value } })}
+                            placeholder={`Details zu ${b.label}...`}
+                            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                            rows={2}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Kontakt als Kunde speichern */}
+              {!editingId && form.firma && (
+                <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:border-red-300">
+                  <input type="checkbox" checked={form.create_customer} onChange={(e) => setForm({ ...form, create_customer: e.target.checked })} className="h-4 w-4" />
+                  <span className="text-sm">Kontakt zusätzlich als Kunden anlegen ({form.firma})</span>
+                </label>
+              )}
+
               <div>
                 <label className="text-xs font-medium">Notizen</label>
                 <textarea value={form.notizen} onChange={(e) => setForm({ ...form, notizen: e.target.value })} className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} />
@@ -380,7 +515,37 @@ export default function VertriebPage() {
                       </div>
                       {c.event_typ && <p className="text-xs text-muted-foreground mt-1">{c.event_typ}</p>}
                       {c.datum_kontakt && <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><Calendar className="h-3 w-3" />Letzter Kontakt: {new Date(c.datum_kontakt).toLocaleDateString("de-CH")}</p>}
-                      {c.notizen && <p className="text-xs text-muted-foreground mt-2 bg-gray-50 p-2 rounded-lg whitespace-pre-wrap">{c.notizen}</p>}
+                      {(() => {
+                        if (!c.notizen) return null;
+                        let freieNotiz = c.notizen;
+                        let details: any = {};
+                        try {
+                          const parsed = JSON.parse(c.notizen);
+                          if (parsed && typeof parsed === "object" && (parsed._text !== undefined || parsed._details)) {
+                            freieNotiz = parsed._text || "";
+                            details = parsed._details || {};
+                          }
+                        } catch {}
+                        const hasDetails = Object.keys(details).length > 0;
+                        return (
+                          <div className="mt-2 space-y-1.5">
+                            {hasDetails && (
+                              <div className="bg-gray-50 p-2.5 rounded-lg space-y-1 text-xs">
+                                {details.infrastruktur && <div><span className="font-semibold text-gray-700">Infrastruktur:</span> {details.infrastruktur}</div>}
+                                {details.ort && <div><span className="font-semibold text-gray-700">Ort:</span> {details.ort}</div>}
+                                {details.zielgruppe && <div><span className="font-semibold text-gray-700">Zielgruppe:</span> {details.zielgruppe}</div>}
+                                {details.programm && <div><span className="font-semibold text-gray-700">Programm:</span> {details.programm}</div>}
+                                {details.bedarf_vor_ort && <div><span className="font-semibold text-gray-700">Bedarf vor Ort:</span> {details.bedarf_vor_ort}</div>}
+                                {details.bedarf && Object.entries(details.bedarf).map(([k, v]: any) => {
+                                  const label = BEDARF_BEREICHE.find((b) => b.key === k)?.label || k;
+                                  return <div key={k}><span className="font-semibold text-gray-700">{label}:</span> {v}</div>;
+                                })}
+                              </div>
+                            )}
+                            {freieNotiz && <p className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-lg whitespace-pre-wrap">{freieNotiz}</p>}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <div className="flex items-center gap-1.5">
