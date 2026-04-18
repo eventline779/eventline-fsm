@@ -150,43 +150,128 @@
 
 /* Dark mode overrides for hardcoded colors */
 .dark .bg-white {
-  background-color: oklch(0.155 0 0) !important;
+  background-color: oklch(0.18 0 0) !important;
 }
 .dark .bg-gray-50,
 .dark .bg-gray-100,
 .dark .bg-\[#f5f5f7\] {
-  background-color: oklch(0.12 0 0) !important;
+  background-color: oklch(0.14 0 0) !important;
+}
+.dark .bg-gray-50\/50,
+.dark .bg-gray-50\/70 {
+  background-color: oklch(0.16 0 0) !important;
 }
 .dark .border-gray-100,
 .dark .border-gray-200 {
-  border-color: oklch(0.25 0 0) !important;
+  border-color: oklch(0.28 0 0) !important;
 }
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700 {
-  color: oklch(0.9 0 0) !important;
+  color: oklch(0.95 0 0) !important;
 }
 .dark .text-gray-600,
 .dark .text-gray-500 {
-  color: oklch(0.65 0 0) !important;
+  color: oklch(0.75 0 0) !important;
 }
 .dark .text-gray-400,
 .dark .text-gray-300 {
+  color: oklch(0.62 0 0) !important;
+}
+.dark .text-gray-200 {
   color: oklch(0.5 0 0) !important;
 }
+.dark .text-muted-foreground {
+  color: oklch(0.72 0 0) !important;
+}
 .dark .bg-gray-200 {
-  background-color: oklch(0.25 0 0) !important;
+  background-color: oklch(0.28 0 0) !important;
 }
 .dark input,
 .dark textarea,
 .dark select {
-  background-color: oklch(0.18 0 0) !important;
-  border-color: oklch(0.28 0 0) !important;
-  color: oklch(0.9 0 0) !important;
+  background-color: oklch(0.2 0 0) !important;
+  border-color: oklch(0.32 0 0) !important;
+  color: oklch(0.95 0 0) !important;
 }
-.dark .hover\:bg-gray-50:hover {
-  background-color: oklch(0.18 0 0) !important;
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: oklch(0.55 0 0) !important;
+}
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: oklch(0.22 0 0) !important;
 }
 .dark .hover\:shadow-md:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+.dark .hover\:shadow-sm:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+/* Status/Priority Badges im Dark Mode kräftiger */
+.dark .bg-blue-50 { background-color: oklch(0.28 0.1 250 / 0.35) !important; }
+.dark .bg-blue-100 { background-color: oklch(0.32 0.12 250 / 0.5) !important; }
+.dark .text-blue-600, .dark .text-blue-700 { color: oklch(0.78 0.15 250) !important; }
+.dark .border-blue-100, .dark .border-blue-200 { border-color: oklch(0.4 0.1 250 / 0.5) !important; }
+
+.dark .bg-green-50 { background-color: oklch(0.28 0.1 150 / 0.35) !important; }
+.dark .bg-green-100 { background-color: oklch(0.32 0.12 150 / 0.5) !important; }
+.dark .text-green-600, .dark .text-green-700, .dark .text-green-800 { color: oklch(0.8 0.15 150) !important; }
+.dark .border-green-100, .dark .border-green-200 { border-color: oklch(0.4 0.1 150 / 0.5) !important; }
+
+.dark .bg-red-50 { background-color: oklch(0.3 0.1 25 / 0.3) !important; }
+.dark .bg-red-100 { background-color: oklch(0.35 0.15 25 / 0.45) !important; }
+.dark .text-red-500, .dark .text-red-600, .dark .text-red-700, .dark .text-red-800 { color: oklch(0.78 0.18 25) !important; }
+.dark .border-red-100, .dark .border-red-200, .dark .border-red-400 { border-color: oklch(0.5 0.15 25 / 0.6) !important; }
+
+.dark .bg-amber-50 { background-color: oklch(0.3 0.1 70 / 0.3) !important; }
+.dark .bg-amber-100 { background-color: oklch(0.35 0.12 70 / 0.45) !important; }
+.dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800 { color: oklch(0.82 0.15 70) !important; }
+.dark .border-amber-100, .dark .border-amber-200 { border-color: oklch(0.45 0.1 70 / 0.55) !important; }
+
+.dark .bg-orange-50 { background-color: oklch(0.3 0.1 50 / 0.3) !important; }
+.dark .bg-orange-100 { background-color: oklch(0.35 0.12 50 / 0.45) !important; }
+.dark .text-orange-500, .dark .text-orange-600, .dark .text-orange-700 { color: oklch(0.8 0.15 50) !important; }
+.dark .border-orange-100, .dark .border-orange-200 { border-color: oklch(0.45 0.1 50 / 0.55) !important; }
+
+.dark .bg-purple-50 { background-color: oklch(0.3 0.1 300 / 0.3) !important; }
+.dark .text-purple-600, .dark .text-purple-700 { color: oklch(0.78 0.15 300) !important; }
+
+.dark .bg-teal-100 { background-color: oklch(0.32 0.1 180 / 0.5) !important; }
+.dark .text-teal-700 { color: oklch(0.78 0.12 180) !important; }
+.dark .border-teal-200 { border-color: oklch(0.45 0.1 180 / 0.55) !important; }
+
+.dark .bg-emerald-50 { background-color: oklch(0.28 0.1 160 / 0.35) !important; }
+.dark .bg-emerald-100 { background-color: oklch(0.32 0.12 160 / 0.5) !important; }
+.dark .text-emerald-600, .dark .text-emerald-700 { color: oklch(0.8 0.15 160) !important; }
+.dark .border-emerald-200 { border-color: oklch(0.45 0.1 160 / 0.55) !important; }
+
+.dark .bg-yellow-100 { background-color: oklch(0.32 0.12 90 / 0.45) !important; }
+.dark .text-yellow-700 { color: oklch(0.82 0.15 90) !important; }
+.dark .border-yellow-200 { border-color: oklch(0.45 0.1 90 / 0.55) !important; }
+
+.dark .bg-violet-50 { background-color: oklch(0.28 0.1 290 / 0.35) !important; }
+.dark .text-violet-600 { color: oklch(0.78 0.15 290) !important; }
+
+/* Event-Details/Card Hintergründe im Dark Mode */
+.dark .bg-gray-800 { background-color: oklch(0.22 0 0) !important; }
+.dark .bg-gray-900 { background-color: oklch(0.16 0 0) !important; }
+
+/* Divider / Border-Gruppen */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: oklch(0.28 0 0) !important;
+}
+
+/* Links kräftiger im Dark Mode */
+.dark a.text-blue-600, .dark .hover\:text-blue-600:hover {
+  color: oklch(0.78 0.18 250) !important;
+}
+
+/* Sonner Toast im Dark Mode */
+.dark [data-sonner-toast] {
+  background: oklch(0.2 0 0) !important;
+  border-color: oklch(0.3 0 0) !important;
+  color: oklch(0.95 0 0) !important;
 }
