@@ -574,8 +574,9 @@ export default function VertriebPage() {
     }).eq("id", editingId);
 
     // E-Mail an Leo
+    let emailOk = false;
     try {
-      await fetch("/api/vertrieb/neuer-auftrag", {
+      const res = await fetch("/api/vertrieb/neuer-auftrag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -591,9 +592,16 @@ export default function VertriebPage() {
           creatorName: profile?.full_name || "Unbekannt",
         }),
       });
-    } catch {}
+      const json = await res.json();
+      emailOk = json.success;
+      if (!emailOk) console.error("Email-Fehler:", json.error);
+    } catch (e) { console.error("Fetch-Fehler:", e); }
 
-    toast.success(`Auftrag INT-${newJob.job_number} erstellt — Leo benachrichtigt`);
+    if (emailOk) {
+      toast.success(`Auftrag INT-${newJob.job_number} erstellt — Leo benachrichtigt`);
+    } else {
+      toast.error(`Auftrag INT-${newJob.job_number} erstellt — E-Mail an Leo fehlgeschlagen`);
+    }
     setShowAuftragModal(false);
     setCreatingAuftrag(false);
     // Zu Auftrag navigieren für Schichtplanung
