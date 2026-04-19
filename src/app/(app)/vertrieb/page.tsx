@@ -513,17 +513,54 @@ export default function VertriebPage() {
     const tz = `${tzSign}${tzH}:${tzM}`;
     const title = `${terminType === "telefon" ? "📞 Telefon-Termin" : "👥 Kunden-Termin"}: ${c.firma}${c.ansprechperson ? ` (${c.ansprechperson})` : ""}`;
     const description = [terminForm.note, c.telefon ? `Tel: ${c.telefon}` : "", c.email ? `E-Mail: ${c.email}` : ""].filter(Boolean).join("\n");
-    await supabase.from("job_appointments").insert({
+    const { data: newAppt } = await supabase.from("job_appointments").insert({
       job_id: null,
       title,
       description: description || null,
       start_time: `${terminForm.date}T${terminForm.time}:00${tz}`,
       end_time: `${terminForm.date}T${terminForm.end_time}:00${tz}`,
       assigned_to: user?.id || null,
-    });
+    }).select("id").single();
+
+    // Termin-ID im Lead speichern
+    if (newAppt?.id) {
+      let obj: any = {};
+      try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+      if (!obj._details) obj._details = {};
+      if (!obj._details.termine) obj._details.termine = [];
+      obj._details.termine.push({
+        id: newAppt.id,
+        type: terminType,
+        title,
+        date: terminForm.date,
+        time: terminForm.time,
+        end_time: terminForm.end_time,
+        note: terminForm.note || null,
+      });
+      await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+      await load();
+    }
+
     toast.success(`${terminType === "telefon" ? "Telefon" : "Kunden"}-Termin im Kalender erstellt`);
     setShowTerminModal(false);
     setSavingTermin(false);
+  }
+
+  async function deleteTerminFromLead(terminId: string) {
+    if (!editingId || !confirm("Termin löschen?")) return;
+    const c = contacts.find((x) => x.id === editingId);
+    if (!c) return;
+    // Aus Kalender löschen
+    await supabase.from("job_appointments").delete().eq("id", terminId);
+    // Aus Lead-Details entfernen
+    let obj: any = {};
+    try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+    if (obj._details?.termine) {
+      obj._details.termine = obj._details.termine.filter((t: any) => t.id !== terminId);
+      await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+      await load();
+    }
+    toast.success("Termin gelöscht");
   }
 
   function openAuftragModal() {
@@ -1018,6 +1055,31 @@ export default function VertriebPage() {
                     </Button>
                   </div>
 
+                  {/* Erstellte Termine anzeigen */}
+                  {(() => {
+                    const c = currentContactWithDetails();
+                    const termine: any[] = c?.details?.termine || [];
+                    if (termine.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Geplante Termine ({termine.length})</p>
+                        {termine.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-blue-200 text-xs">
+                            <span className="text-base shrink-0">{t.type === "telefon" ? "📞" : "👥"}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium truncate">{t.type === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}</p>
+                              <p className="text-muted-foreground text-[11px]">
+                                {new Date(t.date).toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })} · {t.time}{t.end_time ? ` – ${t.end_time}` : ""}
+                              </p>
+                              {t.note && <p className="text-muted-foreground text-[11px] italic mt-0.5">{t.note}</p>}
+                            </div>
+                            <button type="button" onClick={() => deleteTerminFromLead(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <div className="pt-2 border-t border-blue-200">
                     <p className="text-xs text-blue-700 mb-2">Buchhaltung mit allen Verrechnungs-Infos benachrichtigen:</p>
                     <div className="flex gap-2 flex-wrap">
@@ -1417,24 +1479,10 @@ export default function VertriebPage() {
                     </div>
                   )}
 
-                  {/* Status + Priority row */}
+                  {/* Status + Priority als Badges (nicht editierbar) */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <select
-                      value={c.status}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => updateStatus(c.id, e.target.value as VertriebStatus)}
-                      className={`text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer ${statusConf.color}`}
-                    >
-                      {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                    <select
-                      value={c.prioritaet}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => updatePriority(c.id, e.target.value as VertriebPriority)}
-                      className={`text-[11px] font-medium px-2 py-1 rounded-md border cursor-pointer ${prioConf.color}`}
-                    >
-                      {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
+                    <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${statusConf.color}`}>{statusConf.label}</span>
+                    <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${prioConf.color}`}>{prioConf.label}</span>
                     {c.datum_kontakt && (
                       <span className="ml-auto text-[10px] text-muted-foreground flex items-center gap-1">
                         <Calendar className="h-2.5 w-2.5" />
