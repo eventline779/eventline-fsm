@@ -250,7 +250,6 @@ export default function AuftragDetailPage() {
   // Status transition buttons
   const statusActions: { from: JobStatus[]; to: JobStatus; label: string; icon: React.ReactNode; color: string }[] = [
     { from: ["entwurf"], to: "offen", label: "Freigeben", icon: <CheckCircle className="h-4 w-4" />, color: "bg-purple-600 hover:bg-purple-700 text-white" },
-    { from: ["offen", "entwurf"], to: "geplant", label: "Planen", icon: <Calendar className="h-4 w-4" />, color: "bg-blue-600 hover:bg-blue-700 text-white" },
     { from: ["offen", "geplant"], to: "in_arbeit", label: "Starten", icon: <Play className="h-4 w-4" />, color: "bg-yellow-600 hover:bg-yellow-700 text-white" },
     { from: ["in_arbeit", "geplant"], to: "abgeschlossen", label: "Abschliessen", icon: <CheckCircle className="h-4 w-4" />, color: "bg-green-600 hover:bg-green-700 text-white" },
     { from: ["entwurf", "offen", "geplant", "in_arbeit"], to: "storniert", label: "Stornieren", icon: <XCircle className="h-4 w-4" />, color: "bg-gray-600 hover:bg-gray-700 text-white" },
