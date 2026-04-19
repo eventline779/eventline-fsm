@@ -1098,8 +1098,34 @@ export default function VertriebPage() {
                     return (
                       <>
                         <p className="text-xs text-green-700">Erstelle aus diesem Lead einen Auftrag. Leo wird automatisch benachrichtigt. Danach kannst du den Schichtplan machen.</p>
+
+                        {/* Event-Datum bestätigen/eingeben */}
+                        <div className="grid grid-cols-2 gap-2 p-3 rounded-lg bg-white border border-green-200">
+                          <div>
+                            <label className="text-xs font-medium flex items-center gap-1"><PartyPopper className="h-3 w-3" />Veranstaltung Anfang</label>
+                            <Input type="date" value={form.event_start} onChange={(e) => setForm({ ...form, event_start: e.target.value })} className="mt-1 text-sm bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium flex items-center gap-1"><PartyPopper className="h-3 w-3" />Veranstaltung Ende</label>
+                            <Input type="date" value={form.event_end} onChange={(e) => setForm({ ...form, event_end: e.target.value })} className="mt-1 text-sm bg-gray-50" />
+                          </div>
+                        </div>
+
                         <div className="flex gap-2 flex-wrap">
-                          <Button type="button" size="sm" onClick={openAuftragModal} className="bg-green-600 hover:bg-green-700 text-white">
+                          <Button type="button" size="sm" onClick={async () => {
+                            // Event-Datum speichern bevor Auftrag erstellt wird
+                            const cur = contacts.find((x) => x.id === editingId);
+                            if (cur) {
+                              let obj: any = {};
+                              try { obj = JSON.parse(cur.notizen || "{}"); } catch {}
+                              if (!obj._details) obj._details = {};
+                              if (form.event_start) obj._details.event_start = form.event_start;
+                              if (form.event_end) obj._details.event_end = form.event_end;
+                              await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+                              await load();
+                            }
+                            openAuftragModal();
+                          }} className="bg-green-600 hover:bg-green-700 text-white">
                             <Plus className="h-4 w-4 mr-1" />Auftrag erstellen
                           </Button>
                         </div>
