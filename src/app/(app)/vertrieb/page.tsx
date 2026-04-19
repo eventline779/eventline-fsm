@@ -1317,7 +1317,15 @@ export default function VertriebPage() {
                           type="button"
                           onClick={() => {
                             const next = { ...form.bedarf };
-                            if (active) delete next[b.key]; else next[b.key] = "";
+                            if (active) {
+                              // Nur entfernen wenn Text leer ist — sonst Warnung
+                              if (next[b.key]?.trim()) {
+                                if (!confirm(`"${b.label}" entfernen? Der eingegebene Text geht verloren.`)) return;
+                              }
+                              delete next[b.key];
+                            } else {
+                              next[b.key] = "";
+                            }
                             setForm({ ...form, bedarf: next });
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active ? "bg-purple-600 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300"}`}
