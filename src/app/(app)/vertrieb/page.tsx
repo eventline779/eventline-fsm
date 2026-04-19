@@ -104,6 +104,8 @@ export default function VertriebPage() {
   const [auftragForm, setAuftragForm] = useState({ title: "", priority: "normal", start_date: "", end_date: "", location_id: "" });
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
+  // Welche Bedarf-Bereiche aktuell aufgeklappt sind (getrennt vom Text)
+  const [visibleBedarf, setVisibleBedarf] = useState<Set<string>>(new Set());
   // Kunden-Auswahl
   const [customers, setCustomers] = useState<{ id: string; name: string; email: string | null; phone: string | null }[]>([]);
   const [kundenMode, setKundenMode] = useState<"neu" | "bestehend">("neu");
@@ -184,6 +186,7 @@ export default function VertriebPage() {
     setCategoryPicked(false);
     setKundenMode("neu");
     setSelectedCustomerId("");
+    setVisibleBedarf(new Set());
     setShowForm(true);
   }
 
@@ -235,6 +238,8 @@ export default function VertriebPage() {
       bedarf: details.bedarf || {},
       create_customer: false, // Beim Bearbeiten nicht nochmal anlegen
     });
+    // Sichtbare Bedarf-Bereiche initial auf Basis vorhandener Texte
+    setVisibleBedarf(new Set(Object.keys(details.bedarf || {})));
     setOffertePdf(details.offerte_pdf || null);
     setShowForm(true);
   }
@@ -1310,30 +1315,26 @@ export default function VertriebPage() {
                 <div className="space-y-3 p-4 rounded-xl bg-purple-50/50 border border-purple-200 dark:bg-purple-950/30">
                   <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-1.5"><PartyPopper className="h-3.5 w-3.5" />Bedarf (Bereiche auswählen)</p>
                   {BEDARF_BEREICHE.map((b) => {
-                    const active = form.bedarf[b.key] !== undefined;
+                    const hasText = !!form.bedarf[b.key]?.trim();
+                    const isOpen = visibleBedarf.has(b.key) || hasText;
                     return (
                       <div key={b.key}>
                         <button
                           type="button"
                           onClick={() => {
-                            const next = { ...form.bedarf };
-                            if (active) {
-                              // Nur entfernen wenn Text leer ist — sonst Warnung
-                              if (next[b.key]?.trim()) {
-                                if (!confirm(`"${b.label}" entfernen? Der eingegebene Text geht verloren.`)) return;
-                              }
-                              delete next[b.key];
-                            } else {
-                              next[b.key] = "";
-                            }
-                            setForm({ ...form, bedarf: next });
+                            const next = new Set(visibleBedarf);
+                            if (isOpen) next.delete(b.key); else next.add(b.key);
+                            setVisibleBedarf(next);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active ? "bg-purple-600 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300"}`}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isOpen ? "bg-purple-600 text-white" : hasText ? "bg-purple-100 text-purple-800 border border-purple-300" : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300"}`}
                         >
-                          <span>{b.label}</span>
-                          <span className="text-xs">{active ? "−" : "+"}</span>
+                          <span className="flex items-center gap-2">
+                            {b.label}
+                            {hasText && !isOpen && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200 text-purple-800">gespeichert</span>}
+                          </span>
+                          <span className="text-xs">{isOpen ? "−" : "+"}</span>
                         </button>
-                        {active && (
+                        {isOpen && (
                           <textarea
                             value={form.bedarf[b.key] || ""}
                             onChange={(e) => setForm({ ...form, bedarf: { ...form.bedarf, [b.key]: e.target.value } })}
