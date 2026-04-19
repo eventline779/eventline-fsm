@@ -148,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     : [...NAV_GROUPS];
 
   return (
-    <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a] overflow-x-hidden">
+    <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
         onSignOut={handleSignOut}
@@ -156,7 +156,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onToggleSimplified={toggleSimplified}
       />
 
-      <div className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+80px)] md:pb-0 min-w-0">
+      <div className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+80px)] md:pb-0 min-w-0 overflow-x-hidden">
         <main className="flex-1 p-3 sm:p-4 pt-[calc(env(safe-area-inset-top)+12px)] sm:pt-[calc(env(safe-area-inset-top)+16px)] md:p-8 md:pt-8 max-w-[1400px] w-full mx-auto min-w-0">{children}</main>
       </div>
 
