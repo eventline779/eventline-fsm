@@ -716,6 +716,68 @@ export default function VertriebPage() {
         </Button>
       </div>
 
+      {/* Pipeline-Diagramm */}
+      {contacts.length > 0 && (() => {
+        const activeContacts = contacts.filter((c) => c.status !== "gewonnen" && c.status !== "abgesagt");
+        const stepCounts = STEPS.map((s) => activeContacts.filter((c) => (c.step || 1) === s.nr));
+        const wonCount = contacts.filter((c) => c.status === "gewonnen").length;
+        const lostCount = contacts.filter((c) => c.status === "abgesagt").length;
+        const maxCount = Math.max(1, ...stepCounts.map((arr) => arr.length));
+        const stepColors = ["bg-gray-400", "bg-blue-500", "bg-orange-500", "bg-emerald-500"];
+        return (
+          <Card className="bg-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <h2 className="text-sm font-semibold">Pipeline</h2>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" /><span className="text-muted-foreground">Aktiv: <strong className="text-foreground">{activeContacts.length}</strong></span></span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-muted-foreground">Gewonnen: <strong className="text-green-700">{wonCount}</strong></span></span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span className="text-muted-foreground">Verloren: <strong className="text-red-700">{lostCount}</strong></span></span>
+                </div>
+              </div>
+
+              {/* Pipeline Columns */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {STEPS.map((s, i) => {
+                  const leads = stepCounts[i];
+                  const color = stepColors[i];
+                  return (
+                    <div key={s.nr} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold ${color}`}>{s.nr}</span>
+                          <span className="text-xs font-semibold">{s.label}</span>
+                        </div>
+                        <span className="text-lg font-bold">{leads.length}</span>
+                      </div>
+                      {/* Progress bar showing relative size */}
+                      <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mb-2">
+                        <div className={`h-full ${color} transition-all`} style={{ width: `${(leads.length / maxCount) * 100}%` }} />
+                      </div>
+                      {/* Leads in this step (mini list, max 3) */}
+                      <div className="space-y-1">
+                        {leads.slice(0, 3).map((l) => (
+                          <button
+                            key={l.id}
+                            onClick={() => openEdit(l)}
+                            className="w-full text-left text-[11px] truncate px-2 py-1 rounded bg-white dark:bg-gray-900 hover:bg-red-50 dark:hover:bg-red-950 transition-colors border border-gray-100"
+                            title={l.firma}
+                          >
+                            {l.firma}
+                          </button>
+                        ))}
+                        {leads.length > 3 && <p className="text-[10px] text-muted-foreground text-center">+ {leads.length - 3} weitere</p>}
+                        {leads.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">—</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Suche + Filter */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
