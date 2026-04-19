@@ -102,6 +102,10 @@ export default function VertriebPage() {
   const [auftragForm, setAuftragForm] = useState({ title: "", priority: "normal", start_date: "", end_date: "", location_id: "" });
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
+  // Kunden-Auswahl
+  const [customers, setCustomers] = useState<{ id: string; name: string; email: string | null; phone: string | null }[]>([]);
+  const [kundenMode, setKundenMode] = useState<"neu" | "bestehend">("neu");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -161,12 +165,14 @@ export default function VertriebPage() {
   }
 
   async function load() {
-    const [{ data }, locRes] = await Promise.all([
+    const [{ data }, locRes, custRes] = await Promise.all([
       supabase.from("vertrieb_contacts").select("*").order("nr"),
       supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("customers").select("id, name, email, phone").eq("is_active", true).order("name"),
     ]);
     if (data) setContacts(data as VertriebContact[]);
     if (locRes.data) setLocations(locRes.data);
+    if (custRes.data) setCustomers(custRes.data);
     setLoading(false);
   }
 
@@ -174,7 +180,23 @@ export default function VertriebPage() {
     setEditingId(null);
     setForm(emptyForm);
     setCategoryPicked(false);
+    setKundenMode("neu");
+    setSelectedCustomerId("");
     setShowForm(true);
+  }
+
+  function selectExistingCustomer(customerId: string) {
+    setSelectedCustomerId(customerId);
+    const c = customers.find((x) => x.id === customerId);
+    if (c) {
+      setForm((f) => ({
+        ...f,
+        firma: c.name,
+        email: c.email || "",
+        telefon: c.phone || "",
+        create_customer: false, // Kein neuer Kunde nötig
+      }));
+    }
   }
 
   function pickCategory(kategorie: VertriebKategorie) {
@@ -1094,10 +1116,45 @@ export default function VertriebPage() {
                   </div>
                 </div>
               )}
+
+              {/* Kunden-Auswahl: Neu oder Bestehend */}
+              {!editingId && (
+                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "neu" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                      + Neuer Kunde
+                    </button>
+                    <button type="button" onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "bestehend" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                      Bestandskunde auswählen
+                    </button>
+                  </div>
+                  {kundenMode === "bestehend" && (
+                    <div>
+                      <label className="text-xs font-medium">Kunde auswählen *</label>
+                      <select value={selectedCustomerId} onChange={(e) => selectExistingCustomer(e.target.value)} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white" required>
+                        <option value="">— Kunde wählen —</option>
+                        {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      {selectedCustomerId && (() => {
+                        const c = customers.find((x) => x.id === selectedCustomerId);
+                        if (!c) return null;
+                        return (
+                          <div className="mt-2 p-2 rounded-lg bg-white border border-gray-100 text-xs space-y-0.5">
+                            <p className="font-semibold">{c.name}</p>
+                            {c.email && <p className="text-muted-foreground">{c.email}</p>}
+                            {c.phone && <p className="text-muted-foreground">{c.phone}</p>}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-medium">Firma *</label>
-                  <Input value={form.firma} onChange={(e) => setForm({ ...form, firma: e.target.value })} required className="mt-1 bg-gray-50" />
+                  <Input value={form.firma} onChange={(e) => setForm({ ...form, firma: e.target.value })} required className="mt-1 bg-gray-50" disabled={kundenMode === "bestehend" && !!selectedCustomerId} />
                 </div>
                 <div>
                   <label className="text-xs font-medium">Branche</label>
@@ -1200,7 +1257,7 @@ export default function VertriebPage() {
               )}
 
               {/* Kontakt als Kunde speichern */}
-              {!editingId && form.firma && (
+              {!editingId && form.firma && kundenMode === "neu" && (
                 <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:border-red-300">
                   <input type="checkbox" checked={form.create_customer} onChange={(e) => setForm({ ...form, create_customer: e.target.checked })} className="h-4 w-4" />
                   <span className="text-sm">Kontakt zusätzlich als Kunden anlegen ({form.firma})</span>
