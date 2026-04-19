@@ -670,7 +670,7 @@ export default function VertriebPage() {
           <p className="text-sm text-muted-foreground mt-1">{contacts.length} Kontakte · {statusCounts.gewonnen || 0} gewonnen · {statusCounts.offen || 0} offen</p>
         </div>
         <Button onClick={openNew} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-          <Plus className="h-4 w-4 mr-2" />Neuer Kontakt
+          <Plus className="h-4 w-4 mr-2" />Lead
         </Button>
       </div>
 
