@@ -1346,7 +1346,7 @@ export default function VertriebPage() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-mono text-muted-foreground">#{c.nr}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">LEAD-{String(c.nr).padStart(3, "0")}</span>
                         {katConf && KatIcon && (
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border ${katConf.color}`}>
                             <KatIcon className="h-2.5 w-2.5" />
