@@ -91,6 +91,84 @@ export default function AuftraegePage() {
         </Link>
       </div>
 
+      {/* Kreis-Diagramm */}
+      {jobs.length > 0 && (() => {
+        const activeJobs = jobs;
+        const segments = [
+          { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#a855f7" },
+          { label: "Offen", count: activeJobs.filter((j) => j.status === "offen").length, color: "#9ca3af" },
+          { label: "Geplant", count: activeJobs.filter((j) => j.status === "geplant").length, color: "#3b82f6" },
+          { label: "In Arbeit", count: activeJobs.filter((j) => j.status === "in_arbeit").length, color: "#eab308" },
+          { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
+          { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },
+        ].filter((s) => s.count > 0);
+        const total = segments.reduce((sum, s) => sum + s.count, 0);
+        const radius = 70;
+        const strokeWidth = 26;
+        const circumference = 2 * Math.PI * radius;
+        let offset = 0;
+        return (
+          <Card className="bg-white">
+            <CardContent className="p-5">
+              <h2 className="text-sm font-semibold mb-4">Auftrags-Übersicht</h2>
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="relative shrink-0">
+                  <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
+                    <circle cx={radius + strokeWidth / 2} cy={radius + strokeWidth / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} className="dark:stroke-gray-800" />
+                    {segments.map((s, i) => {
+                      const portion = s.count / total;
+                      const dash = portion * circumference;
+                      const gap = circumference - dash;
+                      const el = (
+                        <circle
+                          key={i}
+                          cx={radius + strokeWidth / 2}
+                          cy={radius + strokeWidth / 2}
+                          r={radius}
+                          fill="none"
+                          stroke={s.color}
+                          strokeWidth={strokeWidth}
+                          strokeDasharray={`${dash} ${gap}`}
+                          strokeDashoffset={-offset}
+                          strokeLinecap="butt"
+                        />
+                      );
+                      offset += dash;
+                      return el;
+                    })}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-3xl font-bold">{total}</span>
+                    <span className="text-xs text-muted-foreground">Aufträge</span>
+                  </div>
+                </div>
+                <div className="flex-1 w-full space-y-2">
+                  {segments.map((s) => {
+                    const pct = total > 0 ? (s.count / total) * 100 : 0;
+                    return (
+                      <div key={s.label} className="flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium truncate">{s.label}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
+                            <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Suche */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
