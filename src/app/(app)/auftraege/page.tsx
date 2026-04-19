@@ -24,7 +24,7 @@ export default function AuftraegePage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">("all");
-  const [filterPerson, setFilterPerson] = useState("all");
+  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">("all");
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -50,9 +50,16 @@ export default function AuftraegePage() {
   const filtered = jobs.filter((j) => {
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
-    const matchesPerson = filterPerson === "all" || j.project_lead_id === filterPerson ||
-      (j.assignments as unknown as { profile_id: string }[])?.some((a) => a.profile_id === filterPerson);
-    return matchesSearch && matchesStatus && matchesPerson;
+    const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
+    const isScala = locName.includes("scala");
+    const isBarakuba = locName.includes("barakuba");
+    const isBau3 = locName.includes("bau3");
+    let matchesLocation = true;
+    if (filterLocation === "scala") matchesLocation = isScala;
+    else if (filterLocation === "barakuba") matchesLocation = isBarakuba;
+    else if (filterLocation === "bau3") matchesLocation = isBau3;
+    else if (filterLocation === "sonstige") matchesLocation = !isScala && !isBarakuba && !isBau3;
+    return matchesSearch && matchesStatus && matchesLocation;
   }).sort((a, b) => {
     // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
     const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -95,34 +102,28 @@ export default function AuftraegePage() {
         />
       </div>
 
-      {/* Filter: Personen */}
+      {/* Filter: Location */}
       <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Personen</p>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location</p>
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setFilterPerson("all")}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-              filterPerson === "all"
-                ? "bg-black text-white border-black"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />Alle
-          </button>
-          {profiles.map((p) => (
+          {([
+            { v: "all", label: "Alle" },
+            { v: "scala", label: "SCALA Basel" },
+            { v: "barakuba", label: "Barakuba" },
+            { v: "bau3", label: "Theater BAU3" },
+            { v: "sonstige", label: "Sonstige" },
+          ] as const).map((opt) => (
             <button
-              key={p.id}
-              onClick={() => setFilterPerson(p.id === filterPerson ? "all" : p.id)}
+              key={opt.v}
+              onClick={() => setFilterLocation(opt.v as any)}
               className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                filterPerson === p.id
-                  ? "bg-red-600 text-white border-red-600"
+                filterLocation === opt.v
+                  ? "bg-black text-white border-black"
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
               }`}
             >
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${filterPerson === p.id ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
-                {p.full_name.charAt(0)}
-              </div>
-              {p.full_name.split(" ")[0]}
+              {opt.v === "all" ? <Users className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
+              {opt.label}
             </button>
           ))}
         </div>
