@@ -52,6 +52,8 @@ const emptyForm = {
   prioritaet: "mittel" as VertriebPriority, kategorie: "veranstaltung" as VertriebKategorie,
   // Verwaltung
   infrastruktur: "", ort: "", zielgruppe: "", programm: "", bedarf_vor_ort: "",
+  // Veranstaltungsdatum
+  event_start: "", event_end: "",
   // Veranstaltung: pro Bereich ein Text
   bedarf: {} as Record<string, string>,
   // Kontakt als Kunden speichern (standardmässig aktiv)
@@ -228,6 +230,8 @@ export default function VertriebPage() {
       zielgruppe: details.zielgruppe || "",
       programm: details.programm || "",
       bedarf_vor_ort: details.bedarf_vor_ort || "",
+      event_start: details.event_start || "",
+      event_end: details.event_end || "",
       bedarf: details.bedarf || {},
       create_customer: false, // Beim Bearbeiten nicht nochmal anlegen
     });
@@ -241,6 +245,8 @@ export default function VertriebPage() {
 
     // Details als JSON in notizen speichern (_text = freie Notiz, _details = kategorienspezifisch)
     const details: any = {};
+    if (form.event_start) details.event_start = form.event_start;
+    if (form.event_end) details.event_end = form.event_end;
     if (form.kategorie === "verwaltung") {
       if (form.infrastruktur) details.infrastruktur = form.infrastruktur;
       if (form.ort) details.ort = form.ort;
@@ -526,8 +532,8 @@ export default function VertriebPage() {
     setAuftragForm({
       title: c.event_typ || c.firma,
       priority: "normal",
-      start_date: c.datum_kontakt || new Date().toISOString().split("T")[0],
-      end_date: "",
+      start_date: c.details?.event_start || c.datum_kontakt || new Date().toISOString().split("T")[0],
+      end_date: c.details?.event_end || "",
       location_id: "",
     });
     setShowAuftragModal(true);
@@ -1181,6 +1187,14 @@ export default function VertriebPage() {
                   <Input value={form.event_typ} onChange={(e) => setForm({ ...form, event_typ: e.target.value })} className="mt-1 bg-gray-50" />
                 </div>
                 <div>
+                  <label className="text-xs font-medium">Veranstaltung: Anfang</label>
+                  <Input type="date" value={form.event_start} onChange={(e) => setForm({ ...form, event_start: e.target.value })} className="mt-1 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Veranstaltung: Ende</label>
+                  <Input type="date" value={form.event_end} onChange={(e) => setForm({ ...form, event_end: e.target.value })} className="mt-1 bg-gray-50" />
+                </div>
+                <div>
                   <label className="text-xs font-medium">Datum Kontakt</label>
                   <Input type="date" value={form.datum_kontakt} onChange={(e) => setForm({ ...form, datum_kontakt: e.target.value })} className="mt-1 bg-gray-50" />
                 </div>
@@ -1299,11 +1313,15 @@ export default function VertriebPage() {
             const stepLabel = STEPS.find((s) => s.nr === currentStepNr)?.label || "";
             const isGewonnen = c.status === "gewonnen";
             const isVerloren = c.status === "abgesagt";
-            // Job-Nummer ermitteln
+            // Job-Nummer + Event-Datum ermitteln
             let jobNumber: number | null = null;
+            let eventStart: string | null = null;
+            let eventEnd: string | null = null;
             try {
               const parsed = JSON.parse(c.notizen || "{}");
               jobNumber = parsed._details?.job_number || null;
+              eventStart = parsed._details?.event_start || null;
+              eventEnd = parsed._details?.event_end || null;
             } catch {}
             return (
               <Card
@@ -1350,6 +1368,15 @@ export default function VertriebPage() {
                         {c.email && <a onClick={(e) => e.stopPropagation()} href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 truncate max-w-[180px]"><Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span></a>}
                         {c.telefon && <a onClick={(e) => e.stopPropagation()} href={`tel:${c.telefon}`} className="flex items-center gap-1 hover:text-blue-600"><Phone className="h-3 w-3" />{c.telefon}</a>}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Event-Datum */}
+                  {eventStart && (
+                    <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
+                      <PartyPopper className="h-3.5 w-3.5 shrink-0" />
+                      {new Date(eventStart).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      {eventEnd && eventEnd !== eventStart && ` – ${new Date(eventEnd).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}`}
                     </div>
                   )}
 
