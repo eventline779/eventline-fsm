@@ -321,13 +321,13 @@ export default function AuftraegePage() {
                         {job.start_date && (
                           <span className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5" />
-                            {new Date(job.start_date).toLocaleDateString("de-CH")}
+                            {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
                           </span>
                         )}
                       </div>
                       {noTermin && (
                         <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH")}` : ""}
+                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
                         </p>
                       )}
                       {job.description && (

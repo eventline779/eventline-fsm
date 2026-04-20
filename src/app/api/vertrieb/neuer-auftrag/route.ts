@@ -22,10 +22,15 @@ export async function POST(request: Request) {
   if (!resendKey) return NextResponse.json({ success: true, note: "No email key" });
   const resend = new Resend(resendKey);
 
+  const formatDateCH = (d: string, opts?: Intl.DateTimeFormatOptions) => {
+    if (!d) return "";
+    const [y, m, day] = d.split("T")[0].split("-").map(Number);
+    return new Date(y, m - 1, day, 12).toLocaleDateString("de-CH", opts || { day: "numeric", month: "long", year: "numeric" });
+  };
   const dateStr = startDate
-    ? new Date(startDate).toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    ? formatDateCH(startDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "—";
-  const endStr = endDate ? new Date(endDate).toLocaleDateString("de-CH", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const endStr = endDate ? formatDateCH(endDate) : "";
 
   try {
     await resend.emails.send({

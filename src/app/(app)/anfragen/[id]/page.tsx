@@ -354,7 +354,7 @@ export default function VermietungDetailPage() {
       <Card className="bg-white">
         <CardContent className="p-5">
           <div className="flex flex-wrap gap-4 text-sm">
-            {request.event_date && <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />{new Date(request.event_date).toLocaleDateString("de-CH")}{request.event_end_date ? ` – ${new Date(request.event_end_date).toLocaleDateString("de-CH")}` : ""}</div>}
+            {request.event_date && <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />{new Date(request.event_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}{request.event_end_date ? ` – ${new Date(request.event_end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
             {request.guest_count && <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" />{request.guest_count} Personen</div>}
             {request.event_type && <div className="flex items-center gap-2">{request.event_type}</div>}
           </div>

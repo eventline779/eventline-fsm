@@ -21,7 +21,11 @@ export async function POST(request: Request) {
   const buffer = Buffer.from(await fileData.arrayBuffer());
   const resend = new Resend(resendKey);
 
-  const dateStr = date ? new Date(date).toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+  const dateStr = (() => {
+    if (!date) return "";
+    const [y, m, d] = date.split("T")[0].split("-").map(Number);
+    return new Date(y, m - 1, d, 12).toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  })();
 
   try {
     await resend.emails.send({

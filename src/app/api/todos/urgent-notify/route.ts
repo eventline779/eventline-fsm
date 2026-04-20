@@ -21,9 +21,11 @@ export async function POST(request: Request) {
 
   const resend = new Resend(resendKey);
 
-  const dueDateStr = dueDate
-    ? new Date(dueDate).toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : null;
+  const dueDateStr = (() => {
+    if (!dueDate) return null;
+    const [y, m, d] = dueDate.split("T")[0].split("-").map(Number);
+    return new Date(y, m - 1, d, 12).toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  })();
 
   try {
     await resend.emails.send({

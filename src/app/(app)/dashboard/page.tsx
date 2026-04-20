@@ -256,7 +256,7 @@ export default function DashboardPage() {
                       </div>
                       {todo.due_date && (
                         <p className={`text-xs mt-0.5 ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                          {overdue ? "Überfällig: " : "Fällig: "}{new Date(todo.due_date).toLocaleDateString("de-CH")}
+                          {overdue ? "Überfällig: " : "Fällig: "}{(() => { const [y,m,d] = todo.due_date!.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH"); })()}
                         </p>
                       )}
                     </Link>
@@ -287,7 +287,7 @@ export default function DashboardPage() {
                       <span className="font-medium text-sm">{j.title}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {j.start_date && <span className="text-[10px] text-muted-foreground">bis {new Date(j.start_date).toLocaleDateString("de-CH")}</span>}
+                      {j.start_date && <span className="text-[10px] text-muted-foreground">bis {new Date(j.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}</span>}
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">Kein Termin</span>
                     </div>
                   </CardContent>

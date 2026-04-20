@@ -66,7 +66,7 @@ export default function TodosPage() {
         body: JSON.stringify({
           userIds: [form.assigned_to],
           title: form.priority === "dringend" ? `🚨 Dringendes Todo: ${form.title}` : `Neues Todo: ${form.title}`,
-          message: `Von ${creator?.full_name || "Unbekannt"}${form.due_date ? ` · Fällig: ${new Date(form.due_date).toLocaleDateString("de-CH")}` : ""}`,
+          message: `Von ${creator?.full_name || "Unbekannt"}${form.due_date ? ` · Fällig: ${(() => { const [y,m,d] = form.due_date.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH"); })()}` : ""}`,
           link: "/todos",
         }),
       });
@@ -380,7 +380,7 @@ export default function TodosPage() {
                         <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-1">
-                        {todo.due_date && <span className={`flex items-center gap-1 text-xs ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}><Calendar className="h-3 w-3" />{overdue ? "Überfällig: " : ""}{new Date(todo.due_date).toLocaleDateString("de-CH")}</span>}
+                        {todo.due_date && <span className={`flex items-center gap-1 text-xs ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}><Calendar className="h-3 w-3" />{overdue ? "Überfällig: " : ""}{(() => { const [y,m,d] = todo.due_date!.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH"); })()}</span>}
                         {assignee && <span className="flex items-center gap-1 text-xs text-muted-foreground"><User className="h-3 w-3" />{assignee.full_name}</span>}
                       </div>
                     </div>

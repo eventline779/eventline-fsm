@@ -98,7 +98,7 @@ export default function AnfragenPage() {
                       </div>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         {(req.location as unknown as { name: string })?.name && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{(req.location as unknown as { name: string }).name}</span>}
-                        {req.event_date && <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{new Date(req.event_date).toLocaleDateString("de-CH")}</span>}
+                        {req.event_date && <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{new Date(req.event_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}</span>}
                         {req.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{req.guest_count} Pers.</span>}
                       </div>
                       {req.event_type && <p className="mt-1 text-sm text-muted-foreground">{req.event_type}</p>}
