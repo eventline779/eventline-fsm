@@ -164,13 +164,15 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
 
       {/* Toggles */}
       <div className="px-3 mb-2 space-y-0.5">
-        <button
-          onClick={onToggleSimplified}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
-        >
-          {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {simplified ? "Alle Module anzeigen" : "Vereinfachte Ansicht"}
-        </button>
+        {profile.role === "admin" && (
+          <button
+            onClick={onToggleSimplified}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
+          >
+            {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {simplified ? "Alle Module anzeigen" : "Vereinfachte Ansicht"}
+          </button>
+        )}
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"

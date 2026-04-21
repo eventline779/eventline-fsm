@@ -113,6 +113,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       if (data) {
         setProfile(data as Profile);
+        // Techniker bekommen automatisch vereinfachte Ansicht (ohne Umschaltmöglichkeit)
+        if (data.role === "techniker") {
+          setSimplified(true);
+        }
       }
       setLoading(false);
     }
@@ -232,13 +236,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
-            <button
-              onClick={toggleSimplified}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
-            >
-              {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-              {simplified ? "Alle Module" : "Vereinfacht"}
-            </button>
+            {profile.role === "admin" && (
+              <button
+                onClick={toggleSimplified}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
+              >
+                {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                {simplified ? "Alle Module" : "Vereinfacht"}
+              </button>
+            )}
           </div>
 
           <div className="absolute bottom-3 left-3 right-3">
