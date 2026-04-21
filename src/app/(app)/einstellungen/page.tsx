@@ -284,7 +284,7 @@ export default function EinstellungenPage() {
 
   function exportCSV() {
     const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Kategorie", "Auftrag"]];
-    const catLabels: Record<string, string> = { verwaltung: "Verwaltung", scala: "Verwaltung SCALA Basel", barakuba: "Barakuba", bau3: "Verwaltung Theater BAU3", buero: "Büro", meeting: "Meeting" };
+    const catLabels: Record<string, string> = { scala: "Verwaltung SCALA Basel", barakuba: "Verwaltung Barakuba", bau3: "Verwaltung Theater BAU3", buero: "Büro", meeting: "Meeting" };
     for (const e of completed) {
       const name = e.profile?.full_name || "Unbekannt";
       const date = formatDate(e.clock_in);

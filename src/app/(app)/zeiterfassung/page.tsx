@@ -9,9 +9,8 @@ import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, T
 
 const CATEGORIES = [
   { value: "", label: "Keine Kategorie", icon: Tag, color: "border-gray-200 bg-gray-50 text-gray-500" },
-  { value: "verwaltung", label: "Verwaltung", icon: Building2, color: "border-indigo-200 bg-indigo-50 text-indigo-600" },
   { value: "scala", label: "Verwaltung SCALA Basel", icon: MapPin, color: "border-pink-200 bg-pink-50 text-pink-600" },
-  { value: "barakuba", label: "Barakuba", icon: Music, color: "border-teal-200 bg-teal-50 text-teal-600" },
+  { value: "barakuba", label: "Verwaltung Barakuba", icon: Music, color: "border-teal-200 bg-teal-50 text-teal-600" },
   { value: "bau3", label: "Verwaltung Theater BAU3", icon: MapPin, color: "border-orange-200 bg-orange-50 text-orange-600" },
   { value: "buero", label: "Büro", icon: Monitor, color: "border-blue-200 bg-blue-50 text-blue-600" },
   { value: "meeting", label: "Meeting", icon: Briefcase, color: "border-red-200 bg-red-50 text-red-600" },
