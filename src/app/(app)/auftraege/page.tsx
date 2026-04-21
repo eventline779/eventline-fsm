@@ -17,6 +17,7 @@ import {
   User,
   Users,
   AlertTriangle,
+  Archive,
 } from "lucide-react";
 
 export default function AuftraegePage() {
@@ -25,6 +26,7 @@ export default function AuftraegePage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">("all");
   const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">("all");
+  const [showArchive, setShowArchive] = useState(false);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -47,7 +49,9 @@ export default function AuftraegePage() {
   // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayMs = todayStart.getTime();
+  const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
+    const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
     const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
@@ -59,7 +63,7 @@ export default function AuftraegePage() {
     else if (filterLocation === "barakuba") matchesLocation = isBarakuba;
     else if (filterLocation === "bau3") matchesLocation = isBau3;
     else if (filterLocation === "sonstige") matchesLocation = !isScala && !isBarakuba && !isBau3;
-    return matchesSearch && matchesStatus && matchesLocation;
+    return matchesArchive && matchesSearch && matchesStatus && matchesLocation;
   }).sort((a, b) => {
     // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
     const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -76,19 +80,26 @@ export default function AuftraegePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Aufträge</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Archiv" : "Aufträge"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {jobs.length} {jobs.length === 1 ? "Auftrag" : "Aufträge"} gesamt
+            {jobs.filter((j) => showArchive ? (j.status === "abgeschlossen" || j.status === "storniert") : !(j.status === "abgeschlossen" || j.status === "storniert")).length} {showArchive ? "archiviert" : "aktiv"} von {jobs.length} gesamt
           </p>
         </div>
-        <Link href="/auftraege/neu">
-          <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Neuer Auftrag
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-200"}`}>
+            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => j.status === "abgeschlossen" || j.status === "storniert").length})`}
+          </button>
+          {!showArchive && (
+            <Link href="/auftraege/neu">
+              <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Neuer Auftrag
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Kreis-Diagramm */}
