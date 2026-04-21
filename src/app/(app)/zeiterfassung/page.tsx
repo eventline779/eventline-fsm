@@ -5,10 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { TimeEntry, Job } from "@/types";
-import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, Tag } from "lucide-react";
+import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, Tag, Building2, MapPin, Music } from "lucide-react";
 
 const CATEGORIES = [
   { value: "", label: "Keine Kategorie", icon: Tag, color: "border-gray-200 bg-gray-50 text-gray-500" },
+  { value: "verwaltung", label: "Verwaltung", icon: Building2, color: "border-indigo-200 bg-indigo-50 text-indigo-600" },
+  { value: "scala", label: "SCALA Basel", icon: MapPin, color: "border-pink-200 bg-pink-50 text-pink-600" },
+  { value: "barakuba", label: "Barakuba", icon: Music, color: "border-teal-200 bg-teal-50 text-teal-600" },
+  { value: "bau3", label: "Theater BAU3", icon: MapPin, color: "border-orange-200 bg-orange-50 text-orange-600" },
   { value: "buero", label: "Büro", icon: Monitor, color: "border-blue-200 bg-blue-50 text-blue-600" },
   { value: "homeoffice", label: "Home Office", icon: Home, color: "border-purple-200 bg-purple-50 text-purple-600" },
   { value: "einsatz", label: "Einsatz", icon: Wrench, color: "border-amber-200 bg-amber-50 text-amber-600" },
