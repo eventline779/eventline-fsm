@@ -23,12 +23,18 @@ import {
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<JobStatus | "all">("all");
-  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">("all");
-  const [showArchive, setShowArchive] = useState(false);
+  const [search, setSearch] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search") || "" : "");
+  const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
+  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as any) || "all" : "all");
+  const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+
+  // Filter in localStorage speichern
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search", search); }, [search]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-status", filterStatus); }, [filterStatus]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
 
   useEffect(() => { loadJobs(); }, []);
 
