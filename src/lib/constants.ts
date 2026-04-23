@@ -74,7 +74,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/kalender", label: "Kalender", icon: "Calendar", simplified: true },
       { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true },
-      { href: "/todos", label: "Todos", icon: "CheckSquare" },
+      { href: "/todos", label: "Todos", icon: "CheckSquare", simplified: true },
       { href: "/tickets", label: "Tickets", icon: "Ticket" },
     ],
   },
