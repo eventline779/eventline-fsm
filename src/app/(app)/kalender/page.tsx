@@ -431,12 +431,36 @@ export default function KalenderPage() {
                               )}
                             </div>
                             <div className="mt-0.5 space-y-0.5">
-                              {dayItems.map((item) => (
-                                <div key={item.id} className={`px-1.5 py-0.5 text-[9px] font-semibold rounded border ${item.bgColor} ${item.color} truncate leading-tight`}>
-                                  {item.time && <span className="opacity-70">{item.time} </span>}
-                                  {item.title}
-                                </div>
-                              ))}
+                              {dayItems.map((item) => {
+                                const dayStart = new Date(item.date.getFullYear(), item.date.getMonth(), item.date.getDate()).getTime();
+                                const dayEnd = item.endDate ? new Date(item.endDate.getFullYear(), item.endDate.getMonth(), item.endDate.getDate()).getTime() : dayStart;
+                                const thisDay = new Date(year, month, day).getTime();
+                                const isMultiDay = dayEnd > dayStart;
+                                const isFirstDay = thisDay === dayStart;
+                                const isLastDay = thisDay === dayEnd;
+                                const isWeekStart = new Date(year, month, day).getDay() === 1; // Montag
+                                const showLabel = isFirstDay || isWeekStart;
+                                // Bei mehrtägigen Events: keine Rundung/Border wo es weitergeht
+                                let roundClass = "rounded";
+                                let marginClass = "";
+                                if (isMultiDay) {
+                                  if (isFirstDay && !isLastDay) { roundClass = "rounded-l"; marginClass = "-mr-1.5"; }
+                                  else if (isLastDay && !isFirstDay) { roundClass = "rounded-r"; marginClass = "-ml-1.5"; }
+                                  else if (!isFirstDay && !isLastDay) { roundClass = ""; marginClass = "-mx-1.5"; }
+                                }
+                                return (
+                                  <div key={item.id} className={`px-1.5 py-0.5 text-[9px] font-semibold border ${item.bgColor} ${item.color} truncate leading-tight ${roundClass} ${marginClass}`}>
+                                    {showLabel ? (
+                                      <>
+                                        {item.time && <span className="opacity-70">{item.time} </span>}
+                                        {item.title}
+                                      </>
+                                    ) : (
+                                      <span className="opacity-0">.</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </>
                         )}
