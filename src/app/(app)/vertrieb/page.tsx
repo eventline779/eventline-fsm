@@ -1361,7 +1361,8 @@ export default function VertriebPage() {
                 </div>
               </div>
 
-              {/* Veranstaltungs-Datum */}
+              {/* Veranstaltungs-Datum (nur bei Veranstaltungen, nicht bei Verwaltung) */}
+              {form.kategorie === "veranstaltung" && (
               <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200 dark:bg-purple-950/30 space-y-3">
                 <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-1.5"><PartyPopper className="h-3.5 w-3.5" />Veranstaltungs-Datum</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -1375,6 +1376,7 @@ export default function VertriebPage() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Kategorienspezifische Felder */}
               {form.kategorie === "verwaltung" ? (
@@ -1448,8 +1450,14 @@ export default function VertriebPage() {
               )}
 
               <div>
-                <label className="text-xs font-medium">Notizen</label>
-                <textarea value={form.notizen} onChange={(e) => setForm({ ...form, notizen: e.target.value })} className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} />
+                <label className="text-xs font-medium">Notizen {form.kategorie === "verwaltung" && <span className="text-muted-foreground font-normal">— Beschreibe die Situation detailliert</span>}</label>
+                <textarea
+                  value={form.notizen}
+                  onChange={(e) => setForm({ ...form, notizen: e.target.value })}
+                  placeholder={form.kategorie === "verwaltung" ? "Wie ist die aktuelle Situation? Was sind die Herausforderungen, Hintergründe, wichtige Infos..." : "Notizen..."}
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-y focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  rows={form.kategorie === "verwaltung" ? 8 : 3}
+                />
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }}>Abbrechen</Button>
