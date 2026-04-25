@@ -99,8 +99,17 @@ export default function NeuerAuftragPage() {
     }));
   }
 
-  function validate(): string | null {
+  function validate(target: "draft" | "create"): string | null {
+    // Entwurf: minimal — nur Titel, alles andere darf leer sein
     if (!form.title.trim()) return "Titel ist Pflicht";
+    if (target === "draft") {
+      // Wenn Datum gesetzt: trotzdem Konsistenz prüfen, sonst speichern wir Müll
+      if (form.start_date && form.end_date && form.end_date < form.start_date) {
+        return "Enddatum darf nicht vor dem Startdatum liegen";
+      }
+      return null;
+    }
+    // "Auftrag erstellen": volle Validierung
     if (form.job_type === "location" && !form.location_id) {
       return "Bitte eine Location auswählen";
     }
@@ -120,7 +129,7 @@ export default function NeuerAuftragPage() {
   }
 
   async function submit(target: "draft" | "create") {
-    const err = validate();
+    const err = validate(target);
     if (err) {
       toast.error(err);
       return;
@@ -137,8 +146,10 @@ export default function NeuerAuftragPage() {
       description: form.description.trim() || null,
       status: target === "draft" ? "entwurf" : "offen",
       priority: form.urgent ? "dringend" : "normal",
-      customer_id: form.job_type === "extern" ? form.customer_id : null,
-      location_id: form.job_type === "location" ? form.location_id : null,
+      customer_id:
+        form.job_type === "extern" && form.customer_id ? form.customer_id : null,
+      location_id:
+        form.job_type === "location" && form.location_id ? form.location_id : null,
       external_address:
         form.job_type === "extern" ? form.external_address.trim() || null : null,
       start_date: form.start_date || null,
