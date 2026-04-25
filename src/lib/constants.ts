@@ -64,9 +64,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Veranstaltungen",
     items: [
+      { href: "/veranstaltungen", label: "Pipeline-Übersicht", icon: "TrendingUp", simplified: true },
       { href: "/anfragen", label: "Anfragen-Eingang", icon: "Inbox", simplified: true },
       { href: "/auftraege", label: "Bestätigte Events", icon: "ClipboardList", simplified: true },
-      { href: "/vertrieb", label: "Verkaufs-Pipeline", icon: "TrendingUp" },
+      { href: "/vertrieb", label: "Verkaufs-Details", icon: "FileText" },
     ],
   },
   {
