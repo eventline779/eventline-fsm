@@ -25,7 +25,8 @@ import { SearchableSelect } from "@/components/searchable-select";
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [search, setSearch] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search") || "" : "");
+  const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
+  const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
   const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as any) || "all" : "all");
   const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
@@ -33,7 +34,8 @@ export default function AuftraegePage() {
   const supabase = createClient();
 
   // Filter in localStorage speichern
-  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search", search); }, [search]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-number", searchNumber); }, [searchNumber]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-title", searchTitle); }, [searchTitle]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-status", filterStatus); }, [filterStatus]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
@@ -65,11 +67,11 @@ export default function AuftraegePage() {
   const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
     const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
-    const lowerSearch = search.toLowerCase().trim();
-    const matchesSearch = !lowerSearch
-      ? true
-      : j.title.toLowerCase().includes(lowerSearch) ||
-        String(j.job_number ?? "").includes(lowerSearch);
+    const numQ = searchNumber.trim();
+    const titleQ = searchTitle.trim().toLowerCase();
+    const matchesNumber = !numQ ? true : String(j.job_number ?? "").includes(numQ);
+    const matchesTitle = !titleQ ? true : j.title.toLowerCase().includes(titleQ);
+    const matchesSearch = matchesNumber && matchesTitle;
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
     const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
     const isScala = locName.includes("scala");
@@ -202,19 +204,31 @@ export default function AuftraegePage() {
         );
       })()}
 
-      {/* Such- und Filter-Bar — 1 Zeile, kompakt */}
+      {/* Such- und Filter-Bar — kompakt, getrennte Felder fuer Nummer und Titel */}
       <div className="flex flex-col sm:flex-row gap-2">
-        {/* Suche — INT-Nummer oder Titel */}
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <span className="absolute left-9 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+        {/* Suche Nummer */}
+        <div className="relative w-full sm:w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
             INT-
           </span>
           <Input
-            placeholder="000000 oder Titel"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-[4.25rem] h-9"
+            placeholder="000000"
+            value={searchNumber}
+            onChange={(e) => setSearchNumber(e.target.value)}
+            className="pl-[3rem] h-9 font-mono"
+            aria-label="Auftragsnummer"
+          />
+        </div>
+
+        {/* Suche Titel */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Titel suchen…"
+            value={searchTitle}
+            onChange={(e) => setSearchTitle(e.target.value)}
+            className="pl-9 h-9"
+            aria-label="Titel"
           />
         </div>
 
@@ -259,11 +273,12 @@ export default function AuftraegePage() {
         </div>
 
         {/* Reset (nur wenn ein Filter aktiv) */}
-        {(search || filterStatus !== "all" || filterLocation !== "all") && (
+        {(searchNumber || searchTitle || filterStatus !== "all" || filterLocation !== "all") && (
           <button
             type="button"
             onClick={() => {
-              setSearch("");
+              setSearchNumber("");
+              setSearchTitle("");
               setFilterStatus("all");
               setFilterLocation("all");
             }}
@@ -290,7 +305,7 @@ export default function AuftraegePage() {
         </div>
       ) : filtered.length === 0 ? (
         (() => {
-          const hasFilter = !!search || filterStatus !== "all" || filterLocation !== "all";
+          const hasFilter = !!searchNumber || !!searchTitle || filterStatus !== "all" || filterLocation !== "all";
           return (
             <Card className="border-dashed bg-white">
               <CardContent className="py-16 text-center">
@@ -308,7 +323,8 @@ export default function AuftraegePage() {
                 {hasFilter ? (
                   <Button
                     onClick={() => {
-                      setSearch("");
+                      setSearchNumber("");
+                      setSearchTitle("");
                       setFilterStatus("all");
                       setFilterLocation("all");
                     }}
