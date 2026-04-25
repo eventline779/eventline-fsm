@@ -103,7 +103,7 @@ export default function DashboardPage() {
     } catch {}
 
     const [jobsRes, anfragenRes, timeRes, kundenRes] = await Promise.all([
-      supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", ["offen", "geplant", "in_arbeit"]),
+      supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", ["offen", "in_arbeit"]),
       supabase.from("rental_requests").select("id", { count: "exact", head: true }).eq("status", "neu"),
       supabase.from("time_entries").select("id", { count: "exact", head: true }).is("clock_out", null),
       supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true),
@@ -117,7 +117,7 @@ export default function DashboardPage() {
     });
 
     // Aufträge ohne Termine finden — nur die nächsten 3 nach Startdatum
-    const { data: activeJobs } = await supabase.from("jobs").select("id, title, job_number, start_date").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true, nullsFirst: false });
+    const { data: activeJobs } = await supabase.from("jobs").select("id, title, job_number, start_date").in("status", ["offen", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true, nullsFirst: false });
     const { data: allAppts } = await supabase.from("job_appointments").select("job_id");
     if (activeJobs && allAppts) {
       const jobsWithAppts = new Set(allAppts.map((a: any) => a.job_id).filter(Boolean));

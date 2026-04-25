@@ -130,7 +130,6 @@ export default function AuftraegePage() {
         const segments = [
           { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#a855f7" },
           { label: "Offen", count: activeJobs.filter((j) => j.status === "offen").length, color: "#9ca3af" },
-          { label: "Geplant", count: activeJobs.filter((j) => j.status === "geplant").length, color: "#3b82f6" },
           { label: "In Arbeit", count: activeJobs.filter((j) => j.status === "in_arbeit").length, color: "#eab308" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },

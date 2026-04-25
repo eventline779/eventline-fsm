@@ -1,8 +1,9 @@
 // Status-Labels für Aufträge — Light- + Dark-Mode-Farben
+// 'geplant' bewusst entfernt: redundant mit der Termin-Anzeige
+// (orange Streifen links auf der Karte zeigt schon ob Termin da ist).
 export const JOB_STATUS = {
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Offen", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
-  geplant: { label: "Geplant", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
   in_arbeit: { label: "In Arbeit", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
   storniert: { label: "Storniert", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },

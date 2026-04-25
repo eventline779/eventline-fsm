@@ -33,7 +33,7 @@ export default function ZeiterfassungPage() {
     const [activeRes, entriesRes, jobsRes] = await Promise.all([
       supabase.from("time_entries").select("*").eq("profile_id", user.id).is("clock_out", null).single(),
       supabase.from("time_entries").select("*, job:jobs(title)").eq("profile_id", user.id).not("clock_out", "is", null).order("clock_in", { ascending: false }).limit(20),
-      supabase.from("jobs").select("id, title, job_number, start_date, end_date").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true }),
+      supabase.from("jobs").select("id, title, job_number, start_date, end_date").in("status", ["offen", "in_arbeit"]).neq("is_deleted", true).order("start_date", { ascending: true }),
     ]);
 
     if (activeRes.data) setActiveEntry(activeRes.data as TimeEntry);

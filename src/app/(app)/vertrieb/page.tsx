@@ -621,7 +621,7 @@ export default function VertriebPage() {
     const { data: newJob, error } = await supabase.from("jobs").insert({
       title: auftragForm.title,
       description: descriptionParts.join("\n\n") || null,
-      status: "geplant",
+      status: "offen",
       priority: auftragForm.priority,
       customer_id: customerId,
       location_id: auftragForm.location_id || details.location_id || null,

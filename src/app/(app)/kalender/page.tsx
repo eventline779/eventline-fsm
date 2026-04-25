@@ -69,7 +69,7 @@ export default function KalenderPage() {
         supabase.from("rental_requests").select("*, customer:customers(name), location:locations(name)").not("event_date", "is", null),
         supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
         supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
-        supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "geplant", "in_arbeit"]).neq("is_deleted", true).order("created_at", { ascending: false }),
+        supabase.from("jobs").select("id, title, job_number").in("status", ["offen", "in_arbeit"]).neq("is_deleted", true).order("created_at", { ascending: false }),
       ]);
       if (profRes.data) setProfiles(profRes.data as Profile[]);
       if (activeJobsRes.data) setJobs(activeJobsRes.data as unknown as Job[]);
