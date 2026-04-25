@@ -217,19 +217,19 @@ export default function NeuerAuftragPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {form.job_type === "location" ? (
               <>
-                <select
+                <SearchableSelect
                   value={form.location_id}
-                  onChange={(e) => update("location_id", e.target.value)}
-                  className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-                  aria-required
-                >
-                  <option value="">Location auswählen…</option>
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => update("location_id", id)}
+                  items={locations.map((l) => ({
+                    id: l.id,
+                    label: l.name,
+                    sub: [l.address_street, l.address_zip, l.address_city]
+                      .filter(Boolean)
+                      .join(", "),
+                  }))}
+                  placeholder="Location auswählen…"
+                  required
+                />
                 <div className="h-9 flex items-center px-3 text-xs rounded-lg border border-dashed bg-muted/20 text-muted-foreground truncate">
                   {selectedLocation
                     ? [
