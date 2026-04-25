@@ -13,14 +13,12 @@
  *     onChange={setCustomerId}
  *     items={customers.map(c => ({ id: c.id, label: c.name }))}
  *     placeholder="Kunde…"
- *     emptyAction={{ label: "Neuen Kunden anlegen", href: "/kunden/neu" }}
  *   />
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
-import { ChevronDown, X, Plus } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 export type SelectItem = {
   id: string;
@@ -35,7 +33,6 @@ interface Props {
   placeholder?: string;
   required?: boolean;
   id?: string;
-  emptyAction?: { label: string; href: string };
 }
 
 function matchesWordStart(text: string, q: string): boolean {
@@ -52,7 +49,6 @@ export function SearchableSelect({
   placeholder,
   required,
   id,
-  emptyAction,
 }: Props) {
   const selectedItem = items.find((i) => i.id === value) ?? null;
   const [search, setSearch] = useState(selectedItem?.label ?? "");
@@ -162,19 +158,6 @@ export function SearchableSelect({
         {filtered.length === 0 ? (
           <li className="px-3 py-2 text-sm text-muted-foreground">
             Keine Treffer.
-            {emptyAction && (
-              <Link
-                href={`${emptyAction.href}${
-                  search ? `?name=${encodeURIComponent(search)}` : ""
-                }`}
-                className="block mt-2 px-2 py-1.5 rounded-md bg-foreground text-background text-xs font-medium inline-flex items-center gap-1.5 hover:opacity-90"
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {emptyAction.label}
-                {search ? `: "${search}"` : ""}
-              </Link>
-            )}
           </li>
         ) : (
           filtered.map((item, i) => (

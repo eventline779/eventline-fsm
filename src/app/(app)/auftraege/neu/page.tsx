@@ -257,7 +257,6 @@ export default function NeuerAuftragPage() {
                 items={customers.map((c) => ({ id: c.id, label: c.name }))}
                 placeholder="Kunde tippen…"
                 required
-                emptyAction={{ label: "Neuen Kunden anlegen", href: "/kunden/neu" }}
               />
               <AddressAutocomplete
                 value={form.external_address}
