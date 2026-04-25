@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, Building2 } from "lucide-react";
 
 type LocalLocation = {
@@ -125,8 +126,32 @@ export function AddressAutocomplete({
   >([]);
   const [highlight, setHighlight] = useState(0);
   const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
+
+  // Portal mounting flag (avoids SSR mismatch)
+  useEffect(() => setMounted(true), []);
+
+  // Recalc dropdown position on open / scroll / resize
+  useEffect(() => {
+    if (!open) return;
+    function update() {
+      if (!inputRef.current) return;
+      const r = inputRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
 
   // Google lazily aktivieren beim ersten Fokus
   useEffect(() => {
@@ -136,13 +161,13 @@ export function AddressAutocomplete({
       .catch(() => setGoogleEnabled(false));
   }, []);
 
-  // Click outside → close
+  // Click outside → close (input + portal-rendered dropdown both count as inside)
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      const inWrapper = wrapperRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inWrapper && !inDropdown) {
         setOpen(false);
       }
     }
@@ -255,9 +280,59 @@ export function AddressAutocomplete({
     }
   }
 
+  const dropdown =
+    open && suggestions.length > 0 && pos ? (
+      <ul
+        ref={dropdownRef}
+        style={{
+          position: "fixed",
+          top: pos.top,
+          left: pos.left,
+          width: pos.width,
+        }}
+        className="z-[100] rounded-lg border bg-popover shadow-md max-h-72 overflow-y-auto"
+      >
+        {suggestions.map((s, i) => (
+          <li
+            key={s.kind === "location" ? `loc-${s.id}` : `g-${s.placeId}`}
+            role="option"
+            aria-selected={i === highlight}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              pickSuggestion(s);
+            }}
+            onMouseEnter={() => setHighlight(i)}
+            className={`flex items-start gap-2.5 px-3 py-2 text-sm cursor-pointer ${
+              i === highlight ? "bg-muted" : ""
+            }`}
+          >
+            {s.kind === "location" ? (
+              <Building2 className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+            ) : (
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{s.label}</div>
+              {s.sub && (
+                <div className="truncate text-xs text-muted-foreground">
+                  {s.sub}
+                </div>
+              )}
+            </div>
+            {s.kind === "location" && (
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60 shrink-0">
+                Eigene
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    ) : null;
+
   return (
     <div ref={wrapperRef} className="relative">
       <input
+        ref={inputRef}
         id={id}
         type="text"
         required={required}
@@ -273,44 +348,7 @@ export function AddressAutocomplete({
         autoComplete="off"
         className="flex h-9 w-full rounded-lg border bg-background px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       />
-      {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-md max-h-72 overflow-y-auto">
-          {suggestions.map((s, i) => (
-            <li
-              key={s.kind === "location" ? `loc-${s.id}` : `g-${s.placeId}`}
-              role="option"
-              aria-selected={i === highlight}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                pickSuggestion(s);
-              }}
-              onMouseEnter={() => setHighlight(i)}
-              className={`flex items-start gap-2.5 px-3 py-2 text-sm cursor-pointer ${
-                i === highlight ? "bg-muted" : ""
-              }`}
-            >
-              {s.kind === "location" ? (
-                <Building2 className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-              ) : (
-                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{s.label}</div>
-                {s.sub && (
-                  <div className="truncate text-xs text-muted-foreground">
-                    {s.sub}
-                  </div>
-                )}
-              </div>
-              {s.kind === "location" && (
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60 shrink-0">
-                  Eigene
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      {mounted && dropdown && createPortal(dropdown, document.body)}
       {!GOOGLE_KEY && value.length >= 2 && (
         <p className="text-[10px] text-muted-foreground/60 mt-1">
           Adressvorschläge nur aus eigenen Locations — Google Maps API Key in
