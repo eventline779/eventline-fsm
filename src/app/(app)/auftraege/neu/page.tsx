@@ -153,6 +153,7 @@ export default function NeuerAuftragPage() {
       </div>
 
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           submit("create");
@@ -189,7 +190,7 @@ export default function NeuerAuftragPage() {
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
               className="mt-1"
-              required
+              aria-required
               autoFocus
             />
           </div>
@@ -218,7 +219,7 @@ export default function NeuerAuftragPage() {
               value={form.location_id}
               onChange={(e) => update("location_id", e.target.value)}
               className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-              required
+              aria-required
             >
               <option value="">Location auswählen…</option>
               {locations.map((l) => (

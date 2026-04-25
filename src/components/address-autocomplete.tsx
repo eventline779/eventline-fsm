@@ -359,7 +359,7 @@ export function AddressAutocomplete({
         ref={inputRef}
         id={id}
         type="text"
-        required={required}
+        aria-required={required}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
