@@ -15,9 +15,10 @@ import {
   Calendar,
   MapPin,
   User,
-  Users,
   AlertTriangle,
   Archive,
+  ChevronDown,
+  X,
 } from "lucide-react";
 
 export default function AuftraegePage() {
@@ -191,72 +192,78 @@ export default function AuftraegePage() {
         );
       })()}
 
-      {/* Suche */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Aufträge suchen..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-white border-gray-200"
-        />
-      </div>
-
-      {/* Filter: Location */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location</p>
-        <div className="flex gap-2 flex-wrap">
-          {([
-            { v: "all", label: "Alle" },
-            { v: "scala", label: "SCALA Basel" },
-            { v: "barakuba", label: "Barakuba" },
-            { v: "bau3", label: "Theater BAU3" },
-            { v: "sonstige", label: "Sonstige" },
-          ] as const).map((opt) => (
-            <button
-              key={opt.v}
-              onClick={() => setFilterLocation(opt.v as any)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                filterLocation === opt.v
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {opt.v === "all" ? <Users className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
-              {opt.label}
-            </button>
-          ))}
+      {/* Such- und Filter-Bar — 1 Zeile, kompakt */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Suche */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Aufträge suchen…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
         </div>
-      </div>
 
-      {/* Filter: Status */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-              filterStatus === "all"
-                ? "bg-black text-white border-black"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+        {/* Status-Filter */}
+        <div className="relative">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as JobStatus | "all")}
+            className={`h-9 pl-3 pr-8 text-sm rounded-lg border bg-background appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring ${
+              filterStatus !== "all" ? "border-foreground/50 font-medium" : ""
             }`}
+            aria-label="Status-Filter"
           >
-            Alle
-          </button>
-          {(Object.keys(JOB_STATUS) as JobStatus[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                filterStatus === status
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {JOB_STATUS[status].label}
-            </button>
-          ))}
+            <option value="all">Alle Status</option>
+            {(Object.keys(JOB_STATUS) as JobStatus[]).map((status) => (
+              <option key={status} value={status}>
+                {JOB_STATUS[status].label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
         </div>
+
+        {/* Location-Filter */}
+        <div className="relative">
+          <select
+            value={filterLocation}
+            onChange={(e) =>
+              setFilterLocation(
+                e.target.value as "all" | "scala" | "barakuba" | "bau3" | "sonstige"
+              )
+            }
+            className={`h-9 pl-3 pr-8 text-sm rounded-lg border bg-background appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring ${
+              filterLocation !== "all" ? "border-foreground/50 font-medium" : ""
+            }`}
+            aria-label="Location-Filter"
+          >
+            <option value="all">Alle Locations</option>
+            <option value="scala">SCALA Basel</option>
+            <option value="barakuba">Barakuba</option>
+            <option value="bau3">Theater BAU3</option>
+            <option value="sonstige">Sonstige</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        </div>
+
+        {/* Reset (nur wenn ein Filter aktiv) */}
+        {(search || filterStatus !== "all" || filterLocation !== "all") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setFilterStatus("all");
+              setFilterLocation("all");
+            }}
+            className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
+            title="Alle Filter zurücksetzen"
+          >
+            <X className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        )}
       </div>
 
       {/* Job List */}
