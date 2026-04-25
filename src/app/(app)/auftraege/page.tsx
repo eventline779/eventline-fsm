@@ -343,9 +343,17 @@ export default function AuftraegePage() {
                         <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
                           {JOB_STATUS[job.status].label}
                         </span>
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
-                          {JOB_PRIORITY[job.priority].label}
-                        </span>
+                        {job.priority === "dringend" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                            <AlertTriangle className="h-3 w-3" />
+                            Dringend
+                          </span>
+                        )}
+                        {(job.priority === "hoch" || job.priority === "niedrig") && (
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
+                            {JOB_PRIORITY[job.priority].label}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         {(job.customer as unknown as { name: string })?.name && (

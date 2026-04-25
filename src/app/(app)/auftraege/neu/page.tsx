@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { SearchableSelect } from "@/components/searchable-select";
-import { ArrowLeft, Save, FileEdit } from "lucide-react";
+import { ArrowLeft, Save, FileEdit, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -57,6 +57,7 @@ export default function NeuerAuftragPage() {
     start_date: "",
     end_date: "",
     notes: "",
+    urgent: false,
   });
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export default function NeuerAuftragPage() {
       title: form.title.trim(),
       description: form.description.trim() || null,
       status: target === "draft" ? "entwurf" : "offen",
-      priority: "normal",
+      priority: form.urgent ? "dringend" : "normal",
       customer_id: form.job_type === "extern" ? form.customer_id : null,
       location_id: form.job_type === "location" ? form.location_id : null,
       external_address:
@@ -199,7 +200,21 @@ export default function NeuerAuftragPage() {
           </button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Neuer Auftrag</h1>
-        <span className="font-mono text-xs text-muted-foreground ml-auto">
+        <button
+          type="button"
+          onClick={() => update("urgent", !form.urgent)}
+          title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
+          aria-pressed={form.urgent}
+          className={`ml-auto inline-flex items-center gap-1.5 h-7 px-2 rounded-lg border text-xs font-medium transition-all ${
+            form.urgent
+              ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+              : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+          }`}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {form.urgent ? "Dringend" : "Dringend?"}
+        </button>
+        <span className="font-mono text-xs text-muted-foreground">
           {nextJobNumber ? `INT-${nextJobNumber}` : "INT-…"}
         </span>
       </div>
