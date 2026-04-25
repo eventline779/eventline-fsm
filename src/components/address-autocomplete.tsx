@@ -370,6 +370,7 @@ export function AddressAutocomplete({
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoComplete="off"
+        spellCheck={false}
         className="flex h-9 w-full rounded-lg border bg-background px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       />
       {mounted && dropdown && createPortal(dropdown, document.body)}
