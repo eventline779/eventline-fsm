@@ -36,7 +36,12 @@ export default function AuftraegePage() {
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
 
-  useEffect(() => { loadJobs(); }, []);
+  useEffect(() => {
+    loadJobs();
+    const handler = () => loadJobs();
+    window.addEventListener("jobs:invalidate", handler);
+    return () => window.removeEventListener("jobs:invalidate", handler);
+  }, []);
 
   async function loadJobs() {
     const [jobsRes, profRes] = await Promise.all([

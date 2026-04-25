@@ -162,6 +162,8 @@ export default function NeuerAuftragPage() {
               return;
             }
             toast.success(`INT-${inserted.job_number} verworfen`);
+            // Liste auf /auftraege & co. neu laden
+            window.dispatchEvent(new Event("jobs:invalidate"));
           },
         },
       });
