@@ -55,42 +55,47 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Übersicht",
+    label: "Mein Tag",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard", simplified: true },
-    ],
-  },
-  {
-    label: "Aufträge & Kunden",
-    items: [
-      { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true },
-      { href: "/anfragen", label: "Vermietungen", icon: "Inbox" },
-      { href: "/kunden", label: "Kunden", icon: "Users" },
-      { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
-    ],
-  },
-  {
-    label: "Planung",
-    items: [
+      { href: "/heute", label: "Heute", icon: "LayoutDashboard", simplified: true },
       { href: "/kalender", label: "Kalender", icon: "Calendar", simplified: true },
-      { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true },
-      { href: "/todos", label: "Todos", icon: "CheckSquare", simplified: true },
-      { href: "/tickets", label: "Tickets", icon: "Ticket" },
     ],
   },
   {
-    label: "Dokumentation",
+    label: "Veranstaltungen",
     items: [
-      { href: "/rapporte", label: "Rapporte", icon: "FileText" },
+      { href: "/anfragen", label: "Anfragen-Eingang", icon: "Inbox", simplified: true },
+      { href: "/auftraege", label: "Bestätigte Events", icon: "ClipboardList", simplified: true },
+      { href: "/vertrieb", label: "Verkaufs-Pipeline", icon: "TrendingUp" },
+    ],
+  },
+  {
+    label: "Kunden & Partner",
+    items: [
+      { href: "/kunden", label: "Kunden", icon: "Users" },
+      { href: "/partner", label: "Partner & Lieferanten", icon: "Briefcase" },
+    ],
+  },
+  {
+    label: "Venues",
+    items: [
       { href: "/standorte", label: "Standorte", icon: "MapPin" },
       { href: "/raeume", label: "Räume", icon: "DoorOpen" },
-      { href: "/belege", label: "Belege", icon: "Receipt" },
     ],
   },
   {
-    label: "HR",
+    label: "Dokumente",
     items: [
-      { href: "/hr", label: "HR", icon: "Briefcase", simplified: true },
+      { href: "/rapporte", label: "Rapporte", icon: "FileText", simplified: true },
+      { href: "/belege", label: "Rechnungen & Belege", icon: "Receipt" },
+    ],
+  },
+  {
+    label: "Meine Arbeit",
+    items: [
+      { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true },
+      { href: "/todos", label: "Todos", icon: "CheckSquare", simplified: true },
+      { href: "/tickets", label: "Tickets & Support", icon: "Ticket" },
     ],
   },
 ];
@@ -98,6 +103,9 @@ export const NAV_GROUPS: NavGroup[] = [
 export const ADMIN_NAV_GROUP: NavGroup = {
   label: "Admin",
   items: [
+    { href: "/hr", label: "Team & HR", icon: "Briefcase" },
+    { href: "/it-tickets", label: "IT-Tickets", icon: "AlertTriangle" },
+    { href: "/schulungen", label: "Schulungen", icon: "GraduationCap" },
     { href: "/einstellungen?tab=admin", label: "Einstellungen", icon: "Settings" },
   ],
 };
