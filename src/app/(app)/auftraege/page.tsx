@@ -424,20 +424,23 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Bearbeiten-Button rechts in der Card */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push(`/auftraege/${job.id}/bearbeiten`);
-                      }}
-                      className="shrink-0 p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-                      aria-label="Bearbeiten"
-                      title="Bearbeiten"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                    {/* Bearbeiten-Button — nur bei Entwürfen direkt aus der Liste.
+                        Bei echten Aufträgen erfolgt das Bearbeiten über die Detail-Page. */}
+                    {job.status === "entwurf" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/auftraege/${job.id}/bearbeiten`);
+                        }}
+                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+                        aria-label="Bearbeiten"
+                        title="Entwurf bearbeiten"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

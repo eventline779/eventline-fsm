@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { SearchableSelect } from "@/components/searchable-select";
-import { ArrowLeft, Save, AlertCircle, Send } from "lucide-react";
+import { ArrowLeft, Save, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -195,7 +195,7 @@ export default function AuftragBearbeitenPage() {
     }
 
     if (target === "publish") {
-      toast.success(`Auftrag INT-${jobNumber} veröffentlicht`);
+      toast.success(`Auftrag INT-${jobNumber} freigegeben`);
     } else {
       toast.success(`Änderungen gespeichert`);
     }
@@ -427,10 +427,10 @@ export default function AuftragBearbeitenPage() {
               size="sm"
               disabled={saving !== null}
               onClick={() => submit("publish")}
-              className="flex-1"
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
             >
-              <Send className="h-3.5 w-3.5 mr-1.5" />
-              {saving === "publish" ? "Speichert…" : "Veröffentlichen"}
+              <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+              {saving === "publish" ? "Speichert…" : "Freigeben"}
             </Button>
           )}
         </div>
