@@ -16,59 +16,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  LayoutDashboard,
-  ClipboardList,
-  Inbox,
-  Users,
-  MapPin,
-  Calendar,
-  CalendarClock,
-  Clock,
-  FileText,
-  FolderOpen,
-  Settings,
-  CheckSquare,
-  Eye,
-  EyeOff,
-  Sun,
-  Moon,
-  AlertTriangle,
-  GraduationCap,
-  Briefcase,
-  Ticket,
-  Bell,
-  DoorOpen,
-  Receipt,
-  TrendingUp,
-  Send,
-} from "lucide-react";
+import { Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { useTheme } from "next-themes";
-
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard,
-  ClipboardList,
-  Inbox,
-  Users,
-  MapPin,
-  Calendar,
-  CalendarClock,
-  Clock,
-  FileText,
-  FolderOpen,
-  Settings,
-  CheckSquare,
-  AlertTriangle,
-  GraduationCap,
-  Briefcase,
-  Ticket,
-  DoorOpen,
-  Receipt,
-  TrendingUp,
-  Send,
-};
+import { NAV_ICON_MAP } from "@/lib/nav-icons";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -190,22 +142,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               if (items.length === 0) return null;
 
               return (
-                <div key={group.label}>
-                  <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">
-                    {group.label}
-                  </p>
+                <div key={group.label || group.items[0]?.href}>
+                  {group.label && (
+                    <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">
+                      {group.label}
+                    </p>
+                  )}
                   {items.map((item) => {
-                    const Icon = iconMap[item.icon];
+                    const Icon = NAV_ICON_MAP[item.icon];
                     const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
                     const isActive = item.href.includes("?")
                       ? fullUrl === item.href
                       : item.href === "/einstellungen"
                         ? pathname === "/einstellungen" && !searchParams.get("tab")
-                        : item.href === "/heute"
-                          ? pathname === "/heute"
-                          : item.href === "/dashboard"
-                            ? pathname === "/dashboard"
-                            : pathname.startsWith(item.href);
+                        : item.href === "/heute" || item.href === "/kalender"
+                          ? pathname === item.href
+                          : pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.href}

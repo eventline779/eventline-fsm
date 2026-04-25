@@ -40,49 +40,56 @@ export const USER_ROLES = {
   techniker: "Service-Techniker",
 } as const;
 
-// Gruppierte Navigation
+// === NAVIGATION (single source of truth) ===
+// Adding/changing nav items: edit ONLY this file.
+// Sidebar, mobile bottom-nav and mobile sheet all read from NAV_GROUPS.
+// Icons resolve via src/lib/nav-icons.ts — add new icons there.
+
 export interface NavItem {
   href: string;
   label: string;
   icon: string;
-  simplified?: boolean; // Wird in der vereinfachten Ansicht angezeigt
+  /** Visible in techniker simplified view (mobile + sidebar). */
+  simplified?: boolean;
+  /** Show as a primary tab in mobile bottom-nav. Max 4 across all items. */
+  mobile?: boolean;
 }
 
 export interface NavGroup {
+  /** Empty string = no group header (renders flat at top of sidebar). */
   label: string;
   items: NavItem[];
 }
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Mein Tag",
+    label: "",
     items: [
-      { href: "/heute", label: "Heute", icon: "LayoutDashboard", simplified: true },
-      { href: "/kalender", label: "Kalender", icon: "Calendar", simplified: true },
+      { href: "/heute", label: "Heute", icon: "LayoutDashboard", simplified: true, mobile: true },
+      { href: "/kalender", label: "Kalender", icon: "Calendar", simplified: true, mobile: true },
     ],
   },
   {
-    label: "Veranstaltungen",
+    label: "Buchungen",
     items: [
-      { href: "/veranstaltungen", label: "Pipeline-Übersicht", icon: "TrendingUp", simplified: true },
-      { href: "/anfragen", label: "Anfragen-Eingang", icon: "Inbox", simplified: true },
-      { href: "/auftraege", label: "Bestätigte Events", icon: "ClipboardList", simplified: true },
-      { href: "/vertrieb", label: "Verkaufs-Details", icon: "FileText" },
+      { href: "/anfragen", label: "Vermietungsanfragen", icon: "Inbox", simplified: true, mobile: true },
+      { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true },
+      { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
     ],
   },
   {
-    label: "Kunden & Partner",
-    items: [
-      { href: "/kunden", label: "Kunden", icon: "Users" },
-      { href: "/partner", label: "Partner & Lieferanten", icon: "Briefcase" },
-    ],
-  },
-  {
-    label: "Venues",
+    label: "Räumlichkeiten",
     items: [
       { href: "/belegungsplan", label: "Belegungsplan", icon: "CalendarClock", simplified: true },
       { href: "/standorte", label: "Standorte", icon: "MapPin" },
       { href: "/raeume", label: "Räume", icon: "DoorOpen" },
+    ],
+  },
+  {
+    label: "Kontakte",
+    items: [
+      { href: "/kunden", label: "Kunden", icon: "Users" },
+      { href: "/partner", label: "Partner & Lieferanten", icon: "Briefcase" },
     ],
   },
   {
@@ -96,9 +103,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Meine Arbeit",
     items: [
-      { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true },
+      { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true, mobile: true },
       { href: "/todos", label: "Todos", icon: "CheckSquare", simplified: true },
-      { href: "/tickets", label: "Tickets & Support", icon: "Ticket" },
+      { href: "/tickets", label: "Tickets", icon: "Ticket" },
     ],
   },
 ];
@@ -106,8 +113,7 @@ export const NAV_GROUPS: NavGroup[] = [
 export const ADMIN_NAV_GROUP: NavGroup = {
   label: "Admin",
   items: [
-    { href: "/hr", label: "Team & HR", icon: "Briefcase" },
-    { href: "/it-tickets", label: "IT-Tickets", icon: "AlertTriangle" },
+    { href: "/hr", label: "HR", icon: "Briefcase" },
     { href: "/schulungen", label: "Schulungen", icon: "GraduationCap" },
     { href: "/einstellungen?tab=admin", label: "Einstellungen", icon: "Settings" },
   ],

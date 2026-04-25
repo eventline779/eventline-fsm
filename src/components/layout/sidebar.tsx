@@ -6,63 +6,19 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_GROUPS, ADMIN_NAV_GROUP } from "@/lib/constants";
 import type { NavGroup } from "@/lib/constants";
+import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { Logo } from "@/components/logo";
 import {
-  LayoutDashboard,
-  ClipboardList,
-  Inbox,
-  Users,
-  MapPin,
-  Calendar,
-  CalendarClock,
-  Clock,
-  FileText,
-  FolderOpen,
-  Settings,
   LogOut,
   ChevronRight,
-  CheckSquare,
   Eye,
   EyeOff,
   Sun,
   Moon,
-  AlertTriangle,
-  X,
-  Send,
-  GraduationCap,
-  Briefcase,
-  Ticket,
-  DoorOpen,
-  Receipt,
-  TrendingUp,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { toast } from "sonner";
 import { NotificationBell, useNotificationCounts } from "@/components/layout/notification-bell";
 import type { Profile } from "@/types";
-
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard,
-  ClipboardList,
-  Inbox,
-  Users,
-  MapPin,
-  Calendar,
-  CalendarClock,
-  Clock,
-  FileText,
-  FolderOpen,
-  Settings,
-  CheckSquare,
-  AlertTriangle,
-  GraduationCap,
-  Briefcase,
-  Ticket,
-  DoorOpen,
-  Receipt,
-  TrendingUp,
-  Send,
-};
 
 interface SidebarProps {
   profile: Profile;
@@ -92,9 +48,8 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     if (href === "/einstellungen") {
       return pathname === "/einstellungen" && !searchParams.get("tab");
     }
-    // Default: path prefix matching
-    if (href === "/heute") return pathname === "/heute";
-    if (href === "/dashboard") return pathname === "/dashboard";
+    // Top-level singletons: exact match only, so deeper paths don't bleed into the highlight.
+    if (href === "/heute" || href === "/kalender") return pathname === href;
     return pathname.startsWith(href);
   }
 
@@ -117,13 +72,15 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
           if (items.length === 0) return null;
 
           return (
-            <div key={group.label}>
-              <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/40 uppercase">
-                {group.label}
-              </p>
+            <div key={group.label || group.items[0]?.href}>
+              {group.label && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/40 uppercase">
+                  {group.label}
+                </p>
+              )}
               <div className="space-y-0.5">
                 {items.map((item) => {
-                  const Icon = iconMap[item.icon];
+                  const Icon = NAV_ICON_MAP[item.icon];
                   const active = isActive(item.href);
                   return (
                     <Link
