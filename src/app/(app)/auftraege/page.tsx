@@ -19,7 +19,9 @@ import {
   AlertCircle,
   Archive,
   X,
+  Pencil,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 
 export default function AuftraegePage() {
@@ -32,6 +34,7 @@ export default function AuftraegePage() {
   const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
 
   // Filter in localStorage speichern
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-number", searchNumber); }, [searchNumber]);
@@ -366,7 +369,7 @@ export default function AuftraegePage() {
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
@@ -421,6 +424,20 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
+                    {/* Bearbeiten-Button rechts in der Card */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push(`/auftraege/${job.id}/bearbeiten`);
+                      }}
+                      className="shrink-0 p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+                      aria-label="Bearbeiten"
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
                   </div>
                 </CardContent>
               </Card>
