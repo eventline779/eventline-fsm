@@ -200,21 +200,7 @@ export default function NeuerAuftragPage() {
           </button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Neuer Auftrag</h1>
-        <button
-          type="button"
-          onClick={() => update("urgent", !form.urgent)}
-          title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
-          aria-pressed={form.urgent}
-          className={`ml-auto inline-flex items-center gap-1.5 h-7 px-2 rounded-lg border text-xs font-medium transition-all ${
-            form.urgent
-              ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
-              : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-          }`}
-        >
-          <AlertTriangle className="h-3.5 w-3.5" />
-          {form.urgent ? "Dringend" : "Dringend?"}
-        </button>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground ml-auto">
           {nextJobNumber ? `INT-${nextJobNumber}` : "INT-…"}
         </span>
       </div>
@@ -247,7 +233,23 @@ export default function NeuerAuftragPage() {
 
         {/* Was */}
         <div className="space-y-1.5">
-          <SectionLabel>Titel *</SectionLabel>
+          <div className="flex items-center justify-between">
+            <SectionLabel>Titel *</SectionLabel>
+            <button
+              type="button"
+              onClick={() => update("urgent", !form.urgent)}
+              title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
+              aria-pressed={form.urgent}
+              aria-label="Dringend markieren"
+              className={`inline-flex items-center justify-center h-5 w-5 rounded-md transition-all ${
+                form.urgent
+                  ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
+                  : "text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10"
+              }`}
+            >
+              <AlertTriangle className="h-3 w-3" strokeWidth={form.urgent ? 2.5 : 2} />
+            </button>
+          </div>
           <Input
             id="title"
             placeholder="kurz, was zu tun ist (z.B. Lichtaufbau)"
