@@ -211,72 +211,73 @@ export default function NeuerAuftragPage() {
 
         <hr className="border-border/50" />
 
-        {/* Wo */}
-        {form.job_type === "location" ? (
-          <div className="space-y-1.5">
-            <SectionLabel>Wo</SectionLabel>
-            <select
-              value={form.location_id}
-              onChange={(e) => update("location_id", e.target.value)}
-              className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-required
-            >
-              <option value="">Location auswählen…</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-            {selectedLocation && (
-              <p className="text-xs text-muted-foreground pl-1">
-                {[
-                  selectedLocation.address_street,
-                  selectedLocation.address_zip,
-                  selectedLocation.address_city,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            )}
-            {locations.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Noch keine Locations.{" "}
-                <Link href="/standorte" className="underline">
-                  Jetzt anlegen
-                </Link>
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <SectionLabel>Wo</SectionLabel>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <SearchableSelect
-                value={form.customer_id}
-                onChange={(id) => update("customer_id", id)}
-                items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                placeholder="Kunde tippen…"
-                required
-              />
-              <AddressAutocomplete
-                value={form.external_address}
-                onChange={(v) => update("external_address", v)}
-                localLocations={locations}
-                placeholder="Ort / Adresse…"
-                required
-              />
-            </div>
-            {customers.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Noch keine Kunden.{" "}
-                <Link href="/kunden/neu" className="underline">
-                  Jetzt anlegen
-                </Link>
-              </p>
+        {/* Wo — gleiches 2-Spalten-Layout in beiden Modi, damit nichts springt */}
+        <div className="space-y-2">
+          <SectionLabel>Wo</SectionLabel>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {form.job_type === "location" ? (
+              <>
+                <select
+                  value={form.location_id}
+                  onChange={(e) => update("location_id", e.target.value)}
+                  className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  aria-required
+                >
+                  <option value="">Location auswählen…</option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="h-9 flex items-center px-3 text-xs rounded-lg border border-dashed bg-muted/20 text-muted-foreground truncate">
+                  {selectedLocation
+                    ? [
+                        selectedLocation.address_street,
+                        selectedLocation.address_zip,
+                        selectedLocation.address_city,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "Keine Adresse hinterlegt"
+                    : "Adresse erscheint nach Auswahl"}
+                </div>
+              </>
+            ) : (
+              <>
+                <SearchableSelect
+                  value={form.customer_id}
+                  onChange={(id) => update("customer_id", id)}
+                  items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                  placeholder="Kunde tippen…"
+                  required
+                />
+                <AddressAutocomplete
+                  value={form.external_address}
+                  onChange={(v) => update("external_address", v)}
+                  localLocations={locations}
+                  placeholder="Ort / Adresse…"
+                  required
+                />
+              </>
             )}
           </div>
-        )}
+          {form.job_type === "location" && locations.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Noch keine Locations.{" "}
+              <Link href="/standorte" className="underline">
+                Jetzt anlegen
+              </Link>
+            </p>
+          )}
+          {form.job_type === "extern" && customers.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Noch keine Kunden.{" "}
+              <Link href="/kunden/neu" className="underline">
+                Jetzt anlegen
+              </Link>
+            </p>
+          )}
+        </div>
 
         <hr className="border-border/50" />
 
