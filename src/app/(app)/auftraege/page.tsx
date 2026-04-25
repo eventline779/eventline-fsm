@@ -211,7 +211,7 @@ export default function AuftraegePage() {
             INT-
           </span>
           <Input
-            placeholder="1234 oder Titel"
+            placeholder="000000 oder Titel"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-[4.25rem] h-9"
