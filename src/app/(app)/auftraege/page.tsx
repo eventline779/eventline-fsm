@@ -323,7 +323,7 @@ export default function AuftraegePage() {
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const noTermin = isActive && !hasAppointment;
             return (
-            <Link key={job.id} href={`/auftraege/${job.id}`}>
+            <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
             <div className="flex items-stretch gap-2">
               {/* Linke Seite: Termin-Status */}
               <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
