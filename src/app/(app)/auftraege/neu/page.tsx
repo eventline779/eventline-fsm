@@ -29,6 +29,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// "YYYY-MM-DD" für die lokale Zeitzone (nicht UTC) — passt zu <input type="date">
+function todayLocalISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
 export default function NeuerAuftragPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -100,6 +108,9 @@ export default function NeuerAuftragPage() {
     }
     if (!form.start_date) return "Bitte Startdatum angeben";
     if (!form.end_date) return "Bitte Enddatum angeben";
+    const todayStr = todayLocalISO();
+    if (form.start_date < todayStr) return "Startdatum darf nicht in der Vergangenheit liegen";
+    if (form.end_date < todayStr) return "Enddatum darf nicht in der Vergangenheit liegen";
     if (form.end_date < form.start_date) {
       return "Enddatum darf nicht vor dem Startdatum liegen";
     }
@@ -334,6 +345,7 @@ export default function NeuerAuftragPage() {
               <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
               <Input
                 type="date"
+                min={todayLocalISO()}
                 value={form.start_date}
                 onChange={(e) => update("start_date", e.target.value)}
                 aria-label="Startdatum"
@@ -343,6 +355,7 @@ export default function NeuerAuftragPage() {
               <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
               <Input
                 type="date"
+                min={form.start_date || todayLocalISO()}
                 value={form.end_date}
                 onChange={(e) => update("end_date", e.target.value)}
                 aria-label="Enddatum"
