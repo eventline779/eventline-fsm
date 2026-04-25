@@ -133,15 +133,39 @@ export default function NeuerAuftragPage() {
       created_by: user?.id,
     };
 
-    const { error } = await supabase.from("jobs").insert(payload);
+    const { data: inserted, error } = await supabase
+      .from("jobs")
+      .insert(payload)
+      .select("id, job_number")
+      .single();
 
-    if (error) {
-      toast.error("Fehler: " + error.message);
+    if (error || !inserted) {
+      toast.error("Fehler: " + (error?.message ?? "unbekannt"));
       setSaving(null);
       return;
     }
 
-    toast.success(target === "draft" ? "Als Entwurf gespeichert" : "Auftrag erstellt");
+    if (target === "draft") {
+      toast.success(`Entwurf INT-${inserted.job_number} gespeichert`);
+    } else {
+      toast.success(`Auftrag INT-${inserted.job_number} erstellt`, {
+        duration: 5000,
+        action: {
+          label: "Rückgängig",
+          onClick: async () => {
+            const { error: delErr } = await supabase
+              .from("jobs")
+              .delete()
+              .eq("id", inserted.id);
+            if (delErr) {
+              toast.error("Konnte nicht rückgängig gemacht werden");
+              return;
+            }
+            toast.success(`INT-${inserted.job_number} verworfen`);
+          },
+        },
+      });
+    }
     router.push("/auftraege");
   }
 
