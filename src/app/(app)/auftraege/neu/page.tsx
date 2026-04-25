@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { SearchableSelect } from "@/components/searchable-select";
 import { ArrowLeft, Save, FileEdit } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -250,19 +251,14 @@ export default function NeuerAuftragPage() {
           <div className="space-y-2">
             <SectionLabel>Wo</SectionLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <select
+              <SearchableSelect
                 value={form.customer_id}
-                onChange={(e) => update("customer_id", e.target.value)}
-                className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                onChange={(id) => update("customer_id", id)}
+                items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                placeholder="Kunde tippen…"
                 required
-              >
-                <option value="">Kunde…</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                emptyAction={{ label: "Neuen Kunden anlegen", href: "/kunden/neu" }}
+              />
               <AddressAutocomplete
                 value={form.external_address}
                 onChange={(v) => update("external_address", v)}
