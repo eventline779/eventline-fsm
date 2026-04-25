@@ -267,13 +267,13 @@ export default function NeuerAuftragPage() {
               title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
               aria-pressed={form.urgent}
               aria-label="Dringend markieren"
-              className={`inline-flex items-center justify-center h-5 w-5 rounded-sm transition-all ${
+              className={`inline-flex items-center justify-center h-7 w-7 rounded-md transition-all ${
                 form.urgent
                   ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
-                  : "text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10"
+                  : "text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10"
               }`}
             >
-              <AlertCircle className="h-3.5 w-3.5" strokeWidth={form.urgent ? 2.5 : 2} />
+              <AlertCircle className="h-4 w-4" strokeWidth={form.urgent ? 2.5 : 2} />
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
