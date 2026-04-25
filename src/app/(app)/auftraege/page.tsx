@@ -373,9 +373,11 @@ export default function AuftraegePage() {
                       <div className="flex items-center gap-3 flex-wrap">
                         {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
                         <h3 className="font-semibold truncate">{job.title}</h3>
-                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                          {JOB_STATUS[job.status].label}
-                        </span>
+                        {job.status !== "offen" && (
+                          <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                            {JOB_STATUS[job.status].label}
+                          </span>
+                        )}
                         {job.priority === "dringend" && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                             <AlertCircle className="h-3 w-3" />
