@@ -37,6 +37,7 @@ export default function NeuerAuftragPage() {
   const [saving, setSaving] = useState<"draft" | "create" | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     job_type: "location" as JobType,
@@ -52,16 +53,25 @@ export default function NeuerAuftragPage() {
 
   useEffect(() => {
     async function loadData() {
-      const [custRes, locRes] = await Promise.all([
+      const [custRes, locRes, maxRes] = await Promise.all([
         supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
         supabase
           .from("locations")
           .select("id, name, address_street, address_zip, address_city")
           .eq("is_active", true)
           .order("name"),
+        supabase
+          .from("jobs")
+          .select("job_number")
+          .not("job_number", "is", null)
+          .order("job_number", { ascending: false })
+          .limit(1),
       ]);
       if (custRes.data) setCustomers(custRes.data as Customer[]);
       if (locRes.data) setLocations(locRes.data as Location[]);
+      // Sequenz startet bei 26200 (Migration 011) — wenn noch keine Aufträge: 26200, sonst MAX+1
+      const maxRow = maxRes.data?.[0] as { job_number: number } | undefined;
+      setNextJobNumber(maxRow?.job_number ? maxRow.job_number + 1 : 26200);
     }
     loadData();
   }, []);
@@ -147,8 +157,8 @@ export default function NeuerAuftragPage() {
           </button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Neuer Auftrag</h1>
-        <span className="text-xs text-muted-foreground ml-auto">
-          Nummer wird automatisch vergeben
+        <span className="font-mono text-xs text-muted-foreground ml-auto">
+          {nextJobNumber ? `INT-${nextJobNumber}` : "INT-…"}
         </span>
       </div>
 
