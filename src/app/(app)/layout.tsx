@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
+import { useEnterAsTab } from "@/lib/use-enter-as-tab";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -37,6 +38,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const supabase = createClient();
+
+  // Globale Regel: Enter im Input/Select springt zum nächsten Feld, statt zu submitten.
+  useEnterAsTab();
 
   function toggleSimplified() {
     setSimplified((prev) => {
