@@ -16,6 +16,7 @@ import {
   MapPin,
   User,
   AlertTriangle,
+  AlertCircle,
   Archive,
   X,
 } from "lucide-react";
@@ -345,7 +346,7 @@ export default function AuftraegePage() {
                         </span>
                         {job.priority === "dringend" && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                            <AlertTriangle className="h-3 w-3" />
+                            <AlertCircle className="h-3 w-3" />
                             Dringend
                           </span>
                         )}
