@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * Globaler Hook: Enter im Input/Select springt zum nächsten fokussierbaren
+ * Globaler Hook: Enter im Input/Select/Textarea springt zum nächsten fokussierbaren
  * Element im selben Form, statt das Form zu submitten.
  *
+ * Verhalten:
+ *   - Enter (ohne Modifier) → springt zum nächsten Feld
+ *   - Shift+Enter           → newline in Textareas (Standard-Editor-Verhalten)
+ *   - Ctrl/Cmd/Alt+Enter    → durchgereicht (z.B. "Send via Ctrl+Enter")
+ *
  * Ausnahmen (Enter behält normales Verhalten):
- *   - <textarea>             → newline
  *   - <button>               → click
- *   - input[type=button|submit|checkbox|radio]
+ *   - input[type=button|submit|checkbox|radio|...]
  *   - Wenn ein Element-eigener Handler bereits e.preventDefault() gerufen hat
  *     (z.B. Combobox-Komponenten, die Enter für "Vorschlag auswählen" nutzen)
  *
@@ -36,18 +40,20 @@ export function useEnterAsTab() {
       if (e.key !== "Enter") return;
       // Custom-Komponente hat Enter schon gehandhabt (Combobox-Auswahl etc.)
       if (e.defaultPrevented) return;
-      // Mod-Keys (Ctrl+Enter, Cmd+Enter, Shift+Enter) durchlassen
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      // Shift+Enter: newline in Textareas erlauben (Standard-Editor-Verhalten)
+      if (e.shiftKey) return;
+      // Ctrl/Cmd/Alt+Enter durchlassen (z.B. "Send via Ctrl+Enter")
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const target = e.target as HTMLElement | null;
       if (!target) return;
       const tag = target.tagName;
 
-      if (tag === "TEXTAREA" || tag === "BUTTON") return;
+      if (tag === "BUTTON") return;
       if (tag === "INPUT") {
         const inputType = (target as HTMLInputElement).type;
         if (NON_INTERCEPTED_INPUT_TYPES.has(inputType)) return;
-      } else if (tag !== "SELECT") {
+      } else if (tag !== "SELECT" && tag !== "TEXTAREA") {
         // andere Elemente (z.B. divs mit contentEditable) ignorieren wir hier
         return;
       }
