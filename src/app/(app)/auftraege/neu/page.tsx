@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { SearchableSelect } from "@/components/searchable-select";
-import { ArrowLeft, Save, FileEdit, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, FileEdit, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -233,23 +233,7 @@ export default function NeuerAuftragPage() {
 
         {/* Was */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <SectionLabel>Titel *</SectionLabel>
-            <button
-              type="button"
-              onClick={() => update("urgent", !form.urgent)}
-              title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
-              aria-pressed={form.urgent}
-              aria-label="Dringend markieren"
-              className={`inline-flex items-center justify-center h-5 w-5 rounded-md transition-all ${
-                form.urgent
-                  ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
-                  : "text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10"
-              }`}
-            >
-              <AlertTriangle className="h-3 w-3" strokeWidth={form.urgent ? 2.5 : 2} />
-            </button>
-          </div>
+          <SectionLabel>Titel *</SectionLabel>
           <Input
             id="title"
             placeholder="kurz, was zu tun ist (z.B. Lichtaufbau)"
@@ -275,7 +259,23 @@ export default function NeuerAuftragPage() {
 
         {/* Wo — Sub-Labels direkt am Feld, damit klar ist welches Sub-Feld Pflicht ist */}
         <div className="space-y-2">
-          <SectionLabel>Wo</SectionLabel>
+          <div className="flex items-center justify-between">
+            <SectionLabel>Wo</SectionLabel>
+            <button
+              type="button"
+              onClick={() => update("urgent", !form.urgent)}
+              title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
+              aria-pressed={form.urgent}
+              aria-label="Dringend markieren"
+              className={`inline-flex items-center justify-center h-5 w-5 rounded-sm transition-all ${
+                form.urgent
+                  ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
+                  : "text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10"
+              }`}
+            >
+              <AlertCircle className="h-3.5 w-3.5" strokeWidth={form.urgent ? 2.5 : 2} />
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {form.job_type === "location" ? (
               <>
