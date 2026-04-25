@@ -9,6 +9,7 @@ import type { Profile } from "@/types";
 import {
   Plus, Ticket, ShoppingCart, Monitor, Wrench, HelpCircle,
   ArrowLeft, Upload, FileText, Image as ImageIcon, Trash2, Download, X, Send, Check,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -365,7 +366,12 @@ export default function TicketsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{t.title}</span>
-                          {t.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
+                          {t.priority === "dringend" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                              <AlertCircle className="h-2.5 w-2.5" />
+                              Dringend
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                           <span>{getProfileName(t.created_by)}</span>

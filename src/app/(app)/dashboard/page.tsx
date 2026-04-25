@@ -7,7 +7,7 @@ import Link from "next/link";
 import {
   ClipboardList, Inbox, Clock, Users, ArrowRight, TrendingUp, Plus,
   Ticket, Check, X, ShoppingCart, Monitor, Wrench, HelpCircle,
-  LinkIcon, ExternalLink, Trash2,
+  LinkIcon, ExternalLink, Trash2, AlertCircle,
 } from "lucide-react";
 import { JOB_PRIORITY } from "@/lib/constants";
 import type { Todo } from "@/types";
@@ -319,7 +319,12 @@ export default function DashboardPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm">{ticket.title}</span>
-                          {ticket.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
+                          {ticket.priority === "dringend" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                              <AlertCircle className="h-2.5 w-2.5" />
+                              Dringend
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ticket.description}</p>
                         <p className="text-xs text-muted-foreground mt-1">Von {profiles[ticket.created_by] || "Unbekannt"} · {new Date(ticket.created_at).toLocaleDateString("de-CH")}</p>
