@@ -175,7 +175,7 @@ export function AddressAutocomplete({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // Google query (debounced)
+  // Google query (debounced) — Schweizer Adressen werden anschliessend nach oben sortiert
   useEffect(() => {
     if (!googleEnabled || !value || value.length < 2) {
       setGoogleSuggestions([]);
@@ -196,7 +196,23 @@ export function AddressAutocomplete({
             setGoogleSuggestions([]);
             return;
           }
-          setGoogleSuggestions(preds.slice(0, 5));
+          // Schweiz zuerst — die anderen Länder behalten ihre interne Reihenfolge
+          const isSwiss = (p: GoogleAutocompletePrediction) => {
+            const txt = (
+              p.description +
+              " " +
+              (p.structured_formatting?.secondary_text ?? "")
+            ).toLowerCase();
+            return /\b(schweiz|switzerland)\b/.test(txt);
+          };
+          const sorted = [...preds].sort((a, b) => {
+            const aSw = isSwiss(a);
+            const bSw = isSwiss(b);
+            if (aSw && !bSw) return -1;
+            if (!aSw && bSw) return 1;
+            return 0;
+          });
+          setGoogleSuggestions(sorted.slice(0, 5));
         }
       );
     }, 250);
@@ -205,19 +221,27 @@ export function AddressAutocomplete({
     };
   }, [value, googleEnabled]);
 
-  // Filter lokale Locations
+  // Lokale Locations: nur Wort-Start-Treffer (vermeidet Zufallsmatches in der Mitte von Strings)
+  function locationMatches(loc: LocalLocation, q: string): boolean {
+    const lq = q.toLowerCase();
+    const fields = [
+      loc.name,
+      loc.address_street,
+      loc.address_city,
+      loc.address_zip,
+    ].filter(Boolean) as string[];
+    for (const f of fields) {
+      const lower = f.toLowerCase();
+      if (lower.startsWith(lq)) return true;
+      const parts = lower.split(/[\s,.\-/]+/);
+      if (parts.some((p) => p.startsWith(lq))) return true;
+    }
+    return false;
+  }
+
   const localMatches = (() => {
-    if (!value) return [];
-    const q = value.toLowerCase();
-    return localLocations
-      .filter((l) => {
-        return (
-          l.name.toLowerCase().includes(q) ||
-          (l.address_city ?? "").toLowerCase().includes(q) ||
-          (l.address_street ?? "").toLowerCase().includes(q)
-        );
-      })
-      .slice(0, 4);
+    if (!value || value.length < 1) return [];
+    return localLocations.filter((l) => locationMatches(l, value)).slice(0, 4);
   })();
 
   const suggestions: Suggestion[] = [
