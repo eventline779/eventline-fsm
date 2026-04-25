@@ -92,6 +92,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
       return pathname === "/einstellungen" && !searchParams.get("tab");
     }
     // Default: path prefix matching
+    if (href === "/heute") return pathname === "/heute";
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   }
@@ -100,7 +101,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-gradient-to-b from-[#0a0a0a] to-[#111111] text-white h-screen sticky top-0 shadow-2xl">
       {/* Logo + Glocke */}
       <div className="px-6 py-6 border-b border-white/5 flex items-center justify-between">
-        <Link href="/dashboard" className="block">
+        <Link href="/heute" className="block">
           <Logo size="md" variant="light" />
         </Link>
         <NotificationBell />

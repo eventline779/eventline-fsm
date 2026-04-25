@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 
 const mobileItems = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/auftraege", label: "Aufträge", icon: ClipboardList },
+  { href: "/heute", label: "Heute", icon: LayoutDashboard },
+  { href: "/auftraege", label: "Events", icon: ClipboardList },
   { href: "/kalender", label: "Kalender", icon: Calendar },
   { href: "/zeiterfassung", label: "Zeit", icon: Clock },
 ];
@@ -29,7 +29,7 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/10 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around px-1 pt-2 pb-1">
         {mobileItems.map((item) => {
-          const isActive = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+          const isActive = item.href === "/heute" ? pathname === "/heute" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
