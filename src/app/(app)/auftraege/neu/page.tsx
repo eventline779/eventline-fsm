@@ -153,11 +153,14 @@ export default function NeuerAuftragPage() {
         action: {
           label: "Rückgängig",
           onClick: async () => {
-            const { error: delErr } = await supabase
+            // Soft-Delete via update — die jobs-Tabelle hat keine RLS-DELETE-Policy,
+            // ein 'delete()' würde stillschweigend 0 Zeilen treffen.
+            const { data: updated, error: delErr } = await supabase
               .from("jobs")
-              .delete()
-              .eq("id", inserted.id);
-            if (delErr) {
+              .update({ is_deleted: true })
+              .eq("id", inserted.id)
+              .select("id");
+            if (delErr || !updated || updated.length === 0) {
               toast.error("Konnte nicht rückgängig gemacht werden");
               return;
             }
