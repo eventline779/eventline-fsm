@@ -80,6 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Venues",
     items: [
+      { href: "/belegungsplan", label: "Belegungsplan", icon: "CalendarClock", simplified: true },
       { href: "/standorte", label: "Standorte", icon: "MapPin" },
       { href: "/raeume", label: "Räume", icon: "DoorOpen" },
     ],
