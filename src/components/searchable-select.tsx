@@ -181,8 +181,10 @@ export function SearchableSelect({
               }}
               onMouseEnter={() => setHighlight(i)}
               className={`flex items-start gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
-                i === highlight ? "bg-muted" : ""
-              } ${item.id === value ? "font-medium bg-muted/40" : ""}`}
+                i === highlight
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-accent/60"
+              } ${item.id === value ? "font-semibold" : ""}`}
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate">{item.label}</div>

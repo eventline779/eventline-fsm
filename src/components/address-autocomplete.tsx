@@ -327,7 +327,9 @@ export function AddressAutocomplete({
             }}
             onMouseEnter={() => setHighlight(i)}
             className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
-              i === highlight ? "bg-muted" : ""
+              i === highlight
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent/60"
             }`}
           >
             {s.kind === "location" ? (
