@@ -98,7 +98,8 @@ export default function NeuerAuftragPage() {
       if (!form.customer_id) return "Bitte einen Kunden auswählen";
       if (!form.external_address.trim()) return "Bitte einen Ort angeben";
     }
-    if (form.start_date && form.end_date && form.end_date < form.start_date) {
+    if (!form.start_date) return "Bitte Startdatum angeben";
+    if (form.end_date && form.end_date < form.start_date) {
       return "Enddatum darf nicht vor dem Startdatum liegen";
     }
     return null;
@@ -215,7 +216,7 @@ export default function NeuerAuftragPage() {
 
         {/* Wo — gleiches 2-Spalten-Layout in beiden Modi, damit nichts springt */}
         <div className="space-y-2">
-          <SectionLabel>Wo</SectionLabel>
+          <SectionLabel>Wo *</SectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {form.job_type === "location" ? (
               <>
@@ -285,7 +286,7 @@ export default function NeuerAuftragPage() {
 
         {/* Wann */}
         <div className="space-y-1.5">
-          <SectionLabel>Wann</SectionLabel>
+          <SectionLabel>Wann *</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
             <Input
               type="date"
