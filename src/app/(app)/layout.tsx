@@ -38,6 +38,10 @@ import {
   Briefcase,
   Ticket,
   Bell,
+  DoorOpen,
+  Receipt,
+  TrendingUp,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -60,6 +64,10 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   GraduationCap,
   Briefcase,
   Ticket,
+  DoorOpen,
+  Receipt,
+  TrendingUp,
+  Send,
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

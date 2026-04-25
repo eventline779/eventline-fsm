@@ -61,6 +61,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   DoorOpen,
   Receipt,
   TrendingUp,
+  Send,
 };
 
 interface SidebarProps {

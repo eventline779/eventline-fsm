@@ -90,6 +90,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/rapporte", label: "Rapporte", icon: "FileText", simplified: true },
       { href: "/belege", label: "Rechnungen & Belege", icon: "Receipt" },
+      { href: "/vorlagen", label: "E-Mail-Vorlagen", icon: "Send" },
     ],
   },
   {
