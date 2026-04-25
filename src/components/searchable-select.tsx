@@ -33,6 +33,12 @@ interface Props {
   placeholder?: string;
   required?: boolean;
   id?: string;
+  /** false = reines Dropdown (kein Such-Input, kein Tipp-Filter). Default true. */
+  searchable?: boolean;
+  /** false = kein X-Button zum Leeren der Auswahl (z.B. wenn "Alle" das default Item ist). Default true. */
+  clearable?: boolean;
+  /** Visueller Stil-Hinweis am Trigger, wenn ein Filter aktiv ist (nicht-default-Wert). */
+  active?: boolean;
 }
 
 function matchesWordStart(text: string, q: string): boolean {
@@ -49,6 +55,9 @@ export function SearchableSelect({
   placeholder,
   required,
   id,
+  searchable = true,
+  clearable = true,
+  active = false,
 }: Props) {
   const selectedItem = items.find((i) => i.id === value) ?? null;
   const [search, setSearch] = useState(selectedItem?.label ?? "");
@@ -107,9 +116,10 @@ export function SearchableSelect({
 
   const filtered = useMemo(() => {
     if (!open) return [];
+    if (!searchable) return items;
     if (!search) return items.slice(0, 8);
     return items.filter((i) => matchesWordStart(i.label, search)).slice(0, 8);
-  }, [items, search, open]);
+  }, [items, search, open, searchable]);
 
   function pick(item: SelectItem) {
     onChange(item.id);
@@ -153,7 +163,7 @@ export function SearchableSelect({
           left: pos.left,
           width: pos.width,
         }}
-        className="z-[100] rounded-lg border bg-popover shadow-md max-h-72 overflow-y-auto"
+        className="z-[100] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
       >
         {filtered.length === 0 ? (
           <li className="px-3 py-2 text-sm text-muted-foreground">
@@ -170,9 +180,9 @@ export function SearchableSelect({
                 pick(item);
               }}
               onMouseEnter={() => setHighlight(i)}
-              className={`flex items-start gap-2 px-3 py-2 text-sm cursor-pointer ${
+              className={`flex items-start gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
                 i === highlight ? "bg-muted" : ""
-              } ${item.id === value ? "font-medium" : ""}`}
+              } ${item.id === value ? "font-medium bg-muted/40" : ""}`}
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate">{item.label}</div>
@@ -195,22 +205,28 @@ export function SearchableSelect({
         id={id}
         type="text"
         value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setOpen(true);
-          setHighlight(0);
-        }}
+        readOnly={!searchable}
+        onChange={
+          searchable
+            ? (e) => {
+                setSearch(e.target.value);
+                setOpen(true);
+                setHighlight(0);
+              }
+            : undefined
+        }
+        onClick={() => setOpen(true)}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoComplete="off"
-        // Hidden required-validation: ein nicht-gewählter Wert führt zu submit-Fehler.
-        // Wir lassen das input selber nicht required (sonst "fülle dieses Feld" — wir wollen
-        // unsere eigene Fehlermeldung), die Form-validate-Funktion kümmert sich darum.
+        spellCheck={false}
         aria-required={required}
-        className="flex h-9 w-full rounded-lg border bg-background pl-3 pr-8 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex h-9 w-full rounded-xl border bg-background pl-3 pr-8 py-1 text-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+          !searchable ? "cursor-pointer select-none" : ""
+        } ${active ? "border-foreground/60 font-medium" : "hover:border-foreground/30"}`}
       />
-      {value ? (
+      {clearable && value ? (
         <button
           type="button"
           onClick={clear}
@@ -220,7 +236,11 @@ export function SearchableSelect({
           <X className="h-3.5 w-3.5" />
         </button>
       ) : (
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <ChevronDown
+          className={`absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
       )}
       {mounted && dropdown && createPortal(dropdown, document.body)}
     </div>

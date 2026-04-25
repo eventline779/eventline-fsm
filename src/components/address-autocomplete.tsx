@@ -314,7 +314,7 @@ export function AddressAutocomplete({
           left: pos.left,
           width: pos.width,
         }}
-        className="z-[100] rounded-lg border bg-popover shadow-md max-h-72 overflow-y-auto"
+        className="z-[100] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
       >
         {suggestions.map((s, i) => (
           <li
@@ -326,7 +326,7 @@ export function AddressAutocomplete({
               pickSuggestion(s);
             }}
             onMouseEnter={() => setHighlight(i)}
-            className={`flex items-start gap-2.5 px-3 py-2 text-sm cursor-pointer ${
+            className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
               i === highlight ? "bg-muted" : ""
             }`}
           >
@@ -371,7 +371,7 @@ export function AddressAutocomplete({
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
-        className="flex h-9 w-full rounded-lg border bg-background px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-9 w-full rounded-xl border bg-background px-3 py-1 text-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {mounted && dropdown && createPortal(dropdown, document.body)}
       {!GOOGLE_KEY && value.length >= 2 && (

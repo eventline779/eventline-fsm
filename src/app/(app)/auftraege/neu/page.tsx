@@ -219,7 +219,7 @@ export default function NeuerAuftragPage() {
               key={t}
               type="button"
               onClick={() => setJobType(t)}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
                 form.job_type === t
                   ? "border-foreground bg-foreground text-background"
                   : "border-border hover:bg-muted"
@@ -250,7 +250,7 @@ export default function NeuerAuftragPage() {
             value={form.description}
             onChange={(e) => update("description", e.target.value)}
             rows={2}
-            className="w-full px-3 py-1.5 text-sm rounded-lg border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
           />
         </div>
 
@@ -280,7 +280,7 @@ export default function NeuerAuftragPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] text-muted-foreground/70 ml-1">Adresse</p>
-                  <div className="h-9 flex items-center px-3 text-xs rounded-lg border border-dashed bg-muted/20 text-muted-foreground truncate">
+                  <div className="h-9 flex items-center px-3 text-xs rounded-xl border border-dashed bg-muted/20 text-muted-foreground truncate">
                     {selectedLocation
                       ? [
                           selectedLocation.address_street,
@@ -373,7 +373,7 @@ export default function NeuerAuftragPage() {
             value={form.notes}
             onChange={(e) => update("notes", e.target.value)}
             rows={2}
-            className="w-full px-3 py-1.5 text-sm rounded-lg border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
           />
         </div>
 

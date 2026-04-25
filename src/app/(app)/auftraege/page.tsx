@@ -17,9 +17,9 @@ import {
   User,
   AlertTriangle,
   Archive,
-  ChevronDown,
   X,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -206,46 +206,43 @@ export default function AuftraegePage() {
         </div>
 
         {/* Status-Filter */}
-        <div className="relative">
-          <select
+        <div className="w-full sm:w-44">
+          <SearchableSelect
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as JobStatus | "all")}
-            className={`h-9 pl-3 pr-8 text-sm rounded-lg border bg-background appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring ${
-              filterStatus !== "all" ? "border-foreground/50 font-medium" : ""
-            }`}
-            aria-label="Status-Filter"
-          >
-            <option value="all">Alle Status</option>
-            {(Object.keys(JOB_STATUS) as JobStatus[]).map((status) => (
-              <option key={status} value={status}>
-                {JOB_STATUS[status].label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            onChange={(v) => setFilterStatus(v as JobStatus | "all")}
+            items={[
+              { id: "all", label: "Alle Status" },
+              ...(Object.keys(JOB_STATUS) as JobStatus[]).map((s) => ({
+                id: s,
+                label: JOB_STATUS[s].label,
+              })),
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterStatus !== "all"}
+          />
         </div>
 
         {/* Location-Filter */}
-        <div className="relative">
-          <select
+        <div className="w-full sm:w-44">
+          <SearchableSelect
             value={filterLocation}
-            onChange={(e) =>
+            onChange={(v) =>
               setFilterLocation(
-                e.target.value as "all" | "scala" | "barakuba" | "bau3" | "sonstige"
+                v as "all" | "scala" | "barakuba" | "bau3" | "sonstige"
               )
             }
-            className={`h-9 pl-3 pr-8 text-sm rounded-lg border bg-background appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring ${
-              filterLocation !== "all" ? "border-foreground/50 font-medium" : ""
-            }`}
-            aria-label="Location-Filter"
-          >
-            <option value="all">Alle Locations</option>
-            <option value="scala">SCALA Basel</option>
-            <option value="barakuba">Barakuba</option>
-            <option value="bau3">Theater BAU3</option>
-            <option value="sonstige">Sonstige</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            items={[
+              { id: "all", label: "Alle Locations" },
+              { id: "scala", label: "SCALA Basel" },
+              { id: "barakuba", label: "Barakuba" },
+              { id: "bau3", label: "Theater BAU3" },
+              { id: "sonstige", label: "Sonstige" },
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterLocation !== "all"}
+          />
         </div>
 
         {/* Reset (nur wenn ein Filter aktiv) */}
