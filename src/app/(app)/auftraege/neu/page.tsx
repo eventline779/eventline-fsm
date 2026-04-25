@@ -42,8 +42,9 @@ export default function NeuerAuftragPage() {
   const searchParams = useSearchParams();
   const supabase = createClient();
   const [saving, setSaving] = useState<"draft" | "create" | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  // null = loading, [] = wirklich leer (verhindert Loading-Flash der "noch keine X"-Hints)
+  const [customers, setCustomers] = useState<Customer[] | null>(null);
+  const [locations, setLocations] = useState<Location[] | null>(null);
   const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
 
   const [form, setForm] = useState({
@@ -74,8 +75,8 @@ export default function NeuerAuftragPage() {
           .order("job_number", { ascending: false })
           .limit(1),
       ]);
-      if (custRes.data) setCustomers(custRes.data as Customer[]);
-      if (locRes.data) setLocations(locRes.data as Location[]);
+      setCustomers((custRes.data as Customer[]) ?? []);
+      setLocations((locRes.data as Location[]) ?? []);
       // Sequenz startet bei 26200 (Migration 011) — wenn noch keine Aufträge: 26200, sonst MAX+1
       const maxRow = maxRes.data?.[0] as { job_number: number } | undefined;
       setNextJobNumber(maxRow?.job_number ? maxRow.job_number + 1 : 26200);
@@ -186,7 +187,7 @@ export default function NeuerAuftragPage() {
     router.push("/auftraege");
   }
 
-  const selectedLocation = locations.find((l) => l.id === form.location_id);
+  const selectedLocation = locations?.find((l) => l.id === form.location_id);
 
   return (
     <div className="max-w-2xl">
@@ -266,7 +267,7 @@ export default function NeuerAuftragPage() {
                   <SearchableSelect
                     value={form.location_id}
                     onChange={(id) => update("location_id", id)}
-                    items={locations.map((l) => ({
+                    items={(locations ?? []).map((l) => ({
                       id: l.id,
                       label: l.name,
                       sub: [l.address_street, l.address_zip, l.address_city]
@@ -299,7 +300,7 @@ export default function NeuerAuftragPage() {
                   <SearchableSelect
                     value={form.customer_id}
                     onChange={(id) => update("customer_id", id)}
-                    items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                    items={(customers ?? []).map((c) => ({ id: c.id, label: c.name }))}
                     placeholder="Kunde tippen…"
                     required
                   />
@@ -309,7 +310,7 @@ export default function NeuerAuftragPage() {
                   <AddressAutocomplete
                     value={form.external_address}
                     onChange={(v) => update("external_address", v)}
-                    localLocations={locations}
+                    localLocations={locations ?? []}
                     placeholder="Ort / Adresse…"
                     required
                   />
@@ -317,7 +318,7 @@ export default function NeuerAuftragPage() {
               </>
             )}
           </div>
-          {form.job_type === "location" && locations.length === 0 && (
+          {form.job_type === "location" && locations !== null && locations.length === 0 && (
             <p className="text-xs text-muted-foreground">
               Noch keine Locations.{" "}
               <Link href="/standorte" className="underline">
@@ -325,7 +326,7 @@ export default function NeuerAuftragPage() {
               </Link>
             </p>
           )}
-          {form.job_type === "extern" && customers.length === 0 && (
+          {form.job_type === "extern" && customers !== null && customers.length === 0 && (
             <p className="text-xs text-muted-foreground">
               Noch keine Kunden.{" "}
               <Link href="/kunden/neu" className="underline">
