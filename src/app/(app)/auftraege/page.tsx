@@ -65,7 +65,11 @@ export default function AuftraegePage() {
   const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
     const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
-    const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
+    const lowerSearch = search.toLowerCase().trim();
+    const matchesSearch = !lowerSearch
+      ? true
+      : j.title.toLowerCase().includes(lowerSearch) ||
+        String(j.job_number ?? "").includes(lowerSearch);
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
     const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
     const isScala = locName.includes("scala");
@@ -115,7 +119,7 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm */}
+      {/* Kreis-Diagramm — alle 6 Status, auch wenn count=0 (in der Liste nur, im Donut nur sichtbar wenn >0) */}
       {jobs.length > 0 && (() => {
         const activeJobs = jobs;
         const segments = [
@@ -125,7 +129,7 @@ export default function AuftraegePage() {
           { label: "In Arbeit", count: activeJobs.filter((j) => j.status === "in_arbeit").length, color: "#eab308" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },
-        ].filter((s) => s.count > 0);
+        ];
         const total = segments.reduce((sum, s) => sum + s.count, 0);
         const radius = 70;
         const strokeWidth = 26;
@@ -170,7 +174,12 @@ export default function AuftraegePage() {
                   {segments.map((s) => {
                     const pct = total > 0 ? (s.count / total) * 100 : 0;
                     return (
-                      <div key={s.label} className="flex items-center gap-3">
+                      <div
+                        key={s.label}
+                        className={`flex items-center gap-3 ${
+                          s.count === 0 ? "opacity-40" : ""
+                        }`}
+                      >
                         <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
@@ -195,14 +204,17 @@ export default function AuftraegePage() {
 
       {/* Such- und Filter-Bar — 1 Zeile, kompakt */}
       <div className="flex flex-col sm:flex-row gap-2">
-        {/* Suche */}
+        {/* Suche — INT-Nummer oder Titel */}
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <span className="absolute left-9 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+            INT-
+          </span>
           <Input
-            placeholder="Aufträge suchen…"
+            placeholder="1234 oder Titel"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-[4.25rem] h-9"
           />
         </div>
 
@@ -334,8 +346,10 @@ export default function AuftraegePage() {
                   <Calendar className="h-4 w-4 text-green-500" />
                 )}
               </div>
-              <Card className="bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1">
-                <CardContent className="p-5">
+              <Card className={`bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1 ${
+                job.status === "entwurf" ? "border-dashed opacity-80" : ""
+              }`}>
+                <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
@@ -373,6 +387,12 @@ export default function AuftraegePage() {
                           <span className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5" />
                             {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
+                            {job.end_date && job.end_date !== job.start_date && (
+                              <>
+                                {" – "}
+                                {new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
+                              </>
+                            )}
                           </span>
                         )}
                       </div>
