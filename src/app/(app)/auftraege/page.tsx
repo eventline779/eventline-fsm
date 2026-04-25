@@ -272,29 +272,45 @@ export default function AuftraegePage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed bg-white">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-              <ClipboardList className="h-7 w-7 text-gray-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 text-lg">
-              {search || filterStatus !== "all" ? "Keine Ergebnisse" : "Noch keine Aufträge"}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {search || filterStatus !== "all"
-                ? "Versuche andere Filter."
-                : "Erstelle deinen ersten Auftrag."}
-            </p>
-            {!search && filterStatus === "all" && (
-              <Link href="/auftraege/neu">
-                <Button className="mt-5 bg-red-600 hover:bg-red-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ersten Auftrag erstellen
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+        (() => {
+          const hasFilter = !!search || filterStatus !== "all" || filterLocation !== "all";
+          return (
+            <Card className="border-dashed bg-white">
+              <CardContent className="py-16 text-center">
+                <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                  <ClipboardList className="h-7 w-7 text-gray-400" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-lg">
+                  {hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Aufträge"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {hasFilter
+                    ? `${jobs.length} Auftrag${jobs.length === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
+                    : "Erstelle deinen ersten Auftrag."}
+                </p>
+                {hasFilter ? (
+                  <Button
+                    onClick={() => {
+                      setSearch("");
+                      setFilterStatus("all");
+                      setFilterLocation("all");
+                    }}
+                    className="mt-5 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Filter zurücksetzen
+                  </Button>
+                ) : (
+                  <Link href="/auftraege/neu">
+                    <Button className="mt-5 bg-red-600 hover:bg-red-700 text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ersten Auftrag erstellen
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()
       ) : (
         <div className="space-y-3">
           {filtered.map((job) => {
