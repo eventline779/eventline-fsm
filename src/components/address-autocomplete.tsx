@@ -328,8 +328,8 @@ export function AddressAutocomplete({
             onMouseEnter={() => setHighlight(i)}
             className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
               i === highlight
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent/60"
+                ? "bg-foreground/[0.08]"
+                : "hover:bg-foreground/[0.05]"
             }`}
           >
             {s.kind === "location" ? (
