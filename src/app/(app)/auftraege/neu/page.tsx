@@ -99,7 +99,8 @@ export default function NeuerAuftragPage() {
       if (!form.external_address.trim()) return "Bitte einen Ort angeben";
     }
     if (!form.start_date) return "Bitte Startdatum angeben";
-    if (form.end_date && form.end_date < form.start_date) {
+    if (!form.end_date) return "Bitte Enddatum angeben";
+    if (form.end_date < form.start_date) {
       return "Enddatum darf nicht vor dem Startdatum liegen";
     }
     return null;
@@ -339,7 +340,7 @@ export default function NeuerAuftragPage() {
               />
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende</p>
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
               <Input
                 type="date"
                 value={form.end_date}
