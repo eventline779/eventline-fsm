@@ -102,7 +102,12 @@ export default function HeutePage() {
       .order("clock_in", { ascending: false })
       .limit(1);
     if (openEntries && openEntries.length > 0) {
-      const e = openEntries[0] as { id: string; job_id: string | null; clock_in: string; jobs?: { title: string } | { title: string }[] | null };
+      const e = openEntries[0] as unknown as {
+        id: string;
+        job_id: string | null;
+        clock_in: string;
+        jobs?: { title: string } | { title: string }[] | null;
+      };
       const job = Array.isArray(e.jobs) ? e.jobs[0] : e.jobs;
       setOpenEntry({
         id: e.id,
@@ -121,12 +126,18 @@ export default function HeutePage() {
       .eq("profile_id", user.id)
       .limit(20);
 
+    type JobShape = {
+      id: string;
+      title: string;
+      job_number: number | null;
+      start_date: string | null;
+      end_date: string | null;
+      status: string;
+      locations?: { name: string } | { name: string }[] | null;
+    };
     const events = (assignments ?? [])
       .map((a) => {
-        const jobs = a.jobs as
-          | { id: string; title: string; job_number: number | null; start_date: string | null; end_date: string | null; status: string; locations?: { name: string } | null }
-          | { id: string; title: string; job_number: number | null; start_date: string | null; end_date: string | null; status: string; locations?: { name: string } | null }[]
-          | null;
+        const jobs = a.jobs as unknown as JobShape | JobShape[] | null;
         const job = Array.isArray(jobs) ? jobs[0] : jobs;
         if (!job) return null;
         if (job.status === "abgeschlossen" || job.status === "storniert") return null;
@@ -169,9 +180,11 @@ export default function HeutePage() {
       .not("clock_out", "is", null);
 
     const workedJobIds = new Set<string>();
-    const workedJobsMap = new Map<string, { title: string; end_date: string | null; status: string }>();
+    type WorkedJob = { title: string; end_date: string | null; status: string };
+    const workedJobsMap = new Map<string, WorkedJob>();
     for (const we of workedJobs ?? []) {
-      const j = Array.isArray(we.jobs) ? we.jobs[0] : we.jobs;
+      const raw = we.jobs as unknown as WorkedJob | WorkedJob[] | null;
+      const j = Array.isArray(raw) ? raw[0] : raw;
       if (j && we.job_id) {
         workedJobIds.add(we.job_id);
         workedJobsMap.set(we.job_id, j);
