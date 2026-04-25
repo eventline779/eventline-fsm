@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { SearchableSelect } from "@/components/searchable-select";
 import { ArrowLeft, Save, FileEdit } from "lucide-react";
@@ -189,34 +188,27 @@ export default function NeuerAuftragPage() {
         </div>
 
         {/* Was */}
-        <div className="space-y-2">
-          <div>
-            <Label htmlFor="title" className="text-xs">
-              Titel *
-            </Label>
-            <Input
-              id="title"
-              placeholder="kurz, was zu tun ist (z.B. Lichtaufbau)"
-              value={form.title}
-              onChange={(e) => update("title", e.target.value)}
-              className="mt-1"
-              aria-required
-              autoFocus
-            />
-          </div>
-          <div>
-            <Label htmlFor="description" className="text-xs">
-              Beschreibung
-            </Label>
-            <textarea
-              id="description"
-              placeholder="Details zum Auftrag…"
-              value={form.description}
-              onChange={(e) => update("description", e.target.value)}
-              rows={2}
-              className="mt-1 w-full px-3 py-1.5 text-sm rounded-lg border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
+        <div className="space-y-1.5">
+          <SectionLabel>Titel *</SectionLabel>
+          <Input
+            id="title"
+            placeholder="kurz, was zu tun ist (z.B. Lichtaufbau)"
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            aria-required
+            autoFocus
+          />
+        </div>
+        <div className="space-y-1.5">
+          <SectionLabel>Beschreibung</SectionLabel>
+          <textarea
+            id="description"
+            placeholder="Details zum Auftrag…"
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            rows={2}
+            className="w-full px-3 py-1.5 text-sm rounded-lg border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
 
         <hr className="border-border/50" />
