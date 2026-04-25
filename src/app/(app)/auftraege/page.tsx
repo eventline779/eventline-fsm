@@ -316,7 +316,7 @@ export default function AuftraegePage() {
           );
         })()
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filtered.map((job) => {
             const appointments = (job as any).appointments as { id: string; start_time: string }[] | null;
             const hasAppointment = appointments && appointments.length > 0;
