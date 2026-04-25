@@ -243,53 +243,65 @@ export default function NeuerAuftragPage() {
 
         <hr className="border-border/50" />
 
-        {/* Wo — gleiches 2-Spalten-Layout in beiden Modi, damit nichts springt */}
+        {/* Wo — Sub-Labels direkt am Feld, damit klar ist welches Sub-Feld Pflicht ist */}
         <div className="space-y-2">
-          <SectionLabel>Wo *</SectionLabel>
+          <SectionLabel>Wo</SectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {form.job_type === "location" ? (
               <>
-                <SearchableSelect
-                  value={form.location_id}
-                  onChange={(id) => update("location_id", id)}
-                  items={locations.map((l) => ({
-                    id: l.id,
-                    label: l.name,
-                    sub: [l.address_street, l.address_zip, l.address_city]
-                      .filter(Boolean)
-                      .join(", "),
-                  }))}
-                  placeholder="Location auswählen…"
-                  required
-                />
-                <div className="h-9 flex items-center px-3 text-xs rounded-lg border border-dashed bg-muted/20 text-muted-foreground truncate">
-                  {selectedLocation
-                    ? [
-                        selectedLocation.address_street,
-                        selectedLocation.address_zip,
-                        selectedLocation.address_city,
-                      ]
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Location *</p>
+                  <SearchableSelect
+                    value={form.location_id}
+                    onChange={(id) => update("location_id", id)}
+                    items={locations.map((l) => ({
+                      id: l.id,
+                      label: l.name,
+                      sub: [l.address_street, l.address_zip, l.address_city]
                         .filter(Boolean)
-                        .join(", ") || "Keine Adresse hinterlegt"
-                    : "Adresse erscheint nach Auswahl"}
+                        .join(", "),
+                    }))}
+                    placeholder="Location auswählen…"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Adresse</p>
+                  <div className="h-9 flex items-center px-3 text-xs rounded-lg border border-dashed bg-muted/20 text-muted-foreground truncate">
+                    {selectedLocation
+                      ? [
+                          selectedLocation.address_street,
+                          selectedLocation.address_zip,
+                          selectedLocation.address_city,
+                        ]
+                          .filter(Boolean)
+                          .join(", ") || "Keine Adresse hinterlegt"
+                      : "Adresse erscheint nach Auswahl"}
+                  </div>
                 </div>
               </>
             ) : (
               <>
-                <SearchableSelect
-                  value={form.customer_id}
-                  onChange={(id) => update("customer_id", id)}
-                  items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                  placeholder="Kunde tippen…"
-                  required
-                />
-                <AddressAutocomplete
-                  value={form.external_address}
-                  onChange={(v) => update("external_address", v)}
-                  localLocations={locations}
-                  placeholder="Ort / Adresse…"
-                  required
-                />
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Kunde *</p>
+                  <SearchableSelect
+                    value={form.customer_id}
+                    onChange={(id) => update("customer_id", id)}
+                    items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                    placeholder="Kunde tippen…"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Ort *</p>
+                  <AddressAutocomplete
+                    value={form.external_address}
+                    onChange={(v) => update("external_address", v)}
+                    localLocations={locations}
+                    placeholder="Ort / Adresse…"
+                    required
+                  />
+                </div>
               </>
             )}
           </div>
@@ -314,21 +326,27 @@ export default function NeuerAuftragPage() {
         <hr className="border-border/50" />
 
         {/* Wann */}
-        <div className="space-y-1.5">
-          <SectionLabel>Wann *</SectionLabel>
+        <div className="space-y-2">
+          <SectionLabel>Wann</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
-            <Input
-              type="date"
-              value={form.start_date}
-              onChange={(e) => update("start_date", e.target.value)}
-              aria-label="Startdatum"
-            />
-            <Input
-              type="date"
-              value={form.end_date}
-              onChange={(e) => update("end_date", e.target.value)}
-              aria-label="Enddatum"
-            />
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
+              <Input
+                type="date"
+                value={form.start_date}
+                onChange={(e) => update("start_date", e.target.value)}
+                aria-label="Startdatum"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende</p>
+              <Input
+                type="date"
+                value={form.end_date}
+                onChange={(e) => update("end_date", e.target.value)}
+                aria-label="Enddatum"
+              />
+            </div>
           </div>
         </div>
 
