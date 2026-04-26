@@ -539,9 +539,10 @@ export default function AuftragDetailPage() {
           )}
           {appointments.length === 0 && !showApptForm && (
             !["abgeschlossen", "storniert"].includes(job.status) ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 shrink-0">
-                  <Calendar className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              // Stil-Match Donut-Segmente: fill-opacity 0.12 (light) / 0.18 (dark), Border = volle Farbe
+              <div className="flex items-center gap-3 p-3 rounded-xl border-amber-500 bg-amber-500/[0.12] dark:bg-amber-500/[0.18] border">
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/20 shrink-0">
+                  <Calendar className="h-4 w-4 text-amber-500" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Kein Termin geplant</p>
