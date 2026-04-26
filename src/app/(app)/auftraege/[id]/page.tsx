@@ -10,7 +10,7 @@ import { JOB_STATUS } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
-  Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle,
+  Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -324,6 +324,15 @@ export default function AuftragDetailPage() {
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                 <AlertCircle className="h-3 w-3" />
                 Dringend
+              </span>
+            )}
+            {job.was_anfrage && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
+                title="Aus einer Mietanfrage entstanden"
+              >
+                <Inbox className="h-3 w-3" />
+                Aus Mietanfrage
               </span>
             )}
           </div>
