@@ -507,10 +507,25 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Action-Buttons rechts: Termin planen (bei noTermin) + Pencil (bei Entwurf).
-                        Pencil steht ganz rechts, Termin-Button links davon — in Aktion-Reihenfolge. */}
+                    {/* Action-Buttons rechts: Pencil bei Entwurf (links) + CalendarPlus bei noTermin (rechts).
+                        Reihenfolge fix: CalendarPlus immer am rechten Rand, unabhaengig ob Pencil dort ist. */}
                     {(noTermin || job.status === "entwurf") && (
                       <div className="flex items-center gap-0.5 shrink-0">
+                        {job.status === "entwurf" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(`/auftraege/${job.id}/bearbeiten`);
+                            }}
+                            className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                            aria-label="Bearbeiten"
+                            title="Entwurf bearbeiten"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </button>
+                        )}
                         {noTermin && (
                           <button
                             type="button"
@@ -524,21 +539,6 @@ export default function AuftraegePage() {
                             title="Termin planen"
                           >
                             <CalendarPlus className="h-5 w-5" />
-                          </button>
-                        )}
-                        {job.status === "entwurf" && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(`/auftraege/${job.id}/bearbeiten`);
-                            }}
-                            className="p-2.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-                            aria-label="Bearbeiten"
-                            title="Entwurf bearbeiten"
-                          >
-                            <Pencil className="h-5 w-5" />
                           </button>
                         )}
                       </div>
