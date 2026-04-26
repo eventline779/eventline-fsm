@@ -719,12 +719,12 @@ export default function VertriebPage() {
       {/* Kreis-Diagramm */}
       {contacts.length > 0 && (() => {
         const segments = [
-          { label: "Schritt 1: Offen", count: contacts.filter((c) => (c.step || 1) === 1 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "#d1d5db" },
-          { label: "Schritt 2: Kontaktiert", count: contacts.filter((c) => (c.step || 1) === 2 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "#93c5fd" },
-          { label: "Schritt 3: Finalisierung", count: contacts.filter((c) => (c.step || 1) === 3 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "#fdba74" },
-          { label: "Schritt 4: Operations", count: contacts.filter((c) => (c.step || 1) === 4 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "#6ee7b7" },
-          { label: "Gewonnen", count: contacts.filter((c) => c.status === "gewonnen").length, color: "#86efac" },
-          { label: "Verloren", count: contacts.filter((c) => c.status === "abgesagt").length, color: "#fca5a5" },
+          { label: "Schritt 1: Offen", count: contacts.filter((c) => (c.step || 1) === 1 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-gray)" },
+          { label: "Schritt 2: Kontaktiert", count: contacts.filter((c) => (c.step || 1) === 2 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-blue)" },
+          { label: "Schritt 3: Finalisierung", count: contacts.filter((c) => (c.step || 1) === 3 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-orange)" },
+          { label: "Schritt 4: Operations", count: contacts.filter((c) => (c.step || 1) === 4 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-emerald)" },
+          { label: "Gewonnen", count: contacts.filter((c) => c.status === "gewonnen").length, color: "var(--status-green)" },
+          { label: "Verloren", count: contacts.filter((c) => c.status === "abgesagt").length, color: "var(--status-red)" },
         ].filter((s) => s.count > 0);
 
         const total = segments.reduce((sum, s) => sum + s.count, 0);

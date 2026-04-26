@@ -82,6 +82,14 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
+  /* Diagramm-Status-Farben: Light-Mode mittel gesaettigt (Tailwind 400er-Stufe) */
+  --status-purple: #c084fc;
+  --status-gray: #9ca3af;
+  --status-green: #4ade80;
+  --status-red: #f87171;
+  --status-blue: #60a5fa;
+  --status-orange: #fb923c;
+  --status-emerald: #34d399;
 }
 
 .dark {
@@ -116,6 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
+  /* Diagramm-Status-Farben: Dark-Mode kraeftiger (Tailwind 500er-Stufe) */
+  --status-purple: #a855f7;
+  --status-gray: #6b7280;
+  --status-green: #22c55e;
+  --status-red: #ef4444;
+  --status-blue: #3b82f6;
+  --status-orange: #f97316;
+  --status-emerald: #10b981;
 }
 
 @layer base {
