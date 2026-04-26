@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JOB_STATUS } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
-  ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
+  ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
   Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -667,8 +667,14 @@ export default function AuftragDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Upload className="h-4 w-4" />Dokumente ({documents.length})</CardTitle>
-          <div>
+          <div className="flex items-center gap-2">
             <input type="file" id="jobFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" className="hidden" onChange={handleFileUpload} />
+            {/* Kamera-Capture: triggert auf Mobil die Kamera-App, auf Desktop faellt der Browser auf File-Picker zurueck.
+                Button nur auf Mobile sichtbar — auf Desktop ist er redundant zum normalen Upload. */}
+            <input type="file" id="jobPhotoUpload" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
+            <Button size="sm" variant="outline" className="md:hidden" onClick={() => document.getElementById("jobPhotoUpload")?.click()} disabled={uploading}>
+              <Camera className="h-4 w-4 mr-1" />Foto
+            </Button>
             <Button size="sm" variant="outline" onClick={() => document.getElementById("jobFileUpload")?.click()} disabled={uploading}>
               <Upload className="h-4 w-4 mr-1" />{uploading ? "Laden..." : "Hochladen"}
             </Button>
