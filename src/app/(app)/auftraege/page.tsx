@@ -426,7 +426,8 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment;
             const allGood = isActive && hasAppointment && job.status !== "entwurf";
             // Stripe-Farbe als ::before Pseudo-Element (eigene DOM-Layer, kein Konflikt mit hover:shadow-md)
-            const stripeColor = noTermin ? "before:bg-amber-500" : allGood ? "before:bg-green-500" : "";
+            // Gruen exakt wie Diagramm-Status-Gruen (Jade) — Konsistenz: gleiche Bedeutung = gleiche Farbe
+            const stripeColor = noTermin ? "before:bg-amber-500" : allGood ? "before:bg-[var(--status-green)]" : "";
             const stripeBase = "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-xl before:pointer-events-none";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
