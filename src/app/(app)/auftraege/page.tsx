@@ -426,10 +426,10 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment;
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
-              <Card className={`bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
+              <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               } ${
-                noTermin ? "shadow-[inset_3px_0_0_#f59e0b]" : ""
+                noTermin ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-amber-500 before:rounded-l-xl before:pointer-events-none" : ""
               }`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
