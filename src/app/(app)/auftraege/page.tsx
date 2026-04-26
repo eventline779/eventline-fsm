@@ -357,15 +357,19 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Action-Buttons rechts: zwei feste Slots, damit Pencil/Check und CalendarPlus/Check
-                        stets an derselben X-Position bleiben — unabhaengig davon, welche
-                        Aktion gerade zutrifft. Slot 1 = Pencil (entwurf), Slot 2 = CalendarPlus (kein Termin)
-                        oder gruener Check (allGood). Bei "kein Termin" steht der amber Hinweistext
-                        direkt links neben dem CalendarPlus-Icon. */}
+                    {/* Action-Slot rechts: ein einziger Slot, damit Pencil, CalendarPlus und Check
+                        immer an derselben X-Position liegen — die drei Zustaende schliessen sich
+                        gegenseitig aus (entwurf | kein Termin | allGood). Bei "kein Termin" steht
+                        der amber Hinweistext direkt links neben dem Icon. */}
                     {(noTermin || job.status === "entwurf" || allGood) && (
                       <div className="flex items-center gap-0.5 shrink-0">
+                        {noTermin && (
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
+                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
+                          </span>
+                        )}
                         <div className="w-10 h-10 flex items-center justify-center">
-                          {job.status === "entwurf" && (
+                          {job.status === "entwurf" ? (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -379,15 +383,7 @@ export default function AuftraegePage() {
                             >
                               <Pencil className="h-5 w-5" />
                             </button>
-                          )}
-                        </div>
-                        {noTermin && (
-                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
-                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                          </span>
-                        )}
-                        <div className="w-10 h-10 flex items-center justify-center">
-                          {noTermin ? (
+                          ) : noTermin ? (
                             <button
                               type="button"
                               onClick={(e) => {
