@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STATUS, REQUEST_STEPS } from "@/lib/constants";
+import { RequestStepTracker } from "@/components/request-step-tracker";
 import type { Job, JobStatus, Profile } from "@/types";
 import Link from "next/link";
 import {
@@ -442,11 +443,22 @@ export default function AuftraegePage() {
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
-                      {isAnfrage && (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Schritt {currentStep}/5 · {stepInfo.label}
-                        </p>
-                      )}
+                      {/* Footer-Sektion: identische Hoehe pro Karte. Vermietentwurf zeigt
+                          den 5-Kreis-Step-Tracker, andere Stati eine kurze Status-Info-Zeile
+                          (Termin, Abgeschlossen-Datum, etc.). */}
+                      <div className="mt-3 pt-3 border-t border-foreground/[0.06] min-h-[28px] flex items-center">
+                        {isAnfrage ? (
+                          <RequestStepTracker currentStep={currentStep} size="sm" />
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {job.status === "entwurf" && "Entwurf · vor Freigabe ergänzen"}
+                            {job.status === "offen" && hasAppointment && "Termin geplant"}
+                            {job.status === "offen" && !hasAppointment && "Termin noch zu planen"}
+                            {job.status === "abgeschlossen" && "Abgeschlossen"}
+                            {job.status === "storniert" && "Storniert"}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {/* Action-Slot rechts: Anfragen bekommen einen "Nächster Schritt"-Button mit
                         Text, sodass das Weiterklicken ohne Detail-Seite geht. Bei Entwurf/kein Termin/
@@ -477,8 +489,8 @@ export default function AuftraegePage() {
                         // Warte-Schritte (2, 4): keine Inline-Action — der Kunde muss aus dem Mail
                         // bestaetigen. Manuelles Bestaetigen geht ueber die Detail-Seite.
                         <div className="shrink-0 pr-2">
-                          <span className="text-xs text-muted-foreground italic whitespace-nowrap">
-                            Wartet auf Kunden
+                          <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                            Manuell in Details bestätigen
                           </span>
                         </div>
                       )
