@@ -155,7 +155,7 @@ function NeueAnfragePageContent() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-4">
-        <Link href="/anfragen">
+        <Link href="/auftraege">
           <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -322,7 +322,7 @@ function NeueAnfragePageContent() {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Link href="/anfragen" className="flex-1">
+          <Link href="/auftraege" className="flex-1">
             <Button type="button" variant="outline" size="sm" className="w-full">
               Abbrechen
             </Button>

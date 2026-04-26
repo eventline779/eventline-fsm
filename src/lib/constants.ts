@@ -4,7 +4,7 @@
 // Anfrage konvertiert wird, wechselt der Status auf 'offen' (oder 'entwurf')
 // und request_step wird NULL. Ab dann normale Auftragslogik.
 export const JOB_STATUS = {
-  anfrage: { label: "Anfrage", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
+  anfrage: { label: "Vermietentwurf", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Bevorstehend", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
@@ -91,8 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Buchungen",
     items: [
-      { href: "/anfragen", label: "Mietanfragen", icon: "Inbox", simplified: true, mobile: true },
-      { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true },
+      { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true, mobile: true },
       { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
     ],
   },

@@ -1,26 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Job } from "@/types";
 import { REQUEST_STEPS } from "@/lib/constants";
 import {
   ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
-  StickyNote, FileText, Send, Upload, Trash2,
+  StickyNote, FileText, Send,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
+import { SendStepModal } from "@/components/send-step-modal";
 
 // Schritte mit Mail-Versand. 2/4 sind Warte-Schritte (kein Mail-Modal).
 const MAIL_STEPS = new Set<number>([1, 3, 5]);
-
-interface UploadedDoc { id: string; name: string; storage_path: string }
 
 export default function AnfrageDetailPage() {
   const { id } = useParams();
@@ -43,16 +41,8 @@ export default function AnfrageDetailPage() {
   const [showConvert, setShowConvert] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
 
-  // Mail-Modal: 2 Phasen — "compose" (Upload + Mail senden) und "confirm" (Bestaetigen -> step advance)
-  const [sendPhase, setSendPhase] = useState<"closed" | "compose" | "confirm">("closed");
-  const [sendEmail, setSendEmail] = useState("");
-  const [sendCc, setSendCc] = useState("");
-  const [sendMessage, setSendMessage] = useState("");
-  const [sendDocs, setSendDocs] = useState<UploadedDoc[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Mail-Modal: gemeinsame Komponente, nur Open-Flag hier.
+  const [sendOpen, setSendOpen] = useState(false);
 
   useEffect(() => {
     loadJob();
@@ -67,7 +57,7 @@ export default function AnfrageDetailPage() {
       .single();
     if (error || !data) {
       toast.error("Mietanfrage nicht gefunden");
-      router.push("/anfragen");
+      router.push("/auftraege");
       return;
     }
     if (data.status !== "anfrage" && data.status !== "storniert") {
@@ -91,30 +81,10 @@ export default function AnfrageDetailPage() {
     return () => clearTimeout(handle);
   }, [notesText, savedText, id, supabase]);
 
-  async function openSendModal() {
-    if (!job?.request_step) return;
-    const customerEmail = (job.customer as unknown as { email?: string | null } | undefined)?.email ?? "";
-    setSendEmail(customerEmail);
-    setSendCc("");
-    setSendMessage("");
-    // Nur die zu DIESEM Schritt gehoerenden Dokumente laden, damit z.B. der Vertrag-Schritt
-    // nicht versehentlich die Konditionen wieder anhaengt. Storage-Pfad-Konvention:
-    // anfragen/{jobId}/s{step}/{...}
-    const prefix = `anfragen/${id}/s${job.request_step}/`;
-    const { data: docs } = await supabase
-      .from("documents")
-      .select("id, name, storage_path")
-      .eq("job_id", id)
-      .like("storage_path", `${prefix}%`)
-      .order("created_at", { ascending: false });
-    setSendDocs((docs as UploadedDoc[] | null) ?? []);
-    setSendPhase("compose");
-  }
-
   async function handleNextStep() {
     if (!job?.request_step) return;
     if (MAIL_STEPS.has(job.request_step)) {
-      await openSendModal();
+      setSendOpen(true);
       return;
     }
     await advanceStepRaw();
@@ -141,119 +111,6 @@ export default function AnfrageDetailPage() {
     toast.success(REQUEST_STEPS[nextStep - 1].label);
     window.dispatchEvent(new Event("jobs:invalidate"));
     loadJob();
-  }
-
-  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `anfragen/${id}/s${job?.request_step ?? 0}/${Date.now()}_${safeName}`;
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("path", path);
-      const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-      const upJson = await upRes.json();
-      if (!upJson.success) {
-        toast.error("Upload-Fehler: " + (upJson.error || "Unbekannt"));
-        return;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: inserted, error: dbErr } = await supabase
-        .from("documents")
-        .insert({
-          name: file.name,
-          storage_path: path,
-          file_size: file.size,
-          mime_type: file.type || null,
-          job_id: id,
-          uploaded_by: user?.id,
-        })
-        .select("id, name, storage_path")
-        .single();
-      if (dbErr || !inserted) {
-        toast.error("Fehler: " + (dbErr?.message ?? "Speichern fehlgeschlagen"));
-        return;
-      }
-      setSendDocs((prev) => [inserted as UploadedDoc, ...prev]);
-      toast.success("Dokument hochgeladen");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function removeDoc(doc: UploadedDoc) {
-    await supabase.storage.from("documents").remove([doc.storage_path]);
-    await supabase.from("documents").delete().eq("id", doc.id);
-    setSendDocs((prev) => prev.filter((d) => d.id !== doc.id));
-  }
-
-  async function sendMail() {
-    if (!job?.request_step) return;
-    if (!sendEmail.trim()) {
-      toast.error("Beim Kunden ist keine E-Mail hinterlegt");
-      return;
-    }
-    if (sendDocs.length === 0) {
-      toast.error("Bitte zuerst ein Dokument hochladen");
-      return;
-    }
-    // CC: Komma- oder Semikolon-getrennte Liste, jeder Eintrag muss eine plausible Mail sein.
-    const ccList = sendCc
-      .split(/[,;]/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    const invalidCc = ccList.find((m) => !m.includes("@"));
-    if (invalidCc) {
-      toast.error(`Ungültige CC-Adresse: ${invalidCc}`);
-      return;
-    }
-    setSending(true);
-    try {
-      const customer = job.customer as unknown as { name?: string | null } | undefined;
-      const location = job.location as unknown as { name?: string | null } | undefined;
-      const res = await fetch("/api/anfragen/send-mail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId: id,
-          step: job.request_step,
-          email: sendEmail.trim(),
-          cc: ccList,
-          message: sendMessage.trim(),
-          customerName: customer?.name ?? null,
-          locationName: location?.name ?? null,
-          eventDate: job.start_date,
-          eventEndDate: job.end_date,
-          documentPaths: sendDocs.map((d) => d.storage_path),
-        }),
-      });
-      const json = await res.json();
-      if (!json.success) {
-        toast.error("Mail-Fehler: " + (json.error || "Unbekannt"));
-        return;
-      }
-      toast.success("Mail gesendet");
-      setSendPhase("confirm");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Netzwerkfehler";
-      toast.error(msg);
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function confirmStepAdvance() {
-    setConfirming(true);
-    try {
-      // Modal schliessen bevor advanceStepRaw eventuell den Convert-Modal oeffnet
-      setSendPhase("closed");
-      await advanceStepRaw();
-    } finally {
-      setConfirming(false);
-    }
   }
 
   async function previousStep() {
@@ -299,7 +156,7 @@ export default function AnfrageDetailPage() {
     setCancelReason("");
     toast.success("Mietanfrage storniert");
     window.dispatchEvent(new Event("jobs:invalidate"));
-    router.push("/anfragen");
+    router.push("/auftraege");
   }
 
   async function convertToAuftrag() {
@@ -341,7 +198,7 @@ export default function AnfrageDetailPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/anfragen">
+        <Link href="/auftraege">
           <button className="p-2 rounded-lg hover:bg-muted transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -593,170 +450,18 @@ export default function AnfrageDetailPage() {
         </>
       )}
 
-      {/* Mail-Versand-Modal — Phase 1: Compose, Phase 2: Bestaetigen */}
-      {sendPhase !== "closed" && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-            onClick={() => { if (!sending && !confirming) setSendPhase("closed"); }}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="font-semibold">
-                  {sendPhase === "compose" ? `${stepInfo.label} an Kunde` : "Schritt bestätigen"}
-                </h2>
-                <button
-                  onClick={() => { if (!sending && !confirming) setSendPhase("closed"); }}
-                  className="p-1.5 rounded-lg hover:bg-muted"
-                  disabled={sending || confirming}
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-
-              {sendPhase === "compose" ? (
-                <div className="p-6 space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Empfänger</p>
-                    {sendEmail ? (
-                      <div className="flex h-9 items-center px-3 text-sm rounded-xl border bg-muted/30 text-muted-foreground select-text">
-                        {sendEmail}
-                      </div>
-                    ) : (
-                      <div className="flex h-9 items-center px-3 text-sm rounded-xl border border-destructive/40 bg-destructive/5 text-destructive">
-                        Beim Kunden ist keine E-Mail hinterlegt.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">CC (optional)</p>
-                    <Input
-                      type="text"
-                      placeholder="z.B. partner@firma.ch, buchhaltung@firma.ch"
-                      value={sendCc}
-                      onChange={(e) => setSendCc(e.target.value)}
-                    />
-                    <p className="text-[10px] text-muted-foreground/80">Mehrere Adressen mit Komma trennen.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Persönliche Nachricht (optional)</p>
-                    <textarea
-                      value={sendMessage}
-                      onChange={(e) => setSendMessage(e.target.value)}
-                      placeholder="Optionaler Text, der im Mail-Body erscheint."
-                      rows={3}
-                      style={{ fieldSizing: "content" } as React.CSSProperties}
-                      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Anhänge</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => fileRef.current?.click()}
-                        disabled={uploading}
-                      >
-                        <Upload className="h-3.5 w-3.5 mr-1.5" />
-                        {uploading ? "Lädt…" : "Datei hinzufügen"}
-                      </Button>
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={uploadDoc}
-                        className="hidden"
-                      />
-                    </div>
-                    {sendDocs.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Noch keine Datei hochgeladen.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {sendDocs.map((d) => (
-                          <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border bg-foreground/[0.02]">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                              <span className="text-xs truncate">{d.name}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeDoc(d)}
-                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0"
-                              title="Entfernen"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="flex-1"
-                      onClick={() => setSendPhase("closed")}
-                      disabled={sending}
-                    >
-                      Abbrechen
-                    </Button>
-                    <Button
-                      size="lg"
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                      onClick={sendMail}
-                      disabled={sending || !sendEmail.trim() || sendDocs.length === 0}
-                      title={sendDocs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
-                    >
-                      <Send className="h-4 w-4 mr-1.5" />
-                      {sending ? "Sende…" : "Mail senden"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-6 space-y-4">
-                  <div className="flex items-start gap-2 p-3 rounded-xl border tinted-emerald text-xs">
-                    <Check className="h-4 w-4 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium">Mail wurde versendet</p>
-                      <p className="opacity-80 mt-0.5">
-                        Bestätige, um die Mietanfrage zum nächsten Schritt zu bewegen.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="flex-1"
-                      onClick={() => setSendPhase("closed")}
-                      disabled={confirming}
-                    >
-                      Später
-                    </Button>
-                    <Button
-                      size="lg"
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                      onClick={confirmStepAdvance}
-                      disabled={confirming}
-                    >
-                      <Check className="h-4 w-4 mr-1.5" />
-                      {confirming ? "Bestätige…" : "Bestätigen"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+      <SendStepModal
+        open={sendOpen}
+        jobId={String(id)}
+        step={(job.request_step ?? 1) as 1 | 2 | 3 | 4 | 5}
+        customerEmail={(job.customer as unknown as { email?: string | null } | undefined)?.email ?? ""}
+        customerName={customer?.name ?? null}
+        locationName={location?.name ?? null}
+        eventDate={job.start_date}
+        eventEndDate={job.end_date}
+        onClose={() => setSendOpen(false)}
+        onAdvance={advanceStepRaw}
+      />
 
       {/* Convert-Modal */}
       {showConvert && (

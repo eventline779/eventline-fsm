@@ -200,7 +200,7 @@ export default function DashboardPage() {
 
   const statCards = [
     { label: "Offene Aufträge", value: stats.offeneAuftraege, icon: ClipboardList, iconBg: "bg-blue-50 text-blue-600", href: "/auftraege" },
-    { label: "Neue Mietanfragen", value: stats.neueAnfragen, icon: Inbox, iconBg: "bg-amber-50 text-amber-600", href: "/anfragen" },
+    { label: "Neue Vermietentwürfe", value: stats.neueAnfragen, icon: Inbox, iconBg: "bg-amber-50 text-amber-600", href: "/auftraege" },
     { label: "Aktive Techniker", value: stats.aktiveTechniker, icon: Users, iconBg: "bg-emerald-50 text-emerald-600", href: "/zeiterfassung" },
     { label: "Kunden", value: stats.kundenTotal, icon: TrendingUp, iconBg: "bg-violet-50 text-violet-600", href: "/kunden" },
     { label: "Offene Tickets", value: tickets.length, icon: Ticket, iconBg: "bg-red-50 text-red-600", href: "/tickets" },
@@ -208,7 +208,7 @@ export default function DashboardPage() {
 
   const quickActions = [
     { href: "/auftraege/neu", label: "Neuer Auftrag", icon: ClipboardList, desc: "Auftrag erstellen" },
-    { href: "/anfragen/neu", label: "Neue Mietanfrage", icon: Inbox, desc: "Mietanfrage erfassen" },
+    { href: "/anfragen/neu", label: "Neue Vermietung", icon: Inbox, desc: "Vermietentwurf erfassen" },
     { href: "/kunden/neu", label: "Neuer Kunde", icon: Users, desc: "Kunde anlegen" },
     { href: "/zeiterfassung", label: "Einstempeln", icon: Clock, desc: "Zeit erfassen" },
   ];

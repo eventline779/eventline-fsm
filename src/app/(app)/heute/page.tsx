@@ -507,12 +507,12 @@ export default function HeutePage() {
             Übersicht (Admin)
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Link href="/anfragen">
+            <Link href="/auftraege">
               <Card className="hover:bg-muted/30 transition cursor-pointer">
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground">Neue Mietanfragen</p>
+                      <p className="text-xs text-muted-foreground">Neue Vermietentwürfe</p>
                       <p className="text-2xl font-bold mt-1">
                         {adminStats.neueAnfragen}
                       </p>
