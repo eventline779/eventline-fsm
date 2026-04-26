@@ -352,24 +352,26 @@ html, body, *, *::before, *::after {
 }
 
 /* === Globale Linien-Staerke: alle Tailwind .border-* Utilities auf 2px ===
-   Bewusst UNLAYERED (kein @layer-Block), damit CSS-Cascade-Layering die Tailwind
-   utilities NICHT diese Regeln ueberschreiben — unlayered wins ueber alle Layer.
+   In @layer utilities platziert — innerhalb dieses Layers gewinnt source-order,
+   und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
    Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
-.border:not([class*="border-0"]) {
-  border-width: 2px;
-}
-.border-t:not([class*="border-t-0"]) { border-top-width: 2px; }
-.border-b:not([class*="border-b-0"]) { border-bottom-width: 2px; }
-.border-l:not([class*="border-l-0"]) { border-left-width: 2px; }
-.border-r:not([class*="border-r-0"]) { border-right-width: 2px; }
-.border-x:not([class*="border-x-0"]) { border-left-width: 2px; border-right-width: 2px; }
-.border-y:not([class*="border-y-0"]) { border-top-width: 2px; border-bottom-width: 2px; }
-hr {
-  border-top-width: 2px;
-}
-.divide-x > :not([hidden]) ~ :not([hidden]):not([class*="divide-x-0"]) {
-  border-left-width: 2px;
-}
-.divide-y > :not([hidden]) ~ :not([hidden]):not([class*="divide-y-0"]) {
-  border-top-width: 2px;
+@layer utilities {
+  .border:not([class*="border-0"]) {
+    border-width: 2px;
+  }
+  .border-t:not([class*="border-t-0"]) { border-top-width: 2px; }
+  .border-b:not([class*="border-b-0"]) { border-bottom-width: 2px; }
+  .border-l:not([class*="border-l-0"]) { border-left-width: 2px; }
+  .border-r:not([class*="border-r-0"]) { border-right-width: 2px; }
+  .border-x:not([class*="border-x-0"]) { border-left-width: 2px; border-right-width: 2px; }
+  .border-y:not([class*="border-y-0"]) { border-top-width: 2px; border-bottom-width: 2px; }
+  hr {
+    border-top-width: 2px;
+  }
+  .divide-x > :not([hidden]) ~ :not([hidden]):not([class*="divide-x-0"]) {
+    border-left-width: 2px;
+  }
+  .divide-y > :not([hidden]) ~ :not([hidden]):not([class*="divide-y-0"]) {
+    border-top-width: 2px;
+  }
 }
