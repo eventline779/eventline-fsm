@@ -1,68 +1,65 @@
 "use client";
 
-import Image from "next/image";
-
 interface LogoProps {
   size?: "sm" | "md" | "lg" | "xl";
-  /**
-   * Optionaler Override. Default: das Logo wechselt automatisch zwischen
-   * /logo-gmbh.png (Light-Mode) und /logo-light.png (Dark-Mode).
-   * Setze diesen Prop nur wenn du den Theme-Mechanismus umgehen musst
-   * (z.B. PDF-Export, der immer das schwarze Logo braucht).
-   */
-  variant?: "auto" | "light" | "dark";
+  className?: string;
 }
 
-const sizes = {
-  sm: { width: 120, height: 40 },
-  md: { width: 160, height: 50 },
-  lg: { width: 200, height: 63 },
-  xl: { width: 280, height: 88 },
+// viewBox 460:100 (Aspect 4.6:1). Hoehe wird aus der Breite abgeleitet.
+const widths = {
+  sm: 130,
+  md: 180,
+  lg: 240,
+  xl: 320,
 };
 
-// Dateinamen folgen "logo-<theme>.png" — also das Logo, das IM jeweiligen
-// Theme angezeigt wird. logo-light.png = schwarzes Logo für Light-Mode,
-// logo-dark.png = weisses Logo fuer Dark-Mode.
-const SRC_FOR_LIGHT = "/logo-light.png";
-const SRC_FOR_DARK = "/logo-dark.png";
-
-export function Logo({ size = "md", variant = "auto" }: LogoProps) {
-  const s = sizes[size];
-
-  if (variant === "auto") {
-    // Beide Logos rendern, eines per CSS pro Theme ausblenden — vermeidet
-    // Hydration-Mismatch und braucht keinen useTheme-Hook.
-    return (
-      <>
-        <Image
-          src={SRC_FOR_LIGHT}
-          alt="EVENTLINE GmbH"
-          width={s.width}
-          height={s.height}
-          className="object-contain h-auto block dark:hidden"
-          priority
-        />
-        <Image
-          src={SRC_FOR_DARK}
-          alt="EVENTLINE GmbH"
-          width={s.width}
-          height={s.height}
-          className="object-contain h-auto hidden dark:block"
-          priority
-        />
-      </>
-    );
-  }
-
-  const src = variant === "light" ? SRC_FOR_LIGHT : SRC_FOR_DARK;
+export function Logo({ size = "md", className }: LogoProps) {
+  const w = widths[size];
+  const h = Math.round((w * 100) / 460);
   return (
-    <Image
-      src={src}
-      alt="EVENTLINE GmbH"
-      width={s.width}
-      height={s.height}
-      className="object-contain h-auto"
-      priority
-    />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 460 100"
+      width={w}
+      height={h}
+      className={`text-foreground ${className ?? ""}`}
+      aria-label="EVENTLINE GmbH"
+      role="img"
+    >
+      <text
+        x="0"
+        y="72"
+        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
+        fontWeight={900}
+        fontSize={72}
+        letterSpacing={-3}
+        fill="currentColor"
+      >
+        EVENTL
+      </text>
+      <rect x="263" y="22" width="20" height="50" fill="#E53935" />
+      <text
+        x="287"
+        y="72"
+        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
+        fontWeight={900}
+        fontSize={72}
+        letterSpacing={-3}
+        fill="currentColor"
+      >
+        NE
+      </text>
+      <text
+        x="335"
+        y="94"
+        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
+        fontWeight={900}
+        fontSize={18}
+        letterSpacing={0}
+        fill="currentColor"
+      >
+        GmbH
+      </text>
+    </svg>
   );
 }
