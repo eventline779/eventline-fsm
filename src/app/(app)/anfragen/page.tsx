@@ -54,13 +54,17 @@ export default function AnfragenPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Mietanfragen</h1>
-        <Link href="/anfragen/neu">
-          <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Neue Mietanfrage
-          </Button>
-        </Link>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Mietanfragen</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/anfragen/neu">
+            <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Neue Mietanfrage
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
