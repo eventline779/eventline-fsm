@@ -334,13 +334,15 @@ export default function AuftragDetailPage() {
             );
           })}
 
-        {/* Bearbeiten — neben Stornieren */}
-        <Link href={`/auftraege/${id}/bearbeiten`}>
-          <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-all">
-            <Pencil className="h-4 w-4" />
-            Bearbeiten
-          </button>
-        </Link>
+        {/* Bearbeiten — nur bei Entwuerfen */}
+        {job.status === "entwurf" && (
+          <Link href={`/auftraege/${id}/bearbeiten`}>
+            <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-all">
+              <Pencil className="h-4 w-4" />
+              Bearbeiten
+            </button>
+          </Link>
+        )}
 
         {/* Stornieren als Letztes */}
         {availableActions
