@@ -139,7 +139,7 @@ export default function AuftraegePage() {
         const innerR = radius - ringWidth / 2;
         const ringDiff = outerR - innerR;
         // Padding, damit halber Stroke des Outlines an den Raendern nicht clippt
-        const outlineWidth = 3.5;
+        const outlineWidth = 2.5;
         const svgPad = Math.ceil(outlineWidth / 2) + 1;
         const cx = outerR + svgPad;
         const cy = outerR + svgPad;
