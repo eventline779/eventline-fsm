@@ -16,7 +16,6 @@ import {
   CalendarPlus,
   MapPin,
   User,
-  AlertTriangle,
   AlertCircle,
   Archive,
   X,
@@ -427,19 +426,10 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment;
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
-            <div className="flex items-stretch gap-2">
-              {/* Linke Seite: Termin-Status — nur bei aktiven Auftraegen, Archiv braucht das nicht */}
-              {isActive && (
-                <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border-[2.5px] text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
-                  {noTermin ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  ) : (
-                    <Calendar className="h-4 w-4 text-green-500" />
-                  )}
-                </div>
-              )}
-              <Card className={`bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1 ${
+              <Card className={`bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
+              } ${
+                noTermin ? "shadow-[inset_3px_0_0_#f59e0b]" : ""
               }`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -538,7 +528,6 @@ export default function AuftraegePage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
             </Link>
             );
           })}
