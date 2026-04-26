@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, Save, FileEdit } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
 
 export default function NeuerAuftragPage() {
   const router = useRouter();
@@ -160,9 +161,13 @@ export default function NeuerAuftragPage() {
           </button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Neuer Auftrag</h1>
-        <span className="font-mono text-xs text-muted-foreground ml-auto">
-          {nextJobNumber ? `INT-${nextJobNumber}` : "INT-…"}
-        </span>
+        <div className="ml-auto">
+          {nextJobNumber ? (
+            <JobNumber number={nextJobNumber} />
+          ) : (
+            <span className="font-mono text-xs text-muted-foreground">INT-…</span>
+          )}
+        </div>
       </div>
 
       <form

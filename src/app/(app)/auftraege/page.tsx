@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
+import { JobNumber } from "@/components/job-number";
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -441,7 +442,7 @@ export default function AuftraegePage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         {allGood && <span className="w-2 h-2 rounded-full bg-[var(--status-green)] shrink-0" aria-hidden />}
-                        {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
+                        <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                         {job.status !== "offen" && (
                           <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>

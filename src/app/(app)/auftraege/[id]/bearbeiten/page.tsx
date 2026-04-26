@@ -13,6 +13,7 @@ import {
 import { ArrowLeft, Save, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
 
 function dateToISODate(d: string | null): string {
   if (!d) return "";
@@ -180,9 +181,9 @@ export default function AuftragBearbeitenPage() {
         <h1 className="text-xl font-bold tracking-tight">
           {isDraft ? "Entwurf bearbeiten" : "Auftrag bearbeiten"}
         </h1>
-        <span className="font-mono text-xs text-muted-foreground ml-auto">
-          {jobNumber ? `INT-${jobNumber}` : ""}
-        </span>
+        <div className="ml-auto">
+          <JobNumber number={jobNumber} />
+        </div>
       </div>
 
       <form

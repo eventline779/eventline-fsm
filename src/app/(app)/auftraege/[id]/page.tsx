@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
 
 export default function AuftragDetailPage() {
   const { id } = useParams();
@@ -320,7 +321,7 @@ export default function AuftragDetailPage() {
         <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-muted transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            {job.job_number && <span className="text-sm font-mono text-muted-foreground">INT-{job.job_number}</span>}
+            <JobNumber number={job.job_number} size="md" />
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
           <div className="flex items-center gap-2 mt-1.5">

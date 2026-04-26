@@ -12,6 +12,7 @@ import {
 import { JOB_PRIORITY } from "@/lib/constants";
 import type { Todo } from "@/types";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
 
 const CATEGORY_ICONS: Record<string, any> = {
   bestellung: ShoppingCart,
@@ -283,7 +284,7 @@ export default function DashboardPage() {
                 <Card className="bg-card border-orange-100 hover:shadow-sm transition-all">
                   <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-orange-600">INT-{j.job_number}</span>
+                      <JobNumber number={j.job_number} />
                       <span className="font-medium text-sm">{j.title}</span>
                     </div>
                     <div className="flex items-center gap-2">

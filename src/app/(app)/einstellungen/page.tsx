@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
 
 type Tab = "team" | "zeiten" | "schichten" | "backup";
 
@@ -818,7 +819,7 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
               <Card className="bg-card border-gray-100 hover:shadow-sm transition-all opacity-70">
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-gray-400">INT-{j.job_number}</span>
+                    <JobNumber number={j.job_number} />
                     <span className="font-medium text-sm">{j.title}</span>
                     {j.customer?.name && <span className="text-xs text-muted-foreground">· {j.customer.name}</span>}
                   </div>
