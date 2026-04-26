@@ -32,9 +32,9 @@ export const EVENT_TYPES = [
 
 export const REQUEST_STEPS: readonly RequestStep[] = [
   { step: 1, label: "Konditionen senden" },
-  { step: 2, label: "Bestätigung holen" },
+  { step: 2, label: "Konditionen ausgewählt" },
   { step: 3, label: "Angebot senden" },
-  { step: 4, label: "Annahme holen" },
+  { step: 4, label: "Angebot bestätigt" },
   { step: 5, label: "Vertrag senden" },
 ] as const;
 
