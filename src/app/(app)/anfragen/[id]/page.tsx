@@ -90,7 +90,7 @@ export default function AnfrageDetailPage() {
       toast.error("Fehler: " + error.message);
       return;
     }
-    toast.success(`Schritt ${nextStep} gestartet: ${REQUEST_STEPS[nextStep - 1].label}`);
+    toast.success(REQUEST_STEPS[nextStep - 1].label);
     window.dispatchEvent(new Event("jobs:invalidate"));
     loadJob();
   }
@@ -203,10 +203,6 @@ export default function AnfrageDetailPage() {
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Aktueller Schritt</p>
                 <p className="text-base font-semibold mt-0.5">{currentStep}. {stepInfo.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {stepInfo.action}
-                  {stepInfo.waitFor && <> · wartet auf: {stepInfo.waitFor}</>}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 {currentStep > 1 && (

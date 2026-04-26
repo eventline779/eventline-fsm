@@ -37,7 +37,7 @@ export function RequestStepTracker({ currentStep, size = "lg", className = "" }:
                 {done ? <Check className={isLg ? "h-3.5 w-3.5" : "h-3 w-3"} /> : s.step}
               </div>
               {isLg && (
-                <span className={`${labelSize} font-medium ${active ? "text-foreground" : "text-muted-foreground"} text-center max-w-[64px] leading-tight`}>
+                <span className={`${labelSize} font-medium ${active ? "text-foreground" : "text-muted-foreground"} text-center max-w-[88px] leading-tight`}>
                   {s.label}
                 </span>
               )}

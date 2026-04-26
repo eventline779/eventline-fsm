@@ -13,18 +13,11 @@ export const JOB_STATUS = {
 
 // === Vermietungsanfrage-Pipeline ===
 // 5 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
-// Jeder Schritt hat eine action (was tun in diesem Schritt) und eine waitFor (worauf warten danach).
+// Labels formuliert als ERREICHTER ZUSTAND — selbsterklaerend, keine Sub-Beschreibung noetig.
 // Single source of truth — sowohl Step-Tracker-UI als auch Listen-Filter ziehen daraus.
 export interface RequestStep {
   step: 1 | 2 | 3 | 4 | 5;
-  /** Kurzlabel (Step-Tracker). */
   label: string;
-  /** Was passiert in diesem Schritt? */
-  action: string;
-  /** Worauf wartet man, bevor man weiter kann? */
-  waitFor?: string;
-  /** Falls dieser Schritt eine Datei erfordert: welche Kategorie. */
-  docType?: "konditionen" | "angebot" | "vertrag";
 }
 
 // Haeufigste Veranstaltungstypen einer Anfrage. UI zeigt diese als Dropdown,
@@ -38,11 +31,11 @@ export const EVENT_TYPES = [
 ] as const;
 
 export const REQUEST_STEPS: readonly RequestStep[] = [
-  { step: 1, label: "Konditionen", action: "Konditionen senden",       docType: "konditionen", waitFor: "Kunde bestätigt Konditionen" },
-  { step: 2, label: "Bestätigt",   action: "Bestätigung erhalten",                              waitFor: "Kunde meldet sich" },
-  { step: 3, label: "Angebot",     action: "Angebot senden",          docType: "angebot",      waitFor: "Kunde nimmt Angebot an" },
-  { step: 4, label: "Annahme",     action: "Annahme erhalten",                                  waitFor: "Kunde meldet sich" },
-  { step: 5, label: "Vertrag",     action: "Vertrag senden",          docType: "vertrag",      waitFor: "Vertrag unterschrieben" },
+  { step: 1, label: "Konditionen gesendet" },
+  { step: 2, label: "Konditionen bestätigt" },
+  { step: 3, label: "Angebot gesendet" },
+  { step: 4, label: "Angebot angenommen" },
+  { step: 5, label: "Vertrag gesendet" },
 ] as const;
 
 // Prioritäten — nur 'normal' (default) und 'dringend'
