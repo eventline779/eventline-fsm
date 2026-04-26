@@ -139,9 +139,11 @@ export default function AuftraegePage() {
         const ringWidth = 18; // Dicke des Donut-Rings (Aussen- minus Innenradius)
         const outerR = radius + ringWidth / 2;
         const innerR = radius - ringWidth / 2;
-        const cx = outerR;
-        const cy = outerR;
-        const svgSize = outerR * 2;
+        // Padding, damit halber Stroke des Outlines an den Raendern nicht clippt
+        const svgPad = 2;
+        const cx = outerR + svgPad;
+        const cy = outerR + svgPad;
+        const svgSize = outerR * 2 + svgPad * 2;
         // Lueckenwinkel in Radian zwischen Segmenten
         const gapAngle = visibleSegments.length > 1 ? 0.06 : 0;
         // Outline-Strichstaerke (nur Rand)

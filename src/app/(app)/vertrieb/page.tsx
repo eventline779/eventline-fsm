@@ -732,9 +732,10 @@ export default function VertriebPage() {
         const ringWidth = 18;
         const outerR = radius + ringWidth / 2;
         const innerR = radius - ringWidth / 2;
-        const cx = outerR;
-        const cy = outerR;
-        const svgSize = outerR * 2;
+        const svgPad = 2;
+        const cx = outerR + svgPad;
+        const cy = outerR + svgPad;
+        const svgSize = outerR * 2 + svgPad * 2;
         const gapAngle = segments.length > 1 ? 0.06 : 0;
         const outlineWidth = 1.5;
         let cumulativeAngle = -Math.PI / 2;
