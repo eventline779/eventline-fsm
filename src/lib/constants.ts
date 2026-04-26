@@ -31,11 +31,11 @@ export const EVENT_TYPES = [
 ] as const;
 
 export const REQUEST_STEPS: readonly RequestStep[] = [
-  { step: 1, label: "Konditionen gesendet" },
-  { step: 2, label: "Konditionen bestätigt" },
-  { step: 3, label: "Angebot gesendet" },
-  { step: 4, label: "Angebot angenommen" },
-  { step: 5, label: "Vertrag gesendet" },
+  { step: 1, label: "Konditionen senden" },
+  { step: 2, label: "Bestätigung holen" },
+  { step: 3, label: "Angebot senden" },
+  { step: 4, label: "Annahme holen" },
+  { step: 5, label: "Vertrag senden" },
 ] as const;
 
 // Prioritäten — nur 'normal' (default) und 'dringend'
