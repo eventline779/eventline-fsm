@@ -406,6 +406,14 @@ export default function AuftraegePage() {
                           </span>
                         )}
                       </div>
+                      {/* 5-Schritt-Tracker direkt unter dem Vermietentwurf-Badge —
+                          so sieht man auf einen Blick den Status der Akquise, ohne
+                          erst bis zum Card-Footer scrollen zu muessen. */}
+                      {isAnfrage && (
+                        <div className="mt-2">
+                          <RequestStepTracker currentStep={currentStep} size="sm" />
+                        </div>
+                      )}
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         {(job.customer as unknown as { name: string })?.name && (
                           <span className="flex items-center gap-1.5">
@@ -434,15 +442,6 @@ export default function AuftraegePage() {
                       </div>
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
-                      )}
-                      {/* Vermietentwurf zeigt den 5-Kreis-Step-Tracker im Footer.
-                          Bei normalen Auftraegen sagt das Icon rechts (Termin/Check/Pencil)
-                          alles — kein Zusatz-Text noetig. Cards duerfen unterschiedlich
-                          hoch sein. */}
-                      {isAnfrage && (
-                        <div className="mt-3 pt-3 border-t border-foreground/[0.06]">
-                          <RequestStepTracker currentStep={currentStep} size="sm" />
-                        </div>
                       )}
                     </div>
                     {/* Action-Slot rechts: Anfragen bekommen einen "Nächster Schritt"-Button mit
