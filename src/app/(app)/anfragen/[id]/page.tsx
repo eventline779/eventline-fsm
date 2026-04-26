@@ -196,6 +196,10 @@ export default function AnfrageDetailPage() {
       toast.error("Beim Kunden ist keine E-Mail hinterlegt");
       return;
     }
+    if (sendDocs.length === 0) {
+      toast.error("Bitte zuerst ein Dokument hochladen");
+      return;
+    }
     // CC: Komma- oder Semikolon-getrennte Liste, jeder Eintrag muss eine plausible Mail sein.
     const ccList = sendCc
       .split(/[,;]/)
@@ -707,7 +711,8 @@ export default function AnfrageDetailPage() {
                       size="lg"
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                       onClick={sendMail}
-                      disabled={sending || !sendEmail.trim()}
+                      disabled={sending || !sendEmail.trim() || sendDocs.length === 0}
+                      title={sendDocs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
                     >
                       <Send className="h-4 w-4 mr-1.5" />
                       {sending ? "Sende…" : "Mail senden"}
