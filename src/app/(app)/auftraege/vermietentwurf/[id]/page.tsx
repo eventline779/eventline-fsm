@@ -239,7 +239,7 @@ export default function AnfrageDetailPage() {
                 <Button
                   size="sm"
                   onClick={handleNextStep}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {MAIL_STEPS.has(currentStep) ? (
                     <>
@@ -411,7 +411,7 @@ export default function AnfrageDetailPage() {
                   </Button>
                   <Button
                     size="lg"
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                     onClick={async () => {
                       setShowManualConfirm(false);
                       await advanceStepRaw();
@@ -445,7 +445,7 @@ export default function AnfrageDetailPage() {
                   </Button>
                   <Button
                     size="lg"
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                     onClick={async () => {
                       setShowBackConfirm(false);
                       await previousStep();

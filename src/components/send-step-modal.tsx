@@ -319,7 +319,7 @@ export function SendStepModal({
                 </Button>
                 <Button
                   size="lg"
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={sendMail}
                   disabled={sending || !email.trim() || docs.length === 0}
                   title={docs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
@@ -352,7 +352,7 @@ export function SendStepModal({
                 </Button>
                 <Button
                   size="lg"
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={confirmAdvance}
                   disabled={confirming}
                 >
