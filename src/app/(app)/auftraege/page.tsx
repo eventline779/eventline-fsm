@@ -486,61 +486,53 @@ export default function AuftraegePage() {
                         )}
                       </div>
                       {noTermin && (
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              router.push(`/auftraege/${job.id}?termin=neu`);
-                            }}
-                            className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
-                          >
-                            Termin planen
-                          </button>
-                        </div>
+                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
+                        </p>
                       )}
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Action-Buttons rechts: Pencil bei Entwurf (links) + CalendarPlus bei noTermin (rechts).
-                        Reihenfolge fix: CalendarPlus immer am rechten Rand, unabhaengig ob Pencil dort ist. */}
+                    {/* Action-Buttons rechts: zwei feste Slots, damit Pencil und CalendarPlus
+                        stets an derselben X-Position bleiben — unabhaengig davon, welche
+                        Aktion gerade zutrifft. Slot 1 = Pencil, Slot 2 = CalendarPlus. */}
                     {(noTermin || job.status === "entwurf") && (
                       <div className="flex items-center gap-0.5 shrink-0">
-                        {job.status === "entwurf" && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(`/auftraege/${job.id}/bearbeiten`);
-                            }}
-                            className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
-                            aria-label="Bearbeiten"
-                            title="Entwurf bearbeiten"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </button>
-                        )}
-                        {noTermin && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(`/auftraege/${job.id}?termin=neu`);
-                            }}
-                            className="p-2.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
-                            aria-label="Termin planen"
-                            title="Termin planen"
-                          >
-                            <CalendarPlus className="h-5 w-5" />
-                          </button>
-                        )}
+                        <div className="w-10 h-10 flex items-center justify-center">
+                          {job.status === "entwurf" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                router.push(`/auftraege/${job.id}/bearbeiten`);
+                              }}
+                              className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                              aria-label="Bearbeiten"
+                              title="Entwurf bearbeiten"
+                            >
+                              <Pencil className="h-5 w-5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="w-10 h-10 flex items-center justify-center">
+                          {noTermin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                router.push(`/auftraege/${job.id}?termin=neu`);
+                              }}
+                              className="p-2.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                              aria-label="Termin planen"
+                              title="Termin planen"
+                            >
+                              <CalendarPlus className="h-5 w-5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
