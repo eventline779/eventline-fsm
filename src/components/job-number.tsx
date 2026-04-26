@@ -8,8 +8,8 @@
 
 interface JobNumberProps {
   number: number | null | undefined;
-  /** Default 'sm' (text-xs). 'md' fuer Detail-Header, 'lg' fuer Hero-Anzeige. */
-  size?: "sm" | "md" | "lg";
+  /** Default 'sm' (text-xs). 'md' fuer Detail-Header, 'lg' fuer Hero-Anzeige, 'xl' fuer Page-Title. */
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
 
@@ -17,6 +17,7 @@ const sizeClasses = {
   sm: "text-xs px-1.5 py-0.5",
   md: "text-sm px-2 py-0.5",
   lg: "text-base px-2.5 py-1",
+  xl: "text-xl px-3 py-1",
 };
 
 export function JobNumber({ number, size = "sm", className = "" }: JobNumberProps) {

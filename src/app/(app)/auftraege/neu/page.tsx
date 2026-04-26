@@ -160,14 +160,11 @@ export default function NeuerAuftragPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
         </Link>
-        <h1 className="text-xl font-bold tracking-tight">Neuer Auftrag</h1>
-        <div className="ml-auto">
-          {nextJobNumber ? (
-            <JobNumber number={nextJobNumber} />
-          ) : (
-            <span className="font-mono text-xs text-muted-foreground">INT-…</span>
-          )}
-        </div>
+        {nextJobNumber ? (
+          <JobNumber number={nextJobNumber} size="xl" />
+        ) : (
+          <span className="font-mono text-xl font-semibold text-muted-foreground">INT-…</span>
+        )}
       </div>
 
       <form
