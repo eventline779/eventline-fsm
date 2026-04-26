@@ -40,9 +40,9 @@ export default function AuftragDetailPage() {
   const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
   const [deleteApptCode, setDeleteApptCode] = useState("");
 
-  // Notizen — Direkt-Eingabe (kein Toggle)
-  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string; author?: string }[]>([]);
-  const [newNote, setNewNote] = useState("");
+  // Notizen — eine Freitext-Notiz pro Auftrag, autosave on debounce
+  const [notesText, setNotesText] = useState("");
+  const [savedText, setSavedText] = useState("");
 
   // Stornieren-Flow: Modal mit zwei Phasen (confirm -> reason)
   const [cancelPhase, setCancelPhase] = useState<"closed" | "confirm" | "reason">("closed");
@@ -75,17 +75,22 @@ export default function AuftragDetailPage() {
     ]);
     if (jobRes.data) {
       setJob(jobRes.data as unknown as Job);
-      // Notizen aus JSON parsen
+      // Notizen: alte JSON-Liste -> joined als Text. Plain-Text bleibt as-is.
+      let initial = "";
       if (jobRes.data.notes) {
         try {
           const parsed = JSON.parse(jobRes.data.notes);
-          if (Array.isArray(parsed._notes)) setNotesList(parsed._notes);
-          else setNotesList([]);
+          if (Array.isArray(parsed._notes)) {
+            initial = parsed._notes.map((n: { content: string }) => n.content).join("\n\n");
+          } else {
+            initial = jobRes.data.notes;
+          }
         } catch {
-          // Alte Notiz im Textformat → als eine Notiz einlesen
-          setNotesList([{ id: "legacy", content: jobRes.data.notes, created_at: jobRes.data.created_at }]);
+          initial = jobRes.data.notes;
         }
-      } else setNotesList([]);
+      }
+      setNotesText(initial);
+      setSavedText(initial);
     }
     if (assignRes.data) setAssignments(assignRes.data as unknown as JobAssignment[]);
     if (apptRes.data) setAppointments(apptRes.data as unknown as JobAppointment[]);
@@ -94,28 +99,16 @@ export default function AuftragDetailPage() {
     if (repRes.data) setReports(repRes.data);
   }
 
-  async function saveNotes(notes: typeof notesList) {
-    await supabase.from("jobs").update({ notes: JSON.stringify({ _notes: notes }) }).eq("id", id);
-  }
-
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
-    const updated = [{ id: crypto.randomUUID(), content: newNote, created_at: new Date().toISOString(), author: profile?.full_name }, ...notesList];
-    await saveNotes(updated);
-    setNotesList(updated);
-    setNewNote("");
-    toast.success("Notiz hinzugefügt");
-  }
-
-  async function deleteNote(noteId: string) {
-    const updated = notesList.filter((n) => n.id !== noteId);
-    await saveNotes(updated);
-    setNotesList(updated);
-    toast.success("Notiz gelöscht");
-  }
+  // Notizen autosave: 800ms nach letzter Aenderung in DB schreiben.
+  // Speichert als plain text — keine JSON-Liste mehr. Loader handhabt beide Formate.
+  useEffect(() => {
+    if (notesText === savedText) return;
+    const handle = setTimeout(async () => {
+      await supabase.from("jobs").update({ notes: notesText || null }).eq("id", id);
+      setSavedText(notesText);
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [notesText, savedText, id, supabase]);
 
   async function updateStatus(newStatus: JobStatus) {
     if (newStatus === "abgeschlossen") {
@@ -463,46 +456,20 @@ export default function AuftragDetailPage() {
         </Card>
       )}
 
-      {/* Notizen */}
+      {/* Notizen — eine Freitext-Notiz, autosave nach 800ms ohne Aenderung */}
       <Card className="bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Direkt-Eingabe — kein Toggle, kein "Neue Notiz"-Button */}
-          <form onSubmit={addNote} className="space-y-2">
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Notiz hinzufügen…"
-              rows={2}
-              style={{ fieldSizing: "content" } as React.CSSProperties}
-              className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-            />
-            {newNote.trim() && (
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setNewNote("")}>Abbrechen</Button>
-                <Button type="submit" size="sm">Speichern</Button>
-              </div>
-            )}
-          </form>
-          {notesList.length === 0 && !newNote && <p className="text-sm text-muted-foreground py-2 text-center">Noch keine Notizen.</p>}
-          {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                  part.match(/^https?:\/\//) ? (
-                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
-                  ) : part
-                )}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {n.author ? `${n.author} · ` : ""}
-                  {new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </p>
-              </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
-            </div>
-          ))}
+        <CardContent>
+          <textarea
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            placeholder="Reinschreiben — wird automatisch gespeichert."
+            rows={4}
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+            className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+          />
         </CardContent>
       </Card>
 
