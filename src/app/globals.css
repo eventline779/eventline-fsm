@@ -276,13 +276,12 @@
 }
 
 /* === Scrollbar — dezent, integriert, schmal === */
-/* Firefox */
-html {
+/* Firefox: scrollbar-width wird NICHT vererbt, daher auf alle Container. */
+html, body, *, *::before, *::after {
   scrollbar-width: thin !important;
   scrollbar-color: oklch(0 0 0 / 0.2) transparent !important;
 }
-html.dark,
-.dark html {
+.dark, .dark *, .dark *::before, .dark *::after {
   scrollbar-color: oklch(1 0 0 / 0.15) transparent !important;
 }
 

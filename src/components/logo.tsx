@@ -20,10 +20,11 @@ const sizes = {
   xl: { width: 280, height: 88 },
 };
 
-// dark = schwarzes Logo (für helle Hintergründe / Light-Mode / PDF)
-// light = weisses Logo (für dunkle Hintergründe / Dark-Mode)
-const SRC_DARK = "/logo-gmbh.png";
-const SRC_LIGHT = "/logo-light.png";
+// Dateinamen folgen "logo-<theme>.png" — also das Logo, das IM jeweiligen
+// Theme angezeigt wird. logo-light.png = schwarzes Logo für Light-Mode,
+// logo-dark.png = weisses Logo fuer Dark-Mode.
+const SRC_FOR_LIGHT = "/logo-light.png";
+const SRC_FOR_DARK = "/logo-dark.png";
 
 export function Logo({ size = "md", variant = "auto" }: LogoProps) {
   const s = sizes[size];
@@ -34,7 +35,7 @@ export function Logo({ size = "md", variant = "auto" }: LogoProps) {
     return (
       <>
         <Image
-          src={SRC_DARK}
+          src={SRC_FOR_LIGHT}
           alt="EVENTLINE GmbH"
           width={s.width}
           height={s.height}
@@ -42,7 +43,7 @@ export function Logo({ size = "md", variant = "auto" }: LogoProps) {
           priority
         />
         <Image
-          src={SRC_LIGHT}
+          src={SRC_FOR_DARK}
           alt="EVENTLINE GmbH"
           width={s.width}
           height={s.height}
@@ -53,7 +54,7 @@ export function Logo({ size = "md", variant = "auto" }: LogoProps) {
     );
   }
 
-  const src = variant === "light" ? SRC_LIGHT : SRC_DARK;
+  const src = variant === "light" ? SRC_FOR_LIGHT : SRC_FOR_DARK;
   return (
     <Image
       src={src}
