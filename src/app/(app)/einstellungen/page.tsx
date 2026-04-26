@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { USER_ROLES } from "@/lib/constants";
@@ -387,7 +386,7 @@ export default function EinstellungenPage() {
             <button
               type="button"
               onClick={() => setShowAdd(!showAdd)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
             >
               {showAdd ? <X className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
               {showAdd ? "Abbrechen" : "Hinzufügen"}
@@ -448,8 +447,20 @@ export default function EinstellungenPage() {
                     </div>
                   </div>
                   <div className="flex gap-3 pt-1">
-                    <Button type="button" variant="outline" onClick={() => setShowAdd(false)} className="border-gray-200">Abbrechen</Button>
-                    <Button type="submit" disabled={saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Erstellen..." : "Benutzer erstellen"}</Button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdd(false)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {saving ? "Erstellen..." : "Benutzer erstellen"}
+                    </button>
                   </div>
                 </form>
               </CardContent>
@@ -644,9 +655,13 @@ export default function EinstellungenPage() {
                   <h3 className="font-semibold text-sm">Komplett-Backup</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Alle Tabellen als separate CSV-Dateien herunterladen</p>
                 </div>
-                <Button onClick={exportAll} className="bg-red-600 hover:bg-red-700 text-white">
-                  <Download className="h-4 w-4 mr-2" />Alles exportieren
-                </Button>
+                <button
+                  type="button"
+                  onClick={exportAll}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />Alles exportieren
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -738,9 +753,13 @@ function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleR
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => onToggleRole(profile)} className="text-xs border-gray-200 hover:border-gray-300">
+        <button
+          type="button"
+          onClick={() => onToggleRole(profile)}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+        >
           {isAdmin ? "Zu Techniker" : "Zu Admin"}
-        </Button>
+        </button>
       </CardContent>
     </Card>
   );

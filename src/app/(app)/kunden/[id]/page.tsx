@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,12 +108,22 @@ export default function KundenDetailPage() {
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setEditing(!editing)} variant={editing ? "outline" : "default"} className={editing ? "" : "bg-red-600 hover:bg-red-700 text-white"}>
+          <button
+            type="button"
+            onClick={() => setEditing(!editing)}
+            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card hover:bg-foreground/[0.03] transition-all ${editing ? "text-foreground/70 hover:text-foreground" : "text-red-700 dark:text-red-300"}`}
+          >
             {editing ? "Abbrechen" : "Bearbeiten"}
-          </Button>
-          <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+            aria-label="Löschen"
+            title="Löschen"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -125,10 +134,21 @@ export default function KundenDetailPage() {
             <h3 className="font-semibold text-red-800">Kunde "{customer.name}" wirklich löschen?</h3>
             <p className="text-sm text-red-600 mt-1">Alle verknüpften Aufträge, Vermietentwürfe und Dokumente werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
             <div className="flex gap-3 mt-4">
-              <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="border-gray-200">Abbrechen</Button>
-              <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
-                <Trash2 className="h-4 w-4 mr-2" />{deleting ? "Löschen..." : "Endgültig löschen"}
-              </Button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Trash2 className="h-3.5 w-3.5" />{deleting ? "Löschen..." : "Endgültig löschen"}
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -159,7 +179,13 @@ export default function KundenDetailPage() {
                 <div><Label>Ort</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
               </div>
               <div><Label>Notizen</Label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
-              <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700 text-white"><Save className="h-4 w-4 mr-2" />Speichern</Button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+              >
+                <Save className="h-3.5 w-3.5" />Speichern
+              </button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -177,7 +203,12 @@ export default function KundenDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
-          <Link href={`/auftraege/neu?customer_id=${id}`}><Button size="sm" variant="outline">Neuer Auftrag</Button></Link>
+          <Link
+            href={`/auftraege/neu?customer_id=${id}`}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+          >
+            Neuer Auftrag
+          </Link>
         </CardHeader>
         <CardContent className="space-y-2">
           {jobs.length === 0 ? (

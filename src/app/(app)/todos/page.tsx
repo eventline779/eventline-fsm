@@ -300,9 +300,13 @@ export default function TodosPage() {
           <h1 className="text-2xl font-bold tracking-tight">Todos</h1>
           <p className="text-sm text-muted-foreground mt-1">{openCount} offen von {todos.length}</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-          <Plus className="h-4 w-4 mr-2" />Neues Todo
-        </Button>
+        <button
+          type="button"
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+        >
+          <Plus className="h-3.5 w-3.5" />Neues Todo
+        </button>
       </div>
 
       {/* Add Form */}
@@ -332,8 +336,8 @@ export default function TodosPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
-                <Button type="submit" disabled={!form.title} className="bg-red-600 hover:bg-red-700 text-white">Todo erstellen</Button>
+                <button type="button" onClick={() => setShowForm(false)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all">Abbrechen</button>
+                <button type="submit" disabled={!form.title} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">Todo erstellen</button>
               </div>
             </form>
           </CardContent>

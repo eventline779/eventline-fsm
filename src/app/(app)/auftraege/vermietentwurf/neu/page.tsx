@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
 import { EVENT_TYPES } from "@/lib/constants";
@@ -322,20 +321,20 @@ function NeueAnfragePageContent() {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Link href="/auftraege" className="flex-1">
-            <Button type="button" variant="outline" size="sm" className="w-full">
-              Abbrechen
-            </Button>
-          </Link>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={saving}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+          <Link
+            href="/auftraege"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
           >
-            <Save className="h-3.5 w-3.5 mr-1.5" />
+            Abbrechen
+          </Link>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Save className="h-3.5 w-3.5" />
             {saving ? "Anlegen…" : "Vermietung anlegen"}
-          </Button>
+          </button>
         </div>
       </form>
     </div>

@@ -228,7 +228,7 @@ export default function RaumDetailPage() {
               <textarea value={techText} onChange={(e) => setTechText(e.target.value)} placeholder="Bühne, Licht, Ton, Strom, Bestuhlung..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={4} />
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => { setEditingTech(false); setTechText(room.technical_details || ""); }}>Abbrechen</Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={saveTech}>Speichern</Button>
+                <button type="button" onClick={saveTech} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">Speichern</button>
               </div>
             </div>
           ) : (
@@ -256,7 +256,7 @@ export default function RaumDetailPage() {
               <Input placeholder="Bemerkung (optional)" value={priceForm.notes} onChange={(e) => setPriceForm({ ...priceForm, notes: e.target.value })} />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowPriceForm(false)}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+                <button type="submit" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">Speichern</button>
               </div>
             </form>
           )}
@@ -295,7 +295,7 @@ export default function RaumDetailPage() {
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowContactForm(false)}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+                <button type="submit" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">Speichern</button>
               </div>
             </form>
           )}
@@ -333,7 +333,7 @@ export default function RaumDetailPage() {
               <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+                <button type="submit" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">Speichern</button>
               </div>
             </form>
           )}

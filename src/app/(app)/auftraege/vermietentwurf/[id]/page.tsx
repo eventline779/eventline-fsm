@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Job } from "@/types";
 import { REQUEST_STEPS } from "@/lib/constants";
@@ -232,37 +231,41 @@ export default function AnfrageDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 {currentStep > 1 && (
-                  <Button size="sm" variant="outline" onClick={() => setShowBackConfirm(true)}>
+                  <button
+                    type="button"
+                    onClick={() => setShowBackConfirm(true)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                  >
                     Zurück
-                  </Button>
+                  </button>
                 )}
-                <Button
-                  size="sm"
+                <button
+                  type="button"
                   onClick={handleNextStep}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all"
                 >
                   {MAIL_STEPS.has(currentStep) ? (
                     <>
-                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                      <Send className="h-3.5 w-3.5" />
                       {stepInfo.label}
                     </>
                   ) : currentStep === 2 ? (
                     <>
                       Manuell Konditionen bestätigen
-                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </>
                   ) : currentStep === 4 ? (
                     <>
                       Manuell Angebot bestätigen
-                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </>
                   ) : (
                     <>
                       Nächster Schritt
-                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -378,14 +381,14 @@ export default function AnfrageDetailPage() {
       {/* Stornieren — nur wenn aktiv. Gleiche Optik + 2-Phasen-Flow wie beim Auftrag. */}
       {!isCancelled && (
         <div className="flex justify-end">
-          <Button
-            variant="destructive"
-            size="lg"
+          <button
+            type="button"
             onClick={() => setCancelPhase("confirm")}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
           >
-            <XCircle className="h-4 w-4" />
+            <XCircle className="h-3.5 w-3.5" />
             Stornieren
-          </Button>
+          </button>
         </div>
       )}
 
@@ -406,19 +409,23 @@ export default function AnfrageDetailPage() {
                   {currentStep === 2 ? "die Konditionen" : "das Angebot"} bereits bestätigt wurden (z.B. telefonisch)?
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowManualConfirm(false)}>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualConfirm(false)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                  >
                     Abbrechen
-                  </Button>
-                  <Button
-                    size="lg"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  </button>
+                  <button
+                    type="button"
                     onClick={async () => {
                       setShowManualConfirm(false);
                       await advanceStepRaw();
                     }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all"
                   >
                     Ja, bestätigen
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
@@ -440,19 +447,23 @@ export default function AnfrageDetailPage() {
                   Du gehst zurück zu Schritt {Math.max(1, currentStep - 1)} ({REQUEST_STEPS[Math.max(0, currentStep - 2)].label}). Schon gesendete Mails bleiben beim Kunden — der Klick im Mail würde diesen Schritt wieder vorruckeln.
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowBackConfirm(false)}>
+                  <button
+                    type="button"
+                    onClick={() => setShowBackConfirm(false)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                  >
                     Abbrechen
-                  </Button>
-                  <Button
-                    size="lg"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  </button>
+                  <button
+                    type="button"
                     onClick={async () => {
                       setShowBackConfirm(false);
                       await previousStep();
                     }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all"
                   >
                     Zurücksetzen
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
@@ -489,12 +500,20 @@ export default function AnfrageDetailPage() {
                       Der Vermietentwurf wird als storniert archiviert. Du kannst ihn nachher noch einsehen.
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="lg" className="flex-1" onClick={() => setCancelPhase("closed")}>
+                      <button
+                        type="button"
+                        onClick={() => setCancelPhase("closed")}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                      >
                         Abbrechen
-                      </Button>
-                      <Button variant="destructive" size="lg" className="flex-1" onClick={() => setCancelPhase("reason")}>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCancelPhase("reason")}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+                      >
                         Stornieren
-                      </Button>
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -511,24 +530,22 @@ export default function AnfrageDetailPage() {
                       className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
                     />
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="flex-1"
+                      <button
+                        type="button"
                         onClick={() => setCancelPhase("confirm")}
                         disabled={cancelSaving}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                       >
                         Zurück
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="lg"
-                        className="flex-1"
+                      </button>
+                      <button
+                        type="button"
                         onClick={confirmCancel}
                         disabled={cancelSaving || !cancelReason.trim()}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                       >
                         {cancelSaving ? "Storniere…" : "Bestätigen"}
-                      </Button>
+                      </button>
                     </div>
                   </>
                 )}
@@ -572,12 +589,22 @@ export default function AnfrageDetailPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowConvert(false)} disabled={convertSaving}>
+                  <button
+                    type="button"
+                    onClick={() => setShowConvert(false)}
+                    disabled={convertSaving}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
                     Abbrechen
-                  </Button>
-                  <Button size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={convertToAuftrag} disabled={convertSaving}>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={convertToAuftrag}
+                    disabled={convertSaving}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
                     {convertSaving ? "Wandle um…" : "Umwandeln"}
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>

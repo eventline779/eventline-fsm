@@ -160,7 +160,7 @@ export default function VertriebPage() {
                 autoFocus
               />
               {pwError && <p className="text-xs text-red-600 text-center">Falsches Passwort</p>}
-              <Button type="submit" disabled={!pwInput} className="w-full bg-red-600 hover:bg-red-700 text-white">Zugang</Button>
+              <button type="submit" disabled={!pwInput} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">Zugang</button>
             </form>
           </CardContent>
         </Card>
@@ -714,7 +714,7 @@ export default function VertriebPage() {
         <button
           type="button"
           onClick={openNew}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
         >
           <Plus className="h-3.5 w-3.5" />
           Lead
@@ -1126,9 +1126,9 @@ export default function VertriebPage() {
                   <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
                     {/* Schritt 1: Kontakt aufnehmen */}
                     {editingStep === 1 && (
-                      <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <ArrowRight className="h-4 w-4 mr-1" />Kontakt aufnehmen
-                      </Button>
+                      <button type="button" onClick={advanceStep} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                        <ArrowRight className="h-3.5 w-3.5" />Kontakt aufnehmen
+                      </button>
                     )}
                     {/* Schritt 2-3-4 haben eigene Action-Bars im spezifischen Block */}
                     {form.status !== "gewonnen" && (
@@ -1197,9 +1197,9 @@ export default function VertriebPage() {
                   <div className="pt-2 border-t border-blue-200">
                     <p className="text-xs text-blue-700 mb-2">Buchhaltung mit allen Verrechnungs-Infos benachrichtigen:</p>
                     <div className="flex gap-2 flex-wrap">
-                      <Button type="button" size="sm" onClick={() => setShowBuchhaltung(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <Mail className="h-4 w-4 mr-1" />Benachrichtigung senden
-                      </Button>
+                      <button type="button" onClick={() => setShowBuchhaltung(true)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                        <Mail className="h-3.5 w-3.5" />Benachrichtigung senden
+                      </button>
                       <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
                         <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Finalisierung
                       </Button>
@@ -1242,12 +1242,12 @@ export default function VertriebPage() {
                     <Button type="button" size="sm" onClick={() => setShowVerbesserung(true)} variant="outline" className="text-orange-700 border-orange-300 hover:bg-orange-100">
                       <Mail className="h-4 w-4 mr-1" />Verbesserungs-Nachricht
                     </Button>
-                    <Button type="button" size="sm" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="bg-green-600 hover:bg-green-700 text-white">
-                      <Check className="h-4 w-4 mr-1" />{sendingBestaetigung ? "Senden..." : "Offerte bestätigt"}
-                    </Button>
-                    <Button type="button" size="sm" onClick={advanceStep} className="bg-blue-600 hover:bg-blue-700 text-white">
-                      <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Operations
-                    </Button>
+                    <button type="button" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">
+                      <Check className="h-3.5 w-3.5" />{sendingBestaetigung ? "Senden..." : "Offerte bestätigt"}
+                    </button>
+                    <button type="button" onClick={advanceStep} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                      <ArrowRight className="h-3.5 w-3.5" />Weiter zu Operations
+                    </button>
                   </div>
                 </div>
               )}
@@ -1275,9 +1275,9 @@ export default function VertriebPage() {
                       <>
                         <p className="text-xs text-green-700">Erstelle aus diesem Lead einen Auftrag. Leo wird automatisch benachrichtigt. Danach kannst du den Schichtplan machen.</p>
                         <div className="flex gap-2 flex-wrap">
-                          <Button type="button" size="sm" onClick={openAuftragModal} className="bg-green-600 hover:bg-green-700 text-white">
-                            <Plus className="h-4 w-4 mr-1" />Auftrag erstellen
-                          </Button>
+                          <button type="button" onClick={openAuftragModal} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all">
+                            <Plus className="h-3.5 w-3.5" />Auftrag erstellen
+                          </button>
                         </div>
                       </>
                     );
@@ -1479,8 +1479,8 @@ export default function VertriebPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }}>Abbrechen</Button>
-                <Button type="submit" disabled={!form.firma || saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</Button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all">Abbrechen</button>
+                <button type="submit" disabled={!form.firma || saving} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</button>
               </div>
             </form>
           </CardContent>

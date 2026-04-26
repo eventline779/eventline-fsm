@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -204,10 +203,14 @@ export default function VorlagenPage() {
             werden beim Versand ersetzt.
           </p>
         </div>
-        <Button onClick={openNew}>
-          <Plus className="h-4 w-4 mr-2" />
+        <button
+          type="button"
+          onClick={openNew}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+        >
+          <Plus className="h-3.5 w-3.5" />
           Neue Vorlage
-        </Button>
+        </button>
       </div>
 
       {loading ? (
@@ -220,9 +223,13 @@ export default function VorlagenPage() {
         <div className="rounded-xl border border-dashed p-10 text-center">
           <Send className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Noch keine Vorlagen.</p>
-          <Button className="mt-4" onClick={openNew}>
+          <button
+            type="button"
+            onClick={openNew}
+            className="mt-4 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+          >
             Erste Vorlage anlegen
-          </Button>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -381,17 +388,20 @@ export default function VorlagenPage() {
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                className="flex-1"
                 onClick={() => setShowForm(false)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
               >
                 Abbrechen
-              </Button>
-              <Button type="submit" className="flex-1" disabled={saving}>
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
                 {saving ? "Speichert…" : editing ? "Speichern" : "Anlegen"}
-              </Button>
+              </button>
             </div>
           </form>
         </SheetContent>

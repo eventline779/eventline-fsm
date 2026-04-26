@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { TimeEntry, Job } from "@/types";
 import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, Tag, Building2, MapPin, Music } from "lucide-react";
@@ -164,17 +163,25 @@ export default function ZeiterfassungPage() {
                 {jobs.map((j) => <option key={j.id} value={j.id}>INT-{(j as any).job_number} – {j.title}</option>)}
               </select>
 
-              <Button onClick={clockIn} className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 text-lg rounded-xl">
-                <Play className="h-5 w-5 mr-2" />
+              <button
+                type="button"
+                onClick={clockIn}
+                className="inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all"
+              >
+                <Play className="h-5 w-5" />
                 Einstempeln
-              </Button>
+              </button>
             </div>
           ) : (
             <div className="mt-4">
-              <Button onClick={clockOut} className="bg-red-600 hover:bg-red-700 text-white px-8 py-6 text-lg rounded-xl">
-                <Square className="h-5 w-5 mr-2" />
+              <button
+                type="button"
+                onClick={clockOut}
+                className="inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+              >
+                <Square className="h-5 w-5" />
                 Ausstempeln
-              </Button>
+              </button>
             </div>
           )}
         </CardContent>

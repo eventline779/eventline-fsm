@@ -12,7 +12,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { REQUEST_STEPS } from "@/lib/constants";
 import { Check, FileText, Send, Trash2, Upload, X } from "lucide-react";
@@ -265,16 +264,15 @@ export function SendStepModal({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Anhänge</p>
-                  <Button
+                  <button
                     type="button"
-                    size="sm"
-                    variant="outline"
                     onClick={() => fileRef.current?.click()}
                     disabled={uploading}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    <Upload className="h-3.5 w-3.5" />
                     {uploading ? "Lädt…" : "Datei hinzufügen"}
-                  </Button>
+                  </button>
                   <input
                     ref={fileRef}
                     type="file"
@@ -308,25 +306,24 @@ export function SendStepModal({
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="flex-1"
+                <button
+                  type="button"
                   onClick={close}
                   disabled={sending}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
                   Abbrechen
-                </Button>
-                <Button
-                  size="lg"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                </button>
+                <button
+                  type="button"
                   onClick={sendMail}
                   disabled={sending || !email.trim() || docs.length === 0}
                   title={docs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  <Send className="h-4 w-4 mr-1.5" />
+                  <Send className="h-3.5 w-3.5" />
                   {sending ? "Sende…" : "Mail senden"}
-                </Button>
+                </button>
               </div>
             </div>
           ) : (
@@ -341,24 +338,23 @@ export function SendStepModal({
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="flex-1"
+                <button
+                  type="button"
                   onClick={close}
                   disabled={confirming}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
                   Später
-                </Button>
-                <Button
-                  size="lg"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                </button>
+                <button
+                  type="button"
                   onClick={confirmAdvance}
                   disabled={confirming}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  <Check className="h-4 w-4 mr-1.5" />
+                  <Check className="h-3.5 w-3.5" />
                   {confirming ? "Bestätige…" : "Bestätigen"}
-                </Button>
+                </button>
               </div>
             </div>
           )}

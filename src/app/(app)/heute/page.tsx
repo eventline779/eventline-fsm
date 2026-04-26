@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Play,
   Pause,
@@ -324,25 +323,28 @@ export default function HeutePage() {
                     </p>
                   )}
                 </div>
-                <Button
-                  size="lg"
-                  variant="destructive"
-                  className="w-full"
+                <button
+                  type="button"
                   onClick={handleClockOut}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
                 >
-                  <Pause className="h-4 w-4 mr-2" />
+                  <Pause className="h-4 w-4" />
                   Ausstempeln
-                </Button>
+                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
                   Du bist aktuell nicht eingestempelt.
                 </p>
-                <Button size="lg" className="w-full" onClick={handleClockIn}>
-                  <Play className="h-4 w-4 mr-2" />
+                <button
+                  type="button"
+                  onClick={handleClockIn}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all"
+                >
+                  <Play className="h-4 w-4" />
                   Einstempeln
-                </Button>
+                </button>
                 <Link
                   href="/zeiterfassung"
                   className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"

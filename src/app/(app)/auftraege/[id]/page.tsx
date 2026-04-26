@@ -339,54 +339,53 @@ export default function AuftragDetailPage() {
         </div>
       </div>
 
-      {/* Aktionen: Status-Uebergaenge + Bearbeiten + Stornieren — alle als <Button> mit konsistenten Variants */}
+      {/* Aktionen: Status-Uebergaenge + Bearbeiten + Stornieren — alles im Kasten-Stil */}
       <div className="flex flex-wrap gap-2">
         {availableActions
           .filter((a) => a.to !== "storniert")
           .map((a) => {
             const isFinish = a.to === "abgeschlossen";
             const disabled = isFinish && !canFinish;
-            // Primaere Aktionen (Freigeben) brand-rot, sekundaere (Abschliessen) outline
             const isPrimary = a.variant === "primary";
             return (
-              <Button
+              <button
                 key={a.to}
-                size="lg"
-                variant={isPrimary ? undefined : "outline"}
+                type="button"
                 onClick={() => updateStatus(a.to)}
                 disabled={disabled}
                 title={disabled ? finishBlockReason : undefined}
-                className={isPrimary ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none ${isPrimary ? "text-red-700 dark:text-red-300" : "text-foreground/70 hover:text-foreground"}`}
               >
                 {a.icon}
                 {a.label}
-              </Button>
+              </button>
             );
           })}
 
         {/* Bearbeiten — nur bei Entwuerfen */}
         {job.status === "entwurf" && (
-          <Link href={`/auftraege/${id}/bearbeiten`}>
-            <Button size="lg" variant="outline">
-              <Pencil className="h-4 w-4" />
-              Bearbeiten
-            </Button>
+          <Link
+            href={`/auftraege/${id}/bearbeiten`}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Bearbeiten
           </Link>
         )}
 
-        {/* Stornieren als Letztes — destructive variant (sichtbar rot, nicht erst auf Hover) */}
+        {/* Stornieren als Letztes */}
         {availableActions
           .filter((a) => a.to === "storniert")
           .map((a) => (
-            <Button
+            <button
               key={a.to}
-              size="lg"
-              variant="destructive"
+              type="button"
               onClick={() => setCancelPhase("confirm")}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
             >
               {a.icon}
               {a.label}
-            </Button>
+            </button>
           ))}
       </div>
 
@@ -521,8 +520,8 @@ export default function AuftragDetailPage() {
               </div>
               <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowApptForm(false)}>Abbrechen</Button>
-                <Button type="submit" size="sm">Termin erstellen</Button>
+                <button type="button" onClick={() => setShowApptForm(false)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all">Abbrechen</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">Termin erstellen</button>
               </div>
             </form>
           )}
@@ -749,12 +748,12 @@ export default function AuftragDetailPage() {
                       Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="lg" className="flex-1" onClick={() => setCancelPhase("closed")}>
+                      <button type="button" onClick={() => setCancelPhase("closed")} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all">
                         Abbrechen
-                      </Button>
-                      <Button variant="destructive" size="lg" className="flex-1" onClick={() => setCancelPhase("reason")}>
+                      </button>
+                      <button type="button" onClick={() => setCancelPhase("reason")} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all">
                         Stornieren
-                      </Button>
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -771,24 +770,22 @@ export default function AuftragDetailPage() {
                       className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
                     />
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="flex-1"
+                      <button
+                        type="button"
                         onClick={() => setCancelPhase("confirm")}
                         disabled={cancelSaving}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                       >
                         Zurück
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="lg"
-                        className="flex-1"
+                      </button>
+                      <button
+                        type="button"
                         onClick={confirmCancel}
                         disabled={cancelSaving || !cancelReason.trim()}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
                       >
                         {cancelSaving ? "Storniere…" : "Bestätigen"}
-                      </Button>
+                      </button>
                     </div>
                   </>
                 )}

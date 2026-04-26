@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -500,12 +499,19 @@ export default function NeuerRapportPage() {
 
         {/* Submit */}
         <div className="flex gap-3 pt-2">
-          <Link href={preselectedJobId ? `/auftraege/${preselectedJobId}` : "/rapporte"} className="flex-1">
-            <Button type="button" variant="outline" className="w-full">Abbrechen</Button>
+          <Link
+            href={preselectedJobId ? `/auftraege/${preselectedJobId}` : "/rapporte"}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+          >
+            Abbrechen
           </Link>
-          <Button type="submit" disabled={!form.job_id || !form.work_description || saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-            <Save className="h-4 w-4 mr-2" />{saving ? "Speichern..." : "Rapport abschliessen"}
-          </Button>
+          <button
+            type="submit"
+            disabled={!form.job_id || !form.work_description || saving}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Save className="h-3.5 w-3.5" />{saving ? "Speichern..." : "Rapport abschliessen"}
+          </button>
         </div>
       </form>
     </div>

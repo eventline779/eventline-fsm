@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import {
   AuftragFormFields,
   type AuftragFormState,
@@ -237,32 +236,30 @@ export default function AuftragBearbeitenPage() {
 
         {/* Buttons */}
         <div className="flex gap-3 pt-2">
-          <Link href="/auftraege" className="flex-1">
-            <Button type="button" variant="outline" size="sm" className="w-full">
-              Abbrechen
-            </Button>
-          </Link>
-          <Button
-            type="submit"
-            variant={isDraft ? "outline" : undefined}
-            size="sm"
-            disabled={saving !== null}
-            className={isDraft ? "flex-1" : "flex-1 bg-red-600 hover:bg-red-700 text-white"}
+          <Link
+            href="/auftraege"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
           >
-            <Save className="h-3.5 w-3.5 mr-1.5" />
+            Abbrechen
+          </Link>
+          <button
+            type="submit"
+            disabled={saving !== null}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none ${isDraft ? "text-foreground/70 hover:text-foreground" : "text-red-700 dark:text-red-300"}`}
+          >
+            <Save className="h-3.5 w-3.5" />
             {saving === "save" ? "Speichert…" : "Speichern"}
-          </Button>
+          </button>
           {isDraft && (
-            <Button
+            <button
               type="button"
-              size="sm"
               disabled={saving !== null}
               onClick={() => submit("publish")}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
             >
-              <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+              <CheckCircle className="h-3.5 w-3.5" />
               {saving === "publish" ? "Speichert…" : "Freigeben"}
-            </Button>
+            </button>
           )}
         </div>
       </form>

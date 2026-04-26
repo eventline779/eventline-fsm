@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Room } from "@/types";
@@ -57,7 +56,7 @@ export default function RaeumePage() {
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
         >
           <Plus className="h-3.5 w-3.5" />
           Neuer Raum
@@ -98,8 +97,20 @@ export default function RaeumePage() {
                 <textarea placeholder="Bühne, Licht, Ton, Strom etc." value={form.technical_details} onChange={(e) => setForm({ ...form, technical_details: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={2} />
               </div>
               <div className="flex gap-3">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
-                <Button type="submit" disabled={!form.name || saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Speichern..." : "Raum erstellen"}</Button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={!form.name || saving}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {saving ? "Speichern..." : "Raum erstellen"}
+                </button>
               </div>
             </form>
           </CardContent>

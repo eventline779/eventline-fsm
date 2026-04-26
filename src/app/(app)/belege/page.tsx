@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Receipt, Upload, Camera, Image as ImageIcon, Send, X, Check, Mail } from "lucide-react";
@@ -138,9 +137,14 @@ export default function BelegePage() {
             <textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="z.B. Material für Auftrag INT-2620, Tankfüllung, Büromaterial..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={3} required />
           </div>
 
-          <Button onClick={sendBeleg} disabled={!file || !form.reason.trim() || sending} className="w-full bg-red-600 hover:bg-red-700 text-white">
-            <Send className="h-4 w-4 mr-2" />{sending ? "Senden..." : "An Buchhaltung senden"}
-          </Button>
+          <button
+            type="button"
+            onClick={sendBeleg}
+            disabled={!file || !form.reason.trim() || sending}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Send className="h-3.5 w-3.5" />{sending ? "Senden..." : "An Buchhaltung senden"}
+          </button>
         </CardContent>
       </Card>
 

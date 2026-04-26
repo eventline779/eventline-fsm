@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import {
   AuftragFormFields,
   type AuftragFormState,
@@ -206,31 +205,29 @@ function NeuerAuftragPageContent() {
 
         {/* Buttons */}
         <div className="flex gap-3 pt-2">
-          <Link href="/auftraege" className="flex-1">
-            <Button type="button" variant="outline" size="sm" className="w-full">
-              Abbrechen
-            </Button>
+          <Link
+            href="/auftraege"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+          >
+            Abbrechen
           </Link>
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             disabled={saving !== null}
             onClick={() => submit("draft")}
-            className="flex-1 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:bg-purple-500/15 dark:border-purple-500/30 dark:text-purple-300 dark:hover:bg-purple-500/40 dark:hover:border-purple-400/60 dark:hover:text-purple-100"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-purple-700 dark:text-purple-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
-            <FileEdit className="h-3.5 w-3.5 mr-1.5" />
+            <FileEdit className="h-3.5 w-3.5" />
             {saving === "draft" ? "Speichert…" : "Als Entwurf"}
-          </Button>
-          <Button
+          </button>
+          <button
             type="submit"
-            size="sm"
             disabled={saving !== null}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
-            <Save className="h-3.5 w-3.5 mr-1.5" />
+            <Save className="h-3.5 w-3.5" />
             {saving === "create" ? "Speichert…" : "Auftrag erstellen"}
-          </Button>
+          </button>
         </div>
       </form>
     </div>

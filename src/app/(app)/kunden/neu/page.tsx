@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -255,17 +254,21 @@ function NeuerKundeContent() {
 
         {/* Submit */}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={cancel}>
+          <button
+            type="button"
+            onClick={cancel}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+          >
             Abbrechen
-          </Button>
-          <Button
+          </button>
+          <button
             type="submit"
             disabled={!form.name || saving}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
-            <Save className="h-4 w-4 mr-2" />
+            <Save className="h-3.5 w-3.5" />
             {saving ? "Speichern..." : "Kunde erstellen"}
-          </Button>
+          </button>
         </div>
       </form>
     </div>
