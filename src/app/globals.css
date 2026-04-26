@@ -124,14 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Dark: 500er bei 55% Opacity. Gruen heller (400er) fuer bessere Sichtbarkeit. */
-  --status-purple: rgba(168, 85, 247, 0.55);
-  --status-gray: rgba(107, 114, 128, 0.55);
-  --status-green: rgba(74, 222, 128, 0.7);
-  --status-red: rgba(239, 68, 68, 0.55);
-  --status-blue: rgba(59, 130, 246, 0.55);
-  --status-orange: rgba(249, 115, 22, 0.55);
-  --status-emerald: rgba(16, 185, 129, 0.55);
+  /* Diagramm-Status-Farben Dark: ein Tacken transparenter — 50/65 statt 55/70. */
+  --status-purple: rgba(168, 85, 247, 0.5);
+  --status-gray: rgba(107, 114, 128, 0.5);
+  --status-green: rgba(74, 222, 128, 0.65);
+  --status-red: rgba(239, 68, 68, 0.5);
+  --status-blue: rgba(59, 130, 246, 0.5);
+  --status-orange: rgba(249, 115, 22, 0.5);
+  --status-emerald: rgba(16, 185, 129, 0.5);
 }
 
 @layer base {
