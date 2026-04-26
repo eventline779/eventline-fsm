@@ -44,6 +44,10 @@ export default function AnfrageDetailPage() {
   // Mail-Modal: gemeinsame Komponente, nur Open-Flag hier.
   const [sendOpen, setSendOpen] = useState(false);
 
+  // Confirm-Dialoge fuer Manuell-Bestaetigen (Warte-Schritte 2/4) und Zurueck.
+  const [showManualConfirm, setShowManualConfirm] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+
   useEffect(() => {
     loadJob();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +60,7 @@ export default function AnfrageDetailPage() {
       .eq("id", id)
       .single();
     if (error || !data) {
-      toast.error("Mietanfrage nicht gefunden");
+      toast.error("Vermietentwurf nicht gefunden");
       router.push("/auftraege");
       return;
     }
@@ -87,7 +91,10 @@ export default function AnfrageDetailPage() {
       setSendOpen(true);
       return;
     }
-    await advanceStepRaw();
+    // Warte-Schritte (2, 4): manuelles Bestaetigen — der Kunde haette eigentlich aus
+    // der Mail bestaetigen sollen. Confirm-Dialog zeigen, damit Klick nicht versehentlich
+    // einen Schritt vorruckelt.
+    setShowManualConfirm(true);
   }
 
   // Wirklich speichern. Wird sowohl von Warte-Schritten als auch von der Confirm-Phase
@@ -154,7 +161,7 @@ export default function AnfrageDetailPage() {
     }
     setCancelPhase("closed");
     setCancelReason("");
-    toast.success("Mietanfrage storniert");
+    toast.success("Vermietentwurf storniert");
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push("/auftraege");
   }
@@ -209,7 +216,7 @@ export default function AnfrageDetailPage() {
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {isCancelled ? "Mietanfrage · storniert" : "Mietanfrage · noch nicht freigegeben"}
+            {isCancelled ? "Vermietentwurf · storniert" : "Vermietentwurf · noch nicht freigegeben"}
           </p>
         </div>
       </div>
@@ -225,7 +232,7 @@ export default function AnfrageDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 {currentStep > 1 && (
-                  <Button size="sm" variant="outline" onClick={previousStep}>
+                  <Button size="sm" variant="outline" onClick={() => setShowBackConfirm(true)}>
                     Zurück
                   </Button>
                 )}
@@ -239,9 +246,19 @@ export default function AnfrageDetailPage() {
                       <Send className="h-3.5 w-3.5 mr-1.5" />
                       {stepInfo.label}
                     </>
+                  ) : currentStep === 2 ? (
+                    <>
+                      Manuell Konditionen bestätigen
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </>
+                  ) : currentStep === 4 ? (
+                    <>
+                      Manuell Angebot bestätigen
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </>
                   ) : (
                     <>
-                      {isLastStep ? "Mietanfrage abschliessen" : "Nächster Schritt"}
+                      Nächster Schritt
                       <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                     </>
                   )}
@@ -280,7 +297,7 @@ export default function AnfrageDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <FileText className="h-4 w-4" />Mietanfrage-Details
+            <FileText className="h-4 w-4" />Vermietentwurf-Details
           </CardTitle>
         </CardHeader>
         <CardContent className="p-5 pt-0 space-y-3">
@@ -372,6 +389,77 @@ export default function AnfrageDetailPage() {
         </div>
       )}
 
+      {/* Manuell-bestaetigen-Confirm (Schritt 2/4 — Kunde haette aus Mail bestaetigen sollen) */}
+      {showManualConfirm && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowManualConfirm(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold">
+                  {currentStep === 2 ? "Konditionen manuell bestätigen?" : "Angebot manuell bestätigen?"}
+                </h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Normalerweise bestätigt der Kunde direkt aus der Mail. Bist du sicher, dass{" "}
+                  {currentStep === 2 ? "die Konditionen" : "das Angebot"} bereits bestätigt wurden (z.B. telefonisch)?
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowManualConfirm(false)}>
+                    Abbrechen
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    onClick={async () => {
+                      setShowManualConfirm(false);
+                      await advanceStepRaw();
+                    }}
+                  >
+                    Ja, bestätigen
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Zurueck-Schritt-Confirm */}
+      {showBackConfirm && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowBackConfirm(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold">Schritt zurücksetzen?</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Du gehst zurück zu Schritt {Math.max(1, currentStep - 1)} ({REQUEST_STEPS[Math.max(0, currentStep - 2)].label}). Schon gesendete Mails bleiben beim Kunden — der Klick im Mail würde diesen Schritt wieder vorruckeln.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowBackConfirm(false)}>
+                    Abbrechen
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    onClick={async () => {
+                      setShowBackConfirm(false);
+                      await previousStep();
+                    }}
+                  >
+                    Zurücksetzen
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Storno-Flow: Phase 'confirm' -> 'reason' (identisch zum Auftrag) */}
       {cancelPhase !== "closed" && (
         <>
@@ -380,7 +468,7 @@ export default function AnfrageDetailPage() {
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="flex items-center justify-between px-6 py-4 border-b">
                 <h2 className="font-semibold">
-                  {cancelPhase === "confirm" ? "Mietanfrage stornieren?" : "Grund angeben"}
+                  {cancelPhase === "confirm" ? "Vermietentwurf stornieren?" : "Grund angeben"}
                 </h2>
                 <button
                   onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
@@ -398,7 +486,7 @@ export default function AnfrageDetailPage() {
                 {cancelPhase === "confirm" ? (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Die Anfrage wird als storniert archiviert. Du kannst sie nachher noch einsehen.
+                      Der Vermietentwurf wird als storniert archiviert. Du kannst ihn nachher noch einsehen.
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="lg" className="flex-1" onClick={() => setCancelPhase("closed")}>
@@ -412,7 +500,7 @@ export default function AnfrageDetailPage() {
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Bitte gib einen Grund an, warum diese Anfrage storniert wird.
+                      Bitte gib einen Grund an, warum dieser Vermietentwurf storniert wird.
                     </p>
                     <textarea
                       placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
@@ -470,17 +558,17 @@ export default function AnfrageDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
               <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Mietanfrage in Auftrag umwandeln?</h2>
+                <h2 className="font-semibold">Vermietentwurf in Auftrag umwandeln?</h2>
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Die Anfrage wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
+                  Der Vermietentwurf wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
                 </p>
                 <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
                   <Check className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium">Akquise abgeschlossen</p>
-                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus der Mietanfrage wird jetzt ein echter Auftrag.</p>
+                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

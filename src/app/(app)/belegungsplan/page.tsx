@@ -107,7 +107,7 @@ export default function BelegungsplanPage() {
         id: j.id,
         source: isAnfrage ? "rental_request" : "job",
         location_id: j.location_id,
-        title: isAnfrage ? "Mietanfrage" : j.title,
+        title: isAnfrage ? "Vermietentwurf" : j.title,
         start: startOfDay(new Date(j.start_date)),
         end: startOfDay(new Date(j.end_date ?? j.start_date)),
         status: j.status,
@@ -226,7 +226,7 @@ export default function BelegungsplanPage() {
           <span className="h-3 w-3 rounded-sm border bg-background" /> frei
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-amber-400/70" /> Mietanfrage offen
+          <span className="h-3 w-3 rounded-sm bg-amber-400/70" /> Vermietentwurf offen
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-red-500/80" /> bestätigt / gebucht
@@ -370,7 +370,7 @@ export default function BelegungsplanPage() {
                     }`}
                   />
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {b.source === "job" ? "Bestätigt" : "Mietanfrage"}
+                    {b.source === "job" ? "Bestätigt" : "Vermietentwurf"}
                   </span>
                   <span className="text-[10px] text-muted-foreground ml-auto">
                     {b.status}

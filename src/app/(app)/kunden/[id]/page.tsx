@@ -123,7 +123,7 @@ export default function KundenDetailPage() {
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-5">
             <h3 className="font-semibold text-red-800">Kunde "{customer.name}" wirklich löschen?</h3>
-            <p className="text-sm text-red-600 mt-1">Alle verknüpften Aufträge, Mietanfragen und Dokumente werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <p className="text-sm text-red-600 mt-1">Alle verknüpften Aufträge, Vermietentwürfe und Dokumente werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
             <div className="flex gap-3 mt-4">
               <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="border-gray-200">Abbrechen</Button>
               <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">

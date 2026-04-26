@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (loadErr || !existing) {
-    return new NextResponse(errorPage("Mietanfrage nicht gefunden"), { headers: { "Content-Type": "text/html" } });
+    return new NextResponse(errorPage("Vermietentwurf nicht gefunden"), { headers: { "Content-Type": "text/html" } });
   }
 
   if (existing.status !== "anfrage") {

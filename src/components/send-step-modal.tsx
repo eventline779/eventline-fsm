@@ -336,7 +336,7 @@ export function SendStepModal({
                 <div>
                   <p className="font-medium">Mail wurde versendet</p>
                   <p className="opacity-80 mt-0.5">
-                    Bestätige, um die Mietanfrage zum nächsten Schritt zu bewegen.
+                    Bestätige, um den Vermietentwurf zum nächsten Schritt zu bewegen.
                   </p>
                 </div>
               </div>

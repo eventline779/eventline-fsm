@@ -21,14 +21,12 @@ import {
   X,
   Pencil,
   Check,
-  ArrowRight,
   Send,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
 import { DonutChart } from "@/components/donut-chart";
-import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
 import { toast } from "sonner";
 
@@ -186,7 +184,7 @@ export default function AuftraegePage() {
               <Link href="/anfragen/neu">
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Neue Vermietung
+                  Neuer Vermietentwurf
                 </Button>
               </Link>
               <Link href="/auftraege/neu">
@@ -359,12 +357,20 @@ export default function AuftraegePage() {
                     Filter zurücksetzen
                   </Button>
                 ) : (
-                  <Link href="/auftraege/neu">
-                    <Button className="mt-5 bg-red-600 hover:bg-red-700 text-white">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ersten Auftrag erstellen
-                    </Button>
-                  </Link>
+                  <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+                    <Link href="/anfragen/neu">
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Neuer Vermietentwurf
+                      </Button>
+                    </Link>
+                    <Link href="/auftraege/neu">
+                      <Button className="bg-red-600 hover:bg-red-700 text-white">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Neuer Auftrag
+                      </Button>
+                    </Link>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -437,35 +443,45 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                       {isAnfrage && (
-                        <div className="mt-3 pt-3 border-t border-foreground/[0.06]">
-                          <RequestStepTracker currentStep={currentStep} size="sm" />
-                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Schritt {currentStep}/5 · {stepInfo.label}
+                        </p>
                       )}
                     </div>
                     {/* Action-Slot rechts: Anfragen bekommen einen "Nächster Schritt"-Button mit
                         Text, sodass das Weiterklicken ohne Detail-Seite geht. Bei Entwurf/kein Termin/
                         allGood gilt die alte Icon-Logik. */}
                     {isAnfrage ? (
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
-                          {isMailStep ? stepInfo.label : "Nächster Schritt"}
-                        </span>
-                        <div className="w-10 h-10 flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleAnfrageNext(job.id);
-                            }}
-                            className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
-                            aria-label={isMailStep ? stepInfo.label : "Nächster Schritt"}
-                            title={isMailStep ? stepInfo.label : "Schritt bestätigen"}
-                          >
-                            {isMailStep ? <Send className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
-                          </button>
+                      isMailStep ? (
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
+                            {stepInfo.label}
+                          </span>
+                          <div className="w-10 h-10 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAnfrageNext(job.id);
+                              }}
+                              className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                              aria-label={stepInfo.label}
+                              title={stepInfo.label}
+                            >
+                              <Send className="h-5 w-5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        // Warte-Schritte (2, 4): keine Inline-Action — der Kunde muss aus dem Mail
+                        // bestaetigen. Manuelles Bestaetigen geht ueber die Detail-Seite.
+                        <div className="shrink-0 pr-2">
+                          <span className="text-xs text-muted-foreground italic whitespace-nowrap">
+                            Wartet auf Kunden
+                          </span>
+                        </div>
+                      )
                     ) : (noTermin || job.status === "entwurf" || allGood) && (
                       <div className="flex items-center gap-0.5 shrink-0">
                         {noTermin && (
@@ -554,7 +570,7 @@ export default function AuftraegePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
               <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Mietanfrage in Auftrag umwandeln?</h2>
+                <h2 className="font-semibold">Vermietentwurf in Auftrag umwandeln?</h2>
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-muted-foreground">
@@ -564,7 +580,7 @@ export default function AuftraegePage() {
                   <Check className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium">Akquise abgeschlossen</p>
-                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus der Mietanfrage wird jetzt ein echter Auftrag.</p>
+                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

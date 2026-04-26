@@ -329,10 +329,10 @@ export default function AuftragDetailPage() {
             {job.was_anfrage && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
-                title="Aus einer Mietanfrage entstanden"
+                title="Aus einem Vermietentwurf entstanden"
               >
                 <Inbox className="h-3 w-3" />
-                Mietanfrage
+                Vermietentwurf
               </span>
             )}
           </div>

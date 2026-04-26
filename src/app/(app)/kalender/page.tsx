@@ -220,7 +220,7 @@ export default function KalenderPage() {
 
   const typeConfig = {
     auftrag: { icon: <ClipboardList className="h-3.5 w-3.5" />, label: "Auftrag" },
-    vermietung: { icon: <Inbox className="h-3.5 w-3.5" />, label: "Mietanfrage" },
+    vermietung: { icon: <Inbox className="h-3.5 w-3.5" />, label: "Vermietentwurf" },
     termin: { icon: <CalIcon className="h-3.5 w-3.5" />, label: "Termin" },
   };
 
@@ -257,7 +257,7 @@ export default function KalenderPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
-          <p className="text-sm text-muted-foreground mt-1">Aufträge, Mietanfragen & Termine</p>
+          <p className="text-sm text-muted-foreground mt-1">Aufträge, Vermietentwürfe & Termine</p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setShowSync(true)} variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50">
@@ -340,7 +340,7 @@ export default function KalenderPage() {
       <div className="grid grid-cols-4 gap-3">
         {[
           { label: "Aufträge", count: stats.auftraege, dot: "bg-blue-500" },
-          { label: "Mietanfragen", count: stats.vermietungen, dot: "bg-amber-500" },
+          { label: "Vermietentwürfe", count: stats.vermietungen, dot: "bg-amber-500" },
           { label: "Termine", count: stats.termine, dot: "bg-green-500" },
         ].map((s) => (
           <Card key={s.label} className="bg-card border-gray-100">
@@ -635,7 +635,7 @@ export default function KalenderPage() {
                 <button onClick={() => setShowSync(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
               </div>
               <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300">Mit diesem Link kannst du alle Aufträge, Mietanfragen und Termine in deinen Google Kalender einbinden. Google aktualisiert ihn automatisch alle paar Stunden.</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Mit diesem Link kannst du alle Aufträge, Vermietentwürfe und Termine in deinen Google Kalender einbinden. Google aktualisiert ihn automatisch alle paar Stunden.</p>
 
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Kalender-Link</label>

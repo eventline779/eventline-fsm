@@ -147,7 +147,7 @@ function NeueAnfragePageContent() {
       setSaving(false);
       return;
     }
-    toast.success(`Mietanfrage INT-${inserted.job_number} angelegt`);
+    toast.success(`Vermietentwurf INT-${inserted.job_number} angelegt`);
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push(`/anfragen/${inserted.id}`);
   }
