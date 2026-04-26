@@ -217,7 +217,7 @@ function NeuerAuftragPageContent() {
             size="sm"
             disabled={saving !== null}
             onClick={() => submit("draft")}
-            className="flex-1 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:bg-purple-500/15 dark:border-purple-500/30 dark:text-purple-300 dark:hover:bg-purple-500/25"
+            className="flex-1 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:bg-purple-500/15 dark:border-purple-500/30 dark:text-purple-300 dark:hover:bg-purple-500/40 dark:hover:border-purple-400/60 dark:hover:text-purple-100"
           >
             <FileEdit className="h-3.5 w-3.5 mr-1.5" />
             {saving === "draft" ? "Speichert…" : "Als Entwurf"}
