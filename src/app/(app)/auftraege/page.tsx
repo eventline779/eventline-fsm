@@ -430,7 +430,7 @@ export default function AuftraegePage() {
             <div className="flex items-stretch gap-2">
               {/* Linke Seite: Termin-Status — nur bei aktiven Auftraegen, Archiv braucht das nicht */}
               {isActive && (
-                <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
+                <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border-[2.5px] text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
                   {noTermin ? (
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                   ) : (
