@@ -359,7 +359,9 @@ html, body, *, *::before, *::after {
    Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
 @layer utilities {
   /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border in derselben Farbe.
-     Optik wie Donut-Segmente und Termin-Status-Indikatoren. Tint-Farbe per --tint CSS-Variable. */
+     Optik wie Donut-Segmente. Per-Color-Modifier setzen --tint direkt — keine var()-Kette
+     ueber inline style, weil das in manchen Browsern/CSS-Cascades nicht zuverlaessig
+     aufloest. Verwendung: <div className="tinted tinted-amber"> */
   .tinted {
     background-color: color-mix(in oklch, var(--tint, currentColor) 12%, transparent);
     border-color: var(--tint, currentColor);
@@ -374,6 +376,14 @@ html, body, *, *::before, *::after {
   .dark .tinted:hover {
     background-color: color-mix(in oklch, var(--tint, currentColor) 26%, transparent);
   }
+  .tinted-amber { --tint: #f59e0b; }
+  .tinted-blue { --tint: #2563eb; }
+  .tinted-green { --tint: #00a86b; }
+  .tinted-red { --tint: #dc2626; }
+  .tinted-purple { --tint: #7c3aed; }
+  .tinted-orange { --tint: #ea580c; }
+  .tinted-emerald { --tint: #047857; }
+  .tinted-gray { --tint: #64748b; }
 
   .border:not([class*="border-0"]) {
     border-width: 2px;

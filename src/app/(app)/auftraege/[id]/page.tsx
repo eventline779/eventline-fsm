@@ -404,8 +404,7 @@ export default function AuftragDetailPage() {
                   href={mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted transition-colors"
-                  style={{ "--tint": "var(--status-blue)" } as React.CSSProperties}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted tinted-blue transition-colors"
                 >
                   <MapPin className="h-3.5 w-3.5" />
                   Google Maps
@@ -425,8 +424,7 @@ export default function AuftragDetailPage() {
                   href={mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted transition-colors"
-                  style={{ "--tint": "var(--status-blue)" } as React.CSSProperties}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted tinted-blue transition-colors"
                 >
                   <MapPin className="h-3.5 w-3.5" />
                   Google Maps
@@ -551,10 +549,7 @@ export default function AuftragDetailPage() {
           )}
           {appointments.length === 0 && !showApptForm && (
             !["abgeschlossen", "storniert"].includes(job.status) ? (
-              <div
-                className="flex items-center gap-3 p-3 rounded-xl border tinted"
-                style={{ "--tint": "var(--status-amber)" } as React.CSSProperties}
-              >
+              <div className="flex items-center gap-3 p-3 rounded-xl border tinted tinted-amber">
                 <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/20 shrink-0">
                   <Calendar className="h-4 w-4" />
                 </div>
