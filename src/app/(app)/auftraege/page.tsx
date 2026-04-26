@@ -484,7 +484,7 @@ export default function AuftraegePage() {
                         )}
                       </div>
                       {noTermin && (
-                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                        <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
                           Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
                         </p>
                       )}
@@ -523,7 +523,7 @@ export default function AuftraegePage() {
                                 e.stopPropagation();
                                 router.push(`/auftraege/${job.id}?termin=neu`);
                               }}
-                              className="p-2.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                              className="p-2.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
                               aria-label="Termin planen"
                               title="Termin planen"
                             >
