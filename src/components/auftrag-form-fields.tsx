@@ -83,17 +83,17 @@ export function AuftragFormFields({
 
   return (
     <>
-      {/* Auftragstyp */}
+      {/* Auftragstyp — dezent statt knallig: aktiver Toggle nur leicht abgesetzt */}
       <div className="grid grid-cols-2 gap-3">
         {(["location", "extern"] as AuftragJobType[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setJobType(t)}
-            className={`px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+            className={`px-3 py-2 rounded-xl border text-sm transition-all ${
               form.job_type === t
-                ? "border-foreground bg-foreground text-background"
-                : "border-border hover:bg-muted"
+                ? "bg-foreground/[0.08] border-foreground/40 font-semibold"
+                : "border-border text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
             }`}
           >
             {t === "location" ? "Location" : "Firma / Privat"}
