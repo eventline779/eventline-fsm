@@ -389,30 +389,17 @@ export default function AuftraegePage() {
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
+                  {/* Outer flex auf items-center, sodass Status-Tag + Action-Slot
+                      rechts vertikal zur Card-Mitte ausgerichtet sind statt am
+                      oberen Rand zu kleben. */}
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3 justify-between">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <JobNumber number={job.job_number} />
-                          <h3 className="font-semibold truncate">{job.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {job.priority === "dringend" && isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                              <AlertCircle className="h-3 w-3" />
-                              Dringend
-                            </span>
-                          )}
-                          {job.status !== "offen" && (
-                            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                              {JOB_STATUS[job.status].label}
-                            </span>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <JobNumber number={job.job_number} />
+                        <h3 className="font-semibold truncate">{job.title}</h3>
                       </div>
-                      {/* 5-Schritt-Tracker direkt unter dem Vermietentwurf-Badge —
-                          so sieht man auf einen Blick den Status der Akquise, ohne
-                          erst bis zum Card-Footer scrollen zu muessen. */}
+                      {/* 5-Schritt-Tracker direkt unter dem Titel — auf einen
+                          Blick der Akquise-Stand. */}
                       {isAnfrage && (
                         <div className="mt-2">
                           <RequestStepTracker currentStep={currentStep} size="sm" />
@@ -448,88 +435,99 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Action-Slot rechts: Anfragen bekommen einen "Nächster Schritt"-Button mit
-                        Text, sodass das Weiterklicken ohne Detail-Seite geht. Bei Entwurf/kein Termin/
-                        allGood gilt die alte Icon-Logik. */}
-                    {isAnfrage ? (
-                      isMailStep ? (
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
-                            {stepInfo.label}
-                          </span>
+                    {/* Rechte Spalte: Status-Tags + Action-Slot, beide vertikal
+                        zur Card-Mitte ausgerichtet (siehe items-center am outer
+                        flex). Tags zuerst, dann Action. */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {job.priority === "dringend" && isActive && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                          <AlertCircle className="h-3 w-3" />
+                          Dringend
+                        </span>
+                      )}
+                      {job.status !== "offen" && (
+                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                          {JOB_STATUS[job.status].label}
+                        </span>
+                      )}
+                      {isAnfrage ? (
+                        isMailStep ? (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
+                              {stepInfo.label}
+                            </span>
+                            <div className="w-10 h-10 flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAnfrageNext(job.id);
+                                }}
+                                className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                                aria-label={stepInfo.label}
+                                title={stepInfo.label}
+                              >
+                                <Send className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="pr-2">
+                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                              Manuell in Details bestätigen
+                            </span>
+                          </div>
+                        )
+                      ) : (noTermin || job.status === "entwurf" || allGood) ? (
+                        <div className="flex items-center gap-0.5">
+                          {noTermin && (
+                            <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
+                              Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
+                            </span>
+                          )}
                           <div className="w-10 h-10 flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleAnfrageNext(job.id);
-                              }}
-                              className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
-                              aria-label={stepInfo.label}
-                              title={stepInfo.label}
-                            >
-                              <Send className="h-5 w-5" />
-                            </button>
+                            {job.status === "entwurf" ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/auftraege/${job.id}/bearbeiten`);
+                                }}
+                                className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                                aria-label="Bearbeiten"
+                                title="Entwurf bearbeiten"
+                              >
+                                <Pencil className="h-5 w-5" />
+                              </button>
+                            ) : noTermin ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/auftraege/${job.id}?termin=neu`);
+                                }}
+                                className="p-2.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                                aria-label="Termin planen"
+                                title="Termin planen"
+                              >
+                                <CalendarPlus className="h-5 w-5" />
+                              </button>
+                            ) : allGood ? (
+                              <span
+                                className="p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex"
+                                aria-label="Alles bereit"
+                                title="Alles bereit"
+                              >
+                                <Check className="h-5 w-5" strokeWidth={3} />
+                              </span>
+                            ) : null}
                           </div>
                         </div>
-                      ) : (
-                        // Warte-Schritte (2, 4): keine Inline-Action — der Kunde muss aus dem Mail
-                        // bestaetigen. Manuelles Bestaetigen geht ueber die Detail-Seite.
-                        <div className="shrink-0 pr-2">
-                          <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                            Manuell in Details bestätigen
-                          </span>
-                        </div>
-                      )
-                    ) : (noTermin || job.status === "entwurf" || allGood) && (
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        {noTermin && (
-                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
-                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                          </span>
-                        )}
-                        <div className="w-10 h-10 flex items-center justify-center">
-                          {job.status === "entwurf" ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                router.push(`/auftraege/${job.id}/bearbeiten`);
-                              }}
-                              className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
-                              aria-label="Bearbeiten"
-                              title="Entwurf bearbeiten"
-                            >
-                              <Pencil className="h-5 w-5" />
-                            </button>
-                          ) : noTermin ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                router.push(`/auftraege/${job.id}?termin=neu`);
-                              }}
-                              className="p-2.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
-                              aria-label="Termin planen"
-                              title="Termin planen"
-                            >
-                              <CalendarPlus className="h-5 w-5" />
-                            </button>
-                          ) : allGood ? (
-                            <span
-                              className="p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex"
-                              aria-label="Alles bereit"
-                              title="Alles bereit"
-                            >
-                              <Check className="h-5 w-5" strokeWidth={3} />
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
+                      ) : null}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
