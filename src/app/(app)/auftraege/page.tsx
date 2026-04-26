@@ -205,11 +205,10 @@ export default function AuftraegePage() {
                         <button
                           type="button"
                           onClick={() => setFilterStatus("entwurf")}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
-                          style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
                           title="Filter auf Entwürfe setzen"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
                           {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
                         </button>
                       </div>

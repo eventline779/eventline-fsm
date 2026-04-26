@@ -82,14 +82,14 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben: Light-Mode mittel gesaettigt (Tailwind 400er-Stufe) */
-  --status-purple: #c084fc;
-  --status-gray: #9ca3af;
-  --status-green: #4ade80;
-  --status-red: #f87171;
-  --status-blue: #60a5fa;
-  --status-orange: #fb923c;
-  --status-emerald: #34d399;
+  /* Diagramm-Status-Farben: gleicher Look wie Badge-Hintergrund (Tailwind -100) */
+  --status-purple: #f3e8ff;
+  --status-gray: #f3f4f6;
+  --status-green: #dcfce7;
+  --status-red: #fee2e2;
+  --status-blue: #dbeafe;
+  --status-orange: #ffedd5;
+  --status-emerald: #d1fae5;
 }
 
 .dark {
@@ -124,14 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben: Dark-Mode kraeftiger (Tailwind 500er-Stufe) */
-  --status-purple: #a855f7;
-  --status-gray: #6b7280;
-  --status-green: #22c55e;
-  --status-red: #ef4444;
-  --status-blue: #3b82f6;
-  --status-orange: #f97316;
-  --status-emerald: #10b981;
+  /* Diagramm-Status-Farben: gleicher Look wie Badge-Hintergrund (500er bei 20% Opacity) */
+  --status-purple: rgba(168, 85, 247, 0.2);
+  --status-gray: rgba(107, 114, 128, 0.2);
+  --status-green: rgba(34, 197, 94, 0.2);
+  --status-red: rgba(239, 68, 68, 0.2);
+  --status-blue: rgba(59, 130, 246, 0.2);
+  --status-orange: rgba(249, 115, 22, 0.2);
+  --status-emerald: rgba(16, 185, 129, 0.2);
 }
 
 @layer base {
