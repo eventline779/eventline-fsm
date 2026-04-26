@@ -88,7 +88,7 @@ export default function NeueAnfragePage() {
         <Card className="bg-card">
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Event-Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Startdatum</Label>
                 <Input type="date" value={form.event_date} onChange={(e) => update("event_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
@@ -98,7 +98,7 @@ export default function NeueAnfragePage() {
                 <Input type="date" value={form.event_end_date} onChange={(e) => update("event_end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Personenanzahl</Label>
                 <Input type="number" placeholder="z.B. 80" value={form.guest_count} onChange={(e) => update("guest_count", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />

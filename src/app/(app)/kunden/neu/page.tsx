@@ -87,7 +87,7 @@ export default function NeuerKundePage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Kundentyp</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               {typeOptions.map((opt) => (
                 <button
                   key={opt.value}
@@ -124,7 +124,7 @@ export default function NeuerKundePage() {
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="email">E-Mail</Label>
                 <Input
@@ -166,7 +166,7 @@ export default function NeuerKundePage() {
                 className="mt-1.5 bg-gray-50 border-gray-200"
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label htmlFor="zip">PLZ</Label>
                 <Input

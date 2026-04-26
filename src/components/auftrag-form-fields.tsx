@@ -121,6 +121,7 @@ export function AuftragFormFields({
           value={form.description}
           onChange={(e) => update("description", e.target.value)}
           rows={2}
+          style={{ fieldSizing: "content" } as React.CSSProperties}
           className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
         />
       </div>
@@ -128,7 +129,7 @@ export function AuftragFormFields({
       <hr className="border-border/50" />
 
       {/* Wo */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
           <SectionLabel>Wo</SectionLabel>
           <button
@@ -220,7 +221,7 @@ export function AuftragFormFields({
       <hr className="border-border/50" />
 
       {/* Wann */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <SectionLabel>Wann</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">

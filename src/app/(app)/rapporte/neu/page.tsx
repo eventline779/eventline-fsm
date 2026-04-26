@@ -332,7 +332,7 @@ export default function NeuerRapportPage() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-3">
                   <div>
                     <label className="text-[11px] font-medium text-gray-500">Datum</label>
                     <Input type="date" value={tr.date} onChange={(e) => updateTimeRange(i, "date", e.target.value)} className="mt-1 bg-card border-gray-200 text-xs h-8" />
