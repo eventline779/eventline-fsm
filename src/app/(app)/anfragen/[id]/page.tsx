@@ -287,6 +287,7 @@ export default function AnfrageDetailPage() {
         cancelled_by: user?.id ?? null,
         cancelled_at: new Date().toISOString(),
         cancellation_reason: cancelReason.trim(),
+        cancelled_as_anfrage: true,
       })
       .eq("id", id);
     setCancelSaving(false);

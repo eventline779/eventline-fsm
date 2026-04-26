@@ -72,8 +72,11 @@ export default function AuftraegePage() {
   const todayMs = todayStart.getTime();
   const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
-    // Anfragen leben unter /anfragen, nicht in der Auftrags-Liste — sie zaehlen aber im Donut.
+    // Anfragen leben unter /anfragen, nicht in der Auftrags-Liste.
     if (j.status === "anfrage") return false;
+    // Stornierungen, die in der Anfrage-Phase passierten, gehoeren ebenfalls nicht
+    // ins Auftrags-Archiv — zu dem Zeitpunkt war es noch kein Auftrag.
+    if (j.cancelled_as_anfrage) return false;
     const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
@@ -113,7 +116,7 @@ export default function AuftraegePage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-card text-gray-600 border-gray-200"}`}>
-            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => j.status === "abgeschlossen" || j.status === "storniert").length})`}
+            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => !j.cancelled_as_anfrage && (j.status === "abgeschlossen" || j.status === "storniert")).length})`}
           </button>
           {!showArchive && (
             <Link href="/auftraege/neu">
@@ -132,7 +135,7 @@ export default function AuftraegePage() {
         const segments = [
           { label: "Bevorstehend", count: jobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
           { label: "Abgeschlossen", count: jobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
-          { label: "Storniert", count: jobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
+          { label: "Storniert", count: jobs.filter((j) => j.status === "storniert" && !j.cancelled_as_anfrage).length, color: "var(--status-red)" },
         ];
         const entwurfPill = entwurfCount > 0 && (
           <button

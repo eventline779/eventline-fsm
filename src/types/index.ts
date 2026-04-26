@@ -80,6 +80,8 @@ export interface Job {
   cancelled_by: string | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
+  // TRUE wenn die Stornierung in der Anfrage-Phase passierte — solche Jobs gehoeren nicht ins Auftrags-Archiv.
+  cancelled_as_anfrage: boolean;
   // Joined data
   customer?: Customer;
   location?: Location;

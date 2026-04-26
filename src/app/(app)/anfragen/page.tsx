@@ -47,17 +47,21 @@ export default function AnfragenPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("jobs")
-        .select("status")
+        .select("status, cancelled_as_anfrage")
         .eq("was_anfrage", true)
         .neq("is_deleted", true),
     ]);
     if (listRes.data) setRequests(listRes.data as unknown as Job[]);
     if (outcomeRes.data) {
-      const rows = outcomeRes.data as { status: string }[];
+      const rows = outcomeRes.data as { status: string; cancelled_as_anfrage: boolean }[];
       setOutcome({
         open: rows.filter((r) => r.status === "anfrage").length,
-        converted: rows.filter((r) => ["entwurf", "offen", "abgeschlossen"].includes(r.status)).length,
-        cancelled: rows.filter((r) => r.status === "storniert").length,
+        // "Auftrag erstellt": Anfrage wurde konvertiert. Auch wenn der Auftrag spaeter
+        // storniert wurde (cancelled_as_anfrage=false), gehoert er hier rein — der
+        // Auftrag existierte ja.
+        converted: rows.filter((r) => r.status !== "anfrage" && !r.cancelled_as_anfrage).length,
+        // "Storniert": nur Anfragen, die in der Anfrage-Phase abgelehnt wurden.
+        cancelled: rows.filter((r) => r.cancelled_as_anfrage).length,
       });
     }
     setLoading(false);
