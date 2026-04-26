@@ -391,20 +391,24 @@ export default function AuftraegePage() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <JobNumber number={job.job_number} />
-                        <h3 className="font-semibold truncate">{job.title}</h3>
-                        {job.status !== "offen" && (
-                          <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                            {JOB_STATUS[job.status].label}
-                          </span>
-                        )}
-                        {job.priority === "dringend" && isActive && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                            <AlertCircle className="h-3 w-3" />
-                            Dringend
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3 justify-between">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <JobNumber number={job.job_number} />
+                          <h3 className="font-semibold truncate">{job.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {job.priority === "dringend" && isActive && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                              <AlertCircle className="h-3 w-3" />
+                              Dringend
+                            </span>
+                          )}
+                          {job.status !== "offen" && (
+                            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                              {JOB_STATUS[job.status].label}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {/* 5-Schritt-Tracker direkt unter dem Vermietentwurf-Badge —
                           so sieht man auf einen Blick den Status der Akquise, ohne
