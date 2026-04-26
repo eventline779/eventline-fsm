@@ -90,6 +90,7 @@
   --status-blue: #2563eb;
   --status-orange: #ea580c;
   --status-emerald: #047857;
+  --status-amber: #f59e0b;
 }
 
 .dark {
@@ -132,6 +133,7 @@
   --status-blue: #2563eb;
   --status-orange: #ea580c;
   --status-emerald: #047857;
+  --status-amber: #f59e0b;
 }
 
 @layer base {
@@ -356,6 +358,23 @@ html, body, *, *::before, *::after {
    und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
    Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
 @layer utilities {
+  /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border in derselben Farbe.
+     Optik wie Donut-Segmente und Termin-Status-Indikatoren. Tint-Farbe per --tint CSS-Variable. */
+  .tinted {
+    background-color: color-mix(in oklch, var(--tint, currentColor) 12%, transparent);
+    border-color: var(--tint, currentColor);
+    color: var(--tint, currentColor);
+  }
+  .dark .tinted {
+    background-color: color-mix(in oklch, var(--tint, currentColor) 18%, transparent);
+  }
+  .tinted:hover {
+    background-color: color-mix(in oklch, var(--tint, currentColor) 18%, transparent);
+  }
+  .dark .tinted:hover {
+    background-color: color-mix(in oklch, var(--tint, currentColor) 26%, transparent);
+  }
+
   .border:not([class*="border-0"]) {
     border-width: 2px;
   }

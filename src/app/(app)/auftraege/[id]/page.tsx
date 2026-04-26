@@ -400,7 +400,13 @@ export default function AuftragDetailPage() {
                 <span>{customer.name}{!location && customerAddress ? ` — ${customerAddress}` : ""}</span>
               </div>
               {!location && mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted transition-colors"
+                  style={{ "--tint": "var(--status-blue)" } as React.CSSProperties}
+                >
                   <MapPin className="h-3.5 w-3.5" />
                   Google Maps
                 </a>
@@ -415,7 +421,13 @@ export default function AuftragDetailPage() {
                 <span>{location.name}{locationAddress ? ` — ${locationAddress}` : ""}</span>
               </div>
               {mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted transition-colors"
+                  style={{ "--tint": "var(--status-blue)" } as React.CSSProperties}
+                >
                   <MapPin className="h-3.5 w-3.5" />
                   Google Maps
                 </a>
@@ -539,14 +551,16 @@ export default function AuftragDetailPage() {
           )}
           {appointments.length === 0 && !showApptForm && (
             !["abgeschlossen", "storniert"].includes(job.status) ? (
-              // Stil-Match Donut-Segmente: fill-opacity 0.12 (light) / 0.18 (dark), Border = volle Farbe
-              <div className="flex items-center gap-3 p-3 rounded-xl border-amber-500 bg-amber-500/[0.12] dark:bg-amber-500/[0.18] border">
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl border tinted"
+                style={{ "--tint": "var(--status-amber)" } as React.CSSProperties}
+              >
                 <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/20 shrink-0">
-                  <Calendar className="h-4 w-4 text-amber-500" />
+                  <Calendar className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Kein Termin geplant</p>
-                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                  <p className="text-sm font-medium">Kein Termin geplant</p>
+                  <p className="text-xs opacity-80 mt-0.5">
                     {job.start_date ? (() => {
                       const days = Math.ceil((new Date(job.start_date).getTime() - Date.now()) / 86400000);
                       return days > 0 ? `Auftrag beginnt in ${days} Tag${days === 1 ? "" : "en"}` : days === 0 ? "Auftrag beginnt heute" : `Auftrag hat vor ${Math.abs(days)} Tag${Math.abs(days) === 1 ? "" : "en"} begonnen`;
