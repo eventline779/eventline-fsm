@@ -55,6 +55,8 @@ interface Props {
   locations: Location[] | null;
   /** Bei Edit-Page wollen wir nicht zwingend "Datum nicht in der Vergangenheit" enforcen. */
   enforceNoPastDates?: boolean;
+  /** Wird beim Klick auf "Neuer Kunde" im Kunden-Dropdown aufgerufen. Parent kuemmert sich um Draft-Speichern + Navigation. */
+  onCreateCustomer?: (query: string) => void;
 }
 
 export function AuftragFormFields({
@@ -63,6 +65,7 @@ export function AuftragFormFields({
   customers,
   locations,
   enforceNoPastDates = true,
+  onCreateCustomer,
 }: Props) {
   function update<K extends keyof AuftragFormState>(field: K, value: AuftragFormState[K]) {
     onChange({ ...form, [field]: value });
@@ -185,6 +188,8 @@ export function AuftragFormFields({
                   items={(customers ?? []).map((c) => ({ id: c.id, label: c.name }))}
                   placeholder="Kunde tippen…"
                   required
+                  onCreateNew={onCreateCustomer}
+                  createNewLabel="Neuer Kunde"
                 />
               </div>
               <div className="space-y-1">

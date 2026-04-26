@@ -1,24 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { CustomerType } from "@/types";
-import { ArrowLeft, Save, Building2, User, Globe } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 
-export default function NeuerKundePage() {
+// Erlaubte Return-Pfade — verhindert Open-Redirect via ?return=https://evil.example
+const ALLOWED_RETURN_PREFIXES = ["/anfragen/", "/auftraege/"];
+
+function isAllowedReturn(p: string | null | undefined): p is string {
+  if (!p) return false;
+  if (!p.startsWith("/")) return false;
+  return ALLOWED_RETURN_PREFIXES.some((prefix) => p === prefix.slice(0, -1) || p.startsWith(prefix));
+}
+
+function NeuerKundeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
+
+  const prefillName = searchParams.get("prefillName") ?? "";
+  const returnPathRaw = searchParams.get("return");
+  const returnPath = isAllowedReturn(returnPathRaw) ? returnPathRaw : null;
+
   const [form, setForm] = useState({
-    name: "",
+    name: prefillName,
     type: "company" as CustomerType,
     email: "",
     phone: "",
@@ -36,25 +49,45 @@ export default function NeuerKundePage() {
     e.preventDefault();
     setSaving(true);
 
-    const { error } = await supabase.from("customers").insert({
-      name: form.name,
-      type: form.type,
-      email: form.email || null,
-      phone: form.phone || null,
-      address_street: form.address_street || null,
-      address_zip: form.address_zip || null,
-      address_city: form.address_city || null,
-      notes: form.notes || null,
-    });
+    const { data: inserted, error } = await supabase
+      .from("customers")
+      .insert({
+        name: form.name,
+        type: form.type,
+        email: form.email || null,
+        phone: form.phone || null,
+        address_street: form.address_street || null,
+        address_zip: form.address_zip || null,
+        address_city: form.address_city || null,
+        notes: form.notes || null,
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      toast.error("Fehler beim Speichern: " + error.message);
+    if (error || !inserted) {
+      toast.error("Fehler beim Speichern: " + (error?.message ?? "unbekannt"));
       setSaving(false);
       return;
     }
 
     toast.success("Kunde erfolgreich erstellt");
-    router.push("/kunden");
+
+    if (returnPath) {
+      // Zurueck zum urspruenglichen Formular — Draft wird dort aus sessionStorage
+      // wiederhergestellt, customer_id auf den frisch erstellten Kunden gesetzt.
+      const sep = returnPath.includes("?") ? "&" : "?";
+      router.push(`${returnPath}${sep}customerId=${inserted.id}`);
+    } else {
+      router.push("/kunden");
+    }
+  }
+
+  function cancel() {
+    if (returnPath) {
+      router.push(returnPath);
+    } else {
+      router.push("/kunden");
+    }
   }
 
   const typeOptions: { value: CustomerType; label: string; icon: React.ReactNode }[] = [
@@ -67,11 +100,14 @@ export default function NeuerKundePage() {
     <div className="max-w-2xl space-y-6 mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/kunden">
-          <button className="p-2 rounded-lg hover:bg-card transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        </Link>
+        <button
+          type="button"
+          onClick={cancel}
+          className="p-2 rounded-lg hover:bg-card transition-colors"
+          aria-label="Zurück"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Neuer Kunde</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -79,6 +115,16 @@ export default function NeuerKundePage() {
           </p>
         </div>
       </div>
+
+      {returnPath && (
+        <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
+          <ArrowLeftRight className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">Du wirst nach dem Speichern zurückgeleitet.</p>
+            <p className="opacity-80 mt-0.5">Dein vorheriges Formular ist zwischengespeichert und der neue Kunde wird automatisch ausgewählt.</p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Typ */}
@@ -209,11 +255,9 @@ export default function NeuerKundePage() {
 
         {/* Submit */}
         <div className="flex gap-3 pt-2">
-          <Link href="/kunden" className="flex-1">
-            <Button type="button" variant="outline" className="w-full">
-              Abbrechen
-            </Button>
-          </Link>
+          <Button type="button" variant="outline" className="flex-1" onClick={cancel}>
+            Abbrechen
+          </Button>
           <Button
             type="submit"
             disabled={!form.name || saving}
@@ -225,5 +269,13 @@ export default function NeuerKundePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NeuerKundePage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-muted-foreground">Laden…</div>}>
+      <NeuerKundeContent />
+    </Suspense>
   );
 }

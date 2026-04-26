@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,11 @@ import { ArrowLeft, Save, FileEdit } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
+import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
 
-export default function NeuerAuftragPage() {
+const RETURN_PATH = "/auftraege/neu";
+
+function NeuerAuftragPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -36,6 +39,24 @@ export default function NeuerAuftragPage() {
     end_date: "",
     urgent: false,
   });
+
+  // Draft-Restore wenn von /kunden/neu zurueckkommend
+  useEffect(() => {
+    const newCustomerId = searchParams.get("customerId");
+    if (!newCustomerId) return;
+    const draft = popFormDraft<AuftragFormState>(RETURN_PATH);
+    if (draft) {
+      setForm({ ...draft, customer_id: newCustomerId, job_type: "extern" });
+    } else {
+      setForm((p) => ({ ...p, customer_id: newCustomerId, job_type: "extern" }));
+    }
+    router.replace(RETURN_PATH, { scroll: false });
+  }, [searchParams, router]);
+
+  function startCreateCustomer(query: string) {
+    saveFormDraft<AuftragFormState>(RETURN_PATH, form);
+    router.push(`/kunden/neu?prefillName=${encodeURIComponent(query)}&return=${encodeURIComponent(RETURN_PATH)}`);
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -180,6 +201,7 @@ export default function NeuerAuftragPage() {
           onChange={setForm}
           customers={customers}
           locations={locations}
+          onCreateCustomer={startCreateCustomer}
         />
 
         {/* Buttons */}
@@ -212,5 +234,13 @@ export default function NeuerAuftragPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NeuerAuftragPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-muted-foreground">Laden…</div>}>
+      <NeuerAuftragPageContent />
+    </Suspense>
   );
 }

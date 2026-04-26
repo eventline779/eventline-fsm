@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 
 export type SelectItem = {
   id: string;
@@ -39,6 +39,10 @@ interface Props {
   clearable?: boolean;
   /** Visueller Stil-Hinweis am Trigger, wenn ein Filter aktiv ist (nicht-default-Wert). */
   active?: boolean;
+  /** Wenn gesetzt: zeigt eine "Neu anlegen"-Option am Ende, sobald der Nutzer etwas getippt hat. */
+  onCreateNew?: (query: string) => void;
+  /** Label vor dem getippten Wert, z.B. "Neuer Kunde" -> "+ Neuer Kunde: Max". Default "Neu anlegen". */
+  createNewLabel?: string;
 }
 
 function matchesWordStart(text: string, q: string): boolean {
@@ -58,6 +62,8 @@ export function SearchableSelect({
   searchable = true,
   clearable = true,
   active = false,
+  onCreateNew,
+  createNewLabel = "Neu anlegen",
 }: Props) {
   const selectedItem = items.find((i) => i.id === value) ?? null;
   const [search, setSearch] = useState(selectedItem?.label ?? "");
@@ -121,10 +127,27 @@ export function SearchableSelect({
     return items.filter((i) => matchesWordStart(i.label, search)).slice(0, 8);
   }, [items, search, open, searchable]);
 
+  // "Neu anlegen"-Option: nur wenn vom Aufrufer gewuenscht UND Nutzer hat etwas getippt
+  // UND der getippte Wert matcht keinen bestehenden Eintrag exakt (case-insensitive).
+  const trimmedSearch = search.trim();
+  const exactMatchExists = trimmedSearch.length > 0 && items.some(
+    (i) => i.label.trim().toLowerCase() === trimmedSearch.toLowerCase(),
+  );
+  const showCreateOption = !!onCreateNew && trimmedSearch.length > 0 && !exactMatchExists;
+  // Highlight-Index gilt fuer filtered.length + (showCreateOption ? 1 : 0)
+  const totalOptions = filtered.length + (showCreateOption ? 1 : 0);
+
   function pick(item: SelectItem) {
     onChange(item.id);
     setSearch(item.label);
     setOpen(false);
+  }
+
+  function pickCreateNew() {
+    if (!onCreateNew) return;
+    const q = trimmedSearch;
+    setOpen(false);
+    onCreateNew(q);
   }
 
   function clear() {
@@ -138,14 +161,19 @@ export function SearchableSelect({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (!open) setOpen(true);
-      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+      setHighlight((h) => Math.min(h + 1, totalOptions - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === "Enter") {
-      if (open && filtered[highlight]) {
-        e.preventDefault();
-        pick(filtered[highlight]);
+      if (open) {
+        if (highlight < filtered.length && filtered[highlight]) {
+          e.preventDefault();
+          pick(filtered[highlight]);
+        } else if (showCreateOption && highlight === filtered.length) {
+          e.preventDefault();
+          pickCreateNew();
+        }
       }
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -165,37 +193,61 @@ export function SearchableSelect({
         }}
         className="z-[100] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
       >
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && !showCreateOption ? (
           <li className="px-3 py-2 text-sm text-muted-foreground">
             Keine Treffer.
           </li>
         ) : (
-          filtered.map((item, i) => (
-            <li
-              key={item.id}
-              role="option"
-              aria-selected={i === highlight}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                pick(item);
-              }}
-              onMouseEnter={() => setHighlight(i)}
-              className={`flex items-start gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
-                i === highlight
-                  ? "bg-foreground/[0.08]"
-                  : "hover:bg-foreground/[0.05]"
-              } ${item.id === value ? "font-semibold" : ""}`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate">{item.label}</div>
-                {item.sub && (
-                  <div className="truncate text-xs text-muted-foreground">
-                    {item.sub}
-                  </div>
-                )}
-              </div>
-            </li>
-          ))
+          <>
+            {filtered.map((item, i) => (
+              <li
+                key={item.id}
+                role="option"
+                aria-selected={i === highlight}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(item);
+                }}
+                onMouseEnter={() => setHighlight(i)}
+                className={`flex items-start gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
+                  i === highlight
+                    ? "bg-foreground/[0.08]"
+                    : "hover:bg-foreground/[0.05]"
+                } ${item.id === value ? "font-semibold" : ""}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{item.label}</div>
+                  {item.sub && (
+                    <div className="truncate text-xs text-muted-foreground">
+                      {item.sub}
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+            {showCreateOption && (
+              <li
+                role="option"
+                aria-selected={highlight === filtered.length}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pickCreateNew();
+                }}
+                onMouseEnter={() => setHighlight(filtered.length)}
+                className={`flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors border-t border-border/60 mt-1 pt-2 ${
+                  highlight === filtered.length
+                    ? "bg-foreground/[0.08]"
+                    : "hover:bg-foreground/[0.05]"
+                }`}
+              >
+                <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="text-muted-foreground">{createNewLabel}: </span>
+                  <span className="font-medium">{trimmedSearch}</span>
+                </span>
+              </li>
+            )}
+          </>
         )}
       </ul>
     ) : null;

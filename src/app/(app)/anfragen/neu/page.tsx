@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,22 @@ import type { Customer, Location } from "@/types";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
+
+const RETURN_PATH = "/anfragen/neu";
+
+interface DraftForm {
+  customer_id: string;
+  location_id: string;
+  title: string;
+  event_type: string;
+  guest_count: string;
+  start_date: string;
+  end_date: string;
+  description: string;
+  extended_services: string;
+  eventTypeCustom: boolean;
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -20,8 +36,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function NeueAnfragePage() {
+function NeueAnfragePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<Customer[] | null>(null);
@@ -42,6 +59,34 @@ export default function NeueAnfragePage() {
   // Event-Typ: Toggle zwischen Preset-Auswahl und Sonstige (Freitext)
   const [eventTypeCustom, setEventTypeCustom] = useState(false);
 
+  // Draft wiederherstellen, falls wir gerade von /kunden/neu zurueckkommen.
+  // Lauft synchron in der ersten Render-Runde, damit das Formular sofort den
+  // gespeicherten Stand zeigt (sonst flackert der leere Default kurz auf).
+  useEffect(() => {
+    const newCustomerId = searchParams.get("customerId");
+    if (!newCustomerId) return;
+    const draft = popFormDraft<DraftForm>(RETURN_PATH);
+    if (draft) {
+      setForm({
+        customer_id: newCustomerId,
+        location_id: draft.location_id,
+        title: draft.title,
+        event_type: draft.event_type,
+        guest_count: draft.guest_count,
+        start_date: draft.start_date,
+        end_date: draft.end_date,
+        description: draft.description,
+        extended_services: draft.extended_services,
+      });
+      setEventTypeCustom(draft.eventTypeCustom);
+    } else {
+      // Kein Draft (z.B. neu geoeffneter Tab) — wenigstens den frischen Kunden setzen
+      setForm((p) => ({ ...p, customer_id: newCustomerId }));
+    }
+    // Query-Param entfernen, damit Reload nicht erneut "wiederherstellt"
+    router.replace(RETURN_PATH, { scroll: false });
+  }, [searchParams, router]);
+
   useEffect(() => {
     async function load() {
       const [c, l, m] = await Promise.all([
@@ -56,6 +101,12 @@ export default function NeueAnfragePage() {
     }
     load();
   }, []);
+
+  function startCreateCustomer(query: string) {
+    saveFormDraft<DraftForm>(RETURN_PATH, { ...form, eventTypeCustom });
+    const url = `/kunden/neu?prefillName=${encodeURIComponent(query)}&return=${encodeURIComponent(RETURN_PATH)}`;
+    router.push(url);
+  }
 
   function update<K extends keyof typeof form>(field: K, value: typeof form[K]) {
     setForm((p) => ({ ...p, [field]: value }));
@@ -152,11 +203,12 @@ export default function NeueAnfragePage() {
             items={(customers ?? []).map((c) => ({ id: c.id, label: c.name }))}
             placeholder="Kunde tippen…"
             required
+            onCreateNew={startCreateCustomer}
+            createNewLabel="Neuer Kunde"
           />
           {customers !== null && customers.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              Noch keine Kunden.{" "}
-              <Link href="/kunden/neu" className="underline">Jetzt anlegen</Link>
+              Noch keine Kunden — einfach Namen tippen und „Neuer Kunde" aus dem Vorschlag wählen.
             </p>
           )}
         </div>
@@ -287,5 +339,13 @@ export default function NeueAnfragePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NeueAnfragePage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-muted-foreground">Laden…</div>}>
+      <NeueAnfragePageContent />
+    </Suspense>
   );
 }

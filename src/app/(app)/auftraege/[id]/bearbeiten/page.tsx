@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import { ArrowLeft, Save, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
+import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
 
 function dateToISODate(d: string | null): string {
   if (!d) return "";
@@ -23,7 +24,9 @@ function dateToISODate(d: string | null): string {
 export default function AuftragBearbeitenPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const jobId = params.id as string;
+  const returnPath = `/auftraege/${jobId}/bearbeiten`;
   const supabase = createClient();
 
   const [saving, setSaving] = useState<"save" | "publish" | null>(null);
@@ -75,21 +78,50 @@ export default function AuftragBearbeitenPage() {
       const j = jobRes.data;
       setJobNumber(j.job_number);
       setOriginalStatus(j.status);
-      setForm({
-        job_type: (j.job_type as "location" | "extern") ?? "location",
-        title: j.title ?? "",
-        description: j.description ?? "",
-        location_id: j.location_id ?? "",
-        customer_id: j.customer_id ?? "",
-        external_address: j.external_address ?? "",
-        start_date: dateToISODate(j.start_date),
-        end_date: dateToISODate(j.end_date),
-        urgent: j.priority === "dringend",
-      });
+
+      // Resume-Pfad: kommen wir gerade von /kunden/neu zurueck, dann ueberschreibt
+      // der Draft den DB-Stand und der frische customer_id wird aus der URL gesetzt.
+      const newCustomerId = searchParams.get("customerId");
+      const draft = newCustomerId ? popFormDraft<AuftragFormState>(returnPath) : null;
+
+      if (draft && newCustomerId) {
+        setForm({ ...draft, customer_id: newCustomerId, job_type: "extern" });
+        router.replace(returnPath, { scroll: false });
+      } else if (newCustomerId) {
+        setForm({
+          job_type: "extern",
+          title: j.title ?? "",
+          description: j.description ?? "",
+          location_id: j.location_id ?? "",
+          customer_id: newCustomerId,
+          external_address: j.external_address ?? "",
+          start_date: dateToISODate(j.start_date),
+          end_date: dateToISODate(j.end_date),
+          urgent: j.priority === "dringend",
+        });
+        router.replace(returnPath, { scroll: false });
+      } else {
+        setForm({
+          job_type: (j.job_type as "location" | "extern") ?? "location",
+          title: j.title ?? "",
+          description: j.description ?? "",
+          location_id: j.location_id ?? "",
+          customer_id: j.customer_id ?? "",
+          external_address: j.external_address ?? "",
+          start_date: dateToISODate(j.start_date),
+          end_date: dateToISODate(j.end_date),
+          urgent: j.priority === "dringend",
+        });
+      }
       setLoadingJob(false);
     }
     loadAll();
   }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function startCreateCustomer(query: string) {
+    saveFormDraft<AuftragFormState>(returnPath, form);
+    router.push(`/kunden/neu?prefillName=${encodeURIComponent(query)}&return=${encodeURIComponent(returnPath)}`);
+  }
 
   function validate(target: "save" | "publish"): string | null {
     if (!form.title.trim()) return "Titel ist Pflicht";
@@ -200,6 +232,7 @@ export default function AuftragBearbeitenPage() {
           customers={customers}
           locations={locations}
           enforceNoPastDates={false}
+          onCreateCustomer={startCreateCustomer}
         />
 
         {/* Buttons */}
