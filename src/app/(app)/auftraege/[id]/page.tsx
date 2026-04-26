@@ -103,19 +103,17 @@ export default function AuftragDetailPage() {
   }
 
   async function updateStatus(newStatus: JobStatus) {
-    const wasEntwurf = job?.status === "entwurf";
-
     if (newStatus === "abgeschlossen") {
-      await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
-      toast.success("Auftrag abgeschlossen – Einsatzrapport ausfüllen");
+      // Status wird ERST in der Rapport-Page nach erfolgreichem Speichern auf
+      // 'abgeschlossen' gesetzt — sonst bleibt ein Auftrag fälschlich "geschlossen"
+      // wenn der User den Rapport-Flow abbricht.
+      toast.info("Bitte zuerst den Einsatzrapport ausfüllen");
       router.push(`/rapporte/neu?job_id=${id}`);
       return;
     }
 
     await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
-
-
     loadAll();
   }
 
@@ -261,6 +259,17 @@ export default function AuftragDetailPage() {
   const availableActions = statusActions.filter((a) => a.from.includes(job.status));
   const isDringend = job.priority === "dringend";
 
+  // Abschliessen ist erst möglich, wenn das Enddatum erreicht ist
+  const todayISO = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const endDateISO = job.end_date ? job.end_date.slice(0, 10) : null;
+  const canFinish = !endDateISO || endDateISO <= todayISO;
+  const finishBlockReason = !canFinish && endDateISO
+    ? `Auftrag kann erst ab dem Enddatum (${new Date(endDateISO).toLocaleDateString("de-CH")}) abgeschlossen werden`
+    : "";
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -291,6 +300,8 @@ export default function AuftragDetailPage() {
         {availableActions
           .filter((a) => a.to !== "storniert")
           .map((a) => {
+            const isFinish = a.to === "abgeschlossen";
+            const disabled = isFinish && !canFinish;
             const cls =
               a.variant === "primary"
                 ? "bg-purple-600 hover:bg-purple-700 text-white"
@@ -299,7 +310,9 @@ export default function AuftragDetailPage() {
               <button
                 key={a.to}
                 onClick={() => updateStatus(a.to)}
-                className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium transition-all ${cls}`}
+                disabled={disabled}
+                title={disabled ? finishBlockReason : undefined}
+                className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${cls}`}
               >
                 {a.icon}
                 {a.label}

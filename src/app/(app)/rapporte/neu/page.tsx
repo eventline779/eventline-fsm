@@ -235,6 +235,14 @@ export default function NeuerRapportPage() {
       return;
     }
 
+    // Auftrag auf 'abgeschlossen' setzen — passiert ERST jetzt, nicht beim Klick
+    // auf 'Abschliessen' in der Auftrag-Detail-Page (sonst bleibt der Auftrag
+    // fälschlich geschlossen wenn der User den Rapport abbricht).
+    if (form.job_id) {
+      await supabase.from("jobs").update({ status: "abgeschlossen" }).eq("id", form.job_id);
+      window.dispatchEvent(new Event("jobs:invalidate"));
+    }
+
     // Fotos hochladen
     if (report?.id && photos.length > 0) {
       toast.info(`${photos.length} Foto(s) werden hochgeladen...`);
