@@ -33,7 +33,7 @@ export const EVENT_TYPES = [
   "Konzert",
   "Theater",
   "Firmenanlass",
-  "Hochzeit",
+  "Comedyshow",
   "Privatfeier",
 ] as const;
 
