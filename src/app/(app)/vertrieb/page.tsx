@@ -729,10 +729,15 @@ export default function VertriebPage() {
 
         const total = segments.reduce((sum, s) => sum + s.count, 0);
         const radius = 72;
-        const strokeWidth = 18;
-        const circumference = 2 * Math.PI * radius;
-        const gapPx = segments.length > 1 ? 4 : 0;
-        let offset = 0;
+        const ringWidth = 18;
+        const outerR = radius + ringWidth / 2;
+        const innerR = radius - ringWidth / 2;
+        const cx = outerR;
+        const cy = outerR;
+        const svgSize = outerR * 2;
+        const gapAngle = segments.length > 1 ? 0.06 : 0;
+        const outlineWidth = 1.5;
+        let cumulativeAngle = -Math.PI / 2;
 
         return (
           <Card className="bg-white">
@@ -740,41 +745,36 @@ export default function VertriebPage() {
               <div className="flex flex-col md:flex-row items-start gap-6">
                 {/* Donut Chart */}
                 <div className="relative shrink-0">
-                  <svg
-                    width={radius * 2 + strokeWidth}
-                    height={radius * 2 + strokeWidth}
-                    className="-rotate-90"
-                  >
-                    <circle
-                      cx={radius + strokeWidth / 2}
-                      cy={radius + strokeWidth / 2}
-                      r={radius}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={strokeWidth}
-                      className="text-foreground/[0.04] dark:text-foreground/[0.06]"
-                    />
-                    {segments.map((s, i) => {
-                      const portion = s.count / total;
-                      const dash = Math.max(portion * circumference - gapPx, 0.001);
-                      const gap = circumference - dash;
-                      const el = (
-                        <circle
-                          key={i}
-                          cx={radius + strokeWidth / 2}
-                          cy={radius + strokeWidth / 2}
-                          r={radius}
-                          fill="none"
-                          stroke={s.color}
-                          strokeWidth={strokeWidth}
-                          strokeDasharray={`${dash} ${gap}`}
-                          strokeDashoffset={-offset}
-                          strokeLinecap="round"
-                        />
-                      );
-                      offset += dash + gapPx;
-                      return el;
-                    })}
+                  <svg width={svgSize} height={svgSize}>
+                    <circle cx={cx} cy={cy} r={outerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
+                    <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
+                    {segments.length === 1 ? (
+                      <>
+                        <circle cx={cx} cy={cy} r={outerR} fill="none" stroke={segments[0].color} strokeWidth={outlineWidth} />
+                        <circle cx={cx} cy={cy} r={innerR} fill="none" stroke={segments[0].color} strokeWidth={outlineWidth} />
+                      </>
+                    ) : (
+                      segments.map((s, i) => {
+                        const portion = s.count / total;
+                        const segAngle = portion * 2 * Math.PI - gapAngle;
+                        const startA = cumulativeAngle;
+                        const endA = cumulativeAngle + segAngle;
+                        cumulativeAngle = endA + gapAngle;
+                        const x1 = cx + outerR * Math.cos(startA);
+                        const y1 = cy + outerR * Math.sin(startA);
+                        const x2 = cx + outerR * Math.cos(endA);
+                        const y2 = cy + outerR * Math.sin(endA);
+                        const x3 = cx + innerR * Math.cos(endA);
+                        const y3 = cy + innerR * Math.sin(endA);
+                        const x4 = cx + innerR * Math.cos(startA);
+                        const y4 = cy + innerR * Math.sin(startA);
+                        const largeArc = segAngle > Math.PI ? 1 : 0;
+                        const d = `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+                        return (
+                          <path key={i} d={d} fill="none" stroke={s.color} strokeWidth={outlineWidth} strokeLinejoin="round" />
+                        );
+                      })
+                    )}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>

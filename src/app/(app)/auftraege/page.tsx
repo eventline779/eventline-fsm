@@ -136,53 +136,62 @@ export default function AuftraegePage() {
         const total = segments.reduce((sum, s) => sum + s.count, 0);
         const visibleSegments = segments.filter((s) => s.count > 0);
         const radius = 72;
-        const strokeWidth = 18;
-        const circumference = 2 * Math.PI * radius;
-        // Kleine Luecke zwischen Segmenten (in Bogen-Pixeln). Nur wenn >1 Segment sichtbar.
-        const gapPx = visibleSegments.length > 1 ? 4 : 0;
-        let offset = 0;
+        const ringWidth = 18; // Dicke des Donut-Rings (Aussen- minus Innenradius)
+        const outerR = radius + ringWidth / 2;
+        const innerR = radius - ringWidth / 2;
+        const cx = outerR;
+        const cy = outerR;
+        const svgSize = outerR * 2;
+        // Lueckenwinkel in Radian zwischen Segmenten
+        const gapAngle = visibleSegments.length > 1 ? 0.06 : 0;
+        // Outline-Strichstaerke (nur Rand)
+        const outlineWidth = 1.5;
+        let cumulativeAngle = -Math.PI / 2; // Start oben (12 Uhr)
         return (
           <Card className="bg-white">
             <CardContent className="p-5">
               {total > 0 ? (
                 <div className="flex flex-col md:flex-row items-start gap-6">
                   <div className="relative shrink-0">
-                    <svg
-                      width={radius * 2 + strokeWidth}
-                      height={radius * 2 + strokeWidth}
-                      className="-rotate-90"
-                    >
-                      {/* Track: kaum sichtbar, nur als Anker */}
-                      <circle
-                        cx={radius + strokeWidth / 2}
-                        cy={radius + strokeWidth / 2}
-                        r={radius}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={strokeWidth}
-                        className="text-foreground/[0.04] dark:text-foreground/[0.06]"
-                      />
-                      {visibleSegments.map((s, i) => {
-                        const portion = s.count / total;
-                        const dash = Math.max(portion * circumference - gapPx, 0.001);
-                        const gap = circumference - dash;
-                        const el = (
-                          <circle
-                            key={i}
-                            cx={radius + strokeWidth / 2}
-                            cy={radius + strokeWidth / 2}
-                            r={radius}
-                            fill="none"
-                            stroke={s.color}
-                            strokeWidth={strokeWidth}
-                            strokeDasharray={`${dash} ${gap}`}
-                            strokeDashoffset={-offset}
-                            strokeLinecap="round"
-                          />
-                        );
-                        offset += dash + gapPx;
-                        return el;
-                      })}
+                    <svg width={svgSize} height={svgSize}>
+                      {/* Track: zwei feine konzentrische Outlines als Rahmen des Donuts */}
+                      <circle cx={cx} cy={cy} r={outerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
+                      <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
+                      {visibleSegments.length === 1 ? (
+                        // Voller Ring: aussen + innen kompletter Kreis
+                        <>
+                          <circle cx={cx} cy={cy} r={outerR} fill="none" stroke={visibleSegments[0].color} strokeWidth={outlineWidth} />
+                          <circle cx={cx} cy={cy} r={innerR} fill="none" stroke={visibleSegments[0].color} strokeWidth={outlineWidth} />
+                        </>
+                      ) : (
+                        visibleSegments.map((s, i) => {
+                          const portion = s.count / total;
+                          const segAngle = portion * 2 * Math.PI - gapAngle;
+                          const startA = cumulativeAngle;
+                          const endA = cumulativeAngle + segAngle;
+                          cumulativeAngle = endA + gapAngle;
+                          const x1 = cx + outerR * Math.cos(startA);
+                          const y1 = cy + outerR * Math.sin(startA);
+                          const x2 = cx + outerR * Math.cos(endA);
+                          const y2 = cy + outerR * Math.sin(endA);
+                          const x3 = cx + innerR * Math.cos(endA);
+                          const y3 = cy + innerR * Math.sin(endA);
+                          const x4 = cx + innerR * Math.cos(startA);
+                          const y4 = cy + innerR * Math.sin(startA);
+                          const largeArc = segAngle > Math.PI ? 1 : 0;
+                          const d = `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+                          return (
+                            <path
+                              key={i}
+                              d={d}
+                              fill="none"
+                              stroke={s.color}
+                              strokeWidth={outlineWidth}
+                              strokeLinejoin="round"
+                            />
+                          );
+                        })
+                      )}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>
