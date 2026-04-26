@@ -108,7 +108,7 @@ export default function AuftraegePage() {
           <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Archiv" : "Aufträge"}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-200"}`}>
+          <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-card text-gray-600 border-gray-200"}`}>
             <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => j.status === "abgeschlossen" || j.status === "storniert").length})`}
           </button>
           {!showArchive && (
@@ -149,7 +149,7 @@ export default function AuftraegePage() {
         // Start an einer Gap-Mitte (12 Uhr), nicht am Segment-Anfang
         let cumulativeGapMid = -Math.PI / 2;
         return (
-          <Card className="bg-white">
+          <Card className="bg-card">
             <CardContent className="p-5">
               {total > 0 ? (
                 <div className="flex flex-col md:flex-row items-start gap-6">
@@ -368,7 +368,7 @@ export default function AuftraegePage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse bg-white">
+            <Card key={i} className="animate-pulse bg-card">
               <CardContent className="p-5">
                 <div className="h-5 bg-gray-200 rounded w-1/2 mb-3" />
                 <div className="h-4 bg-gray-100 rounded w-1/3" />
@@ -380,7 +380,7 @@ export default function AuftraegePage() {
         (() => {
           const hasFilter = !!searchNumber || !!searchTitle || filterStatus !== "all" || filterLocation !== "all";
           return (
-            <Card className="border-dashed bg-white">
+            <Card className="border-dashed bg-card">
               <CardContent className="py-16 text-center">
                 <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
                   <ClipboardList className="h-7 w-7 text-gray-400" />
@@ -437,7 +437,7 @@ export default function AuftraegePage() {
                   )}
                 </div>
               )}
-              <Card className={`bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1 ${
+              <Card className={`bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1 ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
                 <CardContent className="p-4">

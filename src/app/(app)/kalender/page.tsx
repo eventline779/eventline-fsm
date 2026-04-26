@@ -280,13 +280,13 @@ export default function KalenderPage() {
           <div className="flex p-0.5 bg-gray-100 rounded-lg">
             <button
               onClick={() => setView("monat")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === "monat" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === "monat" ? "bg-card text-gray-900 shadow-sm" : "text-gray-500"}`}
             >
               Monat
             </button>
             <button
               onClick={() => setView("woche")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === "woche" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === "woche" ? "bg-card text-gray-900 shadow-sm" : "text-gray-500"}`}
             >
               Woche
             </button>
@@ -296,7 +296,7 @@ export default function KalenderPage() {
 
       {/* Termin erstellen */}
       {showForm && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-5">
             <form onSubmit={createAppointment} className="space-y-4">
               <Input placeholder="Titel (z.B. Büro, Übergabe, Meeting) *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-gray-50" required />
@@ -318,7 +318,7 @@ export default function KalenderPage() {
                           onClick={() => setForm({ ...form, assigned_to: selected ? form.assigned_to.filter((id) => id !== p.id) : [...form.assigned_to, p.id] })}
                           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-red-600 text-white border-red-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300"}`}
                         >
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-card/20 text-white" : "bg-gray-200 text-gray-600"}`}>
                             {p.full_name.charAt(0)}
                           </div>
                           {p.full_name.split(" ")[0]}
@@ -352,7 +352,7 @@ export default function KalenderPage() {
           { label: "Vermietungen", count: stats.vermietungen, dot: "bg-amber-500" },
           { label: "Termine", count: stats.termine, dot: "bg-green-500" },
         ].map((s) => (
-          <Card key={s.label} className="bg-white border-gray-100">
+          <Card key={s.label} className="bg-card border-gray-100">
             <CardContent className="p-3 flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full ${s.dot}`} />
               <div>
@@ -366,7 +366,7 @@ export default function KalenderPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Kalender */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="p-5">
             {/* Navigation */}
             <div className="flex items-center justify-between mb-5">
@@ -405,10 +405,10 @@ export default function KalenderPage() {
                       <div
                         key={i}
                         onClick={() => day && setSelectedDay(day === selectedDay ? null : day)}
-                        className={`min-h-[80px] p-1.5 bg-white dark:bg-gray-900 transition-all cursor-pointer ${
-                          !day ? "bg-gray-50/50 dark:bg-gray-900/50" :
+                        className={`min-h-[80px] p-1.5 bg-card transition-all cursor-pointer ${
+                          !day ? "bg-gray-50/50/50" :
                           isSelected ? "bg-red-50 dark:bg-red-950 ring-2 ring-red-400 ring-inset z-10" :
-                          isWeekend(day) ? "bg-gray-50/30 dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800" :
+                          isWeekend(day) ? "bg-gray-50/30/30 hover:bg-gray-50 dark:hover:bg-gray-800" :
                           "hover:bg-gray-50 dark:hover:bg-gray-800"
                         }`}
                       >
@@ -555,7 +555,7 @@ export default function KalenderPage() {
         <div className="space-y-5">
           {/* Ausgewählter Tag */}
           {selectedDay && view === "monat" && (
-            <Card className="bg-white">
+            <Card className="bg-card">
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold ${isToday(selectedDay) ? "bg-red-500 text-white" : "bg-gray-100 text-gray-700"}`}>
@@ -618,7 +618,7 @@ export default function KalenderPage() {
           )}
 
           {/* Legende */}
-          <Card className="bg-white">
+          <Card className="bg-card">
             <CardContent className="p-4">
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Legende</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -638,7 +638,7 @@ export default function KalenderPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSync(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><LinkIcon className="h-4 w-4" />Google Kalender verbinden</h2>
                 <button onClick={() => setShowSync(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -692,7 +692,7 @@ export default function KalenderPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
                 <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">

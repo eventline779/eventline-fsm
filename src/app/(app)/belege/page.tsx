@@ -88,7 +88,7 @@ export default function BelegePage() {
         <p className="text-sm text-muted-foreground mt-1">Kassenzettel hochladen oder abfotografieren — wird an <strong>buchhaltung@eventline-basel.com</strong> gesendet.</p>
       </div>
 
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardContent className="p-5 space-y-4">
           {/* Datei-Upload */}
           {!file ? (
@@ -150,7 +150,7 @@ export default function BelegePage() {
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Zuletzt gesendet</h2>
           <div className="space-y-2">
             {sent.map((s, i) => (
-              <Card key={i} className="bg-white">
+              <Card key={i} className="bg-card">
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-600 shrink-0"><Check className="h-4 w-4" /></div>
                   <div className="min-w-0 flex-1">

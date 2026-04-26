@@ -230,7 +230,7 @@ export default function DashboardPage() {
           <Link href="/todos" className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1">Alle anzeigen <ArrowRight className="h-3 w-3" /></Link>
         </div>
         {myTodos.length === 0 ? (
-          <Card className="bg-white border-gray-100">
+          <Card className="bg-card border-gray-100">
             <CardContent className="py-6 text-center">
               <p className="text-sm text-muted-foreground">Keine offenen Todos für dich.</p>
             </CardContent>
@@ -240,7 +240,7 @@ export default function DashboardPage() {
             {myTodos.map((todo) => {
               const overdue = todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
               return (
-                <Card key={todo.id} className={`hover:shadow-sm transition-all ${overdue ? "bg-red-100 border-red-400" : "bg-white border-gray-100"}`}>
+                <Card key={todo.id} className={`hover:shadow-sm transition-all ${overdue ? "bg-red-100 border-red-400" : "bg-card border-gray-100"}`}>
                   <CardContent className="p-3.5 flex items-center gap-3">
                     <button
                       onClick={async () => {
@@ -280,7 +280,7 @@ export default function DashboardPage() {
           <div className="space-y-1">
             {jobsOhneTermin.map((j) => (
               <Link key={j.id} href={`/auftraege/${j.id}`}>
-                <Card className="bg-white border-orange-100 hover:shadow-sm transition-all">
+                <Card className="bg-card border-orange-100 hover:shadow-sm transition-all">
                   <CardContent className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono text-orange-600">INT-{j.job_number}</span>
@@ -310,7 +310,7 @@ export default function DashboardPage() {
               const CatIcon = CATEGORY_ICONS[ticket.category] || HelpCircle;
               const catColor = CATEGORY_COLORS[ticket.category] || CATEGORY_COLORS.sonstiges;
               return (
-                <Card key={ticket.id} className="bg-white border-gray-100">
+                <Card key={ticket.id} className="bg-card border-gray-100">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5 ${catColor}`}>
@@ -370,7 +370,7 @@ export default function DashboardPage() {
           </button>
         </div>
         {showLinkForm && (
-          <Card className="bg-white border-gray-100 mb-3">
+          <Card className="bg-card border-gray-100 mb-3">
             <CardContent className="p-4">
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -409,7 +409,7 @@ export default function DashboardPage() {
                 onDragEnd={() => setDragIndex(null)}
                 className={`relative group cursor-grab active:cursor-grabbing ${dragIndex === i ? "opacity-30" : ""}`}
               >
-                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-gray-700 text-xs font-medium border border-gray-200 hover:shadow-sm hover:border-gray-300 transition-all">
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card text-gray-700 text-xs font-medium border border-gray-200 hover:shadow-sm hover:border-gray-300 transition-all">
                   {link.name} <ExternalLink className="h-3 w-3 text-gray-400" />
                 </a>
                 <button onClick={(e) => {
@@ -417,14 +417,14 @@ export default function DashboardPage() {
                   const updated = quickLinks.filter((_, j) => j !== i);
                   setQuickLinks(updated);
                   localStorage.setItem("dashboard-links", JSON.stringify(updated));
-                }} className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-white border border-gray-200 shadow-sm text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100">
+                }} className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-card border border-gray-200 shadow-sm text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100">
                   <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
           </div>
         ) : !showLinkForm && (
-          <Card className="bg-white border-gray-100 border-dashed">
+          <Card className="bg-card border-gray-100 border-dashed">
             <CardContent className="py-4 text-center">
               <p className="text-sm text-muted-foreground">Noch keine Links. Füge häufig genutzte Links hinzu.</p>
             </CardContent>
@@ -436,7 +436,7 @@ export default function DashboardPage() {
       <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {statCards.map((stat) => (
           <Link key={stat.label} href={stat.href}>
-            <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group">
+            <Card className="bg-card border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div className={`p-2 rounded-lg ${stat.iconBg}`}>
@@ -460,7 +460,7 @@ export default function DashboardPage() {
         <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
           {quickActions.map((action) => (
             <Link key={action.href} href={action.href}>
-              <Card className="bg-white border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group h-full">
+              <Card className="bg-card border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer group h-full">
                 <CardContent className="p-4">
                   <div className="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
                     <Plus className="h-4 w-4" />

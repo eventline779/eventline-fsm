@@ -360,7 +360,7 @@ export default function AuftragDetailPage() {
       </div>
 
       {/* Info */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardContent className="p-5 space-y-3">
           {customer && (
             <div className="flex items-center justify-between">
@@ -399,7 +399,7 @@ export default function AuftragDetailPage() {
       </Card>
 
       {/* Notizen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
@@ -410,7 +410,7 @@ export default function AuftragDetailPage() {
         <CardContent className="space-y-3">
           {showNoteForm && (
             <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required autoFocus />
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required autoFocus />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
                 <Button type="submit" size="sm">Speichern</Button>
@@ -457,7 +457,7 @@ export default function AuftragDetailPage() {
       )}
 
       {/* Termine */}
-      <Card id="termin-form" className="bg-white scroll-mt-4">
+      <Card id="termin-form" className="bg-card scroll-mt-4">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Calendar className="h-4 w-4" />Termine ({appointments.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}><Plus className="h-4 w-4 mr-1" />Termin</Button>
@@ -483,7 +483,7 @@ export default function AuftragDetailPage() {
                         onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-foreground text-background border-foreground" : "border-border hover:border-foreground/30"}`}
                       >
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-card/20 text-white" : "bg-gray-200 text-gray-600"}`}>
                           {p.full_name.charAt(0)}
                         </div>
                         {p.full_name.split(" ")[0]}
@@ -493,7 +493,7 @@ export default function AuftragDetailPage() {
                 </div>
                 {apptForm.assigned_to.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst</p>}
               </div>
-              <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
+              <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowApptForm(false)}>Abbrechen</Button>
                 <Button type="submit" size="sm">Termin erstellen</Button>
@@ -535,7 +535,7 @@ export default function AuftragDetailPage() {
                         <>
                           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} />
                           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-2">
                                   <Send className="h-5 w-5 text-blue-500" />
@@ -597,7 +597,7 @@ export default function AuftragDetailPage() {
       </Card>
 
       {/* Einsatzrapporte */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Einsatzrapporte ({reports.length})</CardTitle>
         </CardHeader>
@@ -627,7 +627,7 @@ export default function AuftragDetailPage() {
       </Card>
 
       {/* Dokumente / PDFs */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Upload className="h-4 w-4" />Dokumente ({documents.length})</CardTitle>
           <div>
@@ -713,7 +713,7 @@ export default function AuftragDetailPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
                 <button onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">

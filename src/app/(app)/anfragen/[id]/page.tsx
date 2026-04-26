@@ -40,7 +40,7 @@ function Modal({ show, onClose, title, children }: { show: boolean; onClose: () 
     <>
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="font-semibold text-gray-900 dark:text-white">{title}</h2>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -305,7 +305,7 @@ export default function VermietungDetailPage() {
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/anfragen"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <Link href="/anfragen"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">{request.customer?.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{request.location?.name || "Keine Location"}</p>
@@ -351,7 +351,7 @@ export default function VermietungDetailPage() {
       )}
 
       {/* Event Details */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardContent className="p-5">
           <div className="flex flex-wrap gap-4 text-sm">
             {request.event_date && <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />{new Date(request.event_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}{request.event_end_date ? ` – ${new Date(request.event_end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
@@ -367,7 +367,7 @@ export default function VermietungDetailPage() {
         <div className="space-y-3">
           {/* SCHRITT 1: Konditionen senden */}
           {(() => { const s = 0; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
@@ -427,7 +427,7 @@ export default function VermietungDetailPage() {
 
           {/* SCHRITT 3: Angebot senden */}
           {(() => { const s = 2; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
@@ -486,7 +486,7 @@ export default function VermietungDetailPage() {
 
           {/* SCHRITT 5: Vertrag & Termine */}
           {(() => { const s = 4; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-white border-green-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
+          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-green-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"}`}>
@@ -539,7 +539,7 @@ export default function VermietungDetailPage() {
                         <div><label className="text-xs font-medium">Von *</label><Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1" required /></div>
                         <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1" required /></div>
                       </div>
-                      <select value={terminForm.assigned_to} onChange={(e) => setTerminForm({ ...terminForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+                      <select value={terminForm.assigned_to} onChange={(e) => setTerminForm({ ...terminForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
                         <option value="">Techniker zuweisen...</option>
                         {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                       </select>
@@ -606,7 +606,7 @@ export default function VermietungDetailPage() {
             placeholder="4-stelliger Code"
             value={deletePassword}
             onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(false); }}
-            className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-white dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`}
+            className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`}
           />
           {deleteError && <p className="text-xs text-red-600 mt-1">Falsches Passwort</p>}
         </div>

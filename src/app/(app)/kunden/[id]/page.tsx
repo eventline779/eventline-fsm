@@ -102,7 +102,7 @@ export default function KundenDetailPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
-        <Link href="/kunden"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <Link href="/kunden"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">{customer.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
@@ -134,7 +134,7 @@ export default function KundenDetailPage() {
       )}
 
       {/* Kundendaten */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Kundendaten</CardTitle></CardHeader>
         <CardContent>
           {editing ? (
@@ -173,7 +173,7 @@ export default function KundenDetailPage() {
       </Card>
 
       {/* Aufträge */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
           <Link href={`/auftraege/neu?customer_id=${id}`}><Button size="sm" variant="outline">Neuer Auftrag</Button></Link>

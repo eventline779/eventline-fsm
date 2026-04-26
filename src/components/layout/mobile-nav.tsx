@@ -29,7 +29,7 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/10 z-50 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-sidebar/95 text-sidebar-foreground backdrop-blur-lg border-t border-sidebar-border z-50 pb-[env(safe-area-inset-bottom)] font-heading">
       <div className="flex items-center justify-around px-1 pt-2 pb-1">
         {items.map((item) => {
           const Icon = NAV_ICON_MAP[item.icon];
@@ -40,7 +40,7 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
               href={item.href}
               className={cn(
                 "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-[10px] font-medium transition-all min-w-[60px]",
-                active ? "text-red-500" : "text-gray-500 active:text-white"
+                active ? "text-red-500" : "text-sidebar-foreground/60 active:text-sidebar-foreground"
               )}
             >
               {Icon && <Icon className={cn("h-5 w-5", active && "scale-110")} />}
@@ -50,7 +50,7 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
         })}
         <button
           onClick={onMenuOpen}
-          className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-gray-500 text-[10px] font-medium active:text-white min-w-[60px]"
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-sidebar-foreground/60 text-[10px] font-medium active:text-sidebar-foreground min-w-[60px]"
         >
           <Menu className="h-5 w-5" />
           <span>Mehr</span>

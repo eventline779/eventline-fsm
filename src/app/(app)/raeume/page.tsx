@@ -60,7 +60,7 @@ export default function RaeumePage() {
       </div>
 
       {showForm && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <h3 className="font-semibold">Neuen Raum erfassen</h3>
@@ -103,15 +103,15 @@ export default function RaeumePage() {
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Raum suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-white border-gray-200" />
+        <Input placeholder="Raum suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-gray-200" />
       </div>
 
       {loading ? (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse bg-white"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-2/3 mb-3" /><div className="h-4 bg-gray-100 rounded w-1/2" /></CardContent></Card>)}
+          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-2/3 mb-3" /><div className="h-4 bg-gray-100 rounded w-1/2" /></CardContent></Card>)}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed bg-white">
+        <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><DoorOpen className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-gray-900 text-lg">{search ? "Keine Ergebnisse" : "Noch keine Räume"}</h3>
@@ -122,7 +122,7 @@ export default function RaeumePage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((room) => (
             <Link key={room.id} href={`/raeume/${room.id}`}>
-              <Card className="bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 group cursor-pointer">
+              <Card className="bg-card hover:shadow-md hover:border-gray-300 transition-all duration-200 group cursor-pointer">
                 <CardContent className="p-5">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gray-100 text-gray-500 group-hover:bg-red-50 group-hover:text-red-500 transition-colors">

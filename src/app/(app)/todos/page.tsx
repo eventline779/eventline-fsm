@@ -222,7 +222,7 @@ export default function TodosPage() {
     return (
       <div className="space-y-6 max-w-3xl">
         <div className="flex items-center gap-4">
-          <button onClick={() => setSelectedTodo(null)} className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button>
+          <button onClick={() => setSelectedTodo(null)} className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h1 className={`text-2xl font-bold tracking-tight ${selectedTodo.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{selectedTodo.title}</h1>
@@ -232,7 +232,7 @@ export default function TodosPage() {
         </div>
 
         {/* Info */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center gap-4">
               <button onClick={() => toggleTodo(selectedTodo.id, selectedTodo.status)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedTodo.status === "erledigt" ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-red-300"}`}>
@@ -257,7 +257,7 @@ export default function TodosPage() {
         </Card>
 
         {/* Anhänge */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Anhänge ({attachments.length})</h2>
@@ -307,7 +307,7 @@ export default function TodosPage() {
 
       {/* Add Form */}
       {showForm && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6">
             <form onSubmit={addTodo} className="space-y-4">
               <Input placeholder="Was muss erledigt werden? *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-gray-50" required />
@@ -342,17 +342,17 @@ export default function TodosPage() {
 
       {/* Filter */}
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => setFilter("offen")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "offen" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+        <button onClick={() => setFilter("offen")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "offen" ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
           Offen ({openCount})
         </button>
-        <button onClick={() => setFilter("erledigt")} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "erledigt" ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-500 border-gray-200"}`}>
+        <button onClick={() => setFilter("erledigt")} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "erledigt" ? "bg-gray-700 text-white border-gray-700" : "bg-card text-gray-500 border-gray-200"}`}>
           <Archive className="h-3 w-3" />Archiv ({todos.length - openCount})
         </button>
         <span className="border-l border-gray-200 mx-1" />
         <select
           value={personFilter}
           onChange={(e) => setPersonFilter(e.target.value)}
-          className="px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600"
+          className="px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-card text-gray-600"
         >
           <option value="">Alle Personen</option>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
@@ -361,9 +361,9 @@ export default function TodosPage() {
 
       {/* Todo List */}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-white"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-1/2" /></CardContent></Card>)}</div>
+        <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-1/2" /></CardContent></Card>)}</div>
       ) : filtered.length === 0 ? (
-        <Card className="bg-white border-dashed">
+        <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><CheckSquare className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">{filter === "erledigt" ? "Archiv ist leer" : "Keine offenen Todos"}</h3>
@@ -376,7 +376,7 @@ export default function TodosPage() {
             const assignee = (todo as unknown as { assignee: { full_name: string } | null }).assignee;
             const overdue = todo.status === "offen" && todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
             return (
-              <Card key={todo.id} className={`transition-all cursor-pointer ${overdue ? "bg-red-100 border-red-400" : "bg-white"} ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
+              <Card key={todo.id} className={`transition-all cursor-pointer ${overdue ? "bg-red-100 border-red-400" : "bg-card"} ${todo.status === "erledigt" ? "opacity-60" : "hover:shadow-sm"}`}>
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <button onClick={(e) => { e.stopPropagation(); toggleTodo(todo.id, todo.status); }} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${todo.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>

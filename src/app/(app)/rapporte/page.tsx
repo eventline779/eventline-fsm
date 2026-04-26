@@ -40,9 +40,9 @@ export default function RapportePage() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[1,2].map((i) => <Card key={i} className="animate-pulse bg-white"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-1/2 mb-3" /></CardContent></Card>)}</div>
+        <div className="space-y-3">{[1,2].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-1/2 mb-3" /></CardContent></Card>)}</div>
       ) : reports.length === 0 ? (
-        <Card className="border-dashed bg-white">
+        <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><FileText className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">Noch keine Rapporte</h3>
@@ -56,7 +56,7 @@ export default function RapportePage() {
             const job = r.job as unknown as { title: string; job_number: number | null; customer: { name: string } } | undefined;
             const creator = (r as unknown as { creator: { full_name: string } }).creator;
             return (
-              <Card key={r.id} className="bg-white hover:shadow-md transition-all">
+              <Card key={r.id} className="bg-card hover:shadow-md transition-all">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
                     <div>

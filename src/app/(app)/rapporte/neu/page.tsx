@@ -273,7 +273,7 @@ export default function NeuerRapportPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/rapporte"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <Link href="/rapporte"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Einsatzrapport</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -284,7 +284,7 @@ export default function NeuerRapportPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Auftrag */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Auftrag</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -309,7 +309,7 @@ export default function NeuerRapportPage() {
         </Card>
 
         {/* Zeiträume */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">Einsatzzeiten</CardTitle>
@@ -335,19 +335,19 @@ export default function NeuerRapportPage() {
                 <div className="grid grid-cols-4 gap-2">
                   <div>
                     <label className="text-[11px] font-medium text-gray-500">Datum</label>
-                    <Input type="date" value={tr.date} onChange={(e) => updateTimeRange(i, "date", e.target.value)} className="mt-1 bg-white border-gray-200 text-xs h-8" />
+                    <Input type="date" value={tr.date} onChange={(e) => updateTimeRange(i, "date", e.target.value)} className="mt-1 bg-card border-gray-200 text-xs h-8" />
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-gray-500">Von</label>
-                    <Input type="time" value={tr.start} onChange={(e) => updateTimeRange(i, "start", e.target.value)} className="mt-1 bg-white border-gray-200 text-xs h-8" />
+                    <Input type="time" value={tr.start} onChange={(e) => updateTimeRange(i, "start", e.target.value)} className="mt-1 bg-card border-gray-200 text-xs h-8" />
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-gray-500">Bis</label>
-                    <Input type="time" value={tr.end} onChange={(e) => updateTimeRange(i, "end", e.target.value)} className="mt-1 bg-white border-gray-200 text-xs h-8" />
+                    <Input type="time" value={tr.end} onChange={(e) => updateTimeRange(i, "end", e.target.value)} className="mt-1 bg-card border-gray-200 text-xs h-8" />
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-gray-500">Pause (Min)</label>
-                    <Input type="number" min={0} step={5} value={tr.pause} onChange={(e) => updateTimeRange(i, "pause", parseInt(e.target.value) || 0)} className="mt-1 bg-white border-gray-200 text-xs h-8" />
+                    <Input type="number" min={0} step={5} value={tr.pause} onChange={(e) => updateTimeRange(i, "pause", parseInt(e.target.value) || 0)} className="mt-1 bg-card border-gray-200 text-xs h-8" />
                   </div>
                 </div>
               </div>
@@ -364,7 +364,7 @@ export default function NeuerRapportPage() {
         </Card>
 
         {/* Arbeit */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Ausgeführte Arbeiten</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -383,7 +383,7 @@ export default function NeuerRapportPage() {
         </Card>
 
         {/* Fotos */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">Fotos</CardTitle>
@@ -415,7 +415,7 @@ export default function NeuerRapportPage() {
                       placeholder="Beschreibung..."
                       value={photo.caption}
                       onChange={(e) => updateCaption(i, e.target.value)}
-                      className="w-full px-2.5 py-2 text-xs border-t border-gray-100 bg-white focus:outline-none focus:bg-gray-50"
+                      className="w-full px-2.5 py-2 text-xs border-t border-gray-100 bg-card focus:outline-none focus:bg-gray-50"
                     />
                   </div>
                 ))}
@@ -463,7 +463,7 @@ export default function NeuerRapportPage() {
         </Card>
 
         {/* Unterschriften */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Unterschriften</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -476,10 +476,10 @@ export default function NeuerRapportPage() {
             <div className="border-t border-gray-100" />
             <div>
               <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <button type="button" onClick={() => setSignerType("kunde")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "kunde" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+                <button type="button" onClick={() => setSignerType("kunde")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "kunde" ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
                   Kunde / Auftraggeber
                 </button>
-                <button type="button" onClick={() => setSignerType("mieter")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "mieter" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                <button type="button" onClick={() => setSignerType("mieter")} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${signerType === "mieter" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
                   Mieter vor Ort
                 </button>
               </div>

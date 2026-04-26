@@ -140,7 +140,7 @@ export default function VertriebPage() {
   if (!unlocked) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Card className="bg-white w-full max-w-sm">
+        <Card className="bg-card w-full max-w-sm">
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 text-red-500 mx-auto">
               <TrendingUp className="h-7 w-7" />
@@ -742,7 +742,7 @@ export default function VertriebPage() {
         let cumulativeGapMid = -Math.PI / 2;
 
         return (
-          <Card className="bg-white">
+          <Card className="bg-card">
             <CardContent className="p-5">
               <div className="flex flex-col md:flex-row items-start gap-6">
                 {/* Donut Chart */}
@@ -824,17 +824,17 @@ export default function VertriebPage() {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Firma, Person oder Branche..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-white" />
+          <Input placeholder="Firma, Person oder Branche..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card" />
         </div>
-        <select value={filterKategorie} onChange={(e) => setFilterKategorie(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+        <select value={filterKategorie} onChange={(e) => setFilterKategorie(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
           <option value="all">Alle Kategorien</option>
           {KATEGORIE_OPTIONS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
         </select>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
           <option value="all">Alle Status</option>
           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label} ({statusCounts[s.value] || 0})</option>)}
         </select>
-        <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white">
+        <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
           <option value="all">Alle Prioritäten</option>
           {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
@@ -846,7 +846,7 @@ export default function VertriebPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowTerminModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2">
                   {terminType === "telefon" ? <Phone className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
@@ -890,7 +890,7 @@ export default function VertriebPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowAuftragModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Check className="h-4 w-4 text-green-600" />Auftrag erstellen</h2>
                 <button onClick={() => setShowAuftragModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -947,7 +947,7 @@ export default function VertriebPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowBuchhaltung(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-blue-600" />Benachrichtigung Buchhaltung</h2>
                 <button onClick={() => setShowBuchhaltung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -981,7 +981,7 @@ export default function VertriebPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowVerbesserung(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-orange-600" />Verbesserungs-Vorschlag</h2>
                 <button onClick={() => setShowVerbesserung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -1016,7 +1016,7 @@ export default function VertriebPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowLostModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-red-600" />Auftrag verloren</h2>
                 <button onClick={() => setShowLostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -1047,7 +1047,7 @@ export default function VertriebPage() {
       )}
 
       {showForm && !editingId && !categoryPicked && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Was für ein Lead?</h3>
@@ -1082,7 +1082,7 @@ export default function VertriebPage() {
       )}
 
       {showForm && (editingId || categoryPicked) && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6">
             <form onSubmit={save} className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1156,10 +1156,10 @@ export default function VertriebPage() {
                   <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5"><Mail className="h-4 w-4" />Schritt 2: Kontaktiert</p>
 
                   <div className="flex gap-2 flex-wrap">
-                    <Button type="button" size="sm" onClick={() => openTerminModal("telefon")} variant="outline" className="bg-white">
+                    <Button type="button" size="sm" onClick={() => openTerminModal("telefon")} variant="outline" className="bg-card">
                       <Phone className="h-4 w-4 mr-1" />Telefon-Termin
                     </Button>
-                    <Button type="button" size="sm" onClick={() => openTerminModal("kunde")} variant="outline" className="bg-white">
+                    <Button type="button" size="sm" onClick={() => openTerminModal("kunde")} variant="outline" className="bg-card">
                       <Calendar className="h-4 w-4 mr-1" />Kunden-Termin
                     </Button>
                   </div>
@@ -1173,7 +1173,7 @@ export default function VertriebPage() {
                       <div className="space-y-1.5">
                         <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Geplante Termine ({termine.length})</p>
                         {termine.map((t) => (
-                          <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-blue-200 text-xs">
+                          <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-blue-200 text-xs">
                             <span className="text-base shrink-0">{t.type === "telefon" ? "📞" : "👥"}</span>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium truncate">{t.type === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}</p>
@@ -1210,7 +1210,7 @@ export default function VertriebPage() {
                   <div>
                     <label className="text-xs font-medium">Offerte als PDF</label>
                     {offertePdf ? (
-                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-white border border-orange-200">
+                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-card border border-orange-200">
                         <span className="text-sm truncate">{offertePdf.name}</span>
                         <button type="button" onClick={async () => {
                           await supabase.storage.from("documents").remove([offertePdf.path]);
@@ -1227,7 +1227,7 @@ export default function VertriebPage() {
                         }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     ) : (
-                      <label className="mt-1.5 flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-orange-300 bg-white text-sm text-orange-700 cursor-pointer hover:border-orange-500 transition-colors">
+                      <label className="mt-1.5 flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-orange-300 bg-card text-sm text-orange-700 cursor-pointer hover:border-orange-500 transition-colors">
                         <Plus className="h-4 w-4" />{uploadingOfferte ? "Hochladen..." : "Offerte PDF hochladen"}
                         <input type="file" accept=".pdf" onChange={uploadOfferte} className="hidden" disabled={uploadingOfferte} />
                       </label>
@@ -1257,7 +1257,7 @@ export default function VertriebPage() {
                     const jobId = c?.details?.job_id;
                     if (jobNum && jobId) {
                       return (
-                        <div className="p-3 rounded-lg bg-white border border-green-200 flex items-center justify-between flex-wrap gap-2">
+                        <div className="p-3 rounded-lg bg-card border border-green-200 flex items-center justify-between flex-wrap gap-2">
                           <div>
                             <p className="text-xs text-muted-foreground">Auftrag erstellt</p>
                             <p className="font-semibold text-sm"><span className="font-mono text-green-700">INT-{jobNum}</span></p>
@@ -1298,17 +1298,17 @@ export default function VertriebPage() {
               {!editingId && (
                 <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "neu" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                    <button type="button" onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "neu" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
                       + Neuer Kunde
                     </button>
-                    <button type="button" onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "bestehend" ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                    <button type="button" onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "bestehend" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
                       Bestandskunde auswählen
                     </button>
                   </div>
                   {kundenMode === "bestehend" && (
                     <div>
                       <label className="text-xs font-medium">Kunde auswählen *</label>
-                      <select value={selectedCustomerId} onChange={(e) => selectExistingCustomer(e.target.value)} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-white" required>
+                      <select value={selectedCustomerId} onChange={(e) => selectExistingCustomer(e.target.value)} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card" required>
                         <option value="">— Kunde wählen —</option>
                         {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
@@ -1316,7 +1316,7 @@ export default function VertriebPage() {
                         const c = customers.find((x) => x.id === selectedCustomerId);
                         if (!c) return null;
                         return (
-                          <div className="mt-2 p-2 rounded-lg bg-white border border-gray-100 text-xs space-y-0.5">
+                          <div className="mt-2 p-2 rounded-lg bg-card border border-gray-100 text-xs space-y-0.5">
                             <p className="font-semibold">{c.name}</p>
                             {c.email && <p className="text-muted-foreground">{c.email}</p>}
                             {c.phone && <p className="text-muted-foreground">{c.phone}</p>}
@@ -1382,11 +1382,11 @@ export default function VertriebPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-medium">Anfang</label>
-                    <Input type="date" value={form.event_start} onChange={(e) => setForm({ ...form, event_start: e.target.value })} className="mt-1 bg-white" />
+                    <Input type="date" value={form.event_start} onChange={(e) => setForm({ ...form, event_start: e.target.value })} className="mt-1 bg-card" />
                   </div>
                   <div>
                     <label className="text-xs font-medium">Ende</label>
-                    <Input type="date" value={form.event_end} onChange={(e) => setForm({ ...form, event_end: e.target.value })} className="mt-1 bg-white" />
+                    <Input type="date" value={form.event_end} onChange={(e) => setForm({ ...form, event_end: e.target.value })} className="mt-1 bg-card" />
                   </div>
                 </div>
               </div>
@@ -1398,23 +1398,23 @@ export default function VertriebPage() {
                   <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />Verwaltungs-Details</p>
                   <div>
                     <label className="text-xs font-medium">Gegebene Infrastruktur</label>
-                    <textarea value={form.infrastruktur} onChange={(e) => setForm({ ...form, infrastruktur: e.target.value })} placeholder="Was ist vor Ort vorhanden? Saal, Technik, Parkplätze..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                    <textarea value={form.infrastruktur} onChange={(e) => setForm({ ...form, infrastruktur: e.target.value })} placeholder="Was ist vor Ort vorhanden? Saal, Technik, Parkplätze..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
                   </div>
                   <div>
                     <label className="text-xs font-medium">Ort</label>
-                    <Input value={form.ort} onChange={(e) => setForm({ ...form, ort: e.target.value })} placeholder="Adresse oder Bezeichnung" className="mt-1 bg-white" />
+                    <Input value={form.ort} onChange={(e) => setForm({ ...form, ort: e.target.value })} placeholder="Adresse oder Bezeichnung" className="mt-1 bg-card" />
                   </div>
                   <div>
                     <label className="text-xs font-medium">Zielgruppe</label>
-                    <Input value={form.zielgruppe} onChange={(e) => setForm({ ...form, zielgruppe: e.target.value })} placeholder="Wer wird erreicht?" className="mt-1 bg-white" />
+                    <Input value={form.zielgruppe} onChange={(e) => setForm({ ...form, zielgruppe: e.target.value })} placeholder="Wer wird erreicht?" className="mt-1 bg-card" />
                   </div>
                   <div>
                     <label className="text-xs font-medium">Programm</label>
-                    <textarea value={form.programm} onChange={(e) => setForm({ ...form, programm: e.target.value })} placeholder="Geplantes Programm / Ablauf..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                    <textarea value={form.programm} onChange={(e) => setForm({ ...form, programm: e.target.value })} placeholder="Geplantes Programm / Ablauf..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
                   </div>
                   <div>
                     <label className="text-xs font-medium">Bedarf vor Ort</label>
-                    <textarea value={form.bedarf_vor_ort} onChange={(e) => setForm({ ...form, bedarf_vor_ort: e.target.value })} placeholder="Was muss zusätzlich beschafft/organisiert werden?" className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
+                    <textarea value={form.bedarf_vor_ort} onChange={(e) => setForm({ ...form, bedarf_vor_ort: e.target.value })} placeholder="Was muss zusätzlich beschafft/organisiert werden?" className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
                   </div>
                 </div>
               ) : (
@@ -1432,7 +1432,7 @@ export default function VertriebPage() {
                             if (isOpen) next.delete(b.key); else next.add(b.key);
                             setVisibleBedarf(next);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isOpen ? "bg-purple-600 text-white" : hasText ? "bg-purple-100 text-purple-800 border border-purple-300" : "bg-white text-gray-700 border border-gray-200 hover:border-purple-300"}`}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isOpen ? "bg-purple-600 text-white" : hasText ? "bg-purple-100 text-purple-800 border border-purple-300" : "bg-card text-gray-700 border border-gray-200 hover:border-purple-300"}`}
                         >
                           <span className="flex items-center gap-2">
                             {b.label}
@@ -1445,7 +1445,7 @@ export default function VertriebPage() {
                             value={form.bedarf[b.key] || ""}
                             onChange={(e) => setForm({ ...form, bedarf: { ...form.bedarf, [b.key]: e.target.value } })}
                             placeholder={`Details zu ${b.label}...`}
-                            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                             rows={2}
                           />
                         )}
@@ -1484,9 +1484,9 @@ export default function VertriebPage() {
 
       {/* Liste */}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-white"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-1/3" /></CardContent></Card>)}</div>
+        <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-1/3" /></CardContent></Card>)}</div>
       ) : filtered.length === 0 ? (
-        <Card className="bg-white border-dashed">
+        <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><TrendingUp className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">Keine Kontakte</h3>
@@ -1521,7 +1521,7 @@ export default function VertriebPage() {
                 className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 group relative ${
                   isGewonnen ? "bg-green-50 border-green-200" :
                   isVerloren ? "bg-red-50/60 border-red-200 opacity-70" :
-                  "bg-white"
+                  "bg-card"
                 }`}
               >
                 <CardContent className="p-4">

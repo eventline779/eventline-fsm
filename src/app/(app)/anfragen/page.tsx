@@ -63,20 +63,20 @@ export default function AnfragenPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Vermietungen suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-white border-gray-200" />
+          <Input placeholder="Vermietungen suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-gray-200" />
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setFilterStatus("all")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterStatus === "all" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>Alle</button>
+          <button onClick={() => setFilterStatus("all")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterStatus === "all" ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>Alle</button>
           {(Object.keys(RENTAL_STATUS) as RentalStatus[]).map((s) => (
-            <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterStatus === s ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>{RENTAL_STATUS[s].label}</button>
+            <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterStatus === s ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>{RENTAL_STATUS[s].label}</button>
           ))}
         </div>
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-white"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-1/2 mb-3" /><div className="h-4 bg-gray-100 rounded w-1/3" /></CardContent></Card>)}</div>
+        <div className="space-y-3">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-5"><div className="h-5 bg-gray-200 rounded w-1/2 mb-3" /><div className="h-4 bg-gray-100 rounded w-1/3" /></CardContent></Card>)}</div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed bg-white">
+        <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Inbox className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">{search ? "Keine Ergebnisse" : "Noch keine Vermietungen"}</h3>
@@ -88,7 +88,7 @@ export default function AnfragenPage() {
         <div className="space-y-3">
           {filtered.map((req) => (
             <Link key={req.id} href={`/anfragen/${req.id}`}>
-              <Card className={`hover:shadow-md transition-all cursor-pointer ${req.status === "bestaetigt" ? "bg-green-50 border-green-200" : req.status === "abgelehnt" ? "bg-red-50/50 border-red-100 opacity-60" : "bg-white"}`}>
+              <Card className={`hover:shadow-md transition-all cursor-pointer ${req.status === "bestaetigt" ? "bg-green-50 border-green-200" : req.status === "abgelehnt" ? "bg-red-50/50 border-red-100 opacity-60" : "bg-card"}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">

@@ -203,7 +203,7 @@ export default function RaumDetailPage() {
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/raeume"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <Link href="/raeume"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -217,7 +217,7 @@ export default function RaumDetailPage() {
       </div>
 
       {/* Technische Details */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Technische Details</CardTitle>
           {!editingTech && <Button size="sm" variant="outline" onClick={() => setEditingTech(true)}>Bearbeiten</Button>}
@@ -238,7 +238,7 @@ export default function RaumDetailPage() {
       </Card>
 
       {/* Preise */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4" />Preise ({prices.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowPriceForm(!showPriceForm)}>
@@ -277,7 +277,7 @@ export default function RaumDetailPage() {
       </Card>
 
       {/* Kontaktpersonen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Ansprechpartner ({contacts.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowContactForm(!showContactForm)}><UserPlus className="h-4 w-4 mr-1" />Hinzufügen</Button>
@@ -319,7 +319,7 @@ export default function RaumDetailPage() {
       </Card>
 
       {/* Notizen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
@@ -330,7 +330,7 @@ export default function RaumDetailPage() {
         <CardContent className="space-y-3">
           {showNoteForm && (
             <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
                 <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
@@ -351,7 +351,7 @@ export default function RaumDetailPage() {
       </Card>
 
       {/* Dokumente */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
@@ -384,7 +384,7 @@ export default function RaumDetailPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowDelete(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Raum löschen</h2>
                 <button onClick={() => setShowDelete(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
@@ -396,7 +396,7 @@ export default function RaumDetailPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Code eingeben</label>
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-white dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`} />
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`} />
                   {deleteError && <p className="text-xs text-red-600 mt-1">Falscher Code</p>}
                 </div>
                 <div className="flex gap-3">

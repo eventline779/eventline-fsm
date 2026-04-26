@@ -119,7 +119,7 @@ export default function ZeiterfassungPage() {
       </div>
 
       {/* Clock In/Out */}
-      <Card className={`bg-white border-2 ${activeEntry ? "border-green-200" : "border-gray-100"}`}>
+      <Card className={`bg-card border-2 ${activeEntry ? "border-green-200" : "border-gray-100"}`}>
         <CardContent className="p-8 text-center">
           <div className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 ${activeEntry ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400"}`}>
             <Clock className="h-10 w-10" />
@@ -184,7 +184,7 @@ export default function ZeiterfassungPage() {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Letzte Einträge</h2>
         {entries.length === 0 ? (
-          <Card className="bg-white border-dashed">
+          <Card className="bg-card border-dashed">
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">Noch keine Zeiteinträge vorhanden.</p>
             </CardContent>
@@ -194,7 +194,7 @@ export default function ZeiterfassungPage() {
             {entries.map((entry) => {
               const cat = getCategoryInfo((entry as any).category);
               return (
-                <Card key={entry.id} className="bg-white">
+                <Card key={entry.id} className="bg-card">
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="text-sm font-medium text-muted-foreground w-20">{formatDate(entry.clock_in)}</div>

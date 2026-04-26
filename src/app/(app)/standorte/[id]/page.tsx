@@ -278,7 +278,7 @@ export default function StandortDetailPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-4">
-        <Link href="/standorte"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <Link href="/standorte"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{location.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -289,7 +289,7 @@ export default function StandortDetailPage() {
       </div>
 
       {/* Kunde verknüpfen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Building2 className="h-4 w-4" />Zugewiesener Kunde</CardTitle>
         </CardHeader>
@@ -321,7 +321,7 @@ export default function StandortDetailPage() {
       </Card>
 
       {/* Notizen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
@@ -332,7 +332,7 @@ export default function StandortDetailPage() {
         <CardContent className="space-y-3">
           {showNoteForm && (
             <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
                 <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
@@ -357,7 +357,7 @@ export default function StandortDetailPage() {
       </Card>
 
       {/* Dokumente */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
@@ -386,7 +386,7 @@ export default function StandortDetailPage() {
       </Card>
 
       {/* Kontaktpersonen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Kontaktpersonen ({contacts.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowContactForm(!showContactForm)}><UserPlus className="h-4 w-4 mr-1" />Hinzufügen</Button>
@@ -428,7 +428,7 @@ export default function StandortDetailPage() {
       </Card>
 
       {/* Instandhaltung */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Instandhaltung ({tasks.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowTaskForm(!showTaskForm)}>
@@ -440,7 +440,7 @@ export default function StandortDetailPage() {
           {/* Filter */}
           <div className="flex gap-2">
             {(["all", "offen", "erledigt"] as const).map((f) => (
-              <button key={f} onClick={() => setTaskFilter(f)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${taskFilter === f ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+              <button key={f} onClick={() => setTaskFilter(f)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${taskFilter === f ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
                 {f === "all" ? "Alle" : f === "offen" ? "Offen" : "Erledigt"}
               </button>
             ))}
@@ -450,7 +450,7 @@ export default function StandortDetailPage() {
           {showTaskForm && (
             <form onSubmit={addTask} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
               <Input placeholder="Titel der Arbeit *" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} required />
-              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
+              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
               <Input type="date" value={taskForm.due_date} onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })} />
 
               {/* Foto */}

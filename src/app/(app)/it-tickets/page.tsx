@@ -73,7 +73,7 @@ export default function ITTicketsPage() {
       </div>
 
       {showForm && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6">
             <form onSubmit={submitTicket} className="space-y-4">
               <div>
@@ -105,7 +105,7 @@ export default function ITTicketsPage() {
                       key={p.value}
                       type="button"
                       onClick={() => setForm({ ...form, priority: p.value })}
-                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.value ? p.color + " border-current" : "bg-white text-gray-500 border-gray-200"}`}
+                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.value ? p.color + " border-current" : "bg-card text-gray-500 border-gray-200"}`}
                     >
                       {p.label}
                     </button>
@@ -124,7 +124,7 @@ export default function ITTicketsPage() {
       )}
 
       {!showForm && (
-        <Card className="bg-white border-dashed">
+        <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
               <AlertTriangle className="h-7 w-7 text-red-400" />

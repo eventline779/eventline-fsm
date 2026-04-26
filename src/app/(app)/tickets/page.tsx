@@ -201,7 +201,7 @@ export default function TicketsPage() {
     return (
       <div className="space-y-6 max-w-3xl">
         <div className="flex items-center gap-4">
-          <button onClick={() => setSelectedTicket(null)} className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button>
+          <button onClick={() => setSelectedTicket(null)} className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{selectedTicket.title}</h1>
@@ -215,7 +215,7 @@ export default function TicketsPage() {
           </div>
         </div>
 
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="p-5 space-y-4">
             <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
               <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
@@ -232,7 +232,7 @@ export default function TicketsPage() {
         </Card>
 
         {/* Anhänge */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Anhänge ({atts.length})</h2>
@@ -273,7 +273,7 @@ export default function TicketsPage() {
     return (
       <div className="space-y-6">
         <div><h1 className="text-2xl font-bold tracking-tight">Tickets</h1></div>
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
               <Send className="h-7 w-7 text-green-500" />
@@ -303,7 +303,7 @@ export default function TicketsPage() {
       </div>
 
       {showForm && (
-        <Card className="bg-white border-red-100">
+        <Card className="bg-card border-red-100">
           <CardContent className="p-6">
             <form onSubmit={createTicket} className="space-y-4">
               {/* Kategorie */}
@@ -312,7 +312,7 @@ export default function TicketsPage() {
                 <div className="flex gap-2 mt-1">
                   {CATEGORIES.map((c) => (
                     <button key={c.value} type="button" onClick={() => setForm({ ...form, category: c.value })}
-                      className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg border transition-all ${form.category === c.value ? c.color + " border-current" : "bg-white text-gray-500 border-gray-200"}`}>
+                      className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg border transition-all ${form.category === c.value ? c.color + " border-current" : "bg-card text-gray-500 border-gray-200"}`}>
                       <c.icon className="h-4 w-4" />{c.label}
                     </button>
                   ))}
@@ -325,7 +325,7 @@ export default function TicketsPage() {
                 <div className="flex gap-2 mt-1">
                   {[{ v: "normal", l: "Normal" }, { v: "dringend", l: "Dringend" }].map((p) => (
                     <button key={p.v} type="button" onClick={() => setForm({ ...form, priority: p.v })}
-                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.v ? (p.v === "dringend" ? "bg-red-50 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-300") : "bg-white text-gray-500 border-gray-200"}`}>
+                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.v ? (p.v === "dringend" ? "bg-red-50 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-300") : "bg-card text-gray-500 border-gray-200"}`}>
                       {p.l}
                     </button>
                   ))}
@@ -346,7 +346,7 @@ export default function TicketsPage() {
       {/* Ticket List - nur für Admins */}
       {isAdmin && (
         tickets.length === 0 && !showForm ? (
-          <Card className="bg-white border-dashed">
+          <Card className="bg-card border-dashed">
             <CardContent className="py-16 text-center">
               <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
               <h3 className="font-semibold text-lg">Keine offenen Tickets</h3>
@@ -357,7 +357,7 @@ export default function TicketsPage() {
             {tickets.map((t) => {
               const cat = getCat(t.category);
               return (
-                <Card key={t.id} className="bg-white hover:shadow-sm transition-all cursor-pointer" onClick={() => { setSelectedTicket(t); }}>
+                <Card key={t.id} className="bg-card hover:shadow-sm transition-all cursor-pointer" onClick={() => { setSelectedTicket(t); }}>
                   <CardContent className="p-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${cat.color}`}>
@@ -389,7 +389,7 @@ export default function TicketsPage() {
 
       {/* Nicht-Admin: Info wenn kein Formular offen */}
       {!isAdmin && !showForm && (
-        <Card className="bg-white border-dashed">
+        <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">Ticket erstellen</h3>

@@ -68,7 +68,7 @@ export default function NeuerKundePage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/kunden">
-          <button className="p-2 rounded-lg hover:bg-white transition-colors">
+          <button className="p-2 rounded-lg hover:bg-card transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
         </Link>
@@ -82,7 +82,7 @@ export default function NeuerKundePage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Typ */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Kundentyp</CardTitle>
           </CardHeader>
@@ -108,7 +108,7 @@ export default function NeuerKundePage() {
         </Card>
 
         {/* Kontaktdaten */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Kontaktdaten</CardTitle>
           </CardHeader>
@@ -151,7 +151,7 @@ export default function NeuerKundePage() {
         </Card>
 
         {/* Adresse */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Adresse</CardTitle>
           </CardHeader>
@@ -192,7 +192,7 @@ export default function NeuerKundePage() {
         </Card>
 
         {/* Notizen */}
-        <Card className="bg-white">
+        <Card className="bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Notizen</CardTitle>
           </CardHeader>

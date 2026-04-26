@@ -90,12 +90,12 @@ export default function KundenPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Kunden suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-white border-gray-200" />
+          <Input placeholder="Kunden suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-gray-200" />
         </div>
         <div className="flex gap-2">
           {(["all", "company", "individual", "organization"] as const).map((type) => (
             <button key={type} onClick={() => setFilterType(type)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterType === type ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterType === type ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
               {type === "all" ? "Alle" : CUSTOMER_TYPES[type]}
             </button>
           ))}
@@ -106,11 +106,11 @@ export default function KundenPage() {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse bg-white"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-2/3" /></CardContent></Card>
+            <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-2/3" /></CardContent></Card>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed bg-white">
+        <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Users className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">{search ? "Keine Ergebnisse" : "Noch keine Kunden"}</h3>
@@ -128,7 +128,7 @@ export default function KundenPage() {
             <span></span>
           </div>
           {filtered.map((customer) => (
-            <Card key={customer.id} className="bg-white hover:shadow-sm transition-all group">
+            <Card key={customer.id} className="bg-card hover:shadow-sm transition-all group">
               <CardContent className="p-0">
                 {/* Desktop */}
                 <div className="hidden md:grid grid-cols-[1fr_200px_150px_150px_40px] gap-4 items-center px-4 py-3">
@@ -181,7 +181,7 @@ export default function KundenPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Kunde löschen</h2>
                 <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">

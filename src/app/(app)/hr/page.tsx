@@ -53,7 +53,7 @@ export default function HRPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {sections.map((s) => (
           <Link key={s.href} href={s.href}>
-            <Card className="bg-white hover:shadow-md transition-all cursor-pointer h-full">
+            <Card className="bg-card hover:shadow-md transition-all cursor-pointer h-full">
               <CardContent className="p-6">
                 <div className={`w-12 h-12 rounded-xl ${s.color} flex items-center justify-center mb-4`}>
                   <s.icon className="h-6 w-6" />

@@ -369,7 +369,7 @@ export default function EinstellungenPage() {
             onClick={() => setTab(t.key)}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               tab === t.key
-                ? "bg-white text-gray-900 shadow-sm"
+                ? "bg-card text-gray-900 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -403,7 +403,7 @@ export default function EinstellungenPage() {
                     <button
                       key={preset.name}
                       onClick={() => prefillUser(preset)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
                       {preset.name}
@@ -483,7 +483,7 @@ export default function EinstellungenPage() {
                 </div>
               )}
               {profiles.length === 0 && (
-                <Card className="bg-white">
+                <Card className="bg-card">
                   <CardContent className="p-8 text-center">
                     <Users className="h-10 w-10 text-gray-300 mx-auto" />
                     <p className="mt-3 text-sm text-muted-foreground">Noch keine Teammitglieder.</p>
@@ -577,7 +577,7 @@ export default function EinstellungenPage() {
             {timeLoading ? (
               <LoadingSkeleton />
             ) : completed.length === 0 ? (
-              <Card className="bg-white border-dashed">
+              <Card className="bg-card border-dashed">
                 <CardContent className="py-10 text-center">
                   <Clock className="h-8 w-8 text-gray-300 mx-auto" />
                   <p className="mt-2 text-sm text-muted-foreground">Keine Einträge im gewählten Zeitraum.</p>
@@ -586,7 +586,7 @@ export default function EinstellungenPage() {
             ) : (
               <div className="space-y-2">
                 {completed.map((entry) => (
-                  <Card key={entry.id} className="bg-white border-gray-100">
+                  <Card key={entry.id} className="bg-card border-gray-100">
                     <CardContent className="p-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white text-sm font-bold">
@@ -636,7 +636,7 @@ export default function EinstellungenPage() {
           </div>
 
           {/* Alle exportieren */}
-          <Card className="bg-white border-gray-100">
+          <Card className="bg-card border-gray-100">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -666,7 +666,7 @@ export default function EinstellungenPage() {
                 { table: "maintenance_tasks", label: "Instandhaltung", desc: "Alle Instandhaltungsarbeiten" },
                 { table: "calendar_events", label: "Schichten", desc: "Alle Kalendereinträge und Schichten" },
               ].map((item) => (
-                <Card key={item.table} className="bg-white border-gray-100">
+                <Card key={item.table} className="bg-card border-gray-100">
                   <CardContent className="p-4 flex items-center justify-between">
                     <div>
                       <h3 className="font-medium text-sm">{item.label}</h3>
@@ -712,7 +712,7 @@ function LiveTimer({ clockIn }: { clockIn: string }) {
 function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleRole: (p: Profile) => void }) {
   const isAdmin = profile.role === "admin";
   return (
-    <Card className="bg-white border-gray-100 hover:border-gray-200 transition-colors">
+    <Card className="bg-card border-gray-100 hover:border-gray-200 transition-colors">
       <CardContent className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${isAdmin ? "bg-gradient-to-br from-red-500 to-red-700" : "bg-gradient-to-br from-gray-400 to-gray-600"}`}>
@@ -815,7 +815,7 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Abgeschlossene Aufträge</p>
           {archivedJobs.map((j: any) => (
             <Link key={j.id} href={`/auftraege/${j.id}`}>
-              <Card className="bg-white border-gray-100 hover:shadow-sm transition-all opacity-70">
+              <Card className="bg-card border-gray-100 hover:shadow-sm transition-all opacity-70">
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono text-gray-400">INT-{j.job_number}</span>
@@ -836,7 +836,7 @@ function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
       {!showArchive && serverProfiles.map((p) => {
         const d = data[p.id] || { jobs: [], appointments: [], hours: 0 };
         return (
-          <Card key={p.id} className="bg-white border-gray-100">
+          <Card key={p.id} className="bg-card border-gray-100">
             <CardContent className="p-5">
               {/* Person Header */}
               <div className="flex items-center justify-between mb-4">
@@ -932,7 +932,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-2">
       {[1, 2, 3].map((i) => (
-        <Card key={i} className="animate-pulse bg-white">
+        <Card key={i} className="animate-pulse bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
               <div className="h-10 w-10 rounded-xl bg-gray-200" />

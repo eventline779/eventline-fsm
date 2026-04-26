@@ -11,7 +11,7 @@ export default function SchulungenPage() {
         <p className="text-sm text-muted-foreground mt-1">Schulungen und Weiterbildungen</p>
       </div>
 
-      <Card className="bg-white border-dashed">
+      <Card className="bg-card border-dashed">
         <CardContent className="py-20 text-center">
           <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
             <GraduationCap className="h-7 w-7 text-gray-400" />
