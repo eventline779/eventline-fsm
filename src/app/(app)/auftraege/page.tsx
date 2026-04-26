@@ -145,52 +145,52 @@ export default function AuftraegePage() {
           <Card className="bg-white">
             <CardContent className="p-5">
               {total > 0 ? (
-                <div className="flex flex-col md:flex-row items-start gap-6">
-                  <div className="relative shrink-0">
-                    <svg
-                      width={radius * 2 + strokeWidth}
-                      height={radius * 2 + strokeWidth}
-                      className="-rotate-90"
-                    >
-                      {/* Track: kaum sichtbar, nur als Anker */}
-                      <circle
-                        cx={radius + strokeWidth / 2}
-                        cy={radius + strokeWidth / 2}
-                        r={radius}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={strokeWidth}
-                        className="text-foreground/[0.04] dark:text-foreground/[0.06]"
-                      />
-                      {visibleSegments.map((s, i) => {
-                        const portion = s.count / total;
-                        const dash = Math.max(portion * circumference - gapPx, 0.001);
-                        const gap = circumference - dash;
-                        const el = (
-                          <circle
-                            key={i}
-                            cx={radius + strokeWidth / 2}
-                            cy={radius + strokeWidth / 2}
-                            r={radius}
-                            fill="none"
-                            stroke={s.color}
-                            strokeWidth={strokeWidth}
-                            strokeDasharray={`${dash} ${gap}`}
-                            strokeDashoffset={-offset}
-                            strokeLinecap="round"
-                          />
-                        );
-                        offset += dash + gapPx;
-                        return el;
-                      })}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Aufträge</span>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row items-start gap-6">
+                    <div className="relative shrink-0">
+                      <svg
+                        width={radius * 2 + strokeWidth}
+                        height={radius * 2 + strokeWidth}
+                        className="-rotate-90"
+                      >
+                        {/* Track: kaum sichtbar, nur als Anker */}
+                        <circle
+                          cx={radius + strokeWidth / 2}
+                          cy={radius + strokeWidth / 2}
+                          r={radius}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={strokeWidth}
+                          className="text-foreground/[0.04] dark:text-foreground/[0.06]"
+                        />
+                        {visibleSegments.map((s, i) => {
+                          const portion = s.count / total;
+                          const dash = Math.max(portion * circumference - gapPx, 0.001);
+                          const gap = circumference - dash;
+                          const el = (
+                            <circle
+                              key={i}
+                              cx={radius + strokeWidth / 2}
+                              cy={radius + strokeWidth / 2}
+                              r={radius}
+                              fill="none"
+                              stroke={s.color}
+                              strokeWidth={strokeWidth}
+                              strokeDasharray={`${dash} ${gap}`}
+                              strokeDashoffset={-offset}
+                              strokeLinecap="round"
+                            />
+                          );
+                          offset += dash + gapPx;
+                          return el;
+                        })}
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Aufträge</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 w-full md:self-stretch flex flex-col">
-                    <div className="space-y-2.5">
+                    <div className="flex-1 w-full space-y-2.5">
                       {segments.map((s) => {
                         const pct = total > 0 ? (s.count / total) * 100 : 0;
                         return (
@@ -216,20 +216,20 @@ export default function AuftraegePage() {
                         );
                       })}
                     </div>
-                    {entwurfCount > 0 && (
-                      <div className="mt-auto pt-4 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setFilterStatus("entwurf")}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
-                          title="Filter auf Entwürfe setzen"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
-                          {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-                        </button>
-                      </div>
-                    )}
                   </div>
+                  {entwurfCount > 0 && (
+                    <div className="flex justify-start">
+                      <button
+                        type="button"
+                        onClick={() => setFilterStatus("entwurf")}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
+                        title="Filter auf Entwürfe setzen"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
+                        {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -239,14 +239,13 @@ export default function AuftraegePage() {
                       : "Keine Aufträge vorhanden."}
                   </p>
                   {entwurfCount > 0 && (
-                    <div className="flex justify-end">
+                    <div className="flex justify-start">
                       <button
                         type="button"
                         onClick={() => setFilterStatus("entwurf")}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
-                        style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
                         {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
                       </button>
                     </div>

@@ -82,14 +82,14 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben: Originale, kraeftige Tailwind-Farben */
-  --status-purple: #a855f7;
-  --status-gray: #9ca3af;
+  /* Diagramm-Status-Farben: Jewel-Tone Palette mit Jade-Gruen als Anker */
+  --status-purple: #7c3aed;
+  --status-gray: #64748b;
   --status-green: #00a86b;
   --status-red: #dc2626;
-  --status-blue: #3b82f6;
-  --status-orange: #f97316;
-  --status-emerald: #059669;
+  --status-blue: #2563eb;
+  --status-orange: #ea580c;
+  --status-emerald: #047857;
 }
 
 .dark {
@@ -124,14 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Dark: gleiche Originale wie Light */
-  --status-purple: #a855f7;
-  --status-gray: #9ca3af;
+  /* Diagramm-Status-Farben Dark: gleiche Jewel-Tone Palette wie Light */
+  --status-purple: #7c3aed;
+  --status-gray: #64748b;
   --status-green: #00a86b;
   --status-red: #dc2626;
-  --status-blue: #3b82f6;
-  --status-orange: #f97316;
-  --status-emerald: #059669;
+  --status-blue: #2563eb;
+  --status-orange: #ea580c;
+  --status-emerald: #047857;
 }
 
 @layer base {
