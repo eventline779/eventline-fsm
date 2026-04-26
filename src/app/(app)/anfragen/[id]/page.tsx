@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Job } from "@/types";
 import { REQUEST_STEPS } from "@/lib/constants";
 import {
-  ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X,
+  ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
   StickyNote, FileText,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,10 +28,10 @@ export default function AnfrageDetailPage() {
   const [notesText, setNotesText] = useState("");
   const [savedText, setSavedText] = useState("");
 
-  // Reject-Modal
-  const [showReject, setShowReject] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectSaving, setRejectSaving] = useState(false);
+  // Storno-Flow: 2-Phasen-Modal wie beim Auftrag
+  const [cancelPhase, setCancelPhase] = useState<"closed" | "confirm" | "reason">("closed");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   // Convert-Modal
   const [showConvert, setShowConvert] = useState(false);
@@ -111,12 +111,12 @@ export default function AnfrageDetailPage() {
     loadJob();
   }
 
-  async function rejectAnfrage() {
-    if (!rejectReason.trim()) {
-      toast.error("Bitte Grund angeben");
+  async function confirmCancel() {
+    if (!cancelReason.trim()) {
+      toast.error("Bitte einen Grund angeben");
       return;
     }
-    setRejectSaving(true);
+    setCancelSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("jobs")
@@ -125,15 +125,17 @@ export default function AnfrageDetailPage() {
         request_step: null,
         cancelled_by: user?.id ?? null,
         cancelled_at: new Date().toISOString(),
-        cancellation_reason: rejectReason.trim(),
+        cancellation_reason: cancelReason.trim(),
       })
       .eq("id", id);
-    setRejectSaving(false);
+    setCancelSaving(false);
     if (error) {
       toast.error("Fehler: " + error.message);
       return;
     }
-    toast.success("Anfrage abgelehnt");
+    setCancelPhase("closed");
+    setCancelReason("");
+    toast.success("Anfrage storniert");
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push("/anfragen");
   }
@@ -188,7 +190,7 @@ export default function AnfrageDetailPage() {
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {isCancelled ? "Vermietungsanfrage · abgelehnt" : "Vermietungsanfrage · noch nicht freigegeben"}
+            {isCancelled ? "Vermietungsanfrage · storniert" : "Vermietungsanfrage · noch nicht freigegeben"}
           </p>
         </div>
       </div>
@@ -229,13 +231,13 @@ export default function AnfrageDetailPage() {
         </Card>
       )}
 
-      {/* Storno-Info wenn abgelehnt */}
+      {/* Storno-Info wenn storniert */}
       {isCancelled && job.cancellation_reason && (
         <Card className="bg-card border-destructive/30">
           <CardContent className="p-5 space-y-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
-              <X className="h-4 w-4" />
-              Abgelehnt
+              <XCircle className="h-4 w-4" />
+              Storniert
             </div>
             {job.cancelled_at && (
               <div className="text-sm text-muted-foreground">
@@ -332,47 +334,92 @@ export default function AnfrageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Ablehnen — nur wenn aktiv */}
+      {/* Stornieren — nur wenn aktiv. Gleiche Optik + 2-Phasen-Flow wie beim Auftrag. */}
       {!isCancelled && (
         <div className="flex justify-end">
           <Button
             variant="destructive"
             size="lg"
-            onClick={() => setShowReject(true)}
+            onClick={() => setCancelPhase("confirm")}
           >
-            <X className="h-4 w-4" />
-            Anfrage ablehnen
+            <XCircle className="h-4 w-4" />
+            Stornieren
           </Button>
         </div>
       )}
 
-      {/* Reject-Modal */}
-      {showReject && (
+      {/* Storno-Flow: Phase 'confirm' -> 'reason' (identisch zum Auftrag) */}
+      {cancelPhase !== "closed" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!rejectSaving) setShowReject(false); }} />
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
-              <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Anfrage ablehnen?</h2>
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h2 className="font-semibold">
+                  {cancelPhase === "confirm" ? "Anfrage stornieren?" : "Grund angeben"}
+                </h2>
+                <button
+                  onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
+                  className="p-1.5 rounded-lg hover:bg-muted"
+                  disabled={cancelSaving}
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
               </div>
               <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">Bitte gib einen Grund an. Die Anfrage wird als storniert archiviert.</p>
-                <textarea
-                  placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                  autoFocus
-                  className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-                />
-                <div className="flex gap-2">
-                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowReject(false)} disabled={rejectSaving}>
-                    Abbrechen
-                  </Button>
-                  <Button variant="destructive" size="lg" className="flex-1" onClick={rejectAnfrage} disabled={rejectSaving || !rejectReason.trim()}>
-                    {rejectSaving ? "Lehne ab…" : "Ablehnen"}
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {job.job_number ? `INT-${job.job_number} — ` : ""}
+                  <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
+                </p>
+                {cancelPhase === "confirm" ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Die Anfrage wird als storniert archiviert. Du kannst sie nachher noch einsehen.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="lg" className="flex-1" onClick={() => setCancelPhase("closed")}>
+                        Abbrechen
+                      </Button>
+                      <Button variant="destructive" size="lg" className="flex-1" onClick={() => setCancelPhase("reason")}>
+                        Stornieren
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Bitte gib einen Grund an, warum diese Anfrage storniert wird.
+                    </p>
+                    <textarea
+                      placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      rows={3}
+                      autoFocus
+                      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="flex-1"
+                        onClick={() => setCancelPhase("confirm")}
+                        disabled={cancelSaving}
+                      >
+                        Zurück
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="flex-1"
+                        onClick={confirmCancel}
+                        disabled={cancelSaving || !cancelReason.trim()}
+                      >
+                        {cancelSaving ? "Storniere…" : "Bestätigen"}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
