@@ -44,8 +44,10 @@ export default function AuftragDetailPage() {
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [newNote, setNewNote] = useState("");
 
-  // Stornieren-Bestätigung
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Stornieren-Flow: Modal mit zwei Phasen (confirm -> reason)
+  const [cancelPhase, setCancelPhase] = useState<"closed" | "confirm" | "reason">("closed");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -64,7 +66,7 @@ export default function AuftragDetailPage() {
 
   async function loadAll() {
     const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
-      supabase.from("jobs").select("*, customer:customers(name, address_street, address_zip, address_city), location:locations(name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name)").eq("id", id).single(),
+      supabase.from("jobs").select("*, customer:customers(name, address_street, address_zip, address_city), location:locations(name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name), cancelled_by_profile:profiles!cancelled_by(full_name)").eq("id", id).single(),
       supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
       supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
       supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -128,6 +130,33 @@ export default function AuftragDetailPage() {
 
     await supabase.from("jobs").update({ status: newStatus }).eq("id", id);
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
+    loadAll();
+  }
+
+  async function confirmCancel() {
+    if (!cancelReason.trim()) {
+      toast.error("Bitte einen Grund angeben");
+      return;
+    }
+    setCancelSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("jobs")
+      .update({
+        status: "storniert",
+        cancelled_by: user?.id ?? null,
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: cancelReason.trim(),
+      })
+      .eq("id", id);
+    setCancelSaving(false);
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      return;
+    }
+    setCancelPhase("closed");
+    setCancelReason("");
+    toast.success("Auftrag storniert");
     loadAll();
   }
 
@@ -309,53 +338,54 @@ export default function AuftragDetailPage() {
         </div>
       </div>
 
-      {/* Aktionen: Status-Übergänge + Bearbeiten neben Stornieren */}
+      {/* Aktionen: Status-Uebergaenge + Bearbeiten + Stornieren — alle als <Button> mit konsistenten Variants */}
       <div className="flex flex-wrap gap-2">
         {availableActions
           .filter((a) => a.to !== "storniert")
           .map((a) => {
             const isFinish = a.to === "abgeschlossen";
             const disabled = isFinish && !canFinish;
-            const cls =
-              a.variant === "primary"
-                ? "bg-purple-600 hover:bg-purple-700 text-white"
-                : "border border-border text-foreground hover:bg-muted";
+            // Primaere Aktionen (Freigeben) brand-rot, sekundaere (Abschliessen) outline
+            const isPrimary = a.variant === "primary";
             return (
-              <button
+              <Button
                 key={a.to}
+                size="lg"
+                variant={isPrimary ? undefined : "outline"}
                 onClick={() => updateStatus(a.to)}
                 disabled={disabled}
                 title={disabled ? finishBlockReason : undefined}
-                className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${cls}`}
+                className={isPrimary ? "bg-red-600 hover:bg-red-700 text-white" : ""}
               >
                 {a.icon}
                 {a.label}
-              </button>
+              </Button>
             );
           })}
 
         {/* Bearbeiten — nur bei Entwuerfen */}
         {job.status === "entwurf" && (
           <Link href={`/auftraege/${id}/bearbeiten`}>
-            <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-all">
+            <Button size="lg" variant="outline">
               <Pencil className="h-4 w-4" />
               Bearbeiten
-            </button>
+            </Button>
           </Link>
         )}
 
-        {/* Stornieren als Letztes */}
+        {/* Stornieren als Letztes — destructive variant (sichtbar rot, nicht erst auf Hover) */}
         {availableActions
           .filter((a) => a.to === "storniert")
           .map((a) => (
-            <button
+            <Button
               key={a.to}
-              onClick={() => setShowCancelConfirm(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-all"
+              size="lg"
+              variant="destructive"
+              onClick={() => setCancelPhase("confirm")}
             >
               {a.icon}
               {a.label}
-            </button>
+            </Button>
           ))}
       </div>
 
@@ -397,6 +427,32 @@ export default function AuftragDetailPage() {
           {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
         </CardContent>
       </Card>
+
+      {/* Storno-Info — nur sichtbar wenn storniert */}
+      {job.status === "storniert" && (job.cancelled_at || job.cancellation_reason) && (
+        <Card className="bg-card border-destructive/30">
+          <CardContent className="p-5 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <XCircle className="h-4 w-4" />
+              Storniert
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {job.cancelled_by_profile?.full_name && (
+                <>von <span className="font-medium text-foreground">{job.cancelled_by_profile.full_name}</span></>
+              )}
+              {job.cancelled_at && (
+                <> am <span className="font-medium text-foreground">{new Date(job.cancelled_at).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}</span></>
+              )}
+            </div>
+            {job.cancellation_reason && (
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-1">Grund</p>
+                <p className="text-sm whitespace-pre-wrap">{job.cancellation_reason}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notizen */}
       <Card className="bg-card">
@@ -668,15 +724,21 @@ export default function AuftragDetailPage() {
           )}
         </CardContent>
       </Card>
-      {/* Stornieren-Bestätigung */}
-      {showCancelConfirm && (
+      {/* Stornieren-Flow: Phase 'confirm' -> 'reason' */}
+      {cancelPhase !== "closed" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowCancelConfirm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="font-semibold">Auftrag stornieren?</h2>
-                <button onClick={() => setShowCancelConfirm(false)} className="p-1.5 rounded-lg hover:bg-muted">
+                <h2 className="font-semibold">
+                  {cancelPhase === "confirm" ? "Auftrag stornieren?" : "Grund angeben"}
+                </h2>
+                <button
+                  onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
+                  className="p-1.5 rounded-lg hover:bg-muted"
+                  disabled={cancelSaving}
+                >
                   <X className="h-4 w-4 text-muted-foreground" />
                 </button>
               </div>
@@ -685,23 +747,55 @@ export default function AuftragDetailPage() {
                   {job.job_number ? `INT-${job.job_number} — ` : ""}
                   <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowCancelConfirm(false)}
-                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border hover:bg-muted transition-colors"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    onClick={() => { setShowCancelConfirm(false); updateStatus("storniert"); }}
-                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                  >
-                    Stornieren
-                  </button>
-                </div>
+                {cancelPhase === "confirm" ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="lg" className="flex-1" onClick={() => setCancelPhase("closed")}>
+                        Abbrechen
+                      </Button>
+                      <Button variant="destructive" size="lg" className="flex-1" onClick={() => setCancelPhase("reason")}>
+                        Stornieren
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Bitte gib einen Grund an, warum dieser Auftrag storniert wird.
+                    </p>
+                    <textarea
+                      placeholder="z.B. Kunde hat abgesagt, Termin verschoben…"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      rows={3}
+                      autoFocus
+                      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="flex-1"
+                        onClick={() => setCancelPhase("confirm")}
+                        disabled={cancelSaving}
+                      >
+                        Zurück
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="flex-1"
+                        onClick={confirmCancel}
+                        disabled={cancelSaving || !cancelReason.trim()}
+                      >
+                        {cancelSaving ? "Storniere…" : "Bestätigen"}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

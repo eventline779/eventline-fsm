@@ -70,12 +70,17 @@ export interface Job {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // Storno-Metadaten — gefuellt wenn status='storniert'
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   // Joined data
   customer?: Customer;
   location?: Location;
   assignments?: JobAssignment[];
   project_lead?: Profile;
   appointments?: JobAppointment[];
+  cancelled_by_profile?: { full_name: string };
 }
 
 export interface JobAppointment {
