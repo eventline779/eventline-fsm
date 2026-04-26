@@ -106,9 +106,6 @@ export default function AuftraegePage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Archiv" : "Aufträge"}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {jobs.filter((j) => showArchive ? (j.status === "abgeschlossen" || j.status === "storniert") : !(j.status === "abgeschlossen" || j.status === "storniert")).length} {showArchive ? "archiviert" : "aktiv"} von {jobs.length} gesamt
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-200"}`}>
