@@ -20,6 +20,7 @@ import {
   Archive,
   X,
   Pencil,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -301,6 +302,7 @@ export default function AuftraegePage() {
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const noTermin = isActive && !hasAppointment;
+            const allGood = isActive && hasAppointment && job.status !== "entwurf";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
@@ -359,10 +361,11 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Action-Buttons rechts: zwei feste Slots, damit Pencil und CalendarPlus
+                    {/* Action-Buttons rechts: zwei feste Slots, damit Pencil/Check und CalendarPlus/Check
                         stets an derselben X-Position bleiben — unabhaengig davon, welche
-                        Aktion gerade zutrifft. Slot 1 = Pencil, Slot 2 = CalendarPlus. */}
-                    {(noTermin || job.status === "entwurf") && (
+                        Aktion gerade zutrifft. Slot 1 = Pencil (entwurf), Slot 2 = CalendarPlus (kein Termin)
+                        oder gruener Check (allGood). */}
+                    {(noTermin || job.status === "entwurf" || allGood) && (
                       <div className="flex items-center gap-0.5 shrink-0">
                         <div className="w-10 h-10 flex items-center justify-center">
                           {job.status === "entwurf" && (
@@ -382,7 +385,7 @@ export default function AuftraegePage() {
                           )}
                         </div>
                         <div className="w-10 h-10 flex items-center justify-center">
-                          {noTermin && (
+                          {noTermin ? (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -396,7 +399,15 @@ export default function AuftraegePage() {
                             >
                               <CalendarPlus className="h-5 w-5" />
                             </button>
-                          )}
+                          ) : allGood ? (
+                            <span
+                              className="p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex"
+                              aria-label="Alles bereit"
+                              title="Alles bereit"
+                            >
+                              <Check className="h-5 w-5" />
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     )}
