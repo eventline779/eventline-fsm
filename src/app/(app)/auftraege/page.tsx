@@ -128,10 +128,10 @@ export default function AuftraegePage() {
       {jobs.length > 0 && (() => {
         const activeJobs = jobs;
         const segments = [
-          { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#a855f7" },
-          { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "#9ca3af" },
-          { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
-          { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },
+          { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#d8b4fe" },
+          { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "#d1d5db" },
+          { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#86efac" },
+          { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#fca5a5" },
         ];
         const total = segments.reduce((sum, s) => sum + s.count, 0);
         const radius = 70;
