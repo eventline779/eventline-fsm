@@ -410,11 +410,6 @@ html, body, *, *::before, *::after {
 @layer components {
   .kasten {
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-card transition-all;
-    /* Border per BORDER, nicht ring/box-shadow — letztere wurden in v4 ueber
-       --tw-ring-* Variablen indirekt gerendert und kamen offenbar nicht
-       durch. border ist Teil der Box und unzerstoerbar.
-       Hoehe wird nicht durch border verschoben weil rounded-xl + bg-card schon
-       einen Kasten definiert; 1px Border draufgepfropft. */
     border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
   }
   .kasten:hover:not(:disabled) {
@@ -426,10 +421,29 @@ html, body, *, *::before, *::after {
     border-color: color-mix(in oklab, var(--foreground) 32%, transparent);
   }
   .kasten:disabled { @apply opacity-50 pointer-events-none; }
-  .kasten-red    { @apply text-red-700 dark:text-red-300; }
-  .kasten-blue   { @apply text-blue-700 dark:text-blue-300; }
-  .kasten-green  { @apply text-green-700 dark:text-green-300; }
-  .kasten-purple { @apply text-purple-700 dark:text-purple-300; }
+
+  /* Tone-Varianten — Optik wie die Felder im Donut-Diagramm:
+     2px Stroke in der Tone-Farbe + getoenter Fill (12% Light / 18% Dark).
+     Identische Werte und Farben wie .tinted-X / .donut-segment, damit
+     Buttons und Diagramm-Felder visuell die gleiche Sprache sprechen. */
+  .kasten-red, .kasten-blue, .kasten-green, .kasten-purple { border-width: 2px; }
+  .kasten-red    { @apply text-red-700 dark:text-red-300;       border-color: var(--status-red);    background-color: rgba(220,  38,  38, 0.12); }
+  .kasten-blue   { @apply text-blue-700 dark:text-blue-300;     border-color: var(--status-blue);   background-color: rgba( 37,  99, 235, 0.12); }
+  .kasten-green  { @apply text-green-700 dark:text-green-300;   border-color: var(--status-green);  background-color: rgba(  0, 168, 107, 0.12); }
+  .kasten-purple { @apply text-purple-700 dark:text-purple-300; border-color: var(--status-purple); background-color: rgba(124,  58, 237, 0.12); }
+  .dark .kasten-red    { background-color: rgba(220,  38,  38, 0.18); }
+  .dark .kasten-blue   { background-color: rgba( 37,  99, 235, 0.18); }
+  .dark .kasten-green  { background-color: rgba(  0, 168, 107, 0.18); }
+  .dark .kasten-purple { background-color: rgba(124,  58, 237, 0.18); }
+  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.18); border-color: var(--status-red); }
+  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.18); border-color: var(--status-blue); }
+  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.18); border-color: var(--status-green); }
+  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.18); border-color: var(--status-purple); }
+  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.26); border-color: var(--status-red); }
+  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.26); border-color: var(--status-blue); }
+  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.26); border-color: var(--status-green); }
+  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.26); border-color: var(--status-purple); }
+
   .kasten-muted  { @apply text-foreground/70; }
   .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
   /* Aktiv-Variante: gefuellt + invertiert. Fuer Toggles wie Archiv. */
