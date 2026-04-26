@@ -124,11 +124,11 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm — alle 6 Status, auch wenn count=0 (in der Liste nur, im Donut nur sichtbar wenn >0) */}
+      {/* Kreis-Diagramm — Entwuerfe stehen separat, zaehlen nicht zur Uebersicht */}
       {jobs.length > 0 && (() => {
         const activeJobs = jobs;
+        const entwurfCount = activeJobs.filter((j) => j.status === "entwurf").length;
         const segments = [
-          { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "var(--status-purple)" },
           { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
@@ -141,65 +141,87 @@ export default function AuftraegePage() {
         return (
           <Card className="bg-white">
             <CardContent className="p-5">
-              <h2 className="text-sm font-semibold mb-4">Auftrags-Übersicht</h2>
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="relative shrink-0">
-                  <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
-                    <circle cx={radius + strokeWidth / 2} cy={radius + strokeWidth / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} className="dark:stroke-gray-800" />
-                    {segments.map((s, i) => {
-                      const portion = s.count / total;
-                      const dash = portion * circumference;
-                      const gap = circumference - dash;
-                      const el = (
-                        <circle
-                          key={i}
-                          cx={radius + strokeWidth / 2}
-                          cy={radius + strokeWidth / 2}
-                          r={radius}
-                          fill="none"
-                          stroke={s.color}
-                          strokeWidth={strokeWidth}
-                          strokeDasharray={`${dash} ${gap}`}
-                          strokeDashoffset={-offset}
-                          strokeLinecap="butt"
-                        />
-                      );
-                      offset += dash;
-                      return el;
-                    })}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-bold">{total}</span>
-                    <span className="text-xs text-muted-foreground">Aufträge</span>
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                <h2 className="text-sm font-semibold">Auftrags-Übersicht</h2>
+                {entwurfCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterStatus("entwurf")}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
+                    style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                    title="Filter auf Entwürfe setzen"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                    {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+                  </button>
+                )}
+              </div>
+              {total > 0 ? (
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  <div className="relative shrink-0">
+                    <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
+                      <circle cx={radius + strokeWidth / 2} cy={radius + strokeWidth / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} className="dark:stroke-gray-800" />
+                      {segments.map((s, i) => {
+                        const portion = s.count / total;
+                        const dash = portion * circumference;
+                        const gap = circumference - dash;
+                        const el = (
+                          <circle
+                            key={i}
+                            cx={radius + strokeWidth / 2}
+                            cy={radius + strokeWidth / 2}
+                            r={radius}
+                            fill="none"
+                            stroke={s.color}
+                            strokeWidth={strokeWidth}
+                            strokeDasharray={`${dash} ${gap}`}
+                            strokeDashoffset={-offset}
+                            strokeLinecap="butt"
+                          />
+                        );
+                        offset += dash;
+                        return el;
+                      })}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-3xl font-bold">{total}</span>
+                      <span className="text-xs text-muted-foreground">Aufträge</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 w-full space-y-2">
-                  {segments.map((s) => {
-                    const pct = total > 0 ? (s.count / total) * 100 : 0;
-                    return (
-                      <div
-                        key={s.label}
-                        className={`flex items-center gap-3 ${
-                          s.count === 0 ? "opacity-40" : ""
-                        }`}
-                      >
-                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium truncate">{s.label}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                            </span>
-                          </div>
-                          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
-                            <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                  <div className="flex-1 w-full space-y-2">
+                    {segments.map((s) => {
+                      const pct = total > 0 ? (s.count / total) * 100 : 0;
+                      return (
+                        <div
+                          key={s.label}
+                          className={`flex items-center gap-3 ${
+                            s.count === 0 ? "opacity-40" : ""
+                          }`}
+                        >
+                          <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium truncate">{s.label}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
+                              <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {entwurfCount > 0
+                    ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge."
+                    : "Keine Aufträge vorhanden."}
+                </p>
+              )}
             </CardContent>
           </Card>
         );
