@@ -493,25 +493,6 @@ export default function AuftragDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Warnung: Kein Termin */}
-      {appointments.length === 0 && job && !["abgeschlossen", "storniert"].includes(job.status) && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 shrink-0">
-            <Calendar className="h-5 w-5 text-red-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-red-700">Kein Termin geplant</p>
-            <p className="text-xs text-red-600 mt-0.5">
-              {job.start_date ? (() => {
-                const days = Math.ceil((new Date(job.start_date).getTime() - Date.now()) / 86400000);
-                return days > 0 ? `Auftrag beginnt in ${days} Tag${days === 1 ? "" : "en"}` : days === 0 ? "Auftrag beginnt heute" : `Auftrag hat vor ${Math.abs(days)} Tag${Math.abs(days) === 1 ? "" : "en"} begonnen`;
-              })() : "Kein Startdatum gesetzt"}
-              {" · Bitte Termin erstellen"}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Termine */}
       <Card id="termin-form" className="bg-card scroll-mt-4">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
@@ -556,7 +537,27 @@ export default function AuftragDetailPage() {
               </div>
             </form>
           )}
-          {appointments.length === 0 && !showApptForm && <p className="text-sm text-muted-foreground py-2">Keine Termine.</p>}
+          {appointments.length === 0 && !showApptForm && (
+            !["abgeschlossen", "storniert"].includes(job.status) ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900">
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 shrink-0">
+                  <Calendar className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Kein Termin geplant</p>
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                    {job.start_date ? (() => {
+                      const days = Math.ceil((new Date(job.start_date).getTime() - Date.now()) / 86400000);
+                      return days > 0 ? `Auftrag beginnt in ${days} Tag${days === 1 ? "" : "en"}` : days === 0 ? "Auftrag beginnt heute" : `Auftrag hat vor ${Math.abs(days)} Tag${Math.abs(days) === 1 ? "" : "en"} begonnen`;
+                    })() : "Kein Startdatum gesetzt"}
+                    {" · oben rechts \"Termin\" anlegen"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-2">Keine Termine.</p>
+            )
+          )}
           {appointments.map((appt) => {
             const assignee = (appt as unknown as { assignee: { full_name: string } | null }).assignee;
             return (

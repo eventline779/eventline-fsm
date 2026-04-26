@@ -479,7 +479,7 @@ export default function AuftraegePage() {
                         )}
                       </div>
                       {noTermin && (
-                        <p className="mt-2 text-xs font-medium text-amber-500">
+                        <p className="mt-2 text-xs font-medium text-amber-600/60 dark:text-amber-400/60">
                           Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
                         </p>
                       )}
