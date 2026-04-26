@@ -733,7 +733,7 @@ export default function VertriebPage() {
         const outerR = radius + ringWidth / 2;
         const innerR = radius - ringWidth / 2;
         const ringDiff = outerR - innerR;
-        const outlineWidth = 2.5;
+        const outlineWidth = 3.5;
         const svgPad = Math.ceil(outlineWidth / 2) + 1;
         const cx = outerR + svgPad;
         const cy = outerR + svgPad;
