@@ -781,7 +781,7 @@ export default function VertriebPage() {
                         const largeArc = segAngle > Math.PI ? 1 : 0;
                         const d = `M ${ox1} ${oy1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
                         return (
-                          <path key={i} d={d} fill="none" stroke={s.color} strokeWidth={outlineWidth} strokeLinejoin="round" />
+                          <path key={i} d={d} fill={s.color} stroke={s.color} strokeWidth={outlineWidth} strokeLinejoin="round" className="donut-segment" />
                         );
                       })
                     )}

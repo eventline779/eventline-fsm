@@ -195,10 +195,11 @@ export default function AuftraegePage() {
                             <path
                               key={i}
                               d={d}
-                              fill="none"
+                              fill={s.color}
                               stroke={s.color}
                               strokeWidth={outlineWidth}
                               strokeLinejoin="round"
+                              className="donut-segment"
                             />
                           );
                         })
