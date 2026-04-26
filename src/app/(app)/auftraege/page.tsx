@@ -440,6 +440,7 @@ export default function AuftraegePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
+                        {allGood && <span className="w-2 h-2 rounded-full bg-[var(--status-green)] shrink-0" aria-hidden />}
                         {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
                         <h3 className="font-semibold truncate">{job.title}</h3>
                         {job.status !== "offen" && (
