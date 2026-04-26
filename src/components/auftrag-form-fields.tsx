@@ -84,7 +84,7 @@ export function AuftragFormFields({
   return (
     <>
       {/* Auftragstyp */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {(["location", "extern"] as AuftragJobType[]).map((t) => (
           <button
             key={t}
@@ -102,7 +102,7 @@ export function AuftragFormFields({
       </div>
 
       {/* Was */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <SectionLabel>Titel *</SectionLabel>
         <Input
           id="title"
@@ -113,7 +113,7 @@ export function AuftragFormFields({
           autoFocus
         />
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <SectionLabel>Beschreibung</SectionLabel>
         <textarea
           id="description"
@@ -128,7 +128,7 @@ export function AuftragFormFields({
       <hr className="border-border/50" />
 
       {/* Wo */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <SectionLabel>Wo</SectionLabel>
           <button
@@ -146,7 +146,7 @@ export function AuftragFormFields({
             <AlertCircle className="h-4 w-4" strokeWidth={form.urgent ? 2.5 : 2} />
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {form.job_type === "location" ? (
             <>
               <div className="space-y-1">
@@ -220,9 +220,9 @@ export function AuftragFormFields({
       <hr className="border-border/50" />
 
       {/* Wann */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <SectionLabel>Wann</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
             <Input

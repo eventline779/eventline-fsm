@@ -191,7 +191,7 @@ export default function AuftragBearbeitenPage() {
           e.preventDefault();
           submit("save");
         }}
-        className="rounded-xl border bg-card p-4 space-y-4"
+        className="rounded-xl border bg-card p-5 space-y-5"
       >
         <AuftragFormFields
           form={form}
@@ -202,7 +202,7 @@ export default function AuftragBearbeitenPage() {
         />
 
         {/* Buttons */}
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-3 pt-2">
           <Link href="/auftraege" className="flex-1">
             <Button type="button" variant="outline" size="sm" className="w-full">
               Abbrechen
