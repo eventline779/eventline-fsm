@@ -129,7 +129,7 @@ export default function AuftraegePage() {
         const activeJobs = jobs;
         const entwurfCount = activeJobs.filter((j) => j.status === "entwurf").length;
         const segments = [
-          { label: "Anfragen", count: activeJobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
+          { label: "Mietanfragen", count: activeJobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
           { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },

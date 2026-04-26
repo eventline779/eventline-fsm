@@ -54,11 +54,11 @@ export default function AnfragenPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Vermietungsanfragen</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Mietanfragen</h1>
         <Link href="/anfragen/neu">
           <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
             <Plus className="h-4 w-4 mr-2" />
-            Neue Anfrage
+            Neue Mietanfrage
           </Button>
         </Link>
       </div>
@@ -93,9 +93,9 @@ export default function AnfragenPage() {
         <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-foreground/[0.06] flex items-center justify-center mb-4"><Inbox className="h-7 w-7 text-muted-foreground" /></div>
-            <h3 className="font-semibold text-lg">{search || filterStep !== "all" ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Vermietungsanfragen"}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{search || filterStep !== "all" ? "Versuche andere Filter." : "Erstelle die erste Anfrage."}</p>
-            {!search && filterStep === "all" && <Link href="/anfragen/neu"><Button className="mt-5 bg-red-600 hover:bg-red-700 text-white"><Plus className="h-4 w-4 mr-2" />Erste Anfrage erstellen</Button></Link>}
+            <h3 className="font-semibold text-lg">{search || filterStep !== "all" ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Mietanfragen"}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{search || filterStep !== "all" ? "Versuche andere Filter." : "Erstelle die erste Mietanfrage."}</p>
+            {!search && filterStep === "all" && <Link href="/anfragen/neu"><Button className="mt-5 bg-red-600 hover:bg-red-700 text-white"><Plus className="h-4 w-4 mr-2" />Erste Mietanfrage erstellen</Button></Link>}
           </CardContent>
         </Card>
       ) : (
@@ -112,7 +112,7 @@ export default function AnfragenPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 flex-wrap">
                           <JobNumber number={req.job_number} />
-                          <h3 className="font-semibold truncate">{req.title || "Vermietungsanfrage"}</h3>
+                          <h3 className="font-semibold truncate">{req.title || "Mietanfrage"}</h3>
                         </div>
                         <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
                           {customerName && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{customerName}</span>}

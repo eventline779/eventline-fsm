@@ -95,7 +95,7 @@ export default function NeueAnfragePage() {
       setSaving(false);
       return;
     }
-    toast.success(`Anfrage INT-${inserted.job_number} angelegt`);
+    toast.success(`Mietanfrage INT-${inserted.job_number} angelegt`);
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push(`/anfragen/${inserted.id}`);
   }
@@ -281,7 +281,7 @@ export default function NeueAnfragePage() {
             className="flex-1 bg-red-600 hover:bg-red-700 text-white"
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
-            {saving ? "Anlegen…" : "Anfrage anlegen"}
+            {saving ? "Anlegen…" : "Mietanfrage anlegen"}
           </Button>
         </div>
       </form>

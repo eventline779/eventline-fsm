@@ -512,7 +512,7 @@ export default function HeutePage() {
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground">Neue Anfragen</p>
+                      <p className="text-xs text-muted-foreground">Neue Mietanfragen</p>
                       <p className="text-2xl font-bold mt-1">
                         {adminStats.neueAnfragen}
                       </p>

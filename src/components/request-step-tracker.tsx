@@ -1,6 +1,6 @@
 "use client";
 
-// Eine zentrale Stelle fuer den 5-Step-Akquise-Tracker einer Vermietungsanfrage.
+// Eine zentrale Stelle fuer den 5-Step-Akquise-Tracker einer Mietanfrage.
 // Wird in der Liste (kompakt) und im Detail (gross) verwendet — eine Quelle der Wahrheit
 // fuer Look + Logik. Die Schritte selbst kommen aus REQUEST_STEPS in constants.ts.
 

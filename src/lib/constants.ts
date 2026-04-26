@@ -11,7 +11,7 @@ export const JOB_STATUS = {
   storniert: { label: "Storniert", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
 
-// === Vermietungsanfrage-Pipeline ===
+// === Mietanfrage-Pipeline ===
 // 5 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
 // Labels formuliert als ERREICHTER ZUSTAND — selbsterklaerend, keine Sub-Beschreibung noetig.
 // Single source of truth — sowohl Step-Tracker-UI als auch Listen-Filter ziehen daraus.
@@ -91,7 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Buchungen",
     items: [
-      { href: "/anfragen", label: "Vermietungsanfragen", icon: "Inbox", simplified: true, mobile: true },
+      { href: "/anfragen", label: "Mietanfragen", icon: "Inbox", simplified: true, mobile: true },
       { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", simplified: true },
       { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
     ],

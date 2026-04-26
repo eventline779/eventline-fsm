@@ -49,7 +49,7 @@ export default function AnfrageDetailPage() {
       .eq("id", id)
       .single();
     if (error || !data) {
-      toast.error("Anfrage nicht gefunden");
+      toast.error("Mietanfrage nicht gefunden");
       router.push("/anfragen");
       return;
     }
@@ -135,7 +135,7 @@ export default function AnfrageDetailPage() {
     }
     setCancelPhase("closed");
     setCancelReason("");
-    toast.success("Anfrage storniert");
+    toast.success("Mietanfrage storniert");
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push("/anfragen");
   }
@@ -190,7 +190,7 @@ export default function AnfrageDetailPage() {
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {isCancelled ? "Vermietungsanfrage · storniert" : "Vermietungsanfrage · noch nicht freigegeben"}
+            {isCancelled ? "Mietanfrage · storniert" : "Mietanfrage · noch nicht freigegeben"}
           </p>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function AnfrageDetailPage() {
                   onClick={advanceStep}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {isLastStep ? "Anfrage abschliessen" : "Nächster Schritt"}
+                  {isLastStep ? "Mietanfrage abschliessen" : "Nächster Schritt"}
                   <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                 </Button>
               </div>
@@ -252,7 +252,7 @@ export default function AnfrageDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <FileText className="h-4 w-4" />Anfrage-Details
+            <FileText className="h-4 w-4" />Mietanfrage-Details
           </CardTitle>
         </CardHeader>
         <CardContent className="p-5 pt-0 space-y-3">
@@ -352,7 +352,7 @@ export default function AnfrageDetailPage() {
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="flex items-center justify-between px-6 py-4 border-b">
                 <h2 className="font-semibold">
-                  {cancelPhase === "confirm" ? "Anfrage stornieren?" : "Grund angeben"}
+                  {cancelPhase === "confirm" ? "Mietanfrage stornieren?" : "Grund angeben"}
                 </h2>
                 <button
                   onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
@@ -429,7 +429,7 @@ export default function AnfrageDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
               <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Anfrage in Auftrag umwandeln?</h2>
+                <h2 className="font-semibold">Mietanfrage in Auftrag umwandeln?</h2>
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-muted-foreground">
@@ -439,7 +439,7 @@ export default function AnfrageDetailPage() {
                   <Check className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium">Akquise abgeschlossen</p>
-                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus der Anfrage wird jetzt ein echter Auftrag.</p>
+                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus der Mietanfrage wird jetzt ein echter Auftrag.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
