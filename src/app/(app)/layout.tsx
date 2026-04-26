@@ -132,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="bg-sidebar text-sidebar-foreground border-sidebar-border w-[280px] p-0">
+        <SheetContent side="left" className="bg-sidebar text-sidebar-foreground border-sidebar-border w-[280px] p-0 font-heading">
           <SheetHeader className="px-6 py-6 border-b border-sidebar-border">
             <SheetTitle className="text-left">
               <Logo size="md" />
