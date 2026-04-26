@@ -301,7 +301,8 @@ export default function AuftraegePage() {
             const appointments = (job as any).appointments as { id: string; start_time: string }[] | null;
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
-            const noTermin = isActive && !hasAppointment;
+            // Bei Entwurf macht Terminplanung noch keinen Sinn -> Hinweis und CalendarPlus unterdruecken.
+            const noTermin = isActive && !hasAppointment && job.status !== "entwurf";
             const allGood = isActive && hasAppointment && job.status !== "entwurf";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
