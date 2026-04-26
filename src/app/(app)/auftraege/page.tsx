@@ -352,11 +352,6 @@ export default function AuftraegePage() {
                           </span>
                         )}
                       </div>
-                      {noTermin && (
-                        <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                        </p>
-                      )}
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
@@ -364,7 +359,8 @@ export default function AuftraegePage() {
                     {/* Action-Buttons rechts: zwei feste Slots, damit Pencil/Check und CalendarPlus/Check
                         stets an derselben X-Position bleiben — unabhaengig davon, welche
                         Aktion gerade zutrifft. Slot 1 = Pencil (entwurf), Slot 2 = CalendarPlus (kein Termin)
-                        oder gruener Check (allGood). */}
+                        oder gruener Check (allGood). Bei "kein Termin" steht der amber Hinweistext
+                        direkt links neben dem CalendarPlus-Icon. */}
                     {(noTermin || job.status === "entwurf" || allGood) && (
                       <div className="flex items-center gap-0.5 shrink-0">
                         <div className="w-10 h-10 flex items-center justify-center">
@@ -384,6 +380,11 @@ export default function AuftraegePage() {
                             </button>
                           )}
                         </div>
+                        {noTermin && (
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
+                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
+                          </span>
+                        )}
                         <div className="w-10 h-10 flex items-center justify-center">
                           {noTermin ? (
                             <button
