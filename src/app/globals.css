@@ -85,7 +85,7 @@
   /* Diagramm-Status-Farben: Originale, kraeftige Tailwind-Farben */
   --status-purple: #a855f7;
   --status-gray: #9ca3af;
-  --status-green: #16a34a;
+  --status-green: #006039;
   --status-red: #dc2626;
   --status-blue: #3b82f6;
   --status-orange: #f97316;
@@ -127,7 +127,7 @@
   /* Diagramm-Status-Farben Dark: gleiche Originale wie Light */
   --status-purple: #a855f7;
   --status-gray: #9ca3af;
-  --status-green: #16a34a;
+  --status-green: #006039;
   --status-red: #dc2626;
   --status-blue: #3b82f6;
   --status-orange: #f97316;
