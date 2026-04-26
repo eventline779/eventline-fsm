@@ -210,10 +210,10 @@ export default function AuftragBearbeitenPage() {
           </Link>
           <Button
             type="submit"
-            variant={isDraft ? "outline" : "default"}
+            variant={isDraft ? "outline" : undefined}
             size="sm"
             disabled={saving !== null}
-            className="flex-1"
+            className={isDraft ? "flex-1" : "flex-1 bg-red-600 hover:bg-red-700 text-white"}
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
             {saving === "save" ? "Speichert…" : "Speichern"}
@@ -224,7 +224,7 @@ export default function AuftragBearbeitenPage() {
               size="sm"
               disabled={saving !== null}
               onClick={() => submit("publish")}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
             >
               <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
               {saving === "publish" ? "Speichert…" : "Freigeben"}

@@ -202,7 +202,7 @@ export default function NeuerAuftragPage() {
             type="submit"
             size="sm"
             disabled={saving !== null}
-            className="flex-1"
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
             {saving === "create" ? "Speichert…" : "Auftrag erstellen"}
