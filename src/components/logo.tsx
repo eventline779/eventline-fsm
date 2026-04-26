@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
+
 interface LogoProps {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
 
-// viewBox 460:100 (Aspect 4.6:1). Hoehe wird aus der Breite abgeleitet.
+// Native PNG-Aspect 800:185 (~ 4.32:1). Hoehe wird aus der Breite abgeleitet.
 const widths = {
   sm: 130,
   md: 180,
@@ -13,53 +15,30 @@ const widths = {
   xl: 320,
 };
 
+const SRC_LIGHT_MODE = "/logo-gmbh-black.png"; // schwarzes Logo + roter I
+const SRC_DARK_MODE = "/logo-gmbh.png"; // weisses Logo + roter I
+
 export function Logo({ size = "md", className }: LogoProps) {
   const w = widths[size];
-  const h = Math.round((w * 100) / 460);
+  const h = Math.round((w * 185) / 800);
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 460 100"
-      width={w}
-      height={h}
-      className={`text-foreground ${className ?? ""}`}
-      aria-label="EVENTLINE GmbH"
-      role="img"
-    >
-      <text
-        x="0"
-        y="72"
-        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
-        fontWeight={900}
-        fontSize={72}
-        letterSpacing={-3}
-        fill="currentColor"
-      >
-        EVENTL
-      </text>
-      <rect x="263" y="22" width="20" height="50" fill="#E53935" />
-      <text
-        x="287"
-        y="72"
-        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
-        fontWeight={900}
-        fontSize={72}
-        letterSpacing={-3}
-        fill="currentColor"
-      >
-        NE
-      </text>
-      <text
-        x="335"
-        y="94"
-        fontFamily="'Arial Black','Impact','Helvetica Neue',Helvetica,Arial,sans-serif"
-        fontWeight={900}
-        fontSize={18}
-        letterSpacing={0}
-        fill="currentColor"
-      >
-        GmbH
-      </text>
-    </svg>
+    <span className={`inline-block ${className ?? ""}`} style={{ width: w, height: h }}>
+      <Image
+        src={SRC_LIGHT_MODE}
+        alt="EVENTLINE GmbH"
+        width={w}
+        height={h}
+        className="object-contain h-auto block dark:hidden"
+        priority
+      />
+      <Image
+        src={SRC_DARK_MODE}
+        alt="EVENTLINE GmbH"
+        width={w}
+        height={h}
+        className="object-contain h-auto hidden dark:block"
+        priority
+      />
+    </span>
   );
 }

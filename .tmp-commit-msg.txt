@@ -1,0 +1,19 @@
+Logo: echte PNG-Dateien statt Text-SVG
+
+Pixel-Inspektion der vorhandenen Logo-Dateien:
+- logo-light.png: opak ohne Alpha, weisses Logo auf eingebranntem schwarzem
+  Hintergrund - daher der schwarze Block im Light-Mode.
+- logo-dark.png: 1536x1024 mit 97 Prozent transparentem Padding - daher
+  das "viel zu klein" Erlebnis.
+- logo-gmbh.png: 800x185, 51 Prozent transparent, weisses Logo mit rotem
+  I-Balken und GmbH-Subtext, sauber gecroppt - die brauchbare Quelle.
+
+Loesung:
+1. logo-gmbh-black.png einmalig aus logo-gmbh.png erzeugt (Pixel-Skript:
+   weisse Pixel zu schwarz, rote bleiben rot, transparente bleiben
+   transparent). Exakt dasselbe Logo-Bild, nur die Textfarbe invertiert.
+2. logo.tsx nutzt jetzt next/image mit beiden PNGs und schaltet ueber
+   block/dark:hidden, sodass das schwarze Logo im Light-Mode und das
+   weisse Logo im Dark-Mode erscheint.
+
+Echte Bilddateien des Users im Einsatz, kein selbstgerenderter Text.
