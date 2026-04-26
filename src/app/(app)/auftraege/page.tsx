@@ -401,7 +401,7 @@ export default function AuftraegePage() {
                             </button>
                           ) : allGood ? (
                             <span
-                              className="p-2 rounded-lg inline-flex bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                              className="p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex"
                               aria-label="Alles bereit"
                               title="Alles bereit"
                             >
