@@ -82,14 +82,14 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Light: -400er Stufe (kraeftig genug, kein Pastell-Verschwimmen) */
-  --status-purple: #c084fc;
+  /* Diagramm-Status-Farben: Originale, kraeftige Tailwind-Farben */
+  --status-purple: #a855f7;
   --status-gray: #9ca3af;
-  --status-green: #4ade80;
-  --status-red: #f87171;
-  --status-blue: #60a5fa;
-  --status-orange: #fb923c;
-  --status-emerald: #34d399;
+  --status-green: #16a34a;
+  --status-red: #dc2626;
+  --status-blue: #3b82f6;
+  --status-orange: #f97316;
+  --status-emerald: #059669;
 }
 
 .dark {
@@ -124,14 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Dark: -300er Stufe (heller fuer guten Kontrast gegen dunkle BG) */
-  --status-purple: #d8b4fe;
+  /* Diagramm-Status-Farben Dark: gleiche Originale wie Light */
+  --status-purple: #a855f7;
   --status-gray: #9ca3af;
-  --status-green: #86efac;
-  --status-red: #fca5a5;
-  --status-blue: #93c5fd;
-  --status-orange: #fdba74;
-  --status-emerald: #6ee7b7;
+  --status-green: #16a34a;
+  --status-red: #dc2626;
+  --status-blue: #3b82f6;
+  --status-orange: #f97316;
+  --status-emerald: #059669;
 }
 
 @layer base {
