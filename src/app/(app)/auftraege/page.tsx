@@ -141,21 +141,7 @@ export default function AuftraegePage() {
         return (
           <Card className="bg-white">
             <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-                <h2 className="text-sm font-semibold">Auftrags-Übersicht</h2>
-                {entwurfCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterStatus("entwurf")}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
-                    style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
-                    title="Filter auf Entwürfe setzen"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
-                    {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-                  </button>
-                )}
-              </div>
+              <h2 className="text-sm font-semibold mb-4">Auftrags-Übersicht</h2>
               {total > 0 ? (
                 <div className="flex flex-col md:flex-row items-center gap-6">
                   <div className="relative shrink-0">
@@ -221,6 +207,20 @@ export default function AuftraegePage() {
                     ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge."
                     : "Keine Aufträge vorhanden."}
                 </p>
+              )}
+              {entwurfCount > 0 && total > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setFilterStatus("entwurf")}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
+                    style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                    title="Filter auf Entwürfe setzen"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                    {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+                  </button>
+                </div>
               )}
             </CardContent>
           </Card>
