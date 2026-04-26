@@ -301,7 +301,6 @@ export default function AuftraegePage() {
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const noTermin = isActive && !hasAppointment;
-            const allGood = isActive && hasAppointment && job.status !== "entwurf";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
@@ -311,8 +310,6 @@ export default function AuftraegePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
-                        {/* Punkt-Slot immer reserviert, damit INT-Nummer + Titel unabhaengig vom Status an gleicher X-Position bleiben */}
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${allGood ? "bg-[var(--status-green)]" : "invisible"}`} aria-hidden />
                         <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                         {job.status !== "offen" && (
