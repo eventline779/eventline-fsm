@@ -74,6 +74,8 @@ export interface Job {
   event_type: string | null;
   guest_count: number | null;
   extended_services: string | null;
+  // Bleibt TRUE auch nach Konvertierung/Stornierung — fuer Lifecycle-Auswertung der Mietanfragen
+  was_anfrage: boolean;
   // Storno-Metadaten — gefuellt wenn status='storniert'
   cancelled_by: string | null;
   cancelled_at: string | null;

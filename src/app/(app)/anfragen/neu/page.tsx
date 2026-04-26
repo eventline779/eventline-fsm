@@ -86,6 +86,7 @@ export default function NeueAnfragePage() {
         event_type: form.event_type.trim(),
         guest_count: parseInt(form.guest_count, 10),
         extended_services: form.extended_services.trim() || null,
+        was_anfrage: true,
         created_by: user?.id,
       })
       .select("id, job_number")

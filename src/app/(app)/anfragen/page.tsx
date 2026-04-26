@@ -13,18 +13,14 @@ import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
 import { DonutChart } from "@/components/donut-chart";
 
-// Farbe pro Schritt — gleicher CSS-Var-Pool wie der Auftraege-Donut.
-// Progression: neutral start -> blau/lila/orange (mid) -> emerald (final).
-const STEP_COLORS = [
-  "var(--status-gray)",
-  "var(--status-blue)",
-  "var(--status-purple)",
-  "var(--status-orange)",
-  "var(--status-emerald)",
-];
+// Lifecycle-Outcome der Mietanfragen: Offen / Auftrag erstellt / Storniert.
+// Quelle: jobs.was_anfrage=true plus aktueller Status (anfrage = offen,
+// entwurf/offen/abgeschlossen = konvertiert, storniert = abgelehnt).
+type Outcome = { open: number; converted: number; cancelled: number };
 
 export default function AnfragenPage() {
   const [requests, setRequests] = useState<Job[]>([]);
+  const [outcome, setOutcome] = useState<Outcome>({ open: 0, converted: 0, cancelled: 0 });
   const [search, setSearch] = useState("");
   const [filterStep, setFilterStep] = useState<number | "all">("all");
   const [loading, setLoading] = useState(true);
@@ -42,13 +38,28 @@ export default function AnfragenPage() {
   }, []);
 
   async function loadRequests() {
-    const { data } = await supabase
-      .from("jobs")
-      .select("*, customer:customers(name), location:locations(name)")
-      .eq("status", "anfrage")
-      .neq("is_deleted", true)
-      .order("created_at", { ascending: false });
-    if (data) setRequests(data as unknown as Job[]);
+    const [listRes, outcomeRes] = await Promise.all([
+      supabase
+        .from("jobs")
+        .select("*, customer:customers(name), location:locations(name)")
+        .eq("status", "anfrage")
+        .neq("is_deleted", true)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("jobs")
+        .select("status")
+        .eq("was_anfrage", true)
+        .neq("is_deleted", true),
+    ]);
+    if (listRes.data) setRequests(listRes.data as unknown as Job[]);
+    if (outcomeRes.data) {
+      const rows = outcomeRes.data as { status: string }[];
+      setOutcome({
+        open: rows.filter((r) => r.status === "anfrage").length,
+        converted: rows.filter((r) => ["entwurf", "offen", "abgeschlossen"].includes(r.status)).length,
+        cancelled: rows.filter((r) => r.status === "storniert").length,
+      });
+    }
     setLoading(false);
   }
 
@@ -78,21 +89,18 @@ export default function AnfragenPage() {
         </div>
       </div>
 
-      {/* Diagramm — Verteilung der aktiven Anfragen ueber die 5 Pipeline-Schritte */}
-      {requests.length > 0 && (() => {
-        const segments = REQUEST_STEPS.map((step, i) => ({
-          label: `${step.step}. ${step.label}`,
-          count: requests.filter((r) => r.request_step === step.step).length,
-          color: STEP_COLORS[i],
-        }));
-        return (
-          <DonutChart
-            segments={segments}
-            centerLabel="Mietanfragen"
-            emptyMessage="Keine aktiven Mietanfragen."
-          />
-        );
-      })()}
+      {/* Diagramm — Lifecycle-Outcome aller Mietanfragen (offen / konvertiert / storniert) */}
+      {(outcome.open + outcome.converted + outcome.cancelled) > 0 && (
+        <DonutChart
+          segments={[
+            { label: "Offen", count: outcome.open, color: "var(--status-blue)" },
+            { label: "Auftrag erstellt", count: outcome.converted, color: "var(--status-emerald)" },
+            { label: "Storniert", count: outcome.cancelled, color: "var(--status-red)" },
+          ]}
+          centerLabel="Mietanfragen"
+          emptyMessage="Keine Mietanfragen bisher."
+        />
+      )}
 
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
