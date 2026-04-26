@@ -357,26 +357,29 @@ html, body, *, *::before, *::after {
    In @layer utilities platziert — innerhalb dieses Layers gewinnt source-order,
    und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
    Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
-  /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border in derselben Farbe.
+  /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border + dezenterer Text.
      Optik wie Donut-Segmente. Pro Farbe eine self-contained Klasse mit rgba — keine
      CSS-Variable-Indirection, keine color-mix-Funktion. Robust ueber alle Browser.
-     Verwendung: <div className="tinted-amber border"> (border-Klasse fuer 2px-Stripe). */
-  .tinted-amber   { background-color: rgba(245, 158,  11, 0.12); border-color: #f59e0b; color: #f59e0b; }
-  .tinted-blue    { background-color: rgba( 37,  99, 235, 0.12); border-color: #2563eb; color: #2563eb; }
-  .tinted-green   { background-color: rgba(  0, 168, 107, 0.12); border-color: #00a86b; color: #00a86b; }
-  .tinted-red     { background-color: rgba(220,  38,  38, 0.12); border-color: #dc2626; color: #dc2626; }
-  .tinted-purple  { background-color: rgba(124,  58, 237, 0.12); border-color: #7c3aed; color: #7c3aed; }
-  .tinted-orange  { background-color: rgba(234,  88,  12, 0.12); border-color: #ea580c; color: #ea580c; }
-  .tinted-emerald { background-color: rgba(  4, 120,  87, 0.12); border-color: #047857; color: #047857; }
-  .tinted-gray    { background-color: rgba(100, 116, 139, 0.12); border-color: #64748b; color: #64748b; }
-  .dark .tinted-amber   { background-color: rgba(245, 158,  11, 0.18); }
-  .dark .tinted-blue    { background-color: rgba( 37,  99, 235, 0.18); }
-  .dark .tinted-green   { background-color: rgba(  0, 168, 107, 0.18); }
-  .dark .tinted-red     { background-color: rgba(220,  38,  38, 0.18); }
-  .dark .tinted-purple  { background-color: rgba(124,  58, 237, 0.18); }
-  .dark .tinted-orange  { background-color: rgba(234,  88,  12, 0.18); }
-  .dark .tinted-emerald { background-color: rgba(  4, 120,  87, 0.18); }
-  .dark .tinted-gray    { background-color: rgba(100, 116, 139, 0.18); }
+     Verwendung: <div className="tinted-amber border">.
+     Text-Stufen:
+       Light-Mode: -700 (dunkler, weniger knallig auf hellem getoentem Hintergrund)
+       Dark-Mode:  -300 (heller, besserer Kontrast gegen dunklen getoenten Hintergrund) */
+  .tinted-amber   { background-color: rgba(245, 158,  11, 0.12); border-color: #f59e0b; color: #b45309; } /* amber-700 */
+  .tinted-blue    { background-color: rgba( 37,  99, 235, 0.12); border-color: #2563eb; color: #1d4ed8; } /* blue-700 */
+  .tinted-green   { background-color: rgba(  0, 168, 107, 0.12); border-color: #00a86b; color: #006847; } /* Jade dark */
+  .tinted-red     { background-color: rgba(220,  38,  38, 0.12); border-color: #dc2626; color: #b91c1c; } /* red-700 */
+  .tinted-purple  { background-color: rgba(124,  58, 237, 0.12); border-color: #7c3aed; color: #6d28d9; } /* violet-700 */
+  .tinted-orange  { background-color: rgba(234,  88,  12, 0.12); border-color: #ea580c; color: #c2410c; } /* orange-700 */
+  .tinted-emerald { background-color: rgba(  4, 120,  87, 0.12); border-color: #047857; color: #065f46; } /* emerald-800 */
+  .tinted-gray    { background-color: rgba(100, 116, 139, 0.12); border-color: #64748b; color: #334155; } /* slate-700 */
+  .dark .tinted-amber   { background-color: rgba(245, 158,  11, 0.18); color: #fcd34d; } /* amber-300 */
+  .dark .tinted-blue    { background-color: rgba( 37,  99, 235, 0.18); color: #93c5fd; } /* blue-300 */
+  .dark .tinted-green   { background-color: rgba(  0, 168, 107, 0.18); color: #6ee7b7; } /* Jade light */
+  .dark .tinted-red     { background-color: rgba(220,  38,  38, 0.18); color: #fca5a5; } /* red-300 */
+  .dark .tinted-purple  { background-color: rgba(124,  58, 237, 0.18); color: #c4b5fd; } /* violet-300 */
+  .dark .tinted-orange  { background-color: rgba(234,  88,  12, 0.18); color: #fdba74; } /* orange-300 */
+  .dark .tinted-emerald { background-color: rgba(  4, 120,  87, 0.18); color: #6ee7b7; } /* emerald-300 */
+  .dark .tinted-gray    { background-color: rgba(100, 116, 139, 0.18); color: #cbd5e1; } /* slate-300 */
   .tinted-amber:hover   { background-color: rgba(245, 158,  11, 0.18); }
   .tinted-blue:hover    { background-color: rgba( 37,  99, 235, 0.18); }
   .tinted-green:hover   { background-color: rgba(  0, 168, 107, 0.18); }
