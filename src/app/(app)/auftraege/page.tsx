@@ -441,7 +441,8 @@ export default function AuftraegePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
-                        {allGood && <span className="w-2 h-2 rounded-full bg-[var(--status-green)] shrink-0" aria-hidden />}
+                        {/* Punkt-Slot immer reserviert, damit INT-Nummer + Titel unabhaengig vom Status an gleicher X-Position bleiben */}
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${allGood ? "bg-[var(--status-green)]" : "invisible"}`} aria-hidden />
                         <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                         {job.status !== "offen" && (
