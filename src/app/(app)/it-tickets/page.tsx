@@ -66,10 +66,14 @@ export default function ITTicketsPage() {
           <h1 className="text-2xl font-bold tracking-tight">IT-Tickets</h1>
           <p className="text-sm text-muted-foreground mt-1">IT-Probleme melden – Tickets gehen an Mischa Dittus (IT)</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-          {showForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+        <button
+          type="button"
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+        >
+          {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
           {showForm ? "Abbrechen" : "Neues Ticket"}
-        </Button>
+        </button>
       </div>
 
       {showForm && (
@@ -133,9 +137,13 @@ export default function ITTicketsPage() {
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
               Hast du ein technisches Problem? Erstelle ein IT-Ticket und Mischa (IT) wird sich darum kümmern.
             </p>
-            <Button onClick={() => setShowForm(true)} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />Neues Ticket erstellen
-            </Button>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="mt-4 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />Neues Ticket erstellen
+            </button>
           </CardContent>
         </Card>
       )}

@@ -32,10 +32,12 @@ export default function RapportePage() {
           <h1 className="text-2xl font-bold tracking-tight">Einsatzrapporte</h1>
           <p className="text-sm text-muted-foreground mt-1">{reports.length} Rapporte</p>
         </div>
-        <Link href="/rapporte/neu">
-          <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />Neuer Rapport
-          </Button>
+        <Link
+          href="/rapporte/neu"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Neuer Rapport
         </Link>
       </div>
 
@@ -47,7 +49,13 @@ export default function RapportePage() {
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><FileText className="h-7 w-7 text-gray-400" /></div>
             <h3 className="font-semibold text-lg">Noch keine Rapporte</h3>
             <p className="text-sm text-muted-foreground mt-1">Erstelle deinen ersten Einsatzrapport.</p>
-            <Link href="/rapporte/neu"><Button className="mt-5 bg-red-600 hover:bg-red-700 text-white"><Plus className="h-4 w-4 mr-2" />Ersten Rapport erstellen</Button></Link>
+            <Link
+              href="/rapporte/neu"
+              className="mt-5 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ersten Rapport erstellen
+            </Link>
           </CardContent>
         </Card>
       ) : (

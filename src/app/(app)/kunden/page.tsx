@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { CUSTOMER_TYPES } from "@/lib/constants";
@@ -79,10 +78,12 @@ export default function KundenPage() {
           <h1 className="text-2xl font-bold tracking-tight">Kunden</h1>
           <p className="text-sm text-muted-foreground mt-1">{customers.length} Kunden gesamt</p>
         </div>
-        <Link href="/kunden/neu">
-          <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />Neuer Kunde
-          </Button>
+        <Link
+          href="/kunden/neu"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Neuer Kunde
         </Link>
       </div>
 

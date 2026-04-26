@@ -78,13 +78,14 @@ export default function StandortePage() {
             {locations.length} {locations.length === 1 ? "Standort" : "Standorte"}
           </p>
         </div>
-        <Button
+        <button
+          type="button"
           onClick={() => setShowForm(!showForm)}
-          className="bg-red-600 hover:bg-red-700 text-white shadow-sm"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-3.5 w-3.5" />
           Neuer Standort
-        </Button>
+        </button>
       </div>
 
       {/* Inline Form */}

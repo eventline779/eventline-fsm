@@ -384,13 +384,14 @@ export default function EinstellungenPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">{profiles.length} Mitglieder</p>
-            <Button
+            <button
+              type="button"
               onClick={() => setShowAdd(!showAdd)}
-              className="bg-red-600 hover:bg-red-700 text-white shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
             >
-              {showAdd ? <X className="h-4 w-4 mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+              {showAdd ? <X className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
               {showAdd ? "Abbrechen" : "Hinzufügen"}
-            </Button>
+            </button>
           </div>
 
           {/* Quick Add */}

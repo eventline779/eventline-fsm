@@ -280,9 +280,14 @@ export default function TicketsPage() {
             </div>
             <h3 className="font-semibold text-lg">Ticket eingereicht</h3>
             <p className="text-sm text-muted-foreground mt-1">Du bekommst eine E-Mail sobald dein Ticket bearbeitet wurde.</p>
-            <Button onClick={() => { setSubmitted(false); setShowForm(true); }} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />Weiteres Ticket erstellen
-            </Button>
+            <button
+              type="button"
+              onClick={() => { setSubmitted(false); setShowForm(true); }}
+              className="mt-4 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Weiteres Ticket erstellen
+            </button>
           </CardContent>
         </Card>
       </div>
@@ -296,10 +301,14 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Tickets</h1>
           <p className="text-sm text-muted-foreground mt-1">{isAdmin ? "Alle Tickets verwalten" : "Bestellungen, IT-Probleme, Reparaturen anfragen"}</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-          {showForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+        <button
+          type="button"
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+        >
+          {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
           {showForm ? "Abbrechen" : "Neues Ticket"}
-        </Button>
+        </button>
       </div>
 
       {showForm && (

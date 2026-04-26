@@ -182,17 +182,19 @@ export default function AuftraegePage() {
           </button>
           {!showArchive && (
             <>
-              <Link href="/auftraege/vermietentwurf/neu">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Neuer Vermietentwurf
-                </Button>
+              <Link
+                href="/auftraege/vermietentwurf/neu"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-blue-300 dark:border-blue-500/40 bg-card text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Neuer Vermietentwurf
               </Link>
-              <Link href="/auftraege/neu">
-                <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Neuer Auftrag
-                </Button>
+              <Link
+                href="/auftraege/neu"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Neuer Auftrag
               </Link>
             </>
           )}
@@ -358,18 +360,20 @@ export default function AuftraegePage() {
                     Filter zurücksetzen
                   </Button>
                 ) : (
-                  <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
-                    <Link href="/auftraege/vermietentwurf/neu">
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Neuer Vermietentwurf
-                      </Button>
+                  <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+                    <Link
+                      href="/auftraege/vermietentwurf/neu"
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-blue-300 dark:border-blue-500/40 bg-card text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Neuer Vermietentwurf
                     </Link>
-                    <Link href="/auftraege/neu">
-                      <Button className="bg-red-600 hover:bg-red-700 text-white">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Neuer Auftrag
-                      </Button>
+                    <Link
+                      href="/auftraege/neu"
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-300 dark:border-red-500/40 bg-card text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Neuer Auftrag
                     </Link>
                   </div>
                 )}
@@ -443,22 +447,15 @@ export default function AuftraegePage() {
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
-                      {/* Footer-Sektion: identische Hoehe pro Karte. Vermietentwurf zeigt
-                          den 5-Kreis-Step-Tracker, andere Stati eine kurze Status-Info-Zeile
-                          (Termin, Abgeschlossen-Datum, etc.). */}
-                      <div className="mt-3 pt-3 border-t border-foreground/[0.06] min-h-[28px] flex items-center">
-                        {isAnfrage ? (
+                      {/* Vermietentwurf zeigt den 5-Kreis-Step-Tracker im Footer.
+                          Bei normalen Auftraegen sagt das Icon rechts (Termin/Check/Pencil)
+                          alles — kein Zusatz-Text noetig. Cards duerfen unterschiedlich
+                          hoch sein. */}
+                      {isAnfrage && (
+                        <div className="mt-3 pt-3 border-t border-foreground/[0.06]">
                           <RequestStepTracker currentStep={currentStep} size="sm" />
-                        ) : (
-                          <p className="text-[11px] text-muted-foreground">
-                            {job.status === "entwurf" && "Entwurf · vor Freigabe ergänzen"}
-                            {job.status === "offen" && hasAppointment && "Termin geplant"}
-                            {job.status === "offen" && !hasAppointment && "Termin noch zu planen"}
-                            {job.status === "abgeschlossen" && "Abgeschlossen"}
-                            {job.status === "storniert" && "Storniert"}
-                          </p>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                     {/* Action-Slot rechts: Anfragen bekommen einen "Nächster Schritt"-Button mit
                         Text, sodass das Weiterklicken ohne Detail-Seite geht. Bei Entwurf/kein Termin/
