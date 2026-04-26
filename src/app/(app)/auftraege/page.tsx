@@ -124,12 +124,11 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm — Entwuerfe stehen separat, Anfragen als blaues Segment im Donut */}
+      {/* Kreis-Diagramm — Entwuerfe stehen separat, Mietanfragen leben unter /anfragen */}
       {jobs.length > 0 && (() => {
         const activeJobs = jobs;
         const entwurfCount = activeJobs.filter((j) => j.status === "entwurf").length;
         const segments = [
-          { label: "Mietanfragen", count: activeJobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
           { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
