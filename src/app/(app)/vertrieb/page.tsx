@@ -732,13 +732,14 @@ export default function VertriebPage() {
         const ringWidth = 18;
         const outerR = radius + ringWidth / 2;
         const innerR = radius - ringWidth / 2;
-        const svgPad = 2;
+        const ringDiff = outerR - innerR;
+        const outlineWidth = 2.5;
+        const svgPad = Math.ceil(outlineWidth / 2) + 1;
         const cx = outerR + svgPad;
         const cy = outerR + svgPad;
         const svgSize = outerR * 2 + svgPad * 2;
-        const gapAngle = segments.length > 1 ? 0.06 : 0;
-        const outlineWidth = 1.5;
-        let cumulativeAngle = -Math.PI / 2;
+        const gapAngle = segments.length > 1 ? 0.08 : 0;
+        let cumulativeGapMid = -Math.PI / 2;
 
         return (
           <Card className="bg-white">
@@ -758,19 +759,27 @@ export default function VertriebPage() {
                       segments.map((s, i) => {
                         const portion = s.count / total;
                         const segAngle = portion * 2 * Math.PI - gapAngle;
-                        const startA = cumulativeAngle;
-                        const endA = cumulativeAngle + segAngle;
-                        cumulativeAngle = endA + gapAngle;
-                        const x1 = cx + outerR * Math.cos(startA);
-                        const y1 = cy + outerR * Math.sin(startA);
-                        const x2 = cx + outerR * Math.cos(endA);
-                        const y2 = cy + outerR * Math.sin(endA);
-                        const x3 = cx + innerR * Math.cos(endA);
-                        const y3 = cy + innerR * Math.sin(endA);
-                        const x4 = cx + innerR * Math.cos(startA);
-                        const y4 = cy + innerR * Math.sin(startA);
+                        const gapMidPrev = cumulativeGapMid;
+                        const startA = gapMidPrev + gapAngle / 2;
+                        const endA = startA + segAngle;
+                        const gapMidNext = endA + gapAngle / 2;
+                        cumulativeGapMid = gapMidNext;
+                        const ox1 = cx + outerR * Math.cos(startA);
+                        const oy1 = cy + outerR * Math.sin(startA);
+                        const ox2 = cx + outerR * Math.cos(endA);
+                        const oy2 = cy + outerR * Math.sin(endA);
+                        const ix1u = ox1 - ringDiff * Math.cos(gapMidPrev);
+                        const iy1u = oy1 - ringDiff * Math.sin(gapMidPrev);
+                        const innerStartAngle = Math.atan2(iy1u - cy, ix1u - cx);
+                        const ix1 = cx + innerR * Math.cos(innerStartAngle);
+                        const iy1 = cy + innerR * Math.sin(innerStartAngle);
+                        const ix2u = ox2 - ringDiff * Math.cos(gapMidNext);
+                        const iy2u = oy2 - ringDiff * Math.sin(gapMidNext);
+                        const innerEndAngle = Math.atan2(iy2u - cy, ix2u - cx);
+                        const ix2 = cx + innerR * Math.cos(innerEndAngle);
+                        const iy2 = cy + innerR * Math.sin(innerEndAngle);
                         const largeArc = segAngle > Math.PI ? 1 : 0;
-                        const d = `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+                        const d = `M ${ox1} ${oy1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
                         return (
                           <path key={i} d={d} fill="none" stroke={s.color} strokeWidth={outlineWidth} strokeLinejoin="round" />
                         );
