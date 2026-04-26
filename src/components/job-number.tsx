@@ -2,9 +2,9 @@
 // Wird ueberall verwendet wo eine job_number visuell angezeigt wird —
 // damit eine Aenderung des Designs immer alle Stellen erreicht.
 //
-// Stil: mono + semibold, gleiche Textfarbe wie der Auftragstitel — dezent
-// hervorgehoben durch die Schriftart (Mono-Identifier-Charakter), nicht durch
-// Farbe oder Hintergrund.
+// Stil: mono + semibold + dezenter neutraler Hintergrund-Pill via foreground/[0.08].
+// Theme-adaptiv (light = subtle gray, dark = subtle near-white). Keine Farbe — der
+// Identifier soll auffallen durch Form, nicht durch Buntheit.
 
 interface JobNumberProps {
   number: number | null | undefined;
@@ -14,15 +14,17 @@ interface JobNumberProps {
 }
 
 const sizeClasses = {
-  sm: "text-xs",
-  md: "text-sm",
-  lg: "text-base",
+  sm: "text-xs px-1.5 py-0.5",
+  md: "text-sm px-2 py-0.5",
+  lg: "text-base px-2.5 py-1",
 };
 
 export function JobNumber({ number, size = "sm", className = "" }: JobNumberProps) {
   if (!number) return null;
   return (
-    <span className={`font-mono font-semibold ${sizeClasses[size]} ${className}`}>
+    <span
+      className={`inline-flex items-center font-mono font-semibold rounded bg-foreground/[0.08] ${sizeClasses[size]} ${className}`}
+    >
       INT-{number}
     </span>
   );
