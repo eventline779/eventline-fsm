@@ -54,8 +54,8 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
 
   return (
     <aside className="hidden md:flex md:w-[260px] md:flex-col bg-sidebar text-sidebar-foreground h-screen sticky top-0 shadow-lg border-r border-sidebar-border">
-      {/* Logo */}
-      <div className="px-6 py-6 flex items-center justify-center">
+      {/* Logo — Top buendig mit dem oberen Rand der Page-Headline (md:pt-8 in main) */}
+      <div className="px-6 pt-8 pb-4 flex items-start justify-center">
         <Link href="/heute" className="block">
           <Logo size="md" />
         </Link>
