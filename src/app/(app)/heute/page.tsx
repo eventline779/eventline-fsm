@@ -202,7 +202,7 @@ export default function HeutePage() {
       for (const jobId of workedJobIds) {
         if (!reportedJobIds.has(jobId)) {
           const j = workedJobsMap.get(jobId)!;
-          if (j.status === "abgeschlossen" || j.status === "in_arbeit") {
+          if (j.status === "abgeschlossen") {
             due.push({ job_id: jobId, title: j.title, end_date: j.end_date });
           }
         }

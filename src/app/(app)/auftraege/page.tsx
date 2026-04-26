@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
+import { JOB_STATUS } from "@/lib/constants";
 import type { Job, JobStatus, Profile } from "@/types";
 import Link from "next/link";
 import {
@@ -130,7 +130,6 @@ export default function AuftraegePage() {
         const segments = [
           { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#a855f7" },
           { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "#9ca3af" },
-          { label: "In Arbeit", count: activeJobs.filter((j) => j.status === "in_arbeit").length, color: "#eab308" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },
         ];
@@ -382,11 +381,6 @@ export default function AuftraegePage() {
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                             <AlertCircle className="h-3 w-3" />
                             Dringend
-                          </span>
-                        )}
-                        {(job.priority === "hoch" || job.priority === "niedrig") && (
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
-                            {JOB_PRIORITY[job.priority].label}
                           </span>
                         )}
                       </div>

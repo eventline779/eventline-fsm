@@ -5,8 +5,16 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JOB_PRIORITY } from "@/lib/constants";
-import type { Todo, Profile, JobPriority } from "@/types";
+import type { Todo, Profile } from "@/types";
+
+// Todos haben eigene Priority-Levels (nicht aus jobs übernommen) — bewusst 4 Stufen
+type TodoPriority = "niedrig" | "normal" | "hoch" | "dringend";
+const TODO_PRIORITY_COLOR: Record<TodoPriority, string> = {
+  niedrig: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300",
+  normal: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  hoch: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
+  dringend: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+};
 import {
   Plus, Check, CheckSquare, Calendar, User, Trash2,
   ArrowLeft, Upload, FileText, Image as ImageIcon, X, Download, Archive,
@@ -26,7 +34,7 @@ export default function TodosPage() {
   const [filter, setFilter] = useState<"offen" | "erledigt">("offen");
   const [personFilter, setPersonFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", priority: "normal" as JobPriority, due_date: "", assigned_to: "" });
+  const [form, setForm] = useState({ title: "", description: "", priority: "normal" as TodoPriority, due_date: "", assigned_to: "" });
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [attachments, setAttachments] = useState<TodoAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -200,7 +208,7 @@ export default function TodosPage() {
     });
   const openCount = todos.filter((t) => t.status === "offen").length;
 
-  const priorities: { value: JobPriority; label: string }[] = [
+  const priorities: { value: TodoPriority; label: string }[] = [
     { value: "niedrig", label: "Niedrig" },
     { value: "normal", label: "Normal" },
     { value: "hoch", label: "Hoch" },
@@ -218,7 +226,7 @@ export default function TodosPage() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h1 className={`text-2xl font-bold tracking-tight ${selectedTodo.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{selectedTodo.title}</h1>
-              <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[selectedTodo.priority].color}`}>{JOB_PRIORITY[selectedTodo.priority].label}</span>
+              <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full capitalize ${TODO_PRIORITY_COLOR[selectedTodo.priority as TodoPriority] ?? TODO_PRIORITY_COLOR.normal}`}>{selectedTodo.priority}</span>
             </div>
           </div>
         </div>
@@ -307,7 +315,7 @@ export default function TodosPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Priorität</label>
-                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as JobPriority })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TodoPriority })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
                     {priorities.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
@@ -377,7 +385,7 @@ export default function TodosPage() {
                     <div className="min-w-0 flex-1" onClick={() => openTodo(todo)}>
                       <div className="flex items-center gap-2">
                         <span className={`font-medium text-sm ${todo.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{todo.title}</span>
-                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_PRIORITY[todo.priority].color}`}>{JOB_PRIORITY[todo.priority].label}</span>
+                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full capitalize ${TODO_PRIORITY_COLOR[todo.priority as TodoPriority] ?? TODO_PRIORITY_COLOR.normal}`}>{todo.priority}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-1">
                         {todo.due_date && <span className={`flex items-center gap-1 text-xs ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}><Calendar className="h-3 w-3" />{overdue ? "Überfällig: " : ""}{(() => { const [y,m,d] = todo.due_date!.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH"); })()}</span>}

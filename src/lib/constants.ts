@@ -1,10 +1,9 @@
 // Status-Labels für Aufträge — Light- + Dark-Mode-Farben
-// 'geplant' bewusst entfernt: redundant mit der Termin-Anzeige
-// (orange Streifen links auf der Karte zeigt schon ob Termin da ist).
+// Entfernt: 'geplant' (redundant mit Termin-Anzeige), 'in_arbeit' (kein
+// sinnvoller manueller Übergang).
 export const JOB_STATUS = {
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Bevorstehend", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
-  in_arbeit: { label: "In Arbeit", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
   storniert: { label: "Storniert", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
@@ -20,12 +19,12 @@ export const RENTAL_STATUS = {
   abgelehnt: { label: "Abgelehnt", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
 
-// Prioritäten
+// Prioritäten — nur 'normal' (default) und 'dringend'
+// 'niedrig' und 'hoch' wurden nie genutzt, der relevante Hinweis ist binär:
+// "ist das jetzt dringend oder nicht?"
 export const JOB_PRIORITY = {
-  niedrig: { label: "Niedrig", color: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400" },
-  normal: { label: "Normal", color: "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300" },
-  hoch: { label: "Hoch", color: "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300" },
-  dringend: { label: "Dringend", color: "bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-300" },
+  normal: { label: "Normal", color: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300" },
+  dringend: { label: "Dringend", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
 
 // Kundentypen

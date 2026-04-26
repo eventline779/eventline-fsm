@@ -6,11 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
+import { JOB_STATUS } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload,
-  Check, Play, CheckCircle, XCircle, Trash2, UserCheck, Users, Download, Send, X, StickyNote,
+  Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -42,6 +42,9 @@ export default function AuftragDetailPage() {
   const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string; author?: string }[]>([]);
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [newNote, setNewNote] = useState("");
+
+  // Stornieren-Bestätigung
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -247,44 +250,80 @@ export default function AuftragDetailPage() {
   const mapsUrl = mapsQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}` : "";
   const projectLead = (job as unknown as { project_lead: { full_name: string } | null }).project_lead;
 
-  // Status transition buttons
-  const statusActions: { from: JobStatus[]; to: JobStatus; label: string; icon: React.ReactNode; color: string }[] = [
-    { from: ["entwurf"], to: "offen", label: "Freigeben", icon: <CheckCircle className="h-4 w-4" />, color: "bg-purple-600 hover:bg-purple-700 text-white" },
-    { from: ["offen"], to: "in_arbeit", label: "Starten", icon: <Play className="h-4 w-4" />, color: "bg-yellow-600 hover:bg-yellow-700 text-white" },
-    { from: ["in_arbeit"], to: "abgeschlossen", label: "Abschliessen", icon: <CheckCircle className="h-4 w-4" />, color: "bg-green-600 hover:bg-green-700 text-white" },
-    { from: ["entwurf", "offen", "in_arbeit"], to: "storniert", label: "Stornieren", icon: <XCircle className="h-4 w-4" />, color: "bg-gray-600 hover:bg-gray-700 text-white" },
+  // Status-Aktionen — knapp: Freigeben (Entwurf → Bevorstehend), Abschliessen, Stornieren.
+  // 'Starten' entfernt (siehe in_arbeit-Status weg).
+  const statusActions: { from: JobStatus[]; to: JobStatus; label: string; icon: React.ReactNode; variant: "primary" | "outline" | "destructive" }[] = [
+    { from: ["entwurf"], to: "offen", label: "Freigeben", icon: <CheckCircle className="h-4 w-4" />, variant: "primary" },
+    { from: ["offen"], to: "abgeschlossen", label: "Abschliessen", icon: <CheckCircle className="h-4 w-4" />, variant: "outline" },
+    { from: ["entwurf", "offen"], to: "storniert", label: "Stornieren", icon: <XCircle className="h-4 w-4" />, variant: "destructive" },
   ];
 
   const availableActions = statusActions.filter((a) => a.from.includes(job.status));
+  const isDringend = job.priority === "dringend";
 
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
+      <div className="flex items-start gap-4">
+        <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-muted transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
             {job.job_number && <span className="text-sm font-mono text-muted-foreground">INT-{job.job_number}</span>}
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
-          <div className="flex items-center gap-3 mt-1">
-            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>{JOB_STATUS[job.status].label}</span>
-            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>{JOB_PRIORITY[job.priority].label}</span>
+          <div className="flex items-center gap-2 mt-1.5">
+            {/* Konsistent zur Liste: 'offen' = Default, kein Badge */}
+            {job.status !== "offen" && (
+              <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>{JOB_STATUS[job.status].label}</span>
+            )}
+            {isDringend && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                <AlertCircle className="h-3 w-3" />
+                Dringend
+              </span>
+            )}
           </div>
         </div>
+        {/* Bearbeiten-Button im Header (auch bei nicht-Entwurf) */}
+        <Link href={`/auftraege/${id}/bearbeiten`}>
+          <button
+            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Bearbeiten"
+            aria-label="Bearbeiten"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        </Link>
       </div>
 
-      {/* Status Actions */}
+      {/* Status Actions — subtil im App-Stil, nur 'Freigeben' kräftig (lila) */}
       {availableActions.length > 0 && (
-        <Card className="bg-white">
-          <CardContent className="p-4 flex flex-wrap gap-2">
-            {availableActions.map((a) => (
-              <Button key={a.to} onClick={() => updateStatus(a.to)} size="sm" className={a.color}>
-                {a.icon}<span className="ml-1.5">{a.label}</span>
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
+        <div className="flex flex-wrap gap-2">
+          {availableActions.map((a) => {
+            const cls =
+              a.variant === "primary"
+                ? "bg-purple-600 hover:bg-purple-700 text-white"
+                : a.variant === "destructive"
+                ? "border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                : "border border-border text-foreground hover:bg-muted";
+            return (
+              <button
+                key={a.to}
+                onClick={() => {
+                  if (a.to === "storniert") {
+                    setShowCancelConfirm(true);
+                    return;
+                  }
+                  updateStatus(a.to);
+                }}
+                className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium transition-all ${cls}`}
+              >
+                {a.icon}
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* Info */}
@@ -321,7 +360,7 @@ export default function AuftragDetailPage() {
             </div>
           )}
           {projectLead && <div className="flex items-center gap-2 text-sm"><UserCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Projektleiter:</span> {projectLead.full_name}</div>}
-          {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Zeitraum:</span> {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })} {job.end_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
+          {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Event-Datum:</span> {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })} {job.end_date && job.end_date !== job.start_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
           {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
         </CardContent>
       </Card>
@@ -341,7 +380,7 @@ export default function AuftragDetailPage() {
               <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required autoFocus />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+                <Button type="submit" size="sm">Speichern</Button>
               </div>
             </form>
           )}
@@ -362,30 +401,6 @@ export default function AuftragDetailPage() {
               <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
-        </CardContent>
-      </Card>
-
-      {/* Zugewiesene Techniker */}
-      <Card className="bg-white">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Zugewiesene Techniker ({assignments.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {assignments.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">Keine Techniker zugewiesen.</p>
-          ) : (
-            <div className="space-y-2">
-              {assignments.map((a) => {
-                const prof = a.profile as unknown as { full_name: string; role: string } | undefined;
-                return (
-                  <div key={a.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50">
-                    <div className="h-8 w-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold">{prof?.full_name?.charAt(0) || "?"}</div>
-                    <span className="text-sm font-medium">{prof?.full_name}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -433,7 +448,7 @@ export default function AuftragDetailPage() {
                         key={p.id}
                         type="button"
                         onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-red-600 text-white border-red-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300"}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-foreground text-background border-foreground" : "border-border hover:border-foreground/30"}`}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
                           {p.full_name.charAt(0)}
@@ -448,7 +463,7 @@ export default function AuftragDetailPage() {
               <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowApptForm(false)}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Termin erstellen</Button>
+                <Button type="submit" size="sm">Termin erstellen</Button>
               </div>
             </form>
           )}
@@ -620,6 +635,46 @@ export default function AuftragDetailPage() {
           )}
         </CardContent>
       </Card>
+      {/* Stornieren-Bestätigung */}
+      {showCancelConfirm && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowCancelConfirm(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h2 className="font-semibold">Auftrag stornieren?</h2>
+                <button onClick={() => setShowCancelConfirm(false)} className="p-1.5 rounded-lg hover:bg-muted">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {job.job_number ? `INT-${job.job_number} — ` : ""}
+                  <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border hover:bg-muted transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={() => { setShowCancelConfirm(false); updateStatus("storniert"); }}
+                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                  >
+                    Stornieren
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Delete Appointment Modal */}
       {deleteApptTarget && (
         <>

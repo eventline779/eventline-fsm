@@ -1,8 +1,8 @@
 export type UserRole = "admin" | "techniker";
 
-export type JobStatus = "entwurf" | "offen" | "in_arbeit" | "abgeschlossen" | "storniert";
+export type JobStatus = "entwurf" | "offen" | "abgeschlossen" | "storniert";
 
-export type JobPriority = "niedrig" | "normal" | "hoch" | "dringend";
+export type JobPriority = "normal" | "dringend";
 
 export type CustomerType = "company" | "individual" | "organization";
 
