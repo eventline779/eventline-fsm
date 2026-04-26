@@ -40,9 +40,8 @@ export default function AuftragDetailPage() {
   const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
   const [deleteApptCode, setDeleteApptCode] = useState("");
 
-  // Notizen
+  // Notizen — Direkt-Eingabe (kein Toggle)
   const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string; author?: string }[]>([]);
-  const [showNoteForm, setShowNoteForm] = useState(false);
   const [newNote, setNewNote] = useState("");
 
   // Stornieren-Flow: Modal mit zwei Phasen (confirm -> reason)
@@ -108,7 +107,6 @@ export default function AuftragDetailPage() {
     await saveNotes(updated);
     setNotesList(updated);
     setNewNote("");
-    setShowNoteForm(false);
     toast.success("Notiz hinzugefügt");
   }
 
@@ -467,24 +465,28 @@ export default function AuftragDetailPage() {
 
       {/* Notizen */}
       <Card className="bg-card">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
-            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required autoFocus />
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
+          {/* Direkt-Eingabe — kein Toggle, kein "Neue Notiz"-Button */}
+          <form onSubmit={addNote} className="space-y-2">
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Notiz hinzufügen…"
+              rows={2}
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+              className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+            />
+            {newNote.trim() && (
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setNewNote("")}>Abbrechen</Button>
                 <Button type="submit" size="sm">Speichern</Button>
               </div>
-            </form>
-          )}
-          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
+            )}
+          </form>
+          {notesList.length === 0 && !newNote && <p className="text-sm text-muted-foreground py-2 text-center">Noch keine Notizen.</p>}
           {notesList.map((n) => (
             <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
               <div className="min-w-0 flex-1">
