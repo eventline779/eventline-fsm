@@ -70,6 +70,8 @@ export default function AuftraegePage() {
   const todayMs = todayStart.getTime();
   const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
+    // Anfragen leben unter /anfragen, nicht in der Auftrags-Liste — sie zaehlen aber im Donut.
+    if (j.status === "anfrage") return false;
     const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
@@ -122,11 +124,12 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm — Entwuerfe stehen separat, zaehlen nicht zur Uebersicht */}
+      {/* Kreis-Diagramm — Entwuerfe stehen separat, Anfragen als blaues Segment im Donut */}
       {jobs.length > 0 && (() => {
         const activeJobs = jobs;
         const entwurfCount = activeJobs.filter((j) => j.status === "entwurf").length;
         const segments = [
+          { label: "Anfragen", count: activeJobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
           { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
           { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
           { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
