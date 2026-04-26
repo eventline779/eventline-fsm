@@ -332,7 +332,7 @@ export default function AuftragDetailPage() {
                 title="Aus einer Mietanfrage entstanden"
               >
                 <Inbox className="h-3 w-3" />
-                Aus Mietanfrage
+                Mietanfrage
               </span>
             )}
           </div>
