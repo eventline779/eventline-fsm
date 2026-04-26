@@ -430,14 +430,16 @@ export default function AuftraegePage() {
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
             <div className="flex items-stretch gap-2">
-              {/* Linke Seite: Termin-Status */}
-              <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
-                {noTermin ? (
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                ) : (
-                  <Calendar className="h-4 w-4 text-green-500" />
-                )}
-              </div>
+              {/* Linke Seite: Termin-Status — nur bei aktiven Auftraegen, Archiv braucht das nicht */}
+              {isActive && (
+                <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
+                  {noTermin ? (
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  ) : (
+                    <Calendar className="h-4 w-4 text-green-500" />
+                  )}
+                </div>
+              )}
               <Card className={`bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1 ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
@@ -452,7 +454,7 @@ export default function AuftraegePage() {
                             {JOB_STATUS[job.status].label}
                           </span>
                         )}
-                        {job.priority === "dringend" && (
+                        {job.priority === "dringend" && isActive && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                             <AlertCircle className="h-3 w-3" />
                             Dringend
