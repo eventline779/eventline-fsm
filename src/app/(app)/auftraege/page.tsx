@@ -141,9 +141,8 @@ export default function AuftraegePage() {
         return (
           <Card className="bg-white">
             <CardContent className="p-5">
-              <h2 className="text-sm font-semibold mb-4">Auftrags-Übersicht</h2>
               {total > 0 ? (
-                <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex flex-col md:flex-row items-start gap-6">
                   <div className="relative shrink-0">
                     <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
                       <circle cx={radius + strokeWidth / 2} cy={radius + strokeWidth / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} className="dark:stroke-gray-800" />
@@ -174,52 +173,69 @@ export default function AuftraegePage() {
                       <span className="text-xs text-muted-foreground">Aufträge</span>
                     </div>
                   </div>
-                  <div className="flex-1 w-full space-y-2">
-                    {segments.map((s) => {
-                      const pct = total > 0 ? (s.count / total) * 100 : 0;
-                      return (
-                        <div
-                          key={s.label}
-                          className={`flex items-center gap-3 ${
-                            s.count === 0 ? "opacity-40" : ""
-                          }`}
-                        >
-                          <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-medium truncate">{s.label}</span>
-                              <span className="text-xs text-muted-foreground shrink-0">
-                                <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
-                              <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                  <div className="flex-1 w-full md:self-stretch flex flex-col">
+                    <div className="space-y-2">
+                      {segments.map((s) => {
+                        const pct = total > 0 ? (s.count / total) * 100 : 0;
+                        return (
+                          <div
+                            key={s.label}
+                            className={`flex items-center gap-3 ${
+                              s.count === 0 ? "opacity-40" : ""
+                            }`}
+                          >
+                            <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium truncate">{s.label}</span>
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                  <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                                </span>
+                              </div>
+                              <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
+                                <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    {entwurfCount > 0 && (
+                      <div className="mt-auto pt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setFilterStatus("entwurf")}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
+                          style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                          title="Filter auf Entwürfe setzen"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                          {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  {entwurfCount > 0
-                    ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge."
-                    : "Keine Aufträge vorhanden."}
-                </p>
-              )}
-              {entwurfCount > 0 && total > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setFilterStatus("entwurf")}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
-                    style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
-                    title="Filter auf Entwürfe setzen"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
-                    {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-                  </button>
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    {entwurfCount > 0
+                      ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge."
+                      : "Keine Aufträge vorhanden."}
+                  </p>
+                  {entwurfCount > 0 && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setFilterStatus("entwurf")}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors hover:bg-[var(--status-purple)]/10"
+                        style={{ borderColor: "var(--status-purple)", color: "var(--status-purple)" }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-purple)" }} />
+                        {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
