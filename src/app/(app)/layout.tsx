@@ -96,9 +96,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center flex flex-col items-center">
-          <Logo size="lg" variant="dark" />
+          <Logo size="lg" />
           <div className="mt-4 flex items-center justify-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
             <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse [animation-delay:200ms]" />
@@ -135,8 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SheetContent side="left" className="bg-sidebar text-sidebar-foreground border-sidebar-border w-[280px] p-0">
           <SheetHeader className="px-6 py-6 border-b border-sidebar-border">
             <SheetTitle className="text-left">
-              <span className="dark:hidden"><Logo size="md" variant="dark" /></span>
-              <span className="hidden dark:inline"><Logo size="md" variant="light" /></span>
+              <Logo size="md" />
             </SheetTitle>
           </SheetHeader>
           <nav className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]">

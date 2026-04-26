@@ -58,9 +58,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
       {/* Logo + Glocke */}
       <div className="px-6 py-6 border-b border-sidebar-border flex items-center justify-between">
         <Link href="/heute" className="block">
-          {/* Light-Mode: dunkles Logo, Dark-Mode: helles Logo */}
-          <span className="dark:hidden"><Logo size="md" variant="dark" /></span>
-          <span className="hidden dark:inline"><Logo size="md" variant="light" /></span>
+          <Logo size="md" />
         </Link>
         <NotificationBell />
       </div>

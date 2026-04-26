@@ -48,11 +48,11 @@ export default function PasswortResetPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-white border-0 shadow-2xl">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <Card className="w-full max-w-md border shadow-2xl">
         <CardHeader className="text-center pb-2">
           <div className="mb-4 flex justify-center">
-            <Logo size="lg" variant="dark" />
+            <Logo size="lg" />
           </div>
         </CardHeader>
         <CardContent>
