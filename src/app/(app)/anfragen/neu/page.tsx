@@ -331,10 +331,10 @@ function NeueAnfragePageContent() {
             type="submit"
             size="sm"
             disabled={saving}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
-            {saving ? "Anlegen…" : "Mietanfrage anlegen"}
+            {saving ? "Anlegen…" : "Vermietung anlegen"}
           </Button>
         </div>
       </form>
