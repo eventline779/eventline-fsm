@@ -141,7 +141,7 @@ export default function BelegePage() {
             type="button"
             onClick={sendBeleg}
             disabled={!file || !form.reason.trim() || sending}
-            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+            className="kasten kasten-red w-full"
           >
             <Send className="h-3.5 w-3.5" />{sending ? "Senden..." : "An Buchhaltung senden"}
           </button>

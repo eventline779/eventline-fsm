@@ -239,7 +239,7 @@ export default function TicketsPage() {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                className="kasten kasten-muted"
               >
                 <Upload className="h-3.5 w-3.5" />{uploading ? "Hochladen..." : "Datei hochladen"}
               </button>
@@ -287,7 +287,7 @@ export default function TicketsPage() {
             <button
               type="button"
               onClick={() => { setSubmitted(false); setShowForm(true); }}
-              className="mt-4 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+              className="mt-4 inline-kasten kasten-red"
             >
               <Plus className="h-3.5 w-3.5" />
               Weiteres Ticket erstellen
@@ -308,7 +308,7 @@ export default function TicketsPage() {
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+          className="kasten kasten-red"
         >
           {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
           {showForm ? "Abbrechen" : "Neues Ticket"}
@@ -349,14 +349,14 @@ export default function TicketsPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                  className="kasten kasten-muted"
                 >
                   Abbrechen
                 </button>
                 <button
                   type="submit"
                   disabled={sending}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  className="kasten kasten-red"
                 >
                   <Send className="h-3.5 w-3.5" />{sending ? "Senden..." : "Ticket erstellen"}
                 </button>
@@ -420,7 +420,7 @@ export default function TicketsPage() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+              className="kasten kasten-red mt-4"
             >
               <Plus className="h-3.5 w-3.5" />Neues Ticket
             </button>

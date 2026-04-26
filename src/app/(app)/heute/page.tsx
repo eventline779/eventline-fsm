@@ -326,7 +326,7 @@ export default function HeutePage() {
                 <button
                   type="button"
                   onClick={handleClockOut}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+                  className="kasten kasten-red w-full py-3 text-sm gap-2"
                 >
                   <Pause className="h-4 w-4" />
                   Ausstempeln
@@ -340,7 +340,7 @@ export default function HeutePage() {
                 <button
                   type="button"
                   onClick={handleClockIn}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all"
+                  className="kasten kasten-green w-full py-3 text-sm gap-2"
                 >
                   <Play className="h-4 w-4" />
                   Einstempeln

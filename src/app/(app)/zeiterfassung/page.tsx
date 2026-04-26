@@ -166,7 +166,7 @@ export default function ZeiterfassungPage() {
               <button
                 type="button"
                 onClick={clockIn}
-                className="inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all"
+                className="kasten kasten-green px-6 py-4 text-sm gap-2"
               >
                 <Play className="h-5 w-5" />
                 Einstempeln
@@ -177,7 +177,7 @@ export default function ZeiterfassungPage() {
               <button
                 type="button"
                 onClick={clockOut}
-                className="inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+                className="kasten kasten-red px-6 py-4 text-sm gap-2"
               >
                 <Square className="h-5 w-5" />
                 Ausstempeln

@@ -111,14 +111,14 @@ export default function KundenDetailPage() {
           <button
             type="button"
             onClick={() => setEditing(!editing)}
-            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card hover:bg-foreground/[0.03] transition-all ${editing ? "text-foreground/70 hover:text-foreground" : "text-red-700 dark:text-red-300"}`}
+            className={`kasten ${editing ? "kasten-muted" : "kasten-red"}`}
           >
             {editing ? "Abbrechen" : "Bearbeiten"}
           </button>
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+            className="kasten kasten-red"
             aria-label="Löschen"
             title="Löschen"
           >
@@ -137,7 +137,7 @@ export default function KundenDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+                className="kasten kasten-muted"
               >
                 Abbrechen
               </button>
@@ -145,7 +145,7 @@ export default function KundenDetailPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                className="kasten kasten-red"
               >
                 <Trash2 className="h-3.5 w-3.5" />{deleting ? "Löschen..." : "Endgültig löschen"}
               </button>
@@ -182,7 +182,7 @@ export default function KundenDetailPage() {
               <button
                 type="button"
                 onClick={handleSave}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+                className="kasten kasten-red"
               >
                 <Save className="h-3.5 w-3.5" />Speichern
               </button>
@@ -205,7 +205,7 @@ export default function KundenDetailPage() {
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
           <Link
             href={`/auftraege/neu?customer_id=${id}`}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+            className="kasten kasten-red"
           >
             Neuer Auftrag
           </Link>

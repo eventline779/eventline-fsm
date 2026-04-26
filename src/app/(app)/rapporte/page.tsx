@@ -34,7 +34,7 @@ export default function RapportePage() {
         </div>
         <Link
           href="/rapporte/neu"
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+          className="kasten kasten-red"
         >
           <Plus className="h-3.5 w-3.5" />
           Neuer Rapport
@@ -51,7 +51,7 @@ export default function RapportePage() {
             <p className="text-sm text-muted-foreground mt-1">Erstelle deinen ersten Einsatzrapport.</p>
             <Link
               href="/rapporte/neu"
-              className="mt-5 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+              className="mt-5 inline-kasten kasten-red"
             >
               <Plus className="h-3.5 w-3.5" />
               Ersten Rapport erstellen

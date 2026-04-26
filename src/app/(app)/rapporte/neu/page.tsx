@@ -501,14 +501,14 @@ export default function NeuerRapportPage() {
         <div className="flex gap-3 pt-2">
           <Link
             href={preselectedJobId ? `/auftraege/${preselectedJobId}` : "/rapporte"}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all"
+            className="kasten kasten-muted flex-1"
           >
             Abbrechen
           </Link>
           <button
             type="submit"
             disabled={!form.job_id || !form.work_description || saving}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none"
+            className="kasten kasten-red flex-1"
           >
             <Save className="h-3.5 w-3.5" />{saving ? "Speichern..." : "Rapport abschliessen"}
           </button>

@@ -160,7 +160,7 @@ export default function VertriebPage() {
                 autoFocus
               />
               {pwError && <p className="text-xs text-red-600 text-center">Falsches Passwort</p>}
-              <button type="submit" disabled={!pwInput} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">Zugang</button>
+              <button type="submit" disabled={!pwInput} className="kasten kasten-red w-full">Zugang</button>
             </form>
           </CardContent>
         </Card>
@@ -714,7 +714,7 @@ export default function VertriebPage() {
         <button
           type="button"
           onClick={openNew}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all"
+          className="kasten kasten-red"
         >
           <Plus className="h-3.5 w-3.5" />
           Lead
@@ -1126,7 +1126,7 @@ export default function VertriebPage() {
                   <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
                     {/* Schritt 1: Kontakt aufnehmen */}
                     {editingStep === 1 && (
-                      <button type="button" onClick={advanceStep} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                      <button type="button" onClick={advanceStep} className="kasten kasten-blue">
                         <ArrowRight className="h-3.5 w-3.5" />Kontakt aufnehmen
                       </button>
                     )}
@@ -1197,7 +1197,7 @@ export default function VertriebPage() {
                   <div className="pt-2 border-t border-blue-200">
                     <p className="text-xs text-blue-700 mb-2">Buchhaltung mit allen Verrechnungs-Infos benachrichtigen:</p>
                     <div className="flex gap-2 flex-wrap">
-                      <button type="button" onClick={() => setShowBuchhaltung(true)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                      <button type="button" onClick={() => setShowBuchhaltung(true)} className="kasten kasten-blue">
                         <Mail className="h-3.5 w-3.5" />Benachrichtigung senden
                       </button>
                       <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
@@ -1242,10 +1242,10 @@ export default function VertriebPage() {
                     <Button type="button" size="sm" onClick={() => setShowVerbesserung(true)} variant="outline" className="text-orange-700 border-orange-300 hover:bg-orange-100">
                       <Mail className="h-4 w-4 mr-1" />Verbesserungs-Nachricht
                     </Button>
-                    <button type="button" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">
+                    <button type="button" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="kasten kasten-green">
                       <Check className="h-3.5 w-3.5" />{sendingBestaetigung ? "Senden..." : "Offerte bestätigt"}
                     </button>
-                    <button type="button" onClick={advanceStep} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-blue-700 dark:text-blue-300 hover:bg-foreground/[0.03] transition-all">
+                    <button type="button" onClick={advanceStep} className="kasten kasten-blue">
                       <ArrowRight className="h-3.5 w-3.5" />Weiter zu Operations
                     </button>
                   </div>
@@ -1275,7 +1275,7 @@ export default function VertriebPage() {
                       <>
                         <p className="text-xs text-green-700">Erstelle aus diesem Lead einen Auftrag. Leo wird automatisch benachrichtigt. Danach kannst du den Schichtplan machen.</p>
                         <div className="flex gap-2 flex-wrap">
-                          <button type="button" onClick={openAuftragModal} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-green-700 dark:text-green-300 hover:bg-foreground/[0.03] transition-all">
+                          <button type="button" onClick={openAuftragModal} className="kasten kasten-green">
                             <Plus className="h-3.5 w-3.5" />Auftrag erstellen
                           </button>
                         </div>
@@ -1479,8 +1479,8 @@ export default function VertriebPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-all">Abbrechen</button>
-                <button type="submit" disabled={!form.firma || saving} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl ring-1 ring-foreground/10 bg-card text-red-700 dark:text-red-300 hover:bg-foreground/[0.03] transition-all disabled:opacity-50 disabled:pointer-events-none">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="kasten kasten-muted">Abbrechen</button>
+                <button type="submit" disabled={!form.firma || saving} className="kasten kasten-red">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</button>
               </div>
             </form>
           </CardContent>

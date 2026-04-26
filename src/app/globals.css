@@ -397,6 +397,39 @@ html, body, *, *::before, *::after {
   .dark .tinted-emerald:hover { background-color: rgba(  4, 120,  87, 0.26); }
   .dark .tinted-gray:hover    { background-color: rgba(100, 116, 139, 0.26); }
 
+/* === Kasten-Buttons: einheitliches Aktions-Element app-weit ===
+   Optik wie eine Donut-Card im Mini: GLEICHER Ring + GLEICHES rounded-xl + GLEICHES
+   bg-card. Realisiert via @apply auf Tailwind-Klassen, damit Theme-Werte
+   (--radius-xl, ring-foreground/10) 1:1 wie bei der Card greifen.
+
+   Verwendung: <button className="kasten kasten-red">…</button>
+   Tone-Klassen: kasten-red | kasten-blue | kasten-green | kasten-purple | kasten-muted
+   Aktive Toggle (z.B. Archiv): kasten-active (gefuellt + invertiert).
+   Zusatz-Layout (flex-1, w-full, mt-X, px-6, py-4) als normale Tailwind-Utilities
+   daneben — die ueberschreiben dank @layer components / utilities-Reihenfolge. */
+@layer components {
+  .kasten {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-card ring-1 ring-foreground/10 transition-all;
+  }
+  .kasten:hover:not(:disabled) {
+    @apply bg-foreground/[0.04] ring-foreground/20;
+  }
+  .dark .kasten:hover:not(:disabled) {
+    @apply bg-foreground/[0.09] ring-foreground/30;
+  }
+  .kasten:disabled { @apply opacity-50 pointer-events-none; }
+  .kasten-red    { @apply text-red-700 dark:text-red-300; }
+  .kasten-blue   { @apply text-blue-700 dark:text-blue-300; }
+  .kasten-green  { @apply text-green-700 dark:text-green-300; }
+  .kasten-purple { @apply text-purple-700 dark:text-purple-300; }
+  .kasten-muted  { @apply text-foreground/70; }
+  .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
+  /* Aktiv-Variante: gefuellt + invertiert. Fuer Toggles wie Archiv. */
+  .kasten-active {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-foreground text-background ring-1 ring-foreground transition-all;
+  }
+}
+
 @layer utilities {
 
   .border:not([class*="border-0"]) {
