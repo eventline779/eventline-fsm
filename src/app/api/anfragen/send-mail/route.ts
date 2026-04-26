@@ -15,6 +15,7 @@ interface Body {
   jobId: string;
   step: Step;
   email: string;
+  cc?: string[];
   message?: string;
   customerName?: string | null;
   locationName?: string | null;
@@ -39,7 +40,7 @@ function confirmToken(jobId: string) {
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Body;
-  const { jobId, step, email, message, customerName, locationName, eventDate, eventEndDate, documentPaths } = body;
+  const { jobId, step, email, cc, message, customerName, locationName, eventDate, eventEndDate, documentPaths } = body;
 
   if (![1, 3, 5].includes(step)) {
     return NextResponse.json({ success: false, error: "Ungueltiger Schritt" }, { status: 400 });
@@ -128,10 +129,12 @@ export async function POST(request: Request) {
 
   try {
     const resend = new Resend(resendKey);
+    const ccList = (cc ?? []).map((s) => s.trim()).filter(Boolean);
     await resend.emails.send({
       from: "EVENTLINE GmbH <leo@eventline-basel.com>",
       replyTo: "leo@eventline-basel.com",
       to: email,
+      cc: ccList.length > 0 ? ccList : undefined,
       subject,
       html,
       attachments,

@@ -46,6 +46,7 @@ export default function AnfrageDetailPage() {
   // Mail-Modal: 2 Phasen — "compose" (Upload + Mail senden) und "confirm" (Bestaetigen -> step advance)
   const [sendPhase, setSendPhase] = useState<"closed" | "compose" | "confirm">("closed");
   const [sendEmail, setSendEmail] = useState("");
+  const [sendCc, setSendCc] = useState("");
   const [sendMessage, setSendMessage] = useState("");
   const [sendDocs, setSendDocs] = useState<UploadedDoc[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -94,6 +95,7 @@ export default function AnfrageDetailPage() {
     if (!job?.request_step) return;
     const customerEmail = (job.customer as unknown as { email?: string | null } | undefined)?.email ?? "";
     setSendEmail(customerEmail);
+    setSendCc("");
     setSendMessage("");
     // Nur die zu DIESEM Schritt gehoerenden Dokumente laden, damit z.B. der Vertrag-Schritt
     // nicht versehentlich die Konditionen wieder anhaengt. Storage-Pfad-Konvention:
@@ -191,7 +193,17 @@ export default function AnfrageDetailPage() {
   async function sendMail() {
     if (!job?.request_step) return;
     if (!sendEmail.trim()) {
-      toast.error("Empfaenger-Mail fehlt");
+      toast.error("Beim Kunden ist keine E-Mail hinterlegt");
+      return;
+    }
+    // CC: Komma- oder Semikolon-getrennte Liste, jeder Eintrag muss eine plausible Mail sein.
+    const ccList = sendCc
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const invalidCc = ccList.find((m) => !m.includes("@"));
+    if (invalidCc) {
+      toast.error(`Ungültige CC-Adresse: ${invalidCc}`);
       return;
     }
     setSending(true);
@@ -205,6 +217,7 @@ export default function AnfrageDetailPage() {
           jobId: id,
           step: job.request_step,
           email: sendEmail.trim(),
+          cc: ccList,
           message: sendMessage.trim(),
           customerName: customer?.name ?? null,
           locationName: location?.name ?? null,
@@ -601,12 +614,26 @@ export default function AnfrageDetailPage() {
                 <div className="p-6 space-y-4">
                   <div className="space-y-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Empfänger</p>
+                    {sendEmail ? (
+                      <div className="flex h-9 items-center px-3 text-sm rounded-xl border bg-muted/30 text-muted-foreground select-text">
+                        {sendEmail}
+                      </div>
+                    ) : (
+                      <div className="flex h-9 items-center px-3 text-sm rounded-xl border border-destructive/40 bg-destructive/5 text-destructive">
+                        Beim Kunden ist keine E-Mail hinterlegt.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">CC (optional)</p>
                     <Input
-                      type="email"
-                      placeholder="kunde@beispiel.ch"
-                      value={sendEmail}
-                      onChange={(e) => setSendEmail(e.target.value)}
+                      type="text"
+                      placeholder="z.B. partner@firma.ch, buchhaltung@firma.ch"
+                      value={sendCc}
+                      onChange={(e) => setSendCc(e.target.value)}
                     />
+                    <p className="text-[10px] text-muted-foreground/80">Mehrere Adressen mit Komma trennen.</p>
                   </div>
 
                   <div className="space-y-2">
