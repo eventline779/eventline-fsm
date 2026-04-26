@@ -435,14 +435,14 @@ html, body, *, *::before, *::after {
   .dark .kasten-blue   { background-color: rgba( 37,  99, 235, 0.18); }
   .dark .kasten-green  { background-color: rgba(  0, 168, 107, 0.18); }
   .dark .kasten-purple { background-color: rgba(124,  58, 237, 0.18); }
-  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.28); border-color: var(--status-red); }
-  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.28); border-color: var(--status-blue); }
-  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.28); border-color: var(--status-green); }
-  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.28); border-color: var(--status-purple); }
-  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.42); border-color: var(--status-red); }
-  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.42); border-color: var(--status-blue); }
-  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.42); border-color: var(--status-green); }
-  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.42); border-color: var(--status-purple); }
+  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.55); border-color: var(--status-red); }
+  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.55); border-color: var(--status-blue); }
+  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.55); border-color: var(--status-green); }
+  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.55); border-color: var(--status-purple); }
+  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.70); border-color: var(--status-red); }
+  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.70); border-color: var(--status-blue); }
+  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.70); border-color: var(--status-green); }
+  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.70); border-color: var(--status-purple); }
 
   .kasten-muted  { @apply text-foreground/70; }
   .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
