@@ -240,11 +240,11 @@ export default function AuftraegePage() {
                       })}
                     </div>
                     {entwurfCount > 0 && (
-                      <div className="mt-auto pt-4 -ml-[7px]">
+                      <div className="mt-auto pt-4">
                         <button
                           type="button"
                           onClick={() => setFilterStatus("entwurf")}
-                          className="inline-flex items-center gap-3 px-[7px] py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
+                          className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
                           title="Filter auf Entwürfe setzen"
                         >
                           <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
@@ -262,13 +262,13 @@ export default function AuftraegePage() {
                       : "Keine Aufträge vorhanden."}
                   </p>
                   {entwurfCount > 0 && (
-                    <div className="flex justify-start">
+                    <div>
                       <button
                         type="button"
                         onClick={() => setFilterStatus("entwurf")}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
+                        className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
+                        <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
                         {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
                       </button>
                     </div>
