@@ -415,15 +415,15 @@ html, body, *, *::before, *::after {
        durch. border ist Teil der Box und unzerstoerbar.
        Hoehe wird nicht durch border verschoben weil rounded-xl + bg-card schon
        einen Kasten definiert; 1px Border draufgepfropft. */
-    border: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
+    border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
   }
   .kasten:hover:not(:disabled) {
     background-color: color-mix(in oklab, var(--foreground) 4%, transparent);
-    border-color: color-mix(in oklab, var(--foreground) 38%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 24%, transparent);
   }
   .dark .kasten:hover:not(:disabled) {
     background-color: color-mix(in oklab, var(--foreground) 9%, transparent);
-    border-color: color-mix(in oklab, var(--foreground) 50%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 32%, transparent);
   }
   .kasten:disabled { @apply opacity-50 pointer-events-none; }
   .kasten-red    { @apply text-red-700 dark:text-red-300; }
