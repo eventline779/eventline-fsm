@@ -357,33 +357,44 @@ html, body, *, *::before, *::after {
    In @layer utilities platziert — innerhalb dieses Layers gewinnt source-order,
    und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
    Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
-@layer utilities {
   /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border in derselben Farbe.
-     Optik wie Donut-Segmente. Per-Color-Modifier setzen --tint direkt — keine var()-Kette
-     ueber inline style, weil das in manchen Browsern/CSS-Cascades nicht zuverlaessig
-     aufloest. Verwendung: <div className="tinted tinted-amber"> */
-  .tinted {
-    background-color: color-mix(in oklch, var(--tint, currentColor) 12%, transparent);
-    border-color: var(--tint, currentColor);
-    color: var(--tint, currentColor);
-  }
-  .dark .tinted {
-    background-color: color-mix(in oklch, var(--tint, currentColor) 18%, transparent);
-  }
-  .tinted:hover {
-    background-color: color-mix(in oklch, var(--tint, currentColor) 18%, transparent);
-  }
-  .dark .tinted:hover {
-    background-color: color-mix(in oklch, var(--tint, currentColor) 26%, transparent);
-  }
-  .tinted-amber { --tint: #f59e0b; }
-  .tinted-blue { --tint: #2563eb; }
-  .tinted-green { --tint: #00a86b; }
-  .tinted-red { --tint: #dc2626; }
-  .tinted-purple { --tint: #7c3aed; }
-  .tinted-orange { --tint: #ea580c; }
-  .tinted-emerald { --tint: #047857; }
-  .tinted-gray { --tint: #64748b; }
+     Optik wie Donut-Segmente. Pro Farbe eine self-contained Klasse mit rgba — keine
+     CSS-Variable-Indirection, keine color-mix-Funktion. Robust ueber alle Browser.
+     Verwendung: <div className="tinted-amber border"> (border-Klasse fuer 2px-Stripe). */
+  .tinted-amber   { background-color: rgba(245, 158,  11, 0.12); border-color: #f59e0b; color: #f59e0b; }
+  .tinted-blue    { background-color: rgba( 37,  99, 235, 0.12); border-color: #2563eb; color: #2563eb; }
+  .tinted-green   { background-color: rgba(  0, 168, 107, 0.12); border-color: #00a86b; color: #00a86b; }
+  .tinted-red     { background-color: rgba(220,  38,  38, 0.12); border-color: #dc2626; color: #dc2626; }
+  .tinted-purple  { background-color: rgba(124,  58, 237, 0.12); border-color: #7c3aed; color: #7c3aed; }
+  .tinted-orange  { background-color: rgba(234,  88,  12, 0.12); border-color: #ea580c; color: #ea580c; }
+  .tinted-emerald { background-color: rgba(  4, 120,  87, 0.12); border-color: #047857; color: #047857; }
+  .tinted-gray    { background-color: rgba(100, 116, 139, 0.12); border-color: #64748b; color: #64748b; }
+  .dark .tinted-amber   { background-color: rgba(245, 158,  11, 0.18); }
+  .dark .tinted-blue    { background-color: rgba( 37,  99, 235, 0.18); }
+  .dark .tinted-green   { background-color: rgba(  0, 168, 107, 0.18); }
+  .dark .tinted-red     { background-color: rgba(220,  38,  38, 0.18); }
+  .dark .tinted-purple  { background-color: rgba(124,  58, 237, 0.18); }
+  .dark .tinted-orange  { background-color: rgba(234,  88,  12, 0.18); }
+  .dark .tinted-emerald { background-color: rgba(  4, 120,  87, 0.18); }
+  .dark .tinted-gray    { background-color: rgba(100, 116, 139, 0.18); }
+  .tinted-amber:hover   { background-color: rgba(245, 158,  11, 0.18); }
+  .tinted-blue:hover    { background-color: rgba( 37,  99, 235, 0.18); }
+  .tinted-green:hover   { background-color: rgba(  0, 168, 107, 0.18); }
+  .tinted-red:hover     { background-color: rgba(220,  38,  38, 0.18); }
+  .tinted-purple:hover  { background-color: rgba(124,  58, 237, 0.18); }
+  .tinted-orange:hover  { background-color: rgba(234,  88,  12, 0.18); }
+  .tinted-emerald:hover { background-color: rgba(  4, 120,  87, 0.18); }
+  .tinted-gray:hover    { background-color: rgba(100, 116, 139, 0.18); }
+  .dark .tinted-amber:hover   { background-color: rgba(245, 158,  11, 0.26); }
+  .dark .tinted-blue:hover    { background-color: rgba( 37,  99, 235, 0.26); }
+  .dark .tinted-green:hover   { background-color: rgba(  0, 168, 107, 0.26); }
+  .dark .tinted-red:hover     { background-color: rgba(220,  38,  38, 0.26); }
+  .dark .tinted-purple:hover  { background-color: rgba(124,  58, 237, 0.26); }
+  .dark .tinted-orange:hover  { background-color: rgba(234,  88,  12, 0.26); }
+  .dark .tinted-emerald:hover { background-color: rgba(  4, 120,  87, 0.26); }
+  .dark .tinted-gray:hover    { background-color: rgba(100, 116, 139, 0.26); }
+
+@layer utilities {
 
   .border:not([class*="border-0"]) {
     border-width: 2px;
