@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         user_id: admin.id,
         title,
         message: locationName,
-        link: `/anfragen/${id}`,
+        link: `/auftraege/vermietentwurf/${id}`,
       });
     }
   }

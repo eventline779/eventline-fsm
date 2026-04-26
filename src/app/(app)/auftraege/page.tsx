@@ -182,7 +182,7 @@ export default function AuftraegePage() {
           </button>
           {!showArchive && (
             <>
-              <Link href="/anfragen/neu">
+              <Link href="/auftraege/vermietentwurf/neu">
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Neuer Vermietentwurf
@@ -359,7 +359,7 @@ export default function AuftraegePage() {
                   </Button>
                 ) : (
                   <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
-                    <Link href="/anfragen/neu">
+                    <Link href="/auftraege/vermietentwurf/neu">
                       <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                         <Plus className="h-4 w-4 mr-2" />
                         Neuer Vermietentwurf
@@ -390,7 +390,7 @@ export default function AuftraegePage() {
             // Bei Entwurf/Vermietentwurf macht Terminplanung noch keinen Sinn.
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
-            const detailHref = isAnfrage ? `/anfragen/${job.id}` : `/auftraege/${job.id}`;
+            const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
             return (
             <Link key={job.id} href={detailHref} className="block">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${

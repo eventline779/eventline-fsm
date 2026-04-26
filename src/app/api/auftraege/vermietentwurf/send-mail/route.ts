@@ -4,7 +4,7 @@ import { Resend } from "resend";
 
 export const maxDuration = 60;
 
-// Vereinheitlichter Mail-Versand fuer die Mietanfrage-Pipeline.
+// Vereinheitlichter Mail-Versand fuer die Vermietentwurf-Pipeline.
 // step bestimmt Template:
 //   1 = Mietkonditionen (mit Confirm-Link, type=konditionen)
 //   3 = Angebot          (mit Confirm-Link, type=angebot)
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   if (step === 1) {
     subject = `Mietkonditionen: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
     intro = "Vielen Dank f&uuml;r Ihre Anfrage. Anbei finden Sie unsere Mietkonditionen:";
-    const url = `${APP_URL}/api/anfragen/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=konditionen`;
+    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=konditionen`;
     cta = `
       <div style="text-align:center;margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#16a34a;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   } else if (step === 3) {
     subject = `Angebot: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
     intro = "Vielen Dank f&uuml;r die Best&auml;tigung unserer Konditionen. Anbei erhalten Sie unser Angebot:";
-    const url = `${APP_URL}/api/anfragen/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=angebot`;
+    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=angebot`;
     cta = `
       <div style="text-align:center;margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#16a34a;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">

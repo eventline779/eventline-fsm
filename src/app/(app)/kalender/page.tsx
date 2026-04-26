@@ -86,10 +86,10 @@ export default function KalenderPage() {
           const cust = (j.customer as unknown as { name: string })?.name;
           if (j.status === "anfrage") {
             calItems.push({
-              id: j.id, title: `Anfrage: ${cust || j.title}`, date: d, endDate: endD,
+              id: j.id, title: `Vermietentwurf: ${cust || j.title}`, date: d, endDate: endD,
               time: null, endTime: null,
               type: "vermietung", color: "text-amber-700", bgColor: "bg-amber-50 border-amber-200", dotColor: "bg-amber-500",
-              link: `/anfragen/${j.id}`,
+              link: `/auftraege/vermietentwurf/${j.id}`,
               meta: [loc, j.guest_count ? `${j.guest_count} Pers.` : null].filter(Boolean).join(" · "),
             });
           } else {

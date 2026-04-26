@@ -8,7 +8,7 @@
 //   Phase 2 "confirm": Bestaetigen ruft onAdvance(); der Aufrufer entscheidet,
 //     ob ein einfaches Step-+1 oder ein Convert-zu-Auftrag passieren soll.
 //
-// Verwendet auf /anfragen/[id] (Detailseite) und /auftraege (inline pro Karte).
+// Verwendet auf /auftraege/vermietentwurf/[id] (Detailseite) und /auftraege (inline pro Karte).
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -80,7 +80,7 @@ export function SendStepModal({
     setCc("");
     setMessage("");
     (async () => {
-      const prefix = `anfragen/${jobId}/s${step}/`;
+      const prefix = `vermietentwurf/${jobId}/s${step}/`;
       const { data } = await supabase
         .from("documents")
         .select("id, name, storage_path")
@@ -99,7 +99,7 @@ export function SendStepModal({
     setUploading(true);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `anfragen/${jobId}/s${step}/${Date.now()}_${safeName}`;
+      const path = `vermietentwurf/${jobId}/s${step}/${Date.now()}_${safeName}`;
       const fd = new FormData();
       fd.append("file", file);
       fd.append("path", path);
@@ -160,7 +160,7 @@ export function SendStepModal({
     }
     setSending(true);
     try {
-      const res = await fetch("/api/anfragen/send-mail", {
+      const res = await fetch("/api/auftraege/vermietentwurf/send-mail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

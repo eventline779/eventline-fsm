@@ -1,7 +1,7 @@
 "use client";
 
 // Wiederverwendbarer Donut-Chart fuer Lifecycle-/Pipeline-Uebersichten.
-// Verwendet auf /auftraege (Status-Verteilung) und /anfragen (Step-Verteilung).
+// Verwendet auf /auftraege (Status-Verteilung).
 // Stil: Outline-only Tortenstuecke mit parallelen Cap-Kanten + getoenter Fuellung
 // (.donut-segment Klasse). Single source of truth fuer Optik der Status-Charts.
 

@@ -13,7 +13,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
 
-const RETURN_PATH = "/anfragen/neu";
+const RETURN_PATH = "/auftraege/vermietentwurf/neu";
 
 interface DraftForm {
   customer_id: string;
@@ -149,7 +149,7 @@ function NeueAnfragePageContent() {
     }
     toast.success(`Vermietentwurf INT-${inserted.job_number} angelegt`);
     window.dispatchEvent(new Event("jobs:invalidate"));
-    router.push(`/anfragen/${inserted.id}`);
+    router.push(`/auftraege/vermietentwurf/${inserted.id}`);
   }
 
   return (

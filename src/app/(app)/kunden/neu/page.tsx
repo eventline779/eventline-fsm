@@ -12,7 +12,7 @@ import { ArrowLeft, Save, Building2, User, Globe, ArrowLeftRight } from "lucide-
 import { toast } from "sonner";
 
 // Erlaubte Return-Pfade — verhindert Open-Redirect via ?return=https://evil.example
-const ALLOWED_RETURN_PREFIXES = ["/anfragen/", "/auftraege/"];
+const ALLOWED_RETURN_PREFIXES = ["/auftraege/"];
 
 function isAllowedReturn(p: string | null | undefined): p is string {
   if (!p) return false;

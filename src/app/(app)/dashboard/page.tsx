@@ -208,7 +208,7 @@ export default function DashboardPage() {
 
   const quickActions = [
     { href: "/auftraege/neu", label: "Neuer Auftrag", icon: ClipboardList, desc: "Auftrag erstellen" },
-    { href: "/anfragen/neu", label: "Neuer Vermietentwurf", icon: Inbox, desc: "Vermietentwurf erfassen" },
+    { href: "/auftraege/vermietentwurf/neu", label: "Neuer Vermietentwurf", icon: Inbox, desc: "Vermietentwurf erfassen" },
     { href: "/kunden/neu", label: "Neuer Kunde", icon: Users, desc: "Kunde anlegen" },
     { href: "/zeiterfassung", label: "Einstempeln", icon: Clock, desc: "Zeit erfassen" },
   ];

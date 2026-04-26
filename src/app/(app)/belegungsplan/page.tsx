@@ -358,7 +358,7 @@ export default function BelegungsplanPage() {
               <Link
                 key={`${b.source}-${b.id}`}
                 href={
-                  b.source === "job" ? `/auftraege/${b.id}` : `/anfragen/${b.id}`
+                  b.source === "job" ? `/auftraege/${b.id}` : `/auftraege/vermietentwurf/${b.id}`
                 }
                 onClick={() => setSelectedCell(null)}
                 className="block rounded-lg border p-3 hover:bg-muted/40 transition"
