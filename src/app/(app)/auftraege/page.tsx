@@ -485,9 +485,22 @@ export default function AuftraegePage() {
                         )}
                       </div>
                       {noTermin && (
-                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                        </p>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              router.push(`/auftraege/${job.id}?termin=neu`);
+                            }}
+                            className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                          >
+                            Termin planen
+                          </button>
+                        </div>
                       )}
                       {job.description && (
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>

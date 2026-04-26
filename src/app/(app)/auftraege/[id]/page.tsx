@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 export default function AuftragDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [job, setJob] = useState<Job | null>(null);
@@ -47,6 +48,19 @@ export default function AuftragDetailPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => { loadAll(); }, [id]);
+
+  // Auto-open Termin-Formular wenn von der Liste mit ?termin=neu hierher navigiert wurde.
+  useEffect(() => {
+    if (searchParams.get("termin") === "neu") {
+      setShowApptForm(true);
+      // Param entfernen, damit Refresh nicht erneut das Formular oeffnet
+      router.replace(`/auftraege/${id}`, { scroll: false });
+      // Sanft zum Termin-Bereich scrollen, sobald die Seite geladen ist
+      setTimeout(() => {
+        document.getElementById("termin-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [searchParams, id, router]);
 
   async function loadAll() {
     const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
@@ -441,7 +455,7 @@ export default function AuftragDetailPage() {
       )}
 
       {/* Termine */}
-      <Card className="bg-white">
+      <Card id="termin-form" className="bg-white scroll-mt-4">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Calendar className="h-4 w-4" />Termine ({appointments.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}><Plus className="h-4 w-4 mr-1" />Termin</Button>
