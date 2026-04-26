@@ -13,6 +13,7 @@ import {
   Search,
   ClipboardList,
   Calendar,
+  CalendarPlus,
   MapPin,
   User,
   AlertTriangle,
@@ -506,22 +507,41 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-                    {/* Bearbeiten-Button — nur bei Entwürfen direkt aus der Liste.
-                        Bei echten Aufträgen erfolgt das Bearbeiten über die Detail-Page. */}
-                    {job.status === "entwurf" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          router.push(`/auftraege/${job.id}/bearbeiten`);
-                        }}
-                        className="shrink-0 p-2.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-                        aria-label="Bearbeiten"
-                        title="Entwurf bearbeiten"
-                      >
-                        <Pencil className="h-5 w-5" />
-                      </button>
+                    {/* Action-Buttons rechts: Termin planen (bei noTermin) + Pencil (bei Entwurf).
+                        Pencil steht ganz rechts, Termin-Button links davon — in Aktion-Reihenfolge. */}
+                    {(noTermin || job.status === "entwurf") && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {noTermin && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(`/auftraege/${job.id}?termin=neu`);
+                            }}
+                            className="p-2.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                            aria-label="Termin planen"
+                            title="Termin planen"
+                          >
+                            <CalendarPlus className="h-5 w-5" />
+                          </button>
+                        )}
+                        {job.status === "entwurf" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(`/auftraege/${job.id}/bearbeiten`);
+                            }}
+                            className="p-2.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+                            aria-label="Bearbeiten"
+                            title="Entwurf bearbeiten"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </CardContent>
