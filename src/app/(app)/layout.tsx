@@ -132,10 +132,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="bg-gradient-to-b from-[#0a0a0a] to-[#111] text-white border-white/5 w-[280px] p-0">
-          <SheetHeader className="px-6 py-6 border-b border-white/5">
+        <SheetContent side="left" className="bg-sidebar text-sidebar-foreground border-sidebar-border w-[280px] p-0">
+          <SheetHeader className="px-6 py-6 border-b border-sidebar-border">
             <SheetTitle className="text-left">
-              <Logo size="md" variant="light" />
+              <span className="dark:hidden"><Logo size="md" variant="dark" /></span>
+              <span className="hidden dark:inline"><Logo size="md" variant="light" /></span>
             </SheetTitle>
           </SheetHeader>
           <nav className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]">
@@ -148,7 +149,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               return (
                 <div key={group.label || group.items[0]?.href}>
                   {group.label && (
-                    <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-white/25 uppercase">
+                    <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-sidebar-foreground/40 uppercase">
                       {group.label}
                     </p>
                   )}
@@ -170,16 +171,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         className={cn(
                           "group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all",
                           isActive
-                            ? "bg-white/10 text-white"
-                            : "text-white/40 hover:text-white/90 hover:bg-white/[0.05]"
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
                         )}
                       >
                         {Icon && (
                           <div className={cn(
                             "flex items-center justify-center w-7 h-7 rounded-md",
                             isActive
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-white/[0.03] text-white/30"
+                              ? "bg-red-500/20 text-red-500 dark:text-red-400"
+                              : "bg-sidebar-foreground/[0.06] text-sidebar-foreground/60"
                           )}>
                             <Icon className="h-4 w-4" />
                           </div>
@@ -197,7 +198,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="absolute bottom-[90px] left-3 right-3 space-y-0.5">
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
             >
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
@@ -205,7 +206,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {profile.role === "admin" && (
               <button
                 onClick={toggleSimplified}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
               >
                 {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                 {simplified ? "Alle Module" : "Vereinfacht"}
@@ -214,19 +215,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="absolute bottom-3 left-3 right-3">
-            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+            <div className="p-4 rounded-xl bg-sidebar-foreground/[0.04] border border-sidebar-border">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold">
                   {profile.full_name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">{profile.full_name}</p>
-                  <p className="text-[11px] text-white/30 capitalize">{profile.role}</p>
+                  <p className="text-sm font-semibold text-sidebar-foreground">{profile.full_name}</p>
+                  <p className="text-[11px] text-sidebar-foreground/50 capitalize">{profile.role}</p>
                 </div>
               </div>
               <button
                 onClick={handleSignOut}
-                className="mt-3 w-full text-left text-[13px] text-white/30 hover:text-white/70 transition-colors"
+                className="mt-3 w-full text-left text-[13px] text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
               >
                 Abmelden
               </button>
