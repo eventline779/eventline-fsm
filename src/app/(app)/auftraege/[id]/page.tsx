@@ -284,38 +284,21 @@ export default function AuftragDetailPage() {
             )}
           </div>
         </div>
-        {/* Bearbeiten-Button im Header (auch bei nicht-Entwurf) */}
-        <Link href={`/auftraege/${id}/bearbeiten`}>
-          <button
-            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            title="Bearbeiten"
-            aria-label="Bearbeiten"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        </Link>
       </div>
 
-      {/* Status Actions — subtil im App-Stil, nur 'Freigeben' kräftig (lila) */}
-      {availableActions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {availableActions.map((a) => {
+      {/* Aktionen: Status-Übergänge + Bearbeiten neben Stornieren */}
+      <div className="flex flex-wrap gap-2">
+        {availableActions
+          .filter((a) => a.to !== "storniert")
+          .map((a) => {
             const cls =
               a.variant === "primary"
                 ? "bg-purple-600 hover:bg-purple-700 text-white"
-                : a.variant === "destructive"
-                ? "border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50"
                 : "border border-border text-foreground hover:bg-muted";
             return (
               <button
                 key={a.to}
-                onClick={() => {
-                  if (a.to === "storniert") {
-                    setShowCancelConfirm(true);
-                    return;
-                  }
-                  updateStatus(a.to);
-                }}
+                onClick={() => updateStatus(a.to)}
                 className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium transition-all ${cls}`}
               >
                 {a.icon}
@@ -323,8 +306,29 @@ export default function AuftragDetailPage() {
               </button>
             );
           })}
-        </div>
-      )}
+
+        {/* Bearbeiten — neben Stornieren */}
+        <Link href={`/auftraege/${id}/bearbeiten`}>
+          <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-muted transition-all">
+            <Pencil className="h-4 w-4" />
+            Bearbeiten
+          </button>
+        </Link>
+
+        {/* Stornieren als Letztes */}
+        {availableActions
+          .filter((a) => a.to === "storniert")
+          .map((a) => (
+            <button
+              key={a.to}
+              onClick={() => setShowCancelConfirm(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-all"
+            >
+              {a.icon}
+              {a.label}
+            </button>
+          ))}
+      </div>
 
       {/* Info */}
       <Card className="bg-white">

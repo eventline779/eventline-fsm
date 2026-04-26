@@ -429,11 +429,11 @@ export default function AuftraegePage() {
                           e.stopPropagation();
                           router.push(`/auftraege/${job.id}/bearbeiten`);
                         }}
-                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+                        className="shrink-0 p-2.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
                         aria-label="Bearbeiten"
                         title="Entwurf bearbeiten"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-5 w-5" />
                       </button>
                     )}
                   </div>
