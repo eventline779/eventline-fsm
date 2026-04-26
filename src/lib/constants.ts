@@ -27,6 +27,16 @@ export interface RequestStep {
   docType?: "konditionen" | "angebot" | "vertrag";
 }
 
+// Haeufigste Veranstaltungstypen einer Anfrage. UI zeigt diese als Dropdown,
+// Letztes Item ist "Sonstige" — dann oeffnet sich ein Textfeld fuer Freitext.
+export const EVENT_TYPES = [
+  "Konzert",
+  "Theater",
+  "Firmenanlass",
+  "Hochzeit",
+  "Privatfeier",
+] as const;
+
 export const REQUEST_STEPS: readonly RequestStep[] = [
   { step: 1, label: "Konditionen", action: "Konditionen senden",       docType: "konditionen", waitFor: "Kunde bestätigt Konditionen" },
   { step: 2, label: "Bestätigt",   action: "Bestätigung erhalten",                              waitFor: "Kunde meldet sich" },

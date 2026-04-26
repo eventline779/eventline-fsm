@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
+import { EVENT_TYPES } from "@/lib/constants";
 import type { Customer, Location } from "@/types";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
@@ -38,6 +39,8 @@ export default function NeueAnfragePage() {
     description: "",
     extended_services: "",
   });
+  // Event-Typ: Toggle zwischen Preset-Auswahl und Sonstige (Freitext)
+  const [eventTypeCustom, setEventTypeCustom] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -60,14 +63,11 @@ export default function NeueAnfragePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.customer_id) {
-      toast.error("Kunde ist Pflicht");
-      return;
-    }
-    if (!form.title.trim()) {
-      toast.error("Titel ist Pflicht");
-      return;
-    }
+    if (!form.title.trim()) { toast.error("Titel ist Pflicht"); return; }
+    if (!form.customer_id) { toast.error("Kunde ist Pflicht"); return; }
+    if (!form.location_id) { toast.error("Location ist Pflicht"); return; }
+    if (!form.event_type.trim()) { toast.error("Veranstaltungstyp ist Pflicht"); return; }
+    if (!form.guest_count.trim()) { toast.error("Personenanzahl ist Pflicht"); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: inserted, error } = await supabase
@@ -77,14 +77,14 @@ export default function NeueAnfragePage() {
         description: form.description.trim() || null,
         status: "anfrage",
         priority: "normal",
-        job_type: form.location_id ? "location" : "extern",
+        job_type: "location",
         customer_id: form.customer_id,
-        location_id: form.location_id || null,
+        location_id: form.location_id,
         start_date: form.start_date || null,
         end_date: form.end_date || null,
         request_step: 1,
-        event_type: form.event_type.trim() || null,
-        guest_count: form.guest_count ? parseInt(form.guest_count, 10) : null,
+        event_type: form.event_type.trim(),
+        guest_count: parseInt(form.guest_count, 10),
         extended_services: form.extended_services.trim() || null,
         created_by: user?.id,
       })
@@ -161,7 +161,7 @@ export default function NeueAnfragePage() {
         </div>
 
         <div className="space-y-2">
-          <SectionLabel>Location (optional)</SectionLabel>
+          <SectionLabel>Location *</SectionLabel>
           <SearchableSelect
             value={form.location_id}
             onChange={(id) => update("location_id", id)}
@@ -171,7 +171,14 @@ export default function NeueAnfragePage() {
               sub: [l.address_street, l.address_zip, l.address_city].filter(Boolean).join(", "),
             }))}
             placeholder="Location auswählen…"
+            required
           />
+          {locations !== null && locations.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Noch keine Locations.{" "}
+              <Link href="/standorte" className="underline">Jetzt anlegen</Link>
+            </p>
+          )}
         </div>
 
         <hr className="border-border/50" />
@@ -193,19 +200,60 @@ export default function NeueAnfragePage() {
 
         <hr className="border-border/50" />
 
-        {/* Was für ein Event */}
+        {/* Veranstaltungstyp — Preset-Pills + "Sonstige" mit Freitext */}
         <div className="space-y-2">
-          <SectionLabel>Eckdaten</SectionLabel>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Veranstaltungstyp</p>
-              <Input placeholder="z.B. Konzert, Theater" value={form.event_type} onChange={(e) => update("event_type", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Personen (geplant)</p>
-              <Input type="number" placeholder="z.B. 80" value={form.guest_count} onChange={(e) => update("guest_count", e.target.value)} />
-            </div>
+          <SectionLabel>Veranstaltungstyp *</SectionLabel>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {EVENT_TYPES.map((t) => {
+              const active = !eventTypeCustom && form.event_type === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setEventTypeCustom(false); update("event_type", t); }}
+                  className={`px-3 py-2 rounded-xl border text-sm transition-all ${
+                    active
+                      ? "bg-foreground/[0.08] border-foreground/40 font-semibold"
+                      : "border-border text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => { setEventTypeCustom(true); update("event_type", ""); }}
+              className={`px-3 py-2 rounded-xl border text-sm transition-all ${
+                eventTypeCustom
+                  ? "bg-foreground/[0.08] border-foreground/40 font-semibold"
+                  : "border-border text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+              }`}
+            >
+              Sonstige…
+            </button>
           </div>
+          {eventTypeCustom && (
+            <Input
+              placeholder="z.B. Workshop, Generalversammlung, Vereinsfeier"
+              value={form.event_type}
+              onChange={(e) => update("event_type", e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+
+        {/* Personenanzahl */}
+        <div className="space-y-2">
+          <SectionLabel>Personen (geplant) *</SectionLabel>
+          <Input
+            type="number"
+            placeholder="z.B. 80"
+            value={form.guest_count}
+            onChange={(e) => update("guest_count", e.target.value)}
+            required
+            min={1}
+          />
         </div>
 
         <div className="space-y-2">
