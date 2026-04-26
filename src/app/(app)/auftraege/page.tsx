@@ -389,11 +389,13 @@ export default function AuftraegePage() {
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
                 <CardContent className="p-4">
-                  {/* Drei-Spalten-Layout: Inhalt links, vertikaler Trennstrich,
-                      Tag+Tracker mittig, Action ganz rechts. items-stretch
-                      damit der Trennstrich die volle Card-Hoehe einnimmt. */}
+                  {/* Layout: Linke Card-Haelfte = Inhalt, vertikaler Trennstrich
+                      auf der Card-Mitte, rechte Card-Haelfte = Tag+Tracker
+                      direkt nach dem Strich + Action ganz rechts.
+                      Beide Aussen-Spalten flex-1 mit min-w-0, damit der Strich
+                      gleichmaessig zur Mitte rutscht. */}
                   <div className="flex items-stretch gap-3">
-                    {/* LINKS: Titel + Kunde + Beschreibung */}
+                    {/* LINKS (50%): Titel + Kunde + Beschreibung */}
                     <div className="min-w-0 flex-1 self-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <JobNumber number={job.job_number} />
@@ -430,37 +432,34 @@ export default function AuftraegePage() {
                       )}
                     </div>
 
-                    {/* VERTIKALER TRENNSTRICH — gleiche Optik/Opacity wie der
-                        Card-Rand (foreground/10). my-2 sodass er die Ober- und
-                        Unterkante nicht beruehrt. */}
+                    {/* VERTIKALER TRENNSTRICH — auf der Card-Mitte. Gleiche Optik
+                        wie der Card-Rand (foreground/10). my-2 sodass er die
+                        Ober- und Unterkante nicht beruehrt. */}
                     <div className="self-stretch my-2 w-px bg-foreground/10 shrink-0" aria-hidden="true" />
 
-                    {/* MITTE: Tag (oben, horizontal mittig in der Spalte) +
-                        Tracker direkt darunter, linksbuendig zum Tag.
-                        items-start wird unten am Tracker-Rand der Tag-Breite
-                        nachgezogen indem das Tag in einem self-center-Wrapper
-                        liegt. */}
-                    <div className="flex flex-col items-center gap-2 shrink-0 self-center">
-                      <div className="flex items-center gap-2">
-                        {job.priority === "dringend" && isActive && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                            <AlertCircle className="h-3 w-3" />
-                            Dringend
-                          </span>
-                        )}
-                        {job.status !== "offen" && (
-                          <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                            {JOB_STATUS[job.status].label}
-                          </span>
+                    {/* RECHTS (50%): Tag+Tracker direkt nach dem Strich +
+                        Action ganz rechts. Tag und Tracker linksbuendig
+                        zueinander (items-start). */}
+                    <div className="min-w-0 flex-1 self-center flex items-center gap-3">
+                      <div className="flex flex-col items-start gap-2 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {job.priority === "dringend" && isActive && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                              <AlertCircle className="h-3 w-3" />
+                              Dringend
+                            </span>
+                          )}
+                          {job.status !== "offen" && (
+                            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
+                              {JOB_STATUS[job.status].label}
+                            </span>
+                          )}
+                        </div>
+                        {isAnfrage && (
+                          <RequestStepTracker currentStep={currentStep} size="sm" />
                         )}
                       </div>
-                      {isAnfrage && (
-                        <RequestStepTracker currentStep={currentStep} size="sm" />
-                      )}
-                    </div>
-
-                    {/* RECHTS: Action-Slot, vertikal mittig */}
-                    <div className="flex items-center shrink-0 self-center">
+                      <div className="ml-auto flex items-center shrink-0">
                       {isAnfrage ? (
                         isMailStep ? (
                           <div className="flex items-center gap-0.5">
@@ -538,6 +537,7 @@ export default function AuftraegePage() {
                           </div>
                         </div>
                       ) : null}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
