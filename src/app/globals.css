@@ -82,14 +82,14 @@
   --sidebar-accent-foreground: oklch(0.18 0 0);
   --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Light: -300er Stufe */
-  --status-purple: #d8b4fe;
-  --status-gray: #d1d5db;
-  --status-green: #86efac;
-  --status-red: #fca5a5;
-  --status-blue: #93c5fd;
-  --status-orange: #fdba74;
-  --status-emerald: #6ee7b7;
+  /* Diagramm-Status-Farben Light: -400er Stufe (kraeftig genug, kein Pastell-Verschwimmen) */
+  --status-purple: #c084fc;
+  --status-gray: #9ca3af;
+  --status-green: #4ade80;
+  --status-red: #f87171;
+  --status-blue: #60a5fa;
+  --status-orange: #fb923c;
+  --status-emerald: #34d399;
 }
 
 .dark {
@@ -124,14 +124,14 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
-  /* Diagramm-Status-Farben Dark: ein Tacken transparenter — 50/65 statt 55/70. */
-  --status-purple: rgba(168, 85, 247, 0.5);
-  --status-gray: rgba(107, 114, 128, 0.5);
-  --status-green: rgba(74, 222, 128, 0.65);
-  --status-red: rgba(239, 68, 68, 0.5);
-  --status-blue: rgba(59, 130, 246, 0.5);
-  --status-orange: rgba(249, 115, 22, 0.5);
-  --status-emerald: rgba(16, 185, 129, 0.5);
+  /* Diagramm-Status-Farben Dark: -300er Stufe (heller fuer guten Kontrast gegen dunkle BG) */
+  --status-purple: #d8b4fe;
+  --status-gray: #9ca3af;
+  --status-green: #86efac;
+  --status-red: #fca5a5;
+  --status-blue: #93c5fd;
+  --status-orange: #fdba74;
+  --status-emerald: #6ee7b7;
 }
 
 @layer base {

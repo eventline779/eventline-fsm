@@ -728,31 +728,35 @@ export default function VertriebPage() {
         ].filter((s) => s.count > 0);
 
         const total = segments.reduce((sum, s) => sum + s.count, 0);
-        const radius = 70;
-        const strokeWidth = 26;
+        const radius = 72;
+        const strokeWidth = 18;
         const circumference = 2 * Math.PI * radius;
+        const gapPx = segments.length > 1 ? 4 : 0;
         let offset = 0;
 
         return (
           <Card className="bg-white">
             <CardContent className="p-5">
-              <h2 className="text-sm font-semibold mb-4">Pipeline-Übersicht</h2>
-              <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="flex flex-col md:flex-row items-start gap-6">
                 {/* Donut Chart */}
                 <div className="relative shrink-0">
-                  <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
+                  <svg
+                    width={radius * 2 + strokeWidth}
+                    height={radius * 2 + strokeWidth}
+                    className="-rotate-90"
+                  >
                     <circle
                       cx={radius + strokeWidth / 2}
                       cy={radius + strokeWidth / 2}
                       r={radius}
                       fill="none"
-                      stroke="#f3f4f6"
+                      stroke="currentColor"
                       strokeWidth={strokeWidth}
-                      className="dark:stroke-gray-800"
+                      className="text-foreground/[0.04] dark:text-foreground/[0.06]"
                     />
                     {segments.map((s, i) => {
                       const portion = s.count / total;
-                      const dash = portion * circumference;
+                      const dash = Math.max(portion * circumference - gapPx, 0.001);
                       const gap = circumference - dash;
                       const el = (
                         <circle
@@ -765,35 +769,35 @@ export default function VertriebPage() {
                           strokeWidth={strokeWidth}
                           strokeDasharray={`${dash} ${gap}`}
                           strokeDashoffset={-offset}
-                          strokeLinecap="butt"
+                          strokeLinecap="round"
                         />
                       );
-                      offset += dash;
+                      offset += dash + gapPx;
                       return el;
                     })}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-bold">{total}</span>
-                    <span className="text-xs text-muted-foreground">Leads</span>
+                    <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Leads</span>
                   </div>
                 </div>
 
                 {/* Legende */}
-                <div className="flex-1 w-full space-y-2">
+                <div className="flex-1 w-full space-y-2.5">
                   {segments.map((s) => {
                     const pct = total > 0 ? (s.count / total) * 100 : 0;
                     return (
                       <div key={s.label} className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-medium truncate">{s.label}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
+                            <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                               <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
                             </span>
                           </div>
-                          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
-                            <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                          <div className="h-[3px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
                           </div>
                         </div>
                       </div>
