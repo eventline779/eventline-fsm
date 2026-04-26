@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Job, RentalRequest, JobAppointment, Profile } from "@/types";
+import type { Job, JobAppointment, Profile } from "@/types";
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,7 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { JOB_STATUS, RENTAL_STATUS } from "@/lib/constants";
+import { JOB_STATUS } from "@/lib/constants";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -64,9 +64,8 @@ export default function KalenderPage() {
 
   useEffect(() => {
     async function load() {
-      const [jobsRes, rentalsRes, apptsRes, profRes, activeJobsRes] = await Promise.all([
+      const [jobsRes, apptsRes, profRes, activeJobsRes] = await Promise.all([
         supabase.from("jobs").select("*, job_number, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
-        supabase.from("rental_requests").select("*, customer:customers(name), location:locations(name)").not("event_date", "is", null),
         supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
         supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
         supabase.from("jobs").select("id, title, job_number").eq("status", "offen").neq("is_deleted", true).order("created_at", { ascending: false }),
@@ -76,40 +75,32 @@ export default function KalenderPage() {
 
       const calItems: CalendarItem[] = [];
 
-      // Aufträge
+      // Aufträge + Anfragen — beide aus jobs, branchen via status
       if (jobsRes.data) {
         for (const j of jobsRes.data as unknown as Job[]) {
           if (!j.start_date) continue;
+          if (j.status === "storniert") continue;
           const d = new Date(j.start_date);
           const endD = j.end_date ? new Date(j.end_date) : undefined;
           const loc = (j.location as unknown as { name: string })?.name;
           const cust = (j.customer as unknown as { name: string })?.name;
-          calItems.push({
-            id: j.id, title: `INT-${(j as any).job_number} ${j.title}`, date: d, endDate: endD,
-            time: null,
-            endTime: null,
-            type: "auftrag", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200", dotColor: "bg-blue-500",
-            link: `/auftraege/${j.id}`,
-            meta: [cust, loc].filter(Boolean).join(" · "),
-          });
-        }
-      }
-
-      // Vermietungen
-      if (rentalsRes.data) {
-        for (const r of rentalsRes.data as unknown as RentalRequest[]) {
-          if (!r.event_date) continue;
-          const d = new Date(r.event_date);
-          const endD = r.event_end_date ? new Date(r.event_end_date) : undefined;
-          const cust = (r.customer as unknown as { name: string })?.name;
-          const loc = (r.location as unknown as { name: string })?.name;
-          calItems.push({
-            id: r.id, title: `Vermietung: ${cust || "Unbekannt"}`, date: d, endDate: endD,
-            time: null,
-            type: "vermietung", color: "text-amber-700", bgColor: "bg-amber-50 border-amber-200", dotColor: "bg-amber-500",
-            link: `/anfragen/${r.id}`,
-            meta: [loc, r.guest_count ? `${r.guest_count} Pers.` : null].filter(Boolean).join(" · "),
-          });
+          if (j.status === "anfrage") {
+            calItems.push({
+              id: j.id, title: `Anfrage: ${cust || j.title}`, date: d, endDate: endD,
+              time: null, endTime: null,
+              type: "vermietung", color: "text-amber-700", bgColor: "bg-amber-50 border-amber-200", dotColor: "bg-amber-500",
+              link: `/anfragen/${j.id}`,
+              meta: [loc, j.guest_count ? `${j.guest_count} Pers.` : null].filter(Boolean).join(" · "),
+            });
+          } else {
+            calItems.push({
+              id: j.id, title: `INT-${(j as { job_number: number | null }).job_number} ${j.title}`, date: d, endDate: endD,
+              time: null, endTime: null,
+              type: "auftrag", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200", dotColor: "bg-blue-500",
+              link: `/auftraege/${j.id}`,
+              meta: [cust, loc].filter(Boolean).join(" · "),
+            });
+          }
         }
       }
 

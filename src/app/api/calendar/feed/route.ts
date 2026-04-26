@@ -28,16 +28,15 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient();
 
-  const [jobsRes, rentalsRes, apptsRes] = await Promise.all([
-    supabase.from("jobs").select("id, job_number, title, description, start_date, end_date, customer:customers(name), location:locations(name, address_street, address_zip, address_city)").neq("is_deleted", true).not("start_date", "is", null),
-    supabase.from("rental_requests").select("id, event_date, event_end_date, event_type, customer:customers(name), location:locations(name, address_street, address_zip, address_city)").not("event_date", "is", null).neq("status", "abgelehnt"),
+  const [jobsRes, apptsRes] = await Promise.all([
+    supabase.from("jobs").select("id, status, job_number, title, description, start_date, end_date, event_type, customer:customers(name), location:locations(name, address_street, address_zip, address_city)").neq("is_deleted", true).neq("status", "storniert").not("start_date", "is", null),
     supabase.from("job_appointments").select("id, title, description, start_time, end_time, assignee:profiles!assigned_to(full_name), job:jobs(title, job_number)"),
   ]);
 
   const events: string[] = [];
   const now = formatDateUTC(new Date());
 
-  // Aufträge
+  // Aufträge + Anfragen — beide aus jobs, branchen via status
   if (jobsRes.data) {
     for (const j of jobsRes.data as any[]) {
       const start = formatDateOnly(j.start_date);
@@ -46,42 +45,18 @@ export async function GET(request: NextRequest) {
       const end = endDate.toISOString().split("T")[0].replace(/-/g, "");
       const cust = j.customer?.name || "";
       const loc = j.location?.name || "";
-      const locAddress = j.location ? [j.location.address_street, `${j.location.address_zip || ""} ${j.location.address_city || ""}`].filter((s) => s?.trim()).join(", ") : "";
+      const locAddress = j.location ? [j.location.address_street, `${j.location.address_zip || ""} ${j.location.address_city || ""}`].filter((s: string | null) => s?.trim()).join(", ") : "";
+      const isAnfrage = j.status === "anfrage";
       events.push([
         "BEGIN:VEVENT",
-        `UID:job-${j.id}@eventline-basel.com`,
+        `UID:${isAnfrage ? "rental" : "job"}-${j.id}@eventline-basel.com`,
         `DTSTAMP:${now}`,
         `DTSTART;VALUE=DATE:${start}`,
         `DTEND;VALUE=DATE:${end}`,
-        `SUMMARY:${escape(`INT-${j.job_number} · ${j.title}`)}`,
-        `DESCRIPTION:${escape([cust, j.description].filter(Boolean).join(" — "))}`,
+        `SUMMARY:${escape(isAnfrage ? `Anfrage: ${cust || j.title}` : `INT-${j.job_number} · ${j.title}`)}`,
+        `DESCRIPTION:${escape([cust, j.event_type, j.description].filter(Boolean).join(" — "))}`,
         loc ? `LOCATION:${escape([loc, locAddress].filter(Boolean).join(", "))}` : "",
-        "CATEGORIES:Auftrag",
-        "END:VEVENT",
-      ].filter(Boolean).join("\r\n"));
-    }
-  }
-
-  // Vermietungen
-  if (rentalsRes.data) {
-    for (const r of rentalsRes.data as any[]) {
-      const start = formatDateOnly(r.event_date);
-      const endDate = r.event_end_date ? new Date(r.event_end_date) : new Date(r.event_date);
-      endDate.setDate(endDate.getDate() + 1);
-      const end = endDate.toISOString().split("T")[0].replace(/-/g, "");
-      const cust = r.customer?.name || "";
-      const loc = r.location?.name || "";
-      const locAddress = r.location ? [r.location.address_street, `${r.location.address_zip || ""} ${r.location.address_city || ""}`].filter((s) => s?.trim()).join(", ") : "";
-      events.push([
-        "BEGIN:VEVENT",
-        `UID:rental-${r.id}@eventline-basel.com`,
-        `DTSTAMP:${now}`,
-        `DTSTART;VALUE=DATE:${start}`,
-        `DTEND;VALUE=DATE:${end}`,
-        `SUMMARY:${escape(`Vermietung: ${cust}`)}`,
-        `DESCRIPTION:${escape([r.event_type, cust].filter(Boolean).join(" — "))}`,
-        loc ? `LOCATION:${escape([loc, locAddress].filter(Boolean).join(", "))}` : "",
-        "CATEGORIES:Vermietung",
+        `CATEGORIES:${isAnfrage ? "Vermietung" : "Auftrag"}`,
         "END:VEVENT",
       ].filter(Boolean).join("\r\n"));
     }

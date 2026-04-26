@@ -214,9 +214,11 @@ export default function HeutePage() {
     if (profile?.role === "admin") {
       const [anfrRes, todayJobsRes, weekJobsRes] = await Promise.all([
         supabase
-          .from("rental_requests")
+          .from("jobs")
           .select("id", { count: "exact", head: true })
-          .eq("status", "neu"),
+          .eq("status", "anfrage")
+          .eq("request_step", 1)
+          .neq("is_deleted", true),
         supabase
           .from("jobs")
           .select("id", { count: "exact", head: true })

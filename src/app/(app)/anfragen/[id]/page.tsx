@@ -1,622 +1,417 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RENTAL_STATUS } from "@/lib/constants";
-import type { RentalRequest, RentalStatus, Profile } from "@/types";
+import type { Job } from "@/types";
+import { REQUEST_STEPS } from "@/lib/constants";
 import {
-  ArrowLeft, Calendar, MapPin, Users, Send, Check, X,
-  FileText, Upload, Trash2, Download, CheckCircle, Circle,
+  ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X,
+  StickyNote, FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { JobNumber } from "@/components/job-number";
+import { RequestStepTracker } from "@/components/request-step-tracker";
 
-const STEPS = [
-  { key: "konditionen", label: "Konditionen", desc: "Konditionen senden" },
-  { key: "konditionenBestaetigung", label: "Bestätigung", desc: "Kunde bestätigt" },
-  { key: "angebot", label: "Angebot", desc: "Angebot senden" },
-  { key: "angebotAnnahme", label: "Annahme", desc: "Kunde nimmt an" },
-  { key: "vertragTermine", label: "Vertrag", desc: "Vertrag & Termine" },
-];
-
-function getStep(status: string): number {
-  if (status === "neu") return 0;                     // Schritt 1: Konditionen hochladen & senden
-  if (status === "konditionen_gesendet") return 1;    // Schritt 2: Warten auf Bestätigung Konditionen
-  if (status === "konditionen_bestaetigt") return 2;  // Schritt 3: Angebot senden
-  if (status === "angebot_gesendet") return 3;        // Schritt 4: Warten auf Annahme Angebot
-  if (status === "in_bearbeitung") return 1;          // Legacy: wie konditionen_gesendet
-  if (status === "bestaetigt") return 4;              // Schritt 5: Vertrag & Termine
-  if (status === "abgelehnt") return -1;
-  return 0;
-}
-
-function Modal({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!show) return null;
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="font-semibold text-gray-900 dark:text-white">{title}</h2>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-          </div>
-          <div className="p-6 space-y-4">{children}</div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-export default function VermietungDetailPage() {
+export default function AnfrageDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
-  const [request, setRequest] = useState<any>(null);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
 
-  // Angebot
-  const [showOffer, setShowOffer] = useState(false);
-  const [offerEmail, setOfferEmail] = useState("");
-  const [offerMessage, setOfferMessage] = useState("");
-  const [sendingOffer, setSendingOffer] = useState(false);
-  const [docs, setDocs] = useState<{ name: string; path: string }[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Vertrag
-  const [showContract, setShowContract] = useState(false);
-  const [contractEmail, setContractEmail] = useState("");
-  const [contractMessage, setContractMessage] = useState("");
-  const [sendingContract, setSendingContract] = useState(false);
-  const [contractDocs, setContractDocs] = useState<{ name: string; path: string }[]>([]);
-  const [uploadingContract, setUploadingContract] = useState(false);
-  const contractFileRef = useRef<HTMLInputElement>(null);
+  // Notizen — autosave
+  const [notesText, setNotesText] = useState("");
+  const [savedText, setSavedText] = useState("");
 
-  // Angebot (Schritt 3)
-  const [showAngebot, setShowAngebot] = useState(false);
-  const [angebotEmail, setAngebotEmail] = useState("");
-  const [angebotMessage, setAngebotMessage] = useState("");
-  const [sendingAngebot, setSendingAngebot] = useState(false);
-  const [angebotDocs, setAngebotDocs] = useState<{ name: string; path: string }[]>([]);
-  const [uploadingAngebot, setUploadingAngebot] = useState(false);
-  const angebotFileRef = useRef<HTMLInputElement>(null);
+  // Reject-Modal
+  const [showReject, setShowReject] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSaving, setRejectSaving] = useState(false);
 
-  // Termin
-  const [showTermin, setShowTermin] = useState(false);
-  const [terminForm, setTerminForm] = useState({ title: "", date: "", time: "08:00", end_time: "17:00", assigned_to: "" });
-
-  // Löschen
-  const [showDelete, setShowDelete] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deleteError, setDeleteError] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // Convert-Modal
+  const [showConvert, setShowConvert] = useState(false);
+  const [convertSaving, setConvertSaving] = useState(false);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 10000);
-    return () => clearInterval(interval);
+    loadJob();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function loadData() {
-    const { data } = await supabase
-      .from("rental_requests")
-      .select("*, customer:customers(name, email), location:locations(name, id)")
-      .eq("id", id).single();
-    if (data) {
-      setRequest(data);
-      setOfferEmail(data.customer?.email || "");
-      setAngebotEmail(data.customer?.email || "");
-      setContractEmail(data.customer?.email || "");
-      if (data.details) {
-        try {
-          const parsed = JSON.parse(data.details);
-          if (parsed._docs) setDocs(parsed._docs);
-          if (parsed._angebotDocs) setAngebotDocs(parsed._angebotDocs);
-          if (parsed._contractDocs) setContractDocs(parsed._contractDocs);
-        } catch {}
-      }
+  async function loadJob() {
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*, customer:customers(name), location:locations(name, address_street, address_zip, address_city)")
+      .eq("id", id)
+      .single();
+    if (error || !data) {
+      toast.error("Anfrage nicht gefunden");
+      router.push("/anfragen");
+      return;
     }
-    const { data: profs } = await supabase.from("profiles").select("*").eq("is_active", true).order("full_name");
-    if (profs) setProfiles(profs as Profile[]);
+    if (data.status !== "anfrage" && data.status !== "storniert") {
+      // Wurde bereits konvertiert -> redirect zur Auftrags-Detail
+      router.replace(`/auftraege/${data.id}`);
+      return;
+    }
+    setJob(data as unknown as Job);
+    setNotesText(data.notes ?? "");
+    setSavedText(data.notes ?? "");
+    setLoading(false);
   }
 
-  async function updateStatus(status: RentalStatus) {
-    await supabase.from("rental_requests").update({ status }).eq("id", id);
-    toast.success(`Status auf "${RENTAL_STATUS[status].label}" geändert`);
-    loadData();
+  // Notizen autosave debounced
+  useEffect(() => {
+    if (notesText === savedText) return;
+    const handle = setTimeout(async () => {
+      await supabase.from("jobs").update({ notes: notesText || null }).eq("id", id);
+      setSavedText(notesText);
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [notesText, savedText, id, supabase]);
+
+  async function advanceStep() {
+    if (!job?.request_step) return;
+    const nextStep = job.request_step + 1;
+    if (nextStep > 5) {
+      // Letzter Schritt erledigt -> Konvertieren-Modal
+      setShowConvert(true);
+      return;
+    }
+    const { error } = await supabase
+      .from("jobs")
+      .update({ request_step: nextStep })
+      .eq("id", id);
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      return;
+    }
+    toast.success(`Schritt ${nextStep} gestartet: ${REQUEST_STEPS[nextStep - 1].label}`);
+    window.dispatchEvent(new Event("jobs:invalidate"));
+    loadJob();
   }
 
-  async function uploadViaApi(file: File, filePath: string) {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("path", filePath);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const json = await res.json();
-      if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); return false; }
-      return true;
-    } catch (e: any) { toast.error("Upload-Fehler: " + (e.message || "Netzwerkfehler")); return false; }
+  async function previousStep() {
+    if (!job?.request_step || job.request_step <= 1) return;
+    const prevStep = job.request_step - 1;
+    const { error } = await supabase
+      .from("jobs")
+      .update({ request_step: prevStep })
+      .eq("id", id);
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      return;
+    }
+    toast.success(`Zurück zu Schritt ${prevStep}`);
+    window.dispatchEvent(new Event("jobs:invalidate"));
+    loadJob();
   }
 
-  async function saveDetails(newDocs: any[], newContractDocs: any[], newAngebotDocs?: any[]) {
-    let details: any = {};
-    try { details = JSON.parse(request.details || "{}"); } catch { details = { _text: request.details }; }
-    details._docs = newDocs;
-    details._contractDocs = newContractDocs;
-    if (newAngebotDocs !== undefined) details._angebotDocs = newAngebotDocs;
-    await fetch("/api/rentals/update-details", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, details: JSON.stringify(details) }) });
-  }
-
-  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploading(true);
-    const path = `vermietungen/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const ok = await uploadViaApi(file, path);
-    if (!ok) { setUploading(false); e.target.value = ""; return; }
-    const newDocs = [...docs, { name: file.name, path }];
-    await saveDetails(newDocs, contractDocs);
-    setDocs(newDocs);
-    toast.success("Dokument hochgeladen");
-    setUploading(false); e.target.value = "";
-  }
-
-  async function deleteDoc(doc: { name: string; path: string }) {
-    await supabase.storage.from("documents").remove([doc.path]);
-    const newDocs = docs.filter((d) => d.path !== doc.path);
-    await saveDetails(newDocs, contractDocs);
-    setDocs(newDocs); toast.success("Dokument gelöscht");
-  }
-
-  async function uploadContractDoc(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploadingContract(true);
-    const path = `vermietungen/${id}/vertrag_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const ok = await uploadViaApi(file, path);
-    if (!ok) { setUploadingContract(false); e.target.value = ""; return; }
-    const newDocs = [...contractDocs, { name: file.name, path }];
-    await saveDetails(docs, newDocs);
-    setContractDocs(newDocs);
-    toast.success("Mietvertrag hochgeladen");
-    setUploadingContract(false); e.target.value = "";
-  }
-
-  async function deleteContractDoc(doc: { name: string; path: string }) {
-    await supabase.storage.from("documents").remove([doc.path]);
-    const newDocs = contractDocs.filter((d) => d.path !== doc.path);
-    await saveDetails(docs, newDocs);
-    setContractDocs(newDocs); toast.success("Dokument gelöscht");
-  }
-
-  function openFile(path: string) {
-    const { data } = supabase.storage.from("documents").getPublicUrl(path);
-    window.open(data.publicUrl, "_blank");
-  }
-
-  async function sendOffer() {
-    setSendingOffer(true);
-    const pdfUrls = docs.map((d) => { const { data } = supabase.storage.from("documents").getPublicUrl(d.path); return { name: d.name, url: data.publicUrl }; });
-    try {
-      const res = await fetch("/api/rentals/send-offer", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rentalId: id, email: offerEmail, message: offerMessage, customerName: request.customer?.name, locationName: request.location?.name, eventDate: request.event_date, eventEndDate: request.event_end_date, pdfUrls }) });
-      const json = await res.json();
-      if (json.success) { toast.success("Konditionen gesendet"); setShowOffer(false); updateStatus("konditionen_gesendet"); }
-      else toast.error("Fehler: " + (json.error || "Unbekannt"));
-    } catch { toast.error("Fehler beim Senden"); }
-    setSendingOffer(false);
-  }
-
-  async function uploadAngebotDoc(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploadingAngebot(true);
-    const path = `vermietungen/${id}/angebot_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const ok = await uploadViaApi(file, path);
-    if (!ok) { setUploadingAngebot(false); e.target.value = ""; return; }
-    const newDocs = [...angebotDocs, { name: file.name, path }];
-    await saveDetails(docs, contractDocs, newDocs);
-    setAngebotDocs(newDocs);
-    toast.success("Angebot-Dokument hochgeladen");
-    setUploadingAngebot(false); e.target.value = "";
-  }
-
-  async function deleteAngebotDoc(doc: { name: string; path: string }) {
-    await supabase.storage.from("documents").remove([doc.path]);
-    const newDocs = angebotDocs.filter((d) => d.path !== doc.path);
-    await saveDetails(docs, contractDocs, newDocs);
-    setAngebotDocs(newDocs); toast.success("Dokument gelöscht");
-  }
-
-  async function sendAngebot() {
-    setSendingAngebot(true);
-    const pdfUrls = angebotDocs.map((d) => { const { data } = supabase.storage.from("documents").getPublicUrl(d.path); return { name: d.name, url: data.publicUrl }; });
-    try {
-      const res = await fetch("/api/rentals/send-angebot", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rentalId: id, email: angebotEmail, message: angebotMessage, customerName: request.customer?.name, locationName: request.location?.name, eventDate: request.event_date, eventEndDate: request.event_end_date, pdfUrls }) });
-      const json = await res.json();
-      if (json.success) { toast.success("Angebot gesendet"); setShowAngebot(false); updateStatus("angebot_gesendet"); }
-      else toast.error("Fehler: " + (json.error || "Unbekannt"));
-    } catch { toast.error("Fehler beim Senden"); }
-    setSendingAngebot(false);
-  }
-
-  async function sendContract() {
-    if (contractDocs.length === 0) { toast.error("Bitte zuerst Mietvertrag hochladen"); return; }
-    setSendingContract(true);
-    const pdfUrls = contractDocs.map((d) => { const { data } = supabase.storage.from("documents").getPublicUrl(d.path); return { name: d.name, url: data.publicUrl }; });
-    try {
-      const res = await fetch("/api/rentals/send-contract", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: contractEmail, message: contractMessage, customerName: request.customer?.name, locationName: request.location?.name, eventDate: request.event_date, eventEndDate: request.event_end_date, pdfUrls }) });
-      const json = await res.json();
-      if (json.success) { toast.success("Mietvertrag gesendet"); setShowContract(false); }
-      else toast.error("Fehler: " + (json.error || "Unbekannt"));
-    } catch { toast.error("Fehler beim Senden"); }
-    setSendingContract(false);
-  }
-
-  async function createTermin(e: React.FormEvent) {
-    e.preventDefault();
+  async function rejectAnfrage() {
+    if (!rejectReason.trim()) {
+      toast.error("Bitte Grund angeben");
+      return;
+    }
+    setRejectSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const tzOffset = -new Date().getTimezoneOffset();
-    const tz = `${tzOffset >= 0 ? "+" : "-"}${String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0")}:${String(Math.abs(tzOffset) % 60).padStart(2, "0")}`;
-    await supabase.from("job_appointments").insert({ title: terminForm.title, start_time: `${terminForm.date}T${terminForm.time}:00${tz}`, end_time: `${terminForm.date}T${terminForm.end_time}:00${tz}`, assigned_to: terminForm.assigned_to || user?.id, job_id: null });
-    if (terminForm.assigned_to && terminForm.assigned_to !== user?.id) {
-      const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
-      await fetch("/api/appointments/assign-notify", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedTo: terminForm.assigned_to, title: terminForm.title, date: terminForm.date, time: terminForm.time, endTime: terminForm.end_time, jobTitle: `Vermietung: ${request.customer?.name}`, creatorName: creator?.full_name || "Unbekannt" }) });
+    const { error } = await supabase
+      .from("jobs")
+      .update({
+        status: "storniert",
+        request_step: null,
+        cancelled_by: user?.id ?? null,
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: rejectReason.trim(),
+      })
+      .eq("id", id);
+    setRejectSaving(false);
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      return;
     }
-    setTerminForm({ title: "", date: "", time: "08:00", end_time: "17:00", assigned_to: "" });
-    setShowTermin(false); toast.success("Termin erstellt");
+    toast.success("Anfrage abgelehnt");
+    window.dispatchEvent(new Event("jobs:invalidate"));
+    router.push("/anfragen");
   }
 
-  async function deleteRequest() {
-    if (!deletePassword) return;
-    setDeleting(true);
-    try {
-      const res = await fetch("/api/rentals/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, code: deletePassword }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Vermietung gelöscht");
-        router.push("/anfragen");
-      } else {
-        setDeleteError(true);
-        setDeleting(false);
-      }
-    } catch {
-      toast.error("Fehler beim Löschen");
-      setDeleting(false);
+  async function convertToAuftrag() {
+    setConvertSaving(true);
+    const { error } = await supabase
+      .from("jobs")
+      .update({
+        status: "entwurf",
+        request_step: null,
+      })
+      .eq("id", id);
+    setConvertSaving(false);
+    if (error) {
+      toast.error("Fehler: " + error.message);
+      return;
     }
+    toast.success("In Auftrag umgewandelt — bitte vor Freigabe prüfen");
+    window.dispatchEvent(new Event("jobs:invalidate"));
+    router.push(`/auftraege/${id}/bearbeiten`);
   }
 
-  if (!request) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
+  if (loading || !job) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="h-8 w-40 rounded bg-muted animate-pulse" />
+        <div className="h-32 rounded-xl bg-muted animate-pulse" />
+      </div>
+    );
+  }
 
-  const currentStep = getStep(request.status);
-  let services = "";
-  try { const parsed = JSON.parse(request.notes); services = parsed.services || ""; } catch {}
+  const customer = (job.customer as unknown as { name: string }) || null;
+  const location = (job.location as unknown as { name: string; address_street: string | null; address_zip: string | null; address_city: string | null }) || null;
+  const currentStep = job.request_step ?? 1;
+  const stepInfo = REQUEST_STEPS[currentStep - 1];
+  const isLastStep = currentStep === 5;
+  const isCancelled = job.status === "storniert";
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/anfragen"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">{request.customer?.name}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{request.location?.name || "Keine Location"}</p>
+      <div className="flex items-center gap-3">
+        <Link href="/anfragen">
+          <button className="p-2 rounded-lg hover:bg-muted transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </Link>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <JobNumber number={job.job_number} size="md" />
+            <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isCancelled ? "Vermietungsanfrage · abgelehnt" : "Vermietungsanfrage · noch nicht freigegeben"}
+          </p>
         </div>
-        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={() => { setShowDelete(true); setDeletePassword(""); setDeleteError(false); }}>
-          <Trash2 className="h-4 w-4 mr-1" />Löschen
-        </Button>
       </div>
 
-      {/* Prozess-Stepper */}
-      {request.status !== "abgelehnt" && (
-        <div className="flex items-center gap-0">
-          {STEPS.map((step, i) => {
-            const done = i < currentStep;
-            const active = i === currentStep;
-            return (
-              <div key={step.key} className="flex items-center flex-1">
-                <div className="flex flex-col items-center w-full relative">
-                  {/* Verbindungslinie */}
-                  {i > 0 && (
-                    <div className={`absolute top-3 right-1/2 w-full h-0.5 -z-10 ${done ? "bg-green-400" : "bg-gray-200"}`} />
-                  )}
-                  {/* Kreis */}
-                  <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white ring-4 ring-blue-100" : "bg-gray-200 text-gray-400"}`}>
-                    {done ? <Check className="h-4 w-4" /> : <span className="text-xs font-bold">{i + 1}</span>}
-                  </div>
-                  {/* Label */}
-                  <p className={`text-[11px] font-semibold mt-1.5 text-center ${done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}`}>{step.label}</p>
-                  <p className={`text-[10px] text-center hidden sm:block ${done ? "text-green-600" : active ? "text-blue-600" : "text-gray-300"}`}>{step.desc}</p>
-                </div>
+      {/* Step-Tracker — nur wenn nicht abgelehnt */}
+      {!isCancelled && (
+        <Card className="bg-card">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Aktueller Schritt</p>
+                <p className="text-base font-semibold mt-0.5">{currentStep}. {stepInfo.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {stepInfo.action}
+                  {stepInfo.waitFor && <> · wartet auf: {stepInfo.waitFor}</>}
+                </p>
               </div>
-            );
-          })}
-        </div>
+              <div className="flex items-center gap-2">
+                {currentStep > 1 && (
+                  <Button size="sm" variant="outline" onClick={previousStep}>
+                    Zurück
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={advanceStep}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isLastStep ? "Anfrage abschliessen" : "Nächster Schritt"}
+                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <RequestStepTracker currentStep={currentStep} size="lg" />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Abgelehnt Banner */}
-      {request.status === "abgelehnt" && (
-        <div className="flex items-center gap-4 p-5 rounded-xl bg-red-50 border-2 border-red-200">
-          <X className="h-8 w-8 text-red-600 shrink-0" />
-          <div><p className="font-bold text-red-800 text-lg">Abgelehnt</p></div>
-        </div>
+      {/* Storno-Info wenn abgelehnt */}
+      {isCancelled && job.cancellation_reason && (
+        <Card className="bg-card border-destructive/30">
+          <CardContent className="p-5 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <X className="h-4 w-4" />
+              Abgelehnt
+            </div>
+            {job.cancelled_at && (
+              <div className="text-sm text-muted-foreground">
+                am <span className="font-medium text-foreground">{new Date(job.cancelled_at).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-foreground/[0.06]">
+              <p className="text-xs text-muted-foreground mb-1">Grund</p>
+              <p className="text-sm whitespace-pre-wrap">{job.cancellation_reason}</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Event Details */}
+      {/* Anfrage-Daten */}
       <Card className="bg-card">
-        <CardContent className="p-5">
-          <div className="flex flex-wrap gap-4 text-sm">
-            {request.event_date && <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />{new Date(request.event_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}{request.event_end_date ? ` – ${new Date(request.event_end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
-            {request.guest_count && <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" />{request.guest_count} Personen</div>}
-            {request.event_type && <div className="flex items-center gap-2">{request.event_type}</div>}
-          </div>
-          {services && <p className="text-sm mt-2"><strong>Dienstleistungen:</strong> {services}</p>}
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <FileText className="h-4 w-4" />Anfrage-Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5 pt-0 space-y-3">
+          {customer && (
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Kunde:</span>
+              <span>{customer.name}</span>
+            </div>
+          )}
+          {location && (
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Location:</span>
+              <span>{location.name}</span>
+            </div>
+          )}
+          {(job.start_date || job.end_date) && (
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Event-Datum:</span>
+              <span>
+                {job.start_date && new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
+                {job.end_date && job.end_date !== job.start_date && ` – ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}`}
+              </span>
+            </div>
+          )}
+          {(job.event_type || job.guest_count) && (
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              {job.event_type && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Veranstaltung:</span>
+                  <span>{job.event_type}</span>
+                </div>
+              )}
+              {job.guest_count && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Personen:</span>
+                  <span>{job.guest_count}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {job.description && (
+            <div className="pt-2 border-t border-foreground/[0.06]">
+              <p className="text-xs text-muted-foreground mb-1">Beschreibung</p>
+              <p className="text-sm whitespace-pre-wrap">{job.description}</p>
+            </div>
+          )}
+          {job.extended_services && (
+            <div className="pt-2 border-t border-foreground/[0.06]">
+              <p className="text-xs text-muted-foreground mb-1">Zusatzleistungen</p>
+              <p className="text-sm whitespace-pre-wrap">{job.extended_services}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Alle 5 Schritte immer sichtbar */}
-      {request.status !== "abgelehnt" && (
-        <div className="space-y-3">
-          {/* SCHRITT 1: Konditionen senden */}
-          {(() => { const s = 0; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">1</span>}
-                </div>
-                <span className={done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}>Konditionen senden</span>
-                {done && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
-              </CardTitle>
-            </CardHeader>
-            {active && (
-              <CardContent className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Mietkonditionen als PDF hochladen</p>
-                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    <Upload className="h-4 w-4 mr-1" />{uploading ? "..." : "PDF"}
-                  </Button>
-                  <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
-                </div>
-                {docs.map((d) => (
-                  <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                    <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
-                    <button onClick={() => deleteDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={() => setShowOffer(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Konditionen an Kunde senden</Button>
-                  <Button size="sm" variant="outline" onClick={() => updateStatus("abgelehnt")}><X className="h-4 w-4 mr-1" />Ablehnen</Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-          ); })()}
+      {/* Notizen — autosave */}
+      <Card className="bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <StickyNote className="h-4 w-4" />Notizen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <textarea
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            placeholder="Reinschreiben — wird automatisch gespeichert."
+            rows={4}
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+            className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+          />
+        </CardContent>
+      </Card>
 
-          {/* SCHRITT 2: Kunde bestätigt Konditionen */}
-          {(() => { const s = 1; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">2</span>}
-                </div>
-                <span className={done ? "text-green-700" : active ? "text-amber-700" : "text-gray-400"}>Bestätigung Konditionen</span>
-                {done && <span className="text-xs text-green-600 ml-auto">Bestätigt</span>}
-              </CardTitle>
-            </CardHeader>
-            {active && (
-              <CardContent className="pt-1">
-                <div className="flex items-center gap-3">
-                  <div className="animate-pulse w-3 h-3 rounded-full bg-amber-400" />
-                  <p className="text-sm font-medium text-amber-800">Warten auf Bestätigung der Konditionen...</p>
-                  <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus("konditionen_bestaetigt")}><Check className="h-4 w-4 mr-1" />Manuell bestätigen</Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-          ); })()}
-
-          {/* SCHRITT 3: Angebot senden */}
-          {(() => { const s = 2; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-blue-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">3</span>}
-                </div>
-                <span className={done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}>Angebot senden</span>
-                {done && <span className="text-xs text-green-600 ml-auto">Gesendet</span>}
-              </CardTitle>
-            </CardHeader>
-            {active && (
-              <CardContent className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Angebot als PDF hochladen</p>
-                  <Button size="sm" variant="outline" onClick={() => angebotFileRef.current?.click()} disabled={uploadingAngebot}>
-                    <Upload className="h-4 w-4 mr-1" />{uploadingAngebot ? "..." : "PDF"}
-                  </Button>
-                  <input ref={angebotFileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadAngebotDoc} className="hidden" />
-                </div>
-                {angebotDocs.map((d) => (
-                  <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
-                    <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-600"><FileText className="h-4 w-4 text-red-500" />{d.name}</button>
-                    <button onClick={() => deleteAngebotDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={() => setShowAngebot(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Send className="h-4 w-4 mr-1" />Angebot an Kunde senden</Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-          ); })()}
-
-          {/* SCHRITT 4: Kunde nimmt Angebot an */}
-          {(() => { const s = 3; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">4</span>}
-                </div>
-                <span className={done ? "text-green-700" : active ? "text-amber-700" : "text-gray-400"}>Angebot Annahme</span>
-                {done && <span className="text-xs text-green-600 ml-auto">Angenommen</span>}
-              </CardTitle>
-            </CardHeader>
-            {active && (
-              <CardContent className="pt-1">
-                <div className="flex items-center gap-3">
-                  <div className="animate-pulse w-3 h-3 rounded-full bg-amber-400" />
-                  <p className="text-sm font-medium text-amber-800">Warten auf Annahme des Angebots...</p>
-                  <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus("bestaetigt")}><Check className="h-4 w-4 mr-1" />Manuell bestätigen</Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-          ); })()}
-
-          {/* SCHRITT 5: Vertrag & Termine */}
-          {(() => { const s = 4; const done = currentStep > s; const active = currentStep === s; return (
-          <Card className={`transition-all ${done ? "bg-green-50/50 border-green-200" : active ? "bg-card border-green-200 shadow-sm" : "bg-gray-50 border-gray-100 opacity-60"}`}>
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${done ? "bg-green-500 text-white" : active ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"}`}>
-                  {done ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-bold">5</span>}
-                </div>
-                <span className={active ? "text-green-700" : "text-gray-400"}>Vertrag & Termine</span>
-              </CardTitle>
-            </CardHeader>
-            {active && (
-              <CardContent className="space-y-4 pt-1">
-                {/* Vertrag */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Mietvertrag</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">Mietvertrag als PDF hochladen</p>
-                    <Button size="sm" variant="outline" onClick={() => contractFileRef.current?.click()} disabled={uploadingContract}>
-                      <Upload className="h-4 w-4 mr-1" />{uploadingContract ? "..." : "PDF"}
-                    </Button>
-                    <input ref={contractFileRef} type="file" accept=".pdf,.doc,.docx" onChange={uploadContractDoc} className="hidden" />
-                  </div>
-                  {contractDocs.map((d) => (
-                    <div key={d.path} className="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-100">
-                      <button onClick={() => openFile(d.path)} className="flex items-center gap-2 text-sm hover:text-blue-700"><FileText className="h-4 w-4 text-blue-500" />{d.name}</button>
-                      <button onClick={() => deleteContractDoc(d)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
-                  ))}
-                  {contractDocs.length > 0 && (
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowContract(true)}>
-                      <Send className="h-4 w-4 mr-1" />Vertrag an Kunde senden
-                    </Button>
-                  )}
-                </div>
-                {/* Termine */}
-                <div className="space-y-3 border-t pt-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Termine</p>
-                  {!showTermin ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Übergabe ${request.customer?.name}`, date: request.event_date?.split("T")[0] || "" }); }}>
-                        <Calendar className="h-4 w-4 mr-1" />Übergabe-Termin
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setShowTermin(true); setTerminForm({ ...terminForm, title: `Rücknahme ${request.customer?.name}`, date: request.event_end_date?.split("T")[0] || request.event_date?.split("T")[0] || "" }); }}>
-                        <Calendar className="h-4 w-4 mr-1" />Rücknahme-Termin
-                      </Button>
-                    </div>
-                  ) : (
-                    <form onSubmit={createTermin} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-                      <Input placeholder="Titel *" value={terminForm.title} onChange={(e) => setTerminForm({ ...terminForm, title: e.target.value })} required />
-                      <div className="grid grid-cols-3 gap-3">
-                        <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1" required /></div>
-                        <div><label className="text-xs font-medium">Von *</label><Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1" required /></div>
-                        <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1" required /></div>
-                      </div>
-                      <select value={terminForm.assigned_to} onChange={(e) => setTerminForm({ ...terminForm, assigned_to: e.target.value })} className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
-                        <option value="">Techniker zuweisen...</option>
-                        {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                      </select>
-                      <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setShowTermin(false)}>Abbrechen</Button>
-                        <Button type="submit" size="sm" className="bg-green-600 hover:bg-green-700 text-white">Termin erstellen</Button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-          ); })()}
+      {/* Ablehnen — nur wenn aktiv */}
+      {!isCancelled && (
+        <div className="flex justify-end">
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={() => setShowReject(true)}
+          >
+            <X className="h-4 w-4" />
+            Anfrage ablehnen
+          </Button>
         </div>
       )}
 
-      {/* Modals */}
-      <Modal show={showOffer} onClose={() => setShowOffer(false)} title="Konditionen senden">
-        <div><label className="text-sm font-medium">E-Mail *</label><Input value={offerEmail} onChange={(e) => setOfferEmail(e.target.value)} className="mt-1.5" /></div>
-        <div><label className="text-sm font-medium">Nachricht</label><textarea value={offerMessage} onChange={(e) => setOfferMessage(e.target.value)} placeholder="Persönliche Nachricht..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
-        {docs.length > 0 && <div className="text-xs text-muted-foreground">{docs.length} Dokument(e) angehängt</div>}
-        <p className="text-xs text-muted-foreground">Kunde erhält E-Mail mit Konditionen und Bestätigungs-Link.</p>
-        <div className="flex gap-3">
-          <button onClick={() => setShowOffer(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={sendOffer} disabled={!offerEmail || sendingOffer} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{sendingOffer ? "Senden..." : "Senden"}</button>
-        </div>
-      </Modal>
+      {/* Reject-Modal */}
+      {showReject && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!rejectSaving) setShowReject(false); }} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold">Anfrage ablehnen?</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground">Bitte gib einen Grund an. Die Anfrage wird als storniert archiviert.</p>
+                <textarea
+                  placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={3}
+                  autoFocus
+                  className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowReject(false)} disabled={rejectSaving}>
+                    Abbrechen
+                  </Button>
+                  <Button variant="destructive" size="lg" className="flex-1" onClick={rejectAnfrage} disabled={rejectSaving || !rejectReason.trim()}>
+                    {rejectSaving ? "Lehne ab…" : "Ablehnen"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
-      <Modal show={showAngebot} onClose={() => setShowAngebot(false)} title="Angebot senden">
-        <div><label className="text-sm font-medium">E-Mail *</label><Input value={angebotEmail} onChange={(e) => setAngebotEmail(e.target.value)} className="mt-1.5" /></div>
-        <div><label className="text-sm font-medium">Nachricht</label><textarea value={angebotMessage} onChange={(e) => setAngebotMessage(e.target.value)} placeholder="Persönliche Nachricht zum Angebot..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
-        {angebotDocs.length > 0 && <div className="text-xs text-muted-foreground">{angebotDocs.length} Dokument(e) angehängt</div>}
-        <p className="text-xs text-muted-foreground">Kunde erhält E-Mail mit Angebot und Annahme-Link.</p>
-        <div className="flex gap-3">
-          <button onClick={() => setShowAngebot(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={sendAngebot} disabled={!angebotEmail || sendingAngebot} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{sendingAngebot ? "Senden..." : "Senden"}</button>
-        </div>
-      </Modal>
-
-      <Modal show={showContract} onClose={() => setShowContract(false)} title="Mietvertrag senden">
-        <div><label className="text-sm font-medium">E-Mail *</label><Input value={contractEmail} onChange={(e) => setContractEmail(e.target.value)} className="mt-1.5" /></div>
-        <div><label className="text-sm font-medium">Nachricht</label><textarea value={contractMessage} onChange={(e) => setContractMessage(e.target.value)} placeholder="z.B. Bitte unterschrieben zurücksenden..." className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
-        <div className="text-xs text-muted-foreground">{contractDocs.length} Vertragsdokument(e) angehängt</div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowContract(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={sendContract} disabled={sendingContract} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{sendingContract ? "Senden..." : "Senden"}</button>
-        </div>
-      </Modal>
-
-      {/* Löschen Modal */}
-      <Modal show={showDelete} onClose={() => setShowDelete(false)} title="Vermietung löschen">
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
-          <Trash2 className="h-5 w-5 text-red-600 shrink-0" />
-          <p className="text-sm text-red-800">Diese Vermietung wird unwiderruflich gelöscht — inkl. aller hochgeladenen Dokumente.</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium">Passwort eingeben</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            placeholder="4-stelliger Code"
-            value={deletePassword}
-            onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(false); }}
-            className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`}
-          />
-          {deleteError && <p className="text-xs text-red-600 mt-1">Falsches Passwort</p>}
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowDelete(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={deleteRequest} disabled={!deletePassword || deleting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-            <Trash2 className="h-4 w-4" />{deleting ? "Löschen..." : "Endgültig löschen"}
-          </button>
-        </div>
-      </Modal>
+      {/* Convert-Modal */}
+      {showConvert && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!convertSaving) setShowConvert(false); }} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold">Anfrage in Auftrag umwandeln?</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Die Anfrage wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
+                </p>
+                <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
+                  <Check className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">Akquise abgeschlossen</p>
+                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus der Anfrage wird jetzt ein echter Auftrag.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setShowConvert(false)} disabled={convertSaving}>
+                    Abbrechen
+                  </Button>
+                  <Button size="lg" className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={convertToAuftrag} disabled={convertSaving}>
+                    {convertSaving ? "Wandle um…" : "Umwandeln"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

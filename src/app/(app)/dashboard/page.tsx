@@ -105,7 +105,7 @@ export default function DashboardPage() {
 
     const [jobsRes, anfragenRes, timeRes, kundenRes] = await Promise.all([
       supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "offen"),
-      supabase.from("rental_requests").select("id", { count: "exact", head: true }).eq("status", "neu"),
+      supabase.from("jobs").select("id", { count: "exact", head: true }).eq("status", "anfrage").eq("request_step", 1).neq("is_deleted", true),
       supabase.from("time_entries").select("id", { count: "exact", head: true }).is("clock_out", null),
       supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true),
     ]);

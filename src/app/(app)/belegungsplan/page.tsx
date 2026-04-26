@@ -76,7 +76,7 @@ export default function BelegungsplanPage() {
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    const [locRes, jobsRes, rentalsRes] = await Promise.all([
+    const [locRes, jobsRes] = await Promise.all([
       supabase
         .from("locations")
         .select("id, name, address_city, capacity")
@@ -91,14 +91,6 @@ export default function BelegungsplanPage() {
         .not("location_id", "is", null)
         .or(`start_date.gte.${startIso},end_date.gte.${startIso}`)
         .lt("start_date", endIso),
-      supabase
-        .from("rental_requests")
-        .select(
-          "id, status, event_date, event_end_date, location_id, customer:customers(name)"
-        )
-        .not("location_id", "is", null)
-        .gte("event_date", startIso)
-        .lt("event_date", endIso),
     ]);
 
     setLocations((locRes.data as Location[]) ?? []);
@@ -108,29 +100,17 @@ export default function BelegungsplanPage() {
       if (!j.start_date || !j.location_id) continue;
       if (j.status === "storniert") continue;
       const cust = Array.isArray(j.customer) ? j.customer[0] : j.customer;
+      // Anfragen werden auch als jobs gespeichert (status='anfrage'). Source unterscheidet,
+      // damit die UI Anfrage- vs Auftrags-Kacheln optisch trennen kann.
+      const isAnfrage = j.status === "anfrage";
       all.push({
         id: j.id,
-        source: "job",
+        source: isAnfrage ? "rental_request" : "job",
         location_id: j.location_id,
-        title: j.title,
+        title: isAnfrage ? "Anfrage" : j.title,
         start: startOfDay(new Date(j.start_date)),
         end: startOfDay(new Date(j.end_date ?? j.start_date)),
         status: j.status,
-        customer_name: (cust as { name?: string } | null)?.name ?? null,
-      });
-    }
-    for (const r of rentalsRes.data ?? []) {
-      if (!r.event_date || !r.location_id) continue;
-      if (r.status === "abgelehnt") continue;
-      const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
-      all.push({
-        id: r.id,
-        source: "rental_request",
-        location_id: r.location_id,
-        title: "Anfrage",
-        start: startOfDay(new Date(r.event_date)),
-        end: startOfDay(new Date(r.event_end_date ?? r.event_date)),
-        status: r.status,
         customer_name: (cust as { name?: string } | null)?.name ?? null,
       });
     }

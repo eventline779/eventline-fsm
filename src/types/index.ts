@@ -1,12 +1,11 @@
 export type UserRole = "admin" | "techniker";
 
-export type JobStatus = "entwurf" | "offen" | "abgeschlossen" | "storniert";
+export type JobStatus = "anfrage" | "entwurf" | "offen" | "abgeschlossen" | "storniert";
 
 export type JobPriority = "normal" | "dringend";
 
 export type CustomerType = "company" | "individual" | "organization";
 
-export type RentalStatus = "neu" | "konditionen_gesendet" | "konditionen_bestaetigt" | "angebot_gesendet" | "in_bearbeitung" | "bestaetigt" | "abgelehnt";
 
 export type ReportStatus = "entwurf" | "abgeschlossen";
 
@@ -70,6 +69,11 @@ export interface Job {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // Anfrage-Phase (gefuellt wenn status='anfrage')
+  request_step: 1 | 2 | 3 | 4 | 5 | null;
+  event_type: string | null;
+  guest_count: number | null;
+  extended_services: string | null;
   // Storno-Metadaten — gefuellt wenn status='storniert'
   cancelled_by: string | null;
   cancelled_at: string | null;
@@ -168,24 +172,8 @@ export interface Document {
   created_at: string;
 }
 
-export interface RentalRequest {
-  id: string;
-  customer_id: string;
-  location_id: string | null;
-  status: RentalStatus;
-  event_date: string | null;
-  event_end_date: string | null;
-  event_type: string | null;
-  guest_count: number | null;
-  details: string | null;
-  notes: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  // Joined
-  customer?: Customer;
-  location?: Location;
-}
+// RentalRequest-Type entfernt — Vermietungsanfragen sind jetzt jobs mit
+// status='anfrage' und request_step 1..5 (siehe REQUEST_STEPS in constants.ts).
 
 export interface LocationContact {
   id: string;

@@ -1,23 +1,39 @@
-// Status-Labels für Aufträge — Light- + Dark-Mode-Farben
-// Entfernt: 'geplant' (redundant mit Termin-Anzeige), 'in_arbeit' (kein
-// sinnvoller manueller Übergang).
+// Status-Labels für Aufträge — Light- + Dark-Mode-Farben.
+// Lifecycle: anfrage → entwurf → offen → abgeschlossen | storniert.
+// 'anfrage' ist die Akquise-Phase (5 Schritte via REQUEST_STEPS). Sobald die
+// Anfrage konvertiert wird, wechselt der Status auf 'offen' (oder 'entwurf')
+// und request_step wird NULL. Ab dann normale Auftragslogik.
 export const JOB_STATUS = {
+  anfrage: { label: "Anfrage", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Bevorstehend", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
   storniert: { label: "Storniert", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
 
-// Status-Labels für Vermietungsanfragen
-export const RENTAL_STATUS = {
-  neu: { label: "Neu", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
-  konditionen_gesendet: { label: "Konditionen gesendet", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300" },
-  konditionen_bestaetigt: { label: "Konditionen bestätigt", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
-  angebot_gesendet: { label: "Angebot gesendet", color: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300" },
-  in_bearbeitung: { label: "In Bearbeitung", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300" },
-  bestaetigt: { label: "Bestätigt", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
-  abgelehnt: { label: "Abgelehnt", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
-} as const;
+// === Vermietungsanfrage-Pipeline ===
+// 5 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
+// Jeder Schritt hat eine action (was tun in diesem Schritt) und eine waitFor (worauf warten danach).
+// Single source of truth — sowohl Step-Tracker-UI als auch Listen-Filter ziehen daraus.
+export interface RequestStep {
+  step: 1 | 2 | 3 | 4 | 5;
+  /** Kurzlabel (Step-Tracker). */
+  label: string;
+  /** Was passiert in diesem Schritt? */
+  action: string;
+  /** Worauf wartet man, bevor man weiter kann? */
+  waitFor?: string;
+  /** Falls dieser Schritt eine Datei erfordert: welche Kategorie. */
+  docType?: "konditionen" | "angebot" | "vertrag";
+}
+
+export const REQUEST_STEPS: readonly RequestStep[] = [
+  { step: 1, label: "Konditionen", action: "Konditionen senden",       docType: "konditionen", waitFor: "Kunde bestätigt Konditionen" },
+  { step: 2, label: "Bestätigt",   action: "Bestätigung erhalten",                              waitFor: "Kunde meldet sich" },
+  { step: 3, label: "Angebot",     action: "Angebot senden",          docType: "angebot",      waitFor: "Kunde nimmt Angebot an" },
+  { step: 4, label: "Annahme",     action: "Annahme erhalten",                                  waitFor: "Kunde meldet sich" },
+  { step: 5, label: "Vertrag",     action: "Vertrag senden",          docType: "vertrag",      waitFor: "Vertrag unterschrieben" },
+] as const;
 
 // Prioritäten — nur 'normal' (default) und 'dringend'
 // 'niedrig' und 'hoch' wurden nie genutzt, der relevante Hinweis ist binär:

@@ -81,8 +81,8 @@ export default function KundenDetailPage() {
       await supabase.from("documents").delete().in("job_id", ids);
       await supabase.from("time_entries").delete().in("job_id", ids);
     }
+    // Anfragen sind seit Migration 026 auch jobs (status='anfrage'), also reicht jobs-delete.
     await supabase.from("jobs").delete().eq("customer_id", id);
-    await supabase.from("rental_requests").delete().eq("customer_id", id);
 
     const { error } = await supabase.from("customers").delete().eq("id", id);
 

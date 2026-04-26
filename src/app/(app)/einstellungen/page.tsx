@@ -336,7 +336,6 @@ export default function EinstellungenPage() {
       { table: "time_entries", label: "Zeiterfassung" },
       { table: "service_reports", label: "Rapporte" },
       { table: "locations", label: "Standorte" },
-      { table: "rental_requests", label: "Vermietungen" },
       { table: "profiles", label: "Team" },
     ];
     for (const t of tables) {
@@ -661,7 +660,6 @@ export default function EinstellungenPage() {
                 { table: "time_entries", label: "Zeiterfassung", desc: "Alle Stempelzeiten aller Mitarbeiter" },
                 { table: "service_reports", label: "Rapporte", desc: "Alle Einsatzrapporte" },
                 { table: "locations", label: "Standorte", desc: "Alle Standorte und Adressen" },
-                { table: "rental_requests", label: "Vermietungen", desc: "Alle Vermietungsanfragen" },
                 { table: "profiles", label: "Team", desc: "Alle Teammitglieder" },
                 { table: "job_appointments", label: "Termine", desc: "Alle Auftrags-Termine" },
                 { table: "maintenance_tasks", label: "Instandhaltung", desc: "Alle Instandhaltungsarbeiten" },

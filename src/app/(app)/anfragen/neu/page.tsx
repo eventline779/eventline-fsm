@@ -5,123 +5,235 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchableSelect } from "@/components/searchable-select";
 import type { Customer, Location } from "@/types";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
 export default function NeueAnfragePage() {
   const router = useRouter();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [customers, setCustomers] = useState<Customer[] | null>(null);
+  const [locations, setLocations] = useState<Location[] | null>(null);
+  const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
+
   const [form, setForm] = useState({
-    customer_id: "", location_id: "", event_date: "", event_end_date: "", event_type: "", guest_count: "", details: "", notes: "", services: "",
+    customer_id: "",
+    location_id: "",
+    title: "",
+    event_type: "",
+    guest_count: "",
+    start_date: "",
+    end_date: "",
+    description: "",
+    extended_services: "",
   });
 
   useEffect(() => {
     async function load() {
-      const [c, l] = await Promise.all([
-        supabase.from("customers").select("*").eq("is_active", true).order("name"),
-        supabase.from("locations").select("*").eq("is_active", true).order("name"),
+      const [c, l, m] = await Promise.all([
+        supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("locations").select("id, name, address_street, address_zip, address_city").eq("is_active", true).order("name"),
+        supabase.from("jobs").select("job_number").not("job_number", "is", null).order("job_number", { ascending: false }).limit(1),
       ]);
-      if (c.data) setCustomers(c.data as Customer[]);
-      if (l.data) setLocations(l.data as Location[]);
+      setCustomers((c.data as Customer[]) ?? []);
+      setLocations((l.data as Location[]) ?? []);
+      const maxRow = m.data?.[0] as { job_number: number } | undefined;
+      setNextJobNumber(maxRow?.job_number ? maxRow.job_number + 1 : 26200);
     }
     load();
   }, []);
 
-  function update(field: string, value: string) { setForm((p) => ({ ...p, [field]: value })); }
+  function update<K extends keyof typeof form>(field: K, value: typeof form[K]) {
+    setForm((p) => ({ ...p, [field]: value }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.customer_id) {
+      toast.error("Kunde ist Pflicht");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Titel ist Pflicht");
+      return;
+    }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("rental_requests").insert({
-      customer_id: form.customer_id,
-      location_id: form.location_id || null,
-      event_date: form.event_date || null,
-      event_end_date: form.event_end_date || null,
-      event_type: form.event_type || null,
-      guest_count: form.guest_count ? parseInt(form.guest_count) : null,
-      details: form.details || null,
-      notes: form.services ? JSON.stringify({ services: form.services, notes: form.notes }) : (form.notes || null),
-      created_by: user?.id,
-    });
-    if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
-    toast.success("Vermietung erstellt");
-    router.push("/anfragen");
+    const { data: inserted, error } = await supabase
+      .from("jobs")
+      .insert({
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        status: "anfrage",
+        priority: "normal",
+        job_type: form.location_id ? "location" : "extern",
+        customer_id: form.customer_id,
+        location_id: form.location_id || null,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        request_step: 1,
+        event_type: form.event_type.trim() || null,
+        guest_count: form.guest_count ? parseInt(form.guest_count, 10) : null,
+        extended_services: form.extended_services.trim() || null,
+        created_by: user?.id,
+      })
+      .select("id, job_number")
+      .single();
+    if (error || !inserted) {
+      toast.error("Fehler: " + (error?.message ?? "konnte nicht angelegt werden"));
+      setSaving(false);
+      return;
+    }
+    toast.success(`Anfrage INT-${inserted.job_number} angelegt`);
+    window.dispatchEvent(new Event("jobs:invalidate"));
+    router.push(`/anfragen/${inserted.id}`);
   }
 
   return (
-    <div className="max-w-2xl space-y-6 mx-auto">
-      <div className="flex items-center gap-4">
-        <Link href="/anfragen"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Neue Vermietung</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Vermietung erfassen</p>
-        </div>
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-4">
+        <Link href="/anfragen">
+          <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        </Link>
+        {nextJobNumber ? (
+          <span className="font-mono font-semibold text-xl px-3 py-1 rounded inline-flex items-center bg-foreground/[0.08]">INT-{nextJobNumber}</span>
+        ) : (
+          <span className="font-mono text-xl font-semibold text-muted-foreground">INT-…</span>
+        )}
       </div>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <Card className="bg-card">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Kunde & Location</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Kunde *</Label>
-              <select value={form.customer_id} onChange={(e) => update("customer_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" required>
-                <option value="">Kunde auswählen...</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+
+      <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 space-y-5">
+        {/* Was */}
+        <div className="space-y-2">
+          <SectionLabel>Titel *</SectionLabel>
+          <Input
+            placeholder="z.B. Hochzeit Müller, Konzert Stadthalle"
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            required
+            autoFocus
+          />
+        </div>
+
+        <div className="space-y-2">
+          <SectionLabel>Beschreibung</SectionLabel>
+          <textarea
+            placeholder="Was hat der Kunde angefragt? (Originaltext, ggf. zusammengefasst)"
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            rows={3}
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+            className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+          />
+        </div>
+
+        <hr className="border-border/50" />
+
+        {/* Wer */}
+        <div className="space-y-2">
+          <SectionLabel>Kunde *</SectionLabel>
+          <SearchableSelect
+            value={form.customer_id}
+            onChange={(id) => update("customer_id", id)}
+            items={(customers ?? []).map((c) => ({ id: c.id, label: c.name }))}
+            placeholder="Kunde tippen…"
+            required
+          />
+          {customers !== null && customers.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Noch keine Kunden.{" "}
+              <Link href="/kunden/neu" className="underline">Jetzt anlegen</Link>
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <SectionLabel>Location (optional)</SectionLabel>
+          <SearchableSelect
+            value={form.location_id}
+            onChange={(id) => update("location_id", id)}
+            items={(locations ?? []).map((l) => ({
+              id: l.id,
+              label: l.name,
+              sub: [l.address_street, l.address_zip, l.address_city].filter(Boolean).join(", "),
+            }))}
+            placeholder="Location auswählen…"
+          />
+        </div>
+
+        <hr className="border-border/50" />
+
+        {/* Wann */}
+        <div className="space-y-2">
+          <SectionLabel>Event-Datum (geplant)</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Start</p>
+              <Input type="date" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} />
             </div>
-            <div>
-              <Label>Location</Label>
-              <select value={form.location_id} onChange={(e) => update("location_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500">
-                <option value="">Location auswählen...</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name} {l.capacity ? `(${l.capacity} Pers.)` : ""}</option>)}
-              </select>
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende</p>
+              <Input type="date" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} min={form.start_date || undefined} />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Event-Details</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Startdatum</Label>
-                <Input type="date" value={form.event_date} onChange={(e) => update("event_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
-              </div>
-              <div>
-                <Label>Enddatum</Label>
-                <Input type="date" value={form.event_end_date} onChange={(e) => update("event_end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
-              </div>
+          </div>
+        </div>
+
+        <hr className="border-border/50" />
+
+        {/* Was für ein Event */}
+        <div className="space-y-2">
+          <SectionLabel>Eckdaten</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Veranstaltungstyp</p>
+              <Input placeholder="z.B. Konzert, Theater" value={form.event_type} onChange={(e) => update("event_type", e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Personenanzahl</Label>
-                <Input type="number" placeholder="z.B. 80" value={form.guest_count} onChange={(e) => update("guest_count", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
-              </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Personen (geplant)</p>
+              <Input type="number" placeholder="z.B. 80" value={form.guest_count} onChange={(e) => update("guest_count", e.target.value)} />
             </div>
-            <div>
-              <Label>Veranstaltungstyp</Label>
-              <Input placeholder="z.B. Konzert, Firmenanlass, Theater..." value={form.event_type} onChange={(e) => update("event_type", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" />
-            </div>
-            <div>
-              <Label>Erweiterte Dienstleistungen</Label>
-              <textarea placeholder="z.B. Tontechnik, Lichttechnik, Reinigung, Catering..." value={form.services} onChange={(e) => update("services", e.target.value)} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={2} />
-            </div>
-            <div>
-              <Label>Details</Label>
-              <textarea placeholder="Weitere Details zur Anfrage..." value={form.details} onChange={(e) => update("details", e.target.value)} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={4} />
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <SectionLabel>Zusatzleistungen</SectionLabel>
+          <textarea
+            placeholder="z.B. Tontechnik, Lichttechnik, Catering, Reinigung…"
+            value={form.extended_services}
+            onChange={(e) => update("extended_services", e.target.value)}
+            rows={2}
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+            className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+          />
+        </div>
+
         <div className="flex gap-3 pt-2">
-          <Link href="/anfragen" className="flex-1"><Button type="button" variant="outline" className="w-full">Abbrechen</Button></Link>
-          <Button type="submit" disabled={!form.customer_id || saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-            <Save className="h-4 w-4 mr-2" />{saving ? "Speichern..." : "Anfrage erstellen"}
+          <Link href="/anfragen" className="flex-1">
+            <Button type="button" variant="outline" size="sm" className="w-full">
+              Abbrechen
+            </Button>
+          </Link>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={saving}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Save className="h-3.5 w-3.5 mr-1.5" />
+            {saving ? "Anlegen…" : "Anfrage anlegen"}
           </Button>
         </div>
       </form>
