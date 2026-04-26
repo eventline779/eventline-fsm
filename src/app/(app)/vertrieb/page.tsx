@@ -733,7 +733,7 @@ export default function VertriebPage() {
         const outerR = radius + ringWidth / 2;
         const innerR = radius - ringWidth / 2;
         const ringDiff = outerR - innerR;
-        const outlineWidth = 2.5;
+        const outlineWidth = 2;
         const svgPad = Math.ceil(outlineWidth / 2) + 1;
         const cx = outerR + svgPad;
         const cy = outerR + svgPad;
@@ -806,7 +806,7 @@ export default function VertriebPage() {
                               <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
                             </span>
                           </div>
-                          <div className="h-[3px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
+                          <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
                             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
                           </div>
                         </div>

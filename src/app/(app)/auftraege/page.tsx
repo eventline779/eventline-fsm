@@ -138,7 +138,7 @@ export default function AuftraegePage() {
         const innerR = radius - ringWidth / 2;
         const ringDiff = outerR - innerR;
         // Padding, damit halber Stroke des Outlines an den Raendern nicht clippt
-        const outlineWidth = 2.5;
+        const outlineWidth = 2;
         const svgPad = Math.ceil(outlineWidth / 2) + 1;
         const cx = outerR + svgPad;
         const cy = outerR + svgPad;
@@ -228,7 +228,7 @@ export default function AuftraegePage() {
                                   <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
                                 </span>
                               </div>
-                              <div className="h-[3px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
+                              <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
                                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
                               </div>
                             </div>
@@ -428,7 +428,7 @@ export default function AuftraegePage() {
             // Stripe-Farbe als ::before Pseudo-Element (eigene DOM-Layer, kein Konflikt mit hover:shadow-md)
             // Gruen exakt wie Diagramm-Status-Gruen (Jade) — Konsistenz: gleiche Bedeutung = gleiche Farbe
             const stripeColor = noTermin ? "before:bg-amber-500" : allGood ? "before:bg-[var(--status-green)]" : "";
-            const stripeBase = "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-xl before:pointer-events-none";
+            const stripeBase = "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:rounded-l-xl before:pointer-events-none";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
