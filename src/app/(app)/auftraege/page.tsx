@@ -24,6 +24,7 @@ import {
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
+import { DonutChart } from "@/components/donut-chart";
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -126,157 +127,30 @@ export default function AuftraegePage() {
 
       {/* Kreis-Diagramm — Entwuerfe stehen separat, Mietanfragen leben unter /anfragen */}
       {jobs.length > 0 && (() => {
-        const activeJobs = jobs;
-        const entwurfCount = activeJobs.filter((j) => j.status === "entwurf").length;
+        const entwurfCount = jobs.filter((j) => j.status === "entwurf").length;
         const segments = [
-          { label: "Bevorstehend", count: activeJobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
-          { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
-          { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
+          { label: "Bevorstehend", count: jobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
+          { label: "Abgeschlossen", count: jobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
+          { label: "Storniert", count: jobs.filter((j) => j.status === "storniert").length, color: "var(--status-red)" },
         ];
-        const total = segments.reduce((sum, s) => sum + s.count, 0);
-        const visibleSegments = segments.filter((s) => s.count > 0);
-        const radius = 72;
-        const ringWidth = 18; // Dicke des Donut-Rings (Aussen- minus Innenradius)
-        const outerR = radius + ringWidth / 2;
-        const innerR = radius - ringWidth / 2;
-        const ringDiff = outerR - innerR;
-        // Padding, damit halber Stroke des Outlines an den Raendern nicht clippt
-        const outlineWidth = 2;
-        const svgPad = Math.ceil(outlineWidth / 2) + 1;
-        const cx = outerR + svgPad;
-        const cy = outerR + svgPad;
-        const svgSize = outerR * 2 + svgPad * 2;
-        // Lueckenwinkel in Radian zwischen Segmenten
-        const gapAngle = visibleSegments.length > 1 ? 0.08 : 0;
-        // Start an einer Gap-Mitte (12 Uhr), nicht am Segment-Anfang
-        let cumulativeGapMid = -Math.PI / 2;
+        const entwurfPill = entwurfCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilterStatus("entwurf")}
+            className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
+            title="Filter auf Entwürfe setzen"
+          >
+            <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
+            {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
+          </button>
+        );
         return (
-          <Card className="bg-card">
-            <CardContent className="p-5">
-              {total > 0 ? (
-                <div className="flex flex-col md:flex-row items-start gap-6">
-                  <div className="relative shrink-0">
-                    <svg width={svgSize} height={svgSize}>
-                      {/* Track: zwei feine konzentrische Outlines als Rahmen des Donuts */}
-                      <circle cx={cx} cy={cy} r={outerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
-                      <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="currentColor" strokeWidth={1} className="text-foreground/[0.08]" />
-                      {visibleSegments.length === 1 ? (
-                        // Voller Ring: aussen + innen kompletter Kreis
-                        <>
-                          <circle cx={cx} cy={cy} r={outerR} fill="none" stroke={visibleSegments[0].color} strokeWidth={outlineWidth} />
-                          <circle cx={cx} cy={cy} r={innerR} fill="none" stroke={visibleSegments[0].color} strokeWidth={outlineWidth} />
-                        </>
-                      ) : (
-                        visibleSegments.map((s, i) => {
-                          const portion = s.count / total;
-                          const segAngle = portion * 2 * Math.PI - gapAngle;
-                          const gapMidPrev = cumulativeGapMid;
-                          const startA = gapMidPrev + gapAngle / 2;
-                          const endA = startA + segAngle;
-                          const gapMidNext = endA + gapAngle / 2;
-                          cumulativeGapMid = gapMidNext;
-                          // Outer-Endpunkte (exakt auf outerR)
-                          const ox1 = cx + outerR * Math.cos(startA);
-                          const oy1 = cy + outerR * Math.sin(startA);
-                          const ox2 = cx + outerR * Math.cos(endA);
-                          const oy2 = cy + outerR * Math.sin(endA);
-                          // Inner-Endpunkte: parallel zur Gap-Mid-Achse statt radial
-                          const ix1u = ox1 - ringDiff * Math.cos(gapMidPrev);
-                          const iy1u = oy1 - ringDiff * Math.sin(gapMidPrev);
-                          const innerStartAngle = Math.atan2(iy1u - cy, ix1u - cx);
-                          const ix1 = cx + innerR * Math.cos(innerStartAngle);
-                          const iy1 = cy + innerR * Math.sin(innerStartAngle);
-                          const ix2u = ox2 - ringDiff * Math.cos(gapMidNext);
-                          const iy2u = oy2 - ringDiff * Math.sin(gapMidNext);
-                          const innerEndAngle = Math.atan2(iy2u - cy, ix2u - cx);
-                          const ix2 = cx + innerR * Math.cos(innerEndAngle);
-                          const iy2 = cy + innerR * Math.sin(innerEndAngle);
-                          const largeArc = segAngle > Math.PI ? 1 : 0;
-                          const d = `M ${ox1} ${oy1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
-                          return (
-                            <path
-                              key={i}
-                              d={d}
-                              fill={s.color}
-                              stroke={s.color}
-                              strokeWidth={outlineWidth}
-                              strokeLinejoin="round"
-                              className="donut-segment"
-                            />
-                          );
-                        })
-                      )}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[34px] font-bold leading-none tracking-tight">{total}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Aufträge</span>
-                    </div>
-                  </div>
-                  <div className="flex-1 w-full md:self-stretch flex flex-col">
-                    <div className="space-y-2.5">
-                      {segments.map((s) => {
-                        const pct = total > 0 ? (s.count / total) * 100 : 0;
-                        return (
-                          <div
-                            key={s.label}
-                            className={`flex items-center gap-3 ${
-                              s.count === 0 ? "opacity-40" : ""
-                            }`}
-                          >
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium truncate">{s.label}</span>
-                                <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                                  <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                                </span>
-                              </div>
-                              <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
-                                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {entwurfCount > 0 && (
-                      <div className="mt-auto pt-4">
-                        <button
-                          type="button"
-                          onClick={() => setFilterStatus("entwurf")}
-                          className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
-                          title="Filter auf Entwürfe setzen"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
-                          {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    {entwurfCount > 0
-                      ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge."
-                      : "Keine Aufträge vorhanden."}
-                  </p>
-                  {entwurfCount > 0 && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setFilterStatus("entwurf")}
-                        className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
-                      >
-                        <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
-                        {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <DonutChart
+            segments={segments}
+            centerLabel="Aufträge"
+            below={entwurfPill}
+            emptyMessage={entwurfCount > 0 ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge." : "Keine Aufträge vorhanden."}
+          />
         );
       })()}
 

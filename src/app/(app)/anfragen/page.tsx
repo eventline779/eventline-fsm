@@ -11,6 +11,17 @@ import Link from "next/link";
 import { Plus, Search, Inbox, Calendar, MapPin, Users } from "lucide-react";
 import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
+import { DonutChart } from "@/components/donut-chart";
+
+// Farbe pro Schritt — gleicher CSS-Var-Pool wie der Auftraege-Donut.
+// Progression: neutral start -> blau/lila/orange (mid) -> emerald (final).
+const STEP_COLORS = [
+  "var(--status-gray)",
+  "var(--status-blue)",
+  "var(--status-purple)",
+  "var(--status-orange)",
+  "var(--status-emerald)",
+];
 
 export default function AnfragenPage() {
   const [requests, setRequests] = useState<Job[]>([]);
@@ -66,6 +77,22 @@ export default function AnfragenPage() {
           </Link>
         </div>
       </div>
+
+      {/* Diagramm — Verteilung der aktiven Anfragen ueber die 5 Pipeline-Schritte */}
+      {requests.length > 0 && (() => {
+        const segments = REQUEST_STEPS.map((step, i) => ({
+          label: `${step.step}. ${step.label}`,
+          count: requests.filter((r) => r.request_step === step.step).length,
+          color: STEP_COLORS[i],
+        }));
+        return (
+          <DonutChart
+            segments={segments}
+            centerLabel="Mietanfragen"
+            emptyMessage="Keine aktiven Mietanfragen."
+          />
+        );
+      })()}
 
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
