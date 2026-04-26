@@ -288,27 +288,27 @@ html.dark,
 /* Webkit (Chrome, Edge, Safari). Selektor ohne '*' und mit !important damit
    Browser-Defaults und Tailwind-Preflight nicht gewinnen. */
 ::-webkit-scrollbar {
-  width: 10px !important;
-  height: 10px !important;
+  width: 8px !important;
+  height: 8px !important;
 }
 ::-webkit-scrollbar-track {
   background: transparent !important;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: oklch(0 0 0 / 0.18) !important;
+  background-color: oklch(0 0 0 / 0.32) !important;
   border-radius: 999px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
   transition: background-color 0.15s ease !important;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: oklch(0 0 0 / 0.32) !important;
+  background-color: oklch(0 0 0 / 0.5) !important;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background-color: oklch(1 0 0 / 0.12) !important;
+  background-color: oklch(1 0 0 / 0.15) !important;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background-color: oklch(1 0 0 / 0.22) !important;
+  background-color: oklch(1 0 0 / 0.28) !important;
 }
 /* Pfeil-Buttons + Edge-Spezifika weg */
 ::-webkit-scrollbar-button,
