@@ -405,7 +405,7 @@ export default function AuftraegePage() {
                               aria-label="Alles bereit"
                               title="Alles bereit"
                             >
-                              <Check className="h-5 w-5" />
+                              <Check className="h-5 w-5" strokeWidth={3} />
                             </span>
                           ) : null}
                         </div>
