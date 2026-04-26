@@ -273,3 +273,48 @@
   border-color: oklch(0.3 0 0) !important;
   color: oklch(0.95 0 0) !important;
 }
+
+/* === Scrollbar — dezent, integriert, schmal === */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0 0 0 / 0.2) transparent;
+}
+.dark * {
+  scrollbar-color: oklch(1 0 0 / 0.15) transparent;
+}
+
+/* Webkit (Chrome, Edge, Safari) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: oklch(0 0 0 / 0.18);
+  border-radius: 999px;
+  /* Padding-Effekt: schmaler Daumen mit transparentem Rand */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.15s ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0 0 0 / 0.32);
+  background-clip: padding-box;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: oklch(1 0 0 / 0.12);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(1 0 0 / 0.22);
+}
+/* Native Pfeil-Buttons (oben/unten) ausblenden */
+*::-webkit-scrollbar-button {
+  display: none;
+}
+/* Eckpunkt zwischen vertikaler und horizontaler Scrollbar */
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
