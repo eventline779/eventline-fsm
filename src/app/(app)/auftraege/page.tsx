@@ -424,13 +424,15 @@ export default function AuftraegePage() {
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const noTermin = isActive && !hasAppointment;
+            const allGood = isActive && hasAppointment && job.status !== "entwurf";
+            // Stripe-Farbe als ::before Pseudo-Element (eigene DOM-Layer, kein Konflikt mit hover:shadow-md)
+            const stripeColor = noTermin ? "before:bg-amber-500" : allGood ? "before:bg-green-500" : "";
+            const stripeBase = "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-xl before:pointer-events-none";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
-              } ${
-                noTermin ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-amber-500 before:rounded-l-xl before:pointer-events-none" : ""
-              }`}>
+              } ${stripeColor ? `${stripeBase} ${stripeColor}` : ""}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
