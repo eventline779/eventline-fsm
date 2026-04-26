@@ -429,7 +429,7 @@ export default function AuftraegePage() {
             // ::before Pseudo-Element auf eigener DOM-Layer (kein Konflikt mit hover:shadow-md).
             // Amber/Stripe entfernt — Card-Stil signalisiert nur den positiven Zustand.
             const hueClasses = allGood
-              ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[20px] before:bg-[linear-gradient(to_right,rgba(0,168,107,0.22),transparent)] before:rounded-l-xl before:pointer-events-none"
+              ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[50px] before:bg-[linear-gradient(to_right,rgba(0,168,107,0.22),transparent)] before:rounded-l-xl before:pointer-events-none"
               : "";
             return (
             <Link key={job.id} href={`/auftraege/${job.id}`} className="block">
