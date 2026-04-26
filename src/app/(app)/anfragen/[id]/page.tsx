@@ -302,7 +302,7 @@ export default function VermietungDetailPage() {
   try { const parsed = JSON.parse(request.notes); services = parsed.services || ""; } catch {}
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/anfragen"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>

@@ -161,7 +161,7 @@ export default function AuftragBearbeitenPage() {
 
   if (loadingJob) {
     return (
-      <div className="max-w-2xl">
+      <div className="max-w-2xl mx-auto">
         <div className="h-8 w-40 rounded bg-muted animate-pulse mb-4" />
         <div className="h-96 rounded-xl bg-muted animate-pulse" />
       </div>
@@ -169,7 +169,7 @@ export default function AuftragBearbeitenPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <Link href="/auftraege">

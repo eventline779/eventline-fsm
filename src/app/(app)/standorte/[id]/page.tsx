@@ -276,7 +276,7 @@ export default function StandortDetailPage() {
   const filteredTasks = tasks.filter((t) => taskFilter === "all" || t.status === taskFilter);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
         <Link href="/standorte"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div>

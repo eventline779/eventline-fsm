@@ -271,7 +271,7 @@ export default function NeuerRapportPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6 mx-auto">
       <div className="flex items-center gap-4">
         <Link href="/rapporte"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div>

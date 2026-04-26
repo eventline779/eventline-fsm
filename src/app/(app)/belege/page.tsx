@@ -82,7 +82,7 @@ export default function BelegePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Belege</h1>
         <p className="text-sm text-muted-foreground mt-1">Kassenzettel hochladen oder abfotografieren — wird an <strong>buchhaltung@eventline-basel.com</strong> gesendet.</p>

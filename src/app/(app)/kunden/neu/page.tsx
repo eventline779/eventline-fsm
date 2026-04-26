@@ -64,7 +64,7 @@ export default function NeuerKundePage() {
   ];
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6 mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/kunden">

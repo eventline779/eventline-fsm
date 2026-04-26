@@ -220,7 +220,7 @@ export default function TodosPage() {
     const assignee = (selectedTodo as unknown as { assignee: { full_name: string } | null }).assignee;
     const desc = getDescription(selectedTodo);
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl mx-auto">
         <div className="flex items-center gap-4">
           <button onClick={() => setSelectedTodo(null)} className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button>
           <div className="flex-1">
