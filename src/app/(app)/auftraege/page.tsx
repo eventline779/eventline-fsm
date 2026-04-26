@@ -446,30 +446,25 @@ export default function AuftraegePage() {
                         Text, sodass das Weiterklicken ohne Detail-Seite geht. Bei Entwurf/kein Termin/
                         allGood gilt die alte Icon-Logik. */}
                     {isAnfrage ? (
-                      <div className="shrink-0">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleAnfrageNext(job.id);
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
-                          title={isMailStep ? `${stepInfo.label} (Mail-Versand)` : "Schritt bestätigen"}
-                        >
-                          {isMailStep ? (
-                            <>
-                              <Send className="h-3.5 w-3.5 mr-1.5" />
-                              {stepInfo.label}
-                            </>
-                          ) : (
-                            <>
-                              Nächster Schritt
-                              <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                            </>
-                          )}
-                        </Button>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
+                          {isMailStep ? stepInfo.label : "Nächster Schritt"}
+                        </span>
+                        <div className="w-10 h-10 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAnfrageNext(job.id);
+                            }}
+                            className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                            aria-label={isMailStep ? stepInfo.label : "Nächster Schritt"}
+                            title={isMailStep ? stepInfo.label : "Schritt bestätigen"}
+                          >
+                            {isMailStep ? <Send className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                          </button>
+                        </div>
                       </div>
                     ) : (noTermin || job.status === "entwurf" || allGood) && (
                       <div className="flex items-center gap-0.5 shrink-0">
