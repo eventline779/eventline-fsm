@@ -14,17 +14,17 @@ interface JobNumberProps {
 }
 
 const sizeClasses = {
-  sm: "text-xs px-1.5 py-0.5",
-  md: "text-sm px-2 py-0.5",
-  lg: "text-base px-2.5 py-1",
-  xl: "text-xl px-3 py-1",
+  sm: "text-sm px-2 py-0.5",
+  md: "text-base px-2.5 py-1",
+  lg: "text-lg px-3 py-1",
+  xl: "text-2xl px-3.5 py-1.5",
 };
 
 export function JobNumber({ number, size = "sm", className = "" }: JobNumberProps) {
   if (!number) return null;
   return (
     <span
-      className={`inline-flex items-center font-mono font-semibold rounded bg-foreground/[0.08] ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center font-mono font-semibold rounded bg-card border border-foreground/15 ${sizeClasses[size]} ${className}`}
     >
       INT-{number}
     </span>
