@@ -69,23 +69,18 @@ export function SendStepModal({
   const isMailStep = step === 1 || step === 3 || step === 5;
   const stepLabel = REQUEST_STEPS[step - 1]?.label ?? "Schritt";
 
-  // Bei jedem Oeffnen Empfaenger + Doks neu laden, alte Eingaben verwerfen.
+  // Bei jedem Oeffnen alle Felder zuruecksetzen — auch die Anhang-Liste.
+  // Bereits hochgeladene Doks bleiben in der documents-Tabelle (job_id ist
+  // gesetzt), tauchen also weiterhin in der Auftrag-Detail-Seite auf, werden
+  // aber im Modal nicht mehr angezeigt. So startet jeder Mail-Versand mit
+  // frischem Anhang-Slot.
   useEffect(() => {
     if (!open || !isMailStep) return;
     setEmail(customerEmail ?? "");
     setCc("");
     setMessage("");
-    (async () => {
-      const prefix = `vermietentwurf/${jobId}/s${step}/`;
-      const { data } = await supabase
-        .from("documents")
-        .select("id, name, storage_path")
-        .eq("job_id", jobId)
-        .like("storage_path", `${prefix}%`)
-        .order("created_at", { ascending: false });
-      setDocs((data as UploadedDoc[] | null) ?? []);
-    })();
-  }, [open, jobId, step, customerEmail, isMailStep, supabase]);
+    setDocs([]);
+  }, [open, jobId, step, customerEmail, isMailStep]);
 
   if (!open || !isMailStep) return null;
 
