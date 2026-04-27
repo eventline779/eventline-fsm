@@ -66,8 +66,12 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
   // Start-Achse identisch zum Eltern-Segment, sodass das Sub auf der ersten
   // (linken) Kante haengt und sich von dort entlang des Eltern-Bogens streckt
   // proportional zu sub.count / parent.count.
-  const SUB_OUTER_R = INNER_R + RING_WIDTH * 0.55; // ~ obere Haelfte des Rings
-  const SUB_INNER_R = INNER_R + 2;
+  // SUB_PAD = Pixel-Abstand des Sub-Segments zum Eltern-Bogen — gleicher
+  // Wert oben (zu OUTER_R), unten (zu INNER_R) und rechts (angular umgerechnet
+  // ueber midR). Links sitzt das Sub flush am Eltern-Anfang.
+  const SUB_PAD = 4;
+  const SUB_OUTER_R = OUTER_R - SUB_PAD;
+  const SUB_INNER_R = INNER_R + SUB_PAD;
 
   // Pfade vorab berechnen
   let cumulativeGapMid = -Math.PI / 2; // Start an einer Gap-Mitte (12 Uhr)
@@ -103,14 +107,16 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
       const d = `M ${ox1} ${oy1} A ${OUTER_R} ${OUTER_R} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${INNER_R} ${INNER_R} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
       segmentPaths.push({ color: s.color, d });
 
-      // Sub-Segment: schmalerer Innenring zentriert innerhalb des Eltern-
-      // Bogens. Padding links + rechts gleich gross, sodass das Sub mittig
-      // sitzt. Innen + aussen radial (kein parallel-zur-Gap-Versatz mehr).
+      // Sub-Segment: am LINKEN Eltern-Rand ansetzen (wie ursprunglich), aber
+      // gleichmaessiger Abstand zu den anderen 3 Raendern (oben/unten radial,
+      // rechts angular). LEFT flush, RIGHT/TOP/BOTTOM jeweils SUB_PAD Pixel.
       if (s.sub && s.sub.count > 0 && s.count > 0) {
+        const midR = (OUTER_R + INNER_R) / 2;
+        const angularPad = SUB_PAD / midR;
         const subPortion = Math.min(s.sub.count / s.count, 1);
-        const subSegAngle = subPortion * segAngle;
-        const padding = (segAngle - subSegAngle) / 2;
-        const subStartA = startA + padding;
+        const availableAngle = Math.max(segAngle - angularPad, 0);
+        const subSegAngle = subPortion * availableAngle;
+        const subStartA = startA; // flush links am Eltern-Rand
         const subEndA = subStartA + subSegAngle;
         const sox1 = CX + SUB_OUTER_R * Math.cos(subStartA);
         const soy1 = CY + SUB_OUTER_R * Math.sin(subStartA);
@@ -188,9 +194,22 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium truncate">{s.label}</span>
+                          <span className="text-xs font-medium truncate">
+                            {s.label}
+                            {s.sub && s.sub.count > 0 && (
+                              <>
+                                <span className="inline-block w-1.5 h-1.5 rounded-full mx-2 align-middle" style={{ background: s.sub.color }} />
+                                <span style={{ color: s.sub.color }}>{s.sub.label}</span>
+                              </>
+                            )}
+                          </span>
                           <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                             <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                            {s.sub && s.sub.count > 0 && (
+                              <span className="ml-2" style={{ color: s.sub.color }}>
+                                <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
+                              </span>
+                            )}
                           </span>
                         </div>
                         <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5 relative">
@@ -204,19 +223,6 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
                         </div>
                       </div>
                     </div>
-                    {/* Sub-Eintrag: eigene Zeile unter dem Eltern-Eintrag, eingeruckt
-                        damit klar wird dass es ein Sub von oben drueber ist. */}
-                    {s.sub && s.sub.count > 0 && (
-                      <div className="flex items-center gap-3 mt-1.5 pl-5">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.sub.color }} />
-                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium truncate" style={{ color: s.sub.color }}>{s.sub.label}</span>
-                          <span className="text-xs shrink-0 tabular-nums" style={{ color: s.sub.color }}>
-                            <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
-                          </span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
