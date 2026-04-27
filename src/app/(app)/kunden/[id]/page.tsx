@@ -203,11 +203,11 @@ export default function KundenDetailPage() {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div><Label>E-Mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
-                <div><Label>Telefon</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div><Label>E-Mail *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div><Label>Telefon *</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
               </div>
               <div>
-                <Label>Strasse</Label>
+                <Label>Strasse *</Label>
                 <div className="mt-1.5">
                   <AddressAutocomplete
                     value={form.address_street}
@@ -219,8 +219,8 @@ export default function KundenDetailPage() {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <div><Label>PLZ</Label><Input value={form.address_zip} onChange={(e) => setForm({ ...form, address_zip: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
-                <div className="md:col-span-2"><Label>Ort</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div><Label>PLZ *</Label><Input value={form.address_zip} onChange={(e) => setForm({ ...form, address_zip: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div className="md:col-span-2"><Label>Ort *</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
               </div>
               <div>
                 <Label>Land</Label>

@@ -198,7 +198,7 @@ function NeuerKundeContent() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="email">E-Mail</Label>
+                <Label htmlFor="email">E-Mail *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -209,7 +209,7 @@ function NeuerKundeContent() {
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Telefon</Label>
+                <Label htmlFor="phone">Telefon *</Label>
                 <Input
                   id="phone"
                   placeholder="+41 ..."
@@ -229,7 +229,7 @@ function NeuerKundeContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="street">Strasse</Label>
+              <Label htmlFor="street">Strasse *</Label>
               <div className="mt-1.5">
                 <AddressAutocomplete
                   id="street"
@@ -243,7 +243,7 @@ function NeuerKundeContent() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label htmlFor="zip">PLZ</Label>
+                <Label htmlFor="zip">PLZ *</Label>
                 <Input
                   id="zip"
                   placeholder="4052"
@@ -253,7 +253,7 @@ function NeuerKundeContent() {
                 />
               </div>
               <div className="col-span-2">
-                <Label htmlFor="city">Ort</Label>
+                <Label htmlFor="city">Ort *</Label>
                 <Input
                   id="city"
                   placeholder="Basel"
