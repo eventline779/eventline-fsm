@@ -375,6 +375,7 @@ export default function AuftragDetailPage() {
             const isFinish = a.to === "abgeschlossen";
             const disabled = isFinish && !canFinish;
             const isPrimary = a.variant === "primary";
+            const tone = isFinish ? "kasten-green" : isPrimary ? "kasten-red" : "kasten-muted";
             return (
               <button
                 key={a.to}
@@ -382,7 +383,7 @@ export default function AuftragDetailPage() {
                 onClick={() => updateStatus(a.to)}
                 disabled={disabled}
                 title={disabled ? finishBlockReason : undefined}
-                className={`kasten ${isPrimary ? "kasten-red" : "kasten-muted"}`}
+                className={`kasten ${tone}`}
               >
                 {a.icon}
                 {a.label}
