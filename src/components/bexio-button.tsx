@@ -1,20 +1,19 @@
 "use client";
 
-// Wiederverwendbarer Bexio-Button + Match-Modal.
+// Wiederverwendbarer Bexio-Button + Match-Modal + Pflichtfeld-Modal.
 // Verwendung auf Kunden-Detail- UND Auftrag-Detail-Seite.
 //
 // Drei Zustaende:
-// 1. Kein bexio_contact_id -> "In Bexio anlegen" (gruen). Klick startet Search.
-//    a) Match gefunden -> Modal "Existierender Kontakt gefunden — verknuepfen?"
-//    b) Kein Match -> direkt anlegen, ID speichern, Tab oeffnen
+// 1. Kein bexio_contact_id -> "In Bexio anlegen" (gruen). Klick:
+//    a) Pflichtfelder fehlen -> Modal mit Liste, Link zur Kunden-Bearbeiten-Seite
+//    b) Match in Bexio gefunden -> Modal "Verknuepfen oder trotzdem neu anlegen?"
+//    c) Sonst -> direkt anlegen via API, ID speichern, Tab oeffnen
 // 2. bexio_contact_id schon gesetzt -> "In Bexio oeffnen" (gruen). Klick oeffnet
 //    direkt den existierenden Bexio-Tab.
 // 3. Bexio nicht verbunden -> Button verborgen.
-//
-// Lebt isoliert hier damit beide Seiten die exakt gleiche Logik nutzen.
 
 import { useEffect, useState } from "react";
-import { ExternalLink, Link2 } from "lucide-react";
+import { ExternalLink, Link2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
@@ -40,6 +39,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
   const [bexioConnected, setBexioConnected] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [matches, setMatches] = useState<MatchCandidate[] | null>(null);
+  const [missingFields, setMissingFields] = useState<string[] | null>(null);
   const [linkedId, setLinkedId] = useState<string | null>(bexioContactId);
 
   useEffect(() => {
@@ -71,20 +71,22 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     );
   }
 
-  // Klick "In Bexio anlegen" -> Backend prueft ob's einen Treffer gibt.
-  // - alreadyLinked: existierende Bexio-Kontakt-Seite oeffnen
-  // - needsLinkConfirmation: Match-Modal zeigen ("Verknuepfen?")
-  // - openCreateUrl: Bexio's Anlegen-Seite oeffnen (Daten dort manuell eingeben)
-  async function attemptCreate() {
+  // Klick "In Bexio anlegen". Server prueft Pflichtfelder, dann Match-Suche,
+  // dann Anlegen.
+  async function attemptCreate(force: boolean) {
     setBusy(true);
     try {
       const res = await fetch("/api/bexio/contacts/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId }),
+        body: JSON.stringify({ customerId, force }),
       });
       const json = await res.json();
 
+      if (json.missingFields?.length) {
+        setMissingFields(json.missingFields);
+        return;
+      }
       if (json.needsLinkConfirmation && json.matches?.length) {
         setMatches(json.matches);
         return;
@@ -99,25 +101,17 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
         return;
       }
-      if (json.openCreateUrl) {
-        // Kein Match in Bexio -> Bexio-Kontakte-Liste oeffnen.
-        toast.message("Klick in Bexio auf 'Neuer Kontakt'");
-        window.open(json.openCreateUrl, "_blank", "noopener,noreferrer");
-      }
+      // Erfolgreich angelegt
+      setLinkedId(json.bexioContactId);
+      onLinked?.(json.bexioContactId);
+      toast.success("In Bexio angelegt");
+      window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Netzwerkfehler";
       toast.error("Fehler: " + msg);
     } finally {
       setBusy(false);
     }
-  }
-
-  // Aus dem Match-Modal "Trotzdem neu anlegen" -> Bexio-Kontakte-Liste, dort
-  // klickt der User auf "Neuer Kontakt".
-  function openBexioNewContact() {
-    setMatches(null);
-    toast.message("Klick in Bexio auf 'Neuer Kontakt'");
-    window.open("https://office.bexio.com/index.php/kontakt/list", "_blank", "noopener,noreferrer");
   }
 
   async function linkExisting(bexioId: number) {
@@ -151,7 +145,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     <>
       <button
         type="button"
-        onClick={attemptCreate}
+        onClick={() => attemptCreate(false)}
         disabled={busy}
         className="kasten kasten-green shrink-0"
         title="Diesen Kunden in Bexio als Kontakt anlegen"
@@ -160,6 +154,42 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         {busy ? "Prüfe…" : "In Bexio anlegen"}
       </button>
 
+      {/* Pflichtfeld-Modal — wenn noch nicht alle Bexio-Pflichtfelder am
+          Eventline-Kunden hinterlegt sind. */}
+      <Modal
+        open={!!missingFields}
+        onClose={() => setMissingFields(null)}
+        title="Pflichtfelder fehlen"
+        icon={<AlertCircle className="h-5 w-5 text-amber-500" />}
+        size="md"
+      >
+        <p className="text-sm text-muted-foreground">
+          Bexio braucht alle Pflichtfelder bevor der Kontakt angelegt werden kann. Bitte fülle folgende Felder beim Kunden aus:
+        </p>
+        <ul className="space-y-1.5">
+          {missingFields?.map((f) => (
+            <li key={f} className="flex items-center gap-2 text-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="font-medium">{f}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={() => setMissingFields(null)} className="kasten kasten-muted flex-1">
+            Abbrechen
+          </button>
+          <a
+            href={`/kunden/${customerId}`}
+            className="kasten kasten-purple flex-1"
+            onClick={() => setMissingFields(null)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Kunde bearbeiten
+          </a>
+        </div>
+      </Modal>
+
+      {/* Match-Modal — moegliche Duplikat-Treffer. */}
       <Modal
         open={!!matches}
         onClose={() => setMatches(null)}
@@ -203,10 +233,10 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
           </button>
           <button
             type="button"
-            onClick={openBexioNewContact}
+            onClick={() => { setMatches(null); attemptCreate(true); }}
             disabled={busy}
             className="kasten kasten-red flex-1"
-            title="Trotzdem neuen Bexio-Kontakt manuell anlegen (riskiert Duplikat)"
+            title="Trotzdem neuen Bexio-Kontakt anlegen (riskiert Duplikat)"
           >
             Trotzdem neu anlegen
           </button>
