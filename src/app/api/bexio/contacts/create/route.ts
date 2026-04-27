@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createContact, bexioContactUrl, findMatchingContacts } from "@/lib/bexio";
+import { createContact, createContactAddress, bexioContactUrl, findMatchingContacts } from "@/lib/bexio";
 
 // Body: { customerId, force?: boolean }
 //
@@ -82,10 +82,18 @@ export async function POST(request: NextRequest) {
       name2,
       email: customer.email,
       phone: customer.phone,
+      countryCode: customer.address_country,
+    });
+
+    // Adresse separat anhaengen (Bexio's /2.0/contact akzeptiert keine Inline-
+    // Adresse mehr). Schlaegt das fehl, wird nur geloggt — der Kontakt
+    // existiert dann ohne Adresse, das ist besser als gar kein Kontakt.
+    await createContactAddress(result.id, {
       street: customer.address_street,
       postcode: customer.address_zip,
       city: customer.address_city,
       countryCode: customer.address_country,
+      name: customer.name,
     });
 
     // Bexio-ID am Kunden speichern (Service-Role, damit RLS nicht blockt)

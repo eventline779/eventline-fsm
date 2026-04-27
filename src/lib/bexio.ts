@@ -54,6 +54,7 @@ interface BexioConnection {
   scope: string | null;
   bexio_company_id: string | null;
   bexio_user_email: string | null;
+  bexio_user_id: number | null;
   connected_by: string | null;
   connected_at: string;
   updated_at: string;
@@ -110,7 +111,7 @@ async function refreshTokens(refreshToken: string): Promise<TokenResponse> {
 export async function saveConnection(
   tokens: TokenResponse,
   connectedBy: string | null,
-  meta: { email?: string | null; companyId?: string | null }
+  meta: { email?: string | null; companyId?: string | null; userId?: number | null }
 ) {
   const supabase = createAdminClient();
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
@@ -122,11 +123,45 @@ export async function saveConnection(
     scope: tokens.scope ?? SCOPES.join(" "),
     bexio_user_email: meta.email ?? null,
     bexio_company_id: meta.companyId ?? null,
+    bexio_user_id: meta.userId ?? null,
     connected_by: connectedBy,
     connected_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error(`Verbindung speichern fehlgeschlagen: ${error.message}`);
+}
+
+// Holt die numerische Bexio-User-ID des aktuell verbundenen Accounts. Wird als
+// user_id + owner_id beim Kontakt-Anlegen mitgeschickt — beides Pflichtfelder.
+// Cacht in der bexio_connection-Reihe; faellt zurueck auf /3.0/users/me wenn
+// noch nicht hinterlegt (z.B. weil die Verbindung aus der Zeit vor dieser
+// Migration stammt).
+export async function getBexioUserId(): Promise<number> {
+  const conn = await getConnection();
+  if (!conn) throw new Error("Bexio ist nicht verbunden");
+  if (conn.bexio_user_id) return conn.bexio_user_id;
+
+  // Noch nicht gecacht -> jetzt fetchen und sichern
+  const token = await getValidAccessToken();
+  const res = await fetch(`${API_BASE}/3.0/users/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Bexio-User-Info fehlgeschlagen (${res.status}): ${text}`);
+  }
+  const me = (await res.json()) as { id?: number };
+  if (!me.id) throw new Error("Bexio /3.0/users/me lieferte keine User-ID");
+
+  const supabase = createAdminClient();
+  await supabase
+    .from("bexio_connection")
+    .update({ bexio_user_id: me.id, updated_at: new Date().toISOString() })
+    .eq("id", 1);
+  return me.id;
 }
 
 export async function getConnection(): Promise<BexioConnection | null> {
@@ -213,16 +248,23 @@ export async function createContact(input: CreateContactInputWithCountry): Promi
   const code = (input.countryCode || "CH").toUpperCase();
   const countryId = BEXIO_COUNTRY_ID[code] ?? BEXIO_COUNTRY_ID.CH;
 
+  // Bexio braucht beim /2.0/contact-POST zwingend user_id + owner_id (Pflicht).
+  // Beide setzen wir auf den verbundenen Bexio-User. address/postcode/city
+  // werden hier NICHT gesendet — die akzeptiert das aktuelle 2.0-Schema nicht
+  // ("Unexpected extra form field"). Stattdessen rufen wir nach erfolgreicher
+  // Kontakt-Erstellung createContactAddress auf, um die Adresse separat
+  // anzuhaengen.
+  const userId = await getBexioUserId();
+
   const payload = {
     contact_type_id: input.isCompany ? 1 : 2,
     name_1: input.name1,
     name_2: input.name2 ?? "",
-    address: input.street ?? "",
-    postcode: input.postcode ?? "",
-    city: input.city ?? "",
     mail: input.email ?? "",
     phone_fixed: input.phone ?? "",
     country_id: countryId,
+    user_id: userId,
+    owner_id: userId,
   };
   const res = await bexioFetch("/2.0/contact", {
     method: "POST",
@@ -234,6 +276,49 @@ export async function createContact(input: CreateContactInputWithCountry): Promi
   }
   const data = await res.json();
   return { id: data.id, nr: data.nr };
+}
+
+// Hängt eine Hauptadresse an einen frisch erstellten Bexio-Kontakt.
+// /2.0/contact erlaubt keine inline-Adresse mehr — Adressen leben jetzt als
+// eigene Resource pro Kontakt. address_type_id=1 = Hauptadresse.
+//
+// Wird nach createContact aufgerufen, schlägt aber kein Fehler zurück wenn
+// fehlt — dann landet der Kontakt halt ohne Adresse in Bexio (besser als
+// gar kein Kontakt).
+export async function createContactAddress(
+  contactId: number,
+  input: { street?: string | null; postcode?: string | null; city?: string | null; countryCode?: string | null; name?: string | null },
+): Promise<void> {
+  const street = (input.street ?? "").trim();
+  const postcode = (input.postcode ?? "").trim();
+  const city = (input.city ?? "").trim();
+  // Wenn überhaupt nichts da ist — sparen wir uns den API-Call.
+  if (!street && !postcode && !city) return;
+
+  const code = (input.countryCode || "CH").toUpperCase();
+  const countryId = BEXIO_COUNTRY_ID[code] ?? BEXIO_COUNTRY_ID.CH;
+
+  const payload = {
+    contact_id: contactId,
+    address_type_id: 1, // Hauptadresse
+    name: input.name ?? "",
+    subject: "",
+    department: "",
+    address: street,
+    postcode,
+    city,
+    country_id: countryId,
+  };
+  const res = await bexioFetch("/2.0/address", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    // Loggen aber nicht throwen — Kontakt existiert bereits, Adresse manuell
+    // ergaenzbar in Bexio.
+    const text = await res.text();
+    console.warn(`[bexio] Adresse fuer Kontakt ${contactId} konnte nicht angelegt werden (${res.status}): ${text}`);
+  }
 }
 
 // === Search-Endpoint fuer Duplikat-Erkennung (#8) ===

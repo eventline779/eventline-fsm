@@ -49,7 +49,26 @@ export async function GET(request: NextRequest) {
       } catch {}
     }
 
-    await saveConnection(tokens, user?.id ?? null, { email: bexioEmail });
+    // Bexio-User-ID gleich mitfetchen — wird beim Kontakt-Anlegen als
+    // user_id + owner_id (Pflichtfelder) gebraucht.
+    let bexioUserId: number | null = null;
+    try {
+      const meRes = await fetch("https://api.bexio.com/3.0/users/me", {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          Accept: "application/json",
+        },
+      });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        bexioUserId = me?.id ?? null;
+      }
+    } catch {
+      // Wenn das hier scheitert: Verbindung trotzdem speichern. createContact
+      // fetched die ID dann beim ersten Anlegen via getBexioUserId().
+    }
+
+    await saveConnection(tokens, user?.id ?? null, { email: bexioEmail, userId: bexioUserId });
 
     const res = NextResponse.redirect(
       new URL("/einstellungen?tab=integrationen&bexio=connected", request.url),
