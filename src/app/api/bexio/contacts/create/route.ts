@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createContact, createContactAddress, bexioContactUrl, findMatchingContacts } from "@/lib/bexio";
+import { bexioContactUrl, findMatchingContacts, BEXIO_NEW_CONTACT_URL } from "@/lib/bexio";
 
-// Body: { customerId, force?: boolean }
+// Body: { customerId }
+//
+// Sucht in Bexio nach Treffern (Email + Name). Legt NICHT mehr selber an —
+// Bexio's API verlangt zu viele Pflichtfelder die wir nicht haben (Anrede,
+// Sprache, Branchen-IDs, Kontaktgruppen). Stattdessen leiten wir den User
+// auf Bexio's Anlegen-Seite weiter, wo er die Daten manuell befuellt.
 //
 // Ablauf:
-// 1. Kunde aus DB laden. Wenn schon bexio_contact_id gesetzt -> existierenden
-//    oeffnen statt neu anlegen.
-// 2. Match-Suche in Bexio (Email + Name). Wenn Treffer und !force -> Liste der
-//    Kandidaten zurueck (success: false, matches: [...]). Frontend zeigt dann
-//    "Verknuepfen-statt-Anlegen"-Dialog.
-// 3. Wenn keine Treffer ODER force=true -> neu anlegen, bexio_contact_id auf
-//    Customer speichern, URL zurueck.
+// 1. Schon verknuepft (bexio_contact_id gesetzt) -> URL der existierenden
+//    Kontakt-Seite zurueck.
+// 2. Match in Bexio -> Liste der Kandidaten zurueck (Frontend zeigt
+//    "Verknuepfen-Modal").
+// 3. Kein Match -> URL zur Bexio-Anlegen-Seite zurueck (Frontend oeffnet
+//    in neuem Tab).
 export async function POST(request: NextRequest) {
   try {
-    const { customerId, force } = await request.json();
+    const { customerId } = await request.json();
     if (!customerId) {
       return NextResponse.json({ success: false, error: "customerId fehlt" }, { status: 400 });
     }
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: customer, error } = await supabase
       .from("customers")
-      .select("id, name, type, email, phone, address_street, address_zip, address_city, address_country, bexio_contact_id")
+      .select("id, name, email, bexio_contact_id")
       .eq("id", customerId)
       .single();
 
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Kunde nicht gefunden" }, { status: 404 });
     }
 
-    // Schon verknuepft -> direkt URL zurueck (Frontend oeffnet im Tab).
+    // Schon verknuepft -> URL zurueck.
     if (customer.bexio_contact_id) {
       const id = parseInt(customer.bexio_contact_id, 10);
       return NextResponse.json({
@@ -42,71 +45,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Schritt 1: Match-Suche (nur wenn nicht force-creating)
-    if (!force) {
-      const matches = await findMatchingContacts({
-        email: customer.email,
-        name: customer.name,
-      });
-      if (matches.length > 0) {
-        return NextResponse.json({
-          success: false,
-          needsLinkConfirmation: true,
-          matches: matches.map((m) => ({
-            id: m.id,
-            name: [m.name_2, m.name_1].filter(Boolean).join(" ").trim() || m.name_1,
-            email: m.mail ?? null,
-            city: m.city ?? null,
-            postcode: m.postcode ?? null,
-            url: bexioContactUrl(m.id),
-          })),
-        });
-      }
-    }
-
-    // Schritt 2: Anlegen (kein Match oder force)
-    const isCompany = customer.type === "company" || customer.type === "organization";
-    let name1 = customer.name;
-    let name2: string | null = null;
-    if (!isCompany) {
-      const lastSpace = customer.name.lastIndexOf(" ");
-      if (lastSpace > 0) {
-        name2 = customer.name.slice(0, lastSpace).trim();
-        name1 = customer.name.slice(lastSpace + 1).trim();
-      }
-    }
-
-    const result = await createContact({
-      isCompany,
-      name1,
-      name2,
+    // Match-Suche
+    const matches = await findMatchingContacts({
       email: customer.email,
-      phone: customer.phone,
-      countryCode: customer.address_country,
-    });
-
-    // Adresse separat anhaengen (Bexio's /2.0/contact akzeptiert keine Inline-
-    // Adresse mehr). Schlaegt das fehl, wird nur geloggt — der Kontakt
-    // existiert dann ohne Adresse, das ist besser als gar kein Kontakt.
-    await createContactAddress(result.id, {
-      street: customer.address_street,
-      postcode: customer.address_zip,
-      city: customer.address_city,
-      countryCode: customer.address_country,
       name: customer.name,
     });
+    if (matches.length > 0) {
+      return NextResponse.json({
+        success: false,
+        needsLinkConfirmation: true,
+        matches: matches.map((m) => ({
+          id: m.id,
+          name: [m.name_2, m.name_1].filter(Boolean).join(" ").trim() || m.name_1,
+          email: m.mail ?? null,
+          city: m.city ?? null,
+          postcode: m.postcode ?? null,
+          url: bexioContactUrl(m.id),
+        })),
+      });
+    }
 
-    // Bexio-ID am Kunden speichern (Service-Role, damit RLS nicht blockt)
-    const admin = createAdminClient();
-    await admin
-      .from("customers")
-      .update({ bexio_contact_id: String(result.id) })
-      .eq("id", customerId);
-
+    // Kein Match -> Bexio's Anlegen-Seite oeffnen
     return NextResponse.json({
       success: true,
-      bexioContactId: String(result.id),
-      bexioContactUrl: bexioContactUrl(result.id),
+      openCreateUrl: BEXIO_NEW_CONTACT_URL,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unbekannter Fehler";

@@ -71,13 +71,17 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     );
   }
 
-  async function attemptCreate(force: boolean) {
+  // Klick "In Bexio anlegen" -> Backend prueft ob's einen Treffer gibt.
+  // - alreadyLinked: existierende Bexio-Kontakt-Seite oeffnen
+  // - needsLinkConfirmation: Match-Modal zeigen ("Verknuepfen?")
+  // - openCreateUrl: Bexio's Anlegen-Seite oeffnen (Daten dort manuell eingeben)
+  async function attemptCreate() {
     setBusy(true);
     try {
       const res = await fetch("/api/bexio/contacts/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, force }),
+        body: JSON.stringify({ customerId }),
       });
       const json = await res.json();
 
@@ -90,21 +94,29 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         return;
       }
       if (json.alreadyLinked) {
-        // Server hat festgestellt dass eh schon verknuepft — Tab oeffnen, Status updaten.
         setLinkedId(json.bexioContactId);
         onLinked?.(json.bexioContactId);
-      } else {
-        setLinkedId(json.bexioContactId);
-        onLinked?.(json.bexioContactId);
-        toast.success("In Bexio angelegt");
+        window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
+        return;
       }
-      window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
+      if (json.openCreateUrl) {
+        // Kein Match in Bexio -> direkt Anlegen-Seite oeffnen.
+        toast.message("Trage die Kunden-Infos in Bexio ein");
+        window.open(json.openCreateUrl, "_blank", "noopener,noreferrer");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Netzwerkfehler";
       toast.error("Fehler: " + msg);
     } finally {
       setBusy(false);
     }
+  }
+
+  // Aus dem Match-Modal "Trotzdem neu anlegen" -> direkt Bexio-Anlegen-Seite.
+  function openBexioNewContact() {
+    setMatches(null);
+    toast.message("Trage die Kunden-Infos in Bexio ein");
+    window.open("https://office.bexio.com/index.php/kontakt/edit/id/0", "_blank", "noopener,noreferrer");
   }
 
   async function linkExisting(bexioId: number) {
@@ -138,7 +150,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     <>
       <button
         type="button"
-        onClick={() => attemptCreate(false)}
+        onClick={attemptCreate}
         disabled={busy}
         className="kasten kasten-green shrink-0"
         title="Diesen Kunden in Bexio als Kontakt anlegen"
@@ -190,10 +202,10 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => { setMatches(null); attemptCreate(true); }}
+            onClick={openBexioNewContact}
             disabled={busy}
             className="kasten kasten-red flex-1"
-            title="Trotzdem neuen Bexio-Kontakt anlegen (riskiert Duplikat)"
+            title="Trotzdem neuen Bexio-Kontakt manuell anlegen (riskiert Duplikat)"
           >
             Trotzdem neu anlegen
           </button>
