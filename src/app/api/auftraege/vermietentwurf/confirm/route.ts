@@ -76,22 +76,38 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Erstmaliger Klick — Step weiterstellen + Mitarbeiter benachrichtigen
-  await supabase.from("jobs").update({ request_step: targetStep }).eq("id", id);
+  // Erstmaliger Klick — Step weiterstellen.
+  // Bei Angebot-Bestaetigung wandeln wir den Vermietentwurf gleichzeitig
+  // in einen Auftrag um (status='entwurf', request_step=null). was_anfrage
+  // bleibt true, damit der hellblaue Vermietung-Tag haengen bleibt. Die
+  // Vermietentwurf-Phase ist mit der Angebot-Bestaetigung abgeschlossen —
+  // ab jetzt sitzt das in der Auftraege-Liste und kann freigegeben werden.
+  if (type === "angebot") {
+    await supabase.from("jobs").update({
+      status: "entwurf",
+      request_step: null,
+    }).eq("id", id);
+  } else {
+    await supabase.from("jobs").update({ request_step: targetStep }).eq("id", id);
+  }
 
+  // Mitarbeiter benachrichtigen
   const { data: admins } = await supabase
     .from("profiles")
     .select("id")
     .in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
 
   if (admins) {
-    const title = type === "angebot" ? `Angebot best&auml;tigt: ${customerName}` : `Konditionen best&auml;tigt: ${customerName}`;
+    const title = type === "angebot"
+      ? `Angebot best&auml;tigt — Auftrag erstellt: ${customerName}`
+      : `Konditionen best&auml;tigt: ${customerName}`;
+    const link = type === "angebot" ? `/auftraege/${id}` : `/auftraege/vermietentwurf/${id}`;
     for (const admin of admins) {
       await supabase.from("notifications").insert({
         user_id: admin.id,
         title,
         message: locationName,
-        link: `/auftraege/vermietentwurf/${id}`,
+        link,
       });
     }
   }
