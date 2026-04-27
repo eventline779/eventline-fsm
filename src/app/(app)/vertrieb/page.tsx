@@ -3,65 +3,29 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import type { VertriebContact, VertriebStatus, VertriebPriority, VertriebKategorie } from "@/types";
-import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search, Building2, PartyPopper, ArrowRight, Check, AlertTriangle } from "lucide-react";
+import { Plus, TrendingUp, Phone, Mail, Calendar, Search, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-
-const STATUS_OPTIONS: { value: VertriebStatus; label: string; color: string }[] = [
-  { value: "offen", label: "Offen", color: "bg-gray-100 text-gray-700 border-gray-200" },
-  { value: "kontaktiert", label: "Kontaktiert", color: "bg-amber-100 text-amber-700 border-amber-200" },
-  { value: "gespraech", label: "Gespräch", color: "bg-teal-100 text-teal-700 border-teal-200" },
-  { value: "gewonnen", label: "Gewonnen", color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "abgesagt", label: "Abgesagt", color: "bg-red-100 text-red-700 border-red-200" },
-];
-
-const PRIORITY_OPTIONS: { value: VertriebPriority; label: string; color: string }[] = [
-  { value: "top", label: "★ Top", color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "gut", label: "Gut", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  { value: "mittel", label: "Mittel", color: "bg-gray-100 text-gray-600 border-gray-200" },
-];
-
-const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; color: string }[] = [
-  { value: "verwaltung", label: "Verwaltungs-Anfragen", icon: Building2, color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "veranstaltung", label: "Veranstaltungen", icon: PartyPopper, color: "bg-purple-100 text-purple-700 border-purple-200" },
-];
-
-const STEPS = [
-  { nr: 1, label: "Offen", action: "Kontakt aufnehmen" },
-  { nr: 2, label: "Kontaktiert", action: "Weiter zu Finalisierung" },
-  { nr: 3, label: "Finalisierung", action: "Weiter zu Operations" },
-  { nr: 4, label: "Operations", action: "Auftrag erstellen" },
-];
-
-const BEDARF_BEREICHE = [
-  { key: "verwaltungsaufwand", label: "Verwaltungsaufwand" },
-  { key: "material", label: "Material" },
-  { key: "arbeiten", label: "Arbeiten" },
-  { key: "stunden", label: "Stunden" },
-  { key: "catering", label: "Catering" },
-  { key: "transport", label: "Transport" },
-  { key: "raum", label: "Raum" },
-] as const;
-
-const emptyForm = {
-  firma: "", branche: "", ansprechperson: "", position: "", email: "", telefon: "",
-  event_typ: "", status: "offen" as VertriebStatus, datum_kontakt: "", notizen: "",
-  prioritaet: "mittel" as VertriebPriority, kategorie: "veranstaltung" as VertriebKategorie,
-  // Verwaltung
-  infrastruktur: "", ort: "", zielgruppe: "", programm: "", bedarf_vor_ort: "",
-  // Veranstaltungsdatum
-  event_start: "", event_end: "",
-  // Veranstaltung: pro Bereich ein Text
-  bedarf: {} as Record<string, string>,
-  // Kontakt als Kunden speichern (standardmässig aktiv)
-  create_customer: true,
-};
-
-const VERTRIEB_PASSWORD = "788596";
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  KATEGORIE_OPTIONS,
+  STEPS,
+  BEDARF_LABELS,
+  emptyForm,
+  VERTRIEB_PASSWORD,
+} from "./constants";
+import { TerminModalBody } from "@/components/vertrieb/termin-modal-body";
+import { AuftragModalBody } from "@/components/vertrieb/auftrag-modal-body";
+import { BuchhaltungModalBody } from "@/components/vertrieb/buchhaltung-modal-body";
+import { VerbesserungModalBody } from "@/components/vertrieb/verbesserung-modal-body";
+import { LostModalBody } from "@/components/vertrieb/lost-modal-body";
+import { LeadCard } from "@/components/vertrieb/lead-card";
+import { LeadForm } from "@/components/vertrieb/lead-form";
+import { CategoryPicker } from "@/components/vertrieb/category-picker";
 
 export default function VertriebPage() {
   const router = useRouter();
@@ -615,7 +579,6 @@ export default function VertriebPage() {
     if (details.programm) descriptionParts.push(`Programm: ${details.programm}`);
     if (details.bedarf_vor_ort) descriptionParts.push(`Bedarf vor Ort: ${details.bedarf_vor_ort}`);
     if (details.bedarf) {
-      const BEDARF_LABELS: Record<string, string> = { verwaltungsaufwand: "Verwaltungsaufwand", material: "Material", arbeiten: "Arbeiten", stunden: "Stunden", catering: "Catering", transport: "Transport", raum: "Raum" };
       Object.entries(details.bedarf).forEach(([k, v]: any) => { descriptionParts.push(`${BEDARF_LABELS[k] || k}: ${v}`); });
     }
 
@@ -689,6 +652,27 @@ export default function VertriebPage() {
     await supabase.from("vertrieb_contacts").delete().eq("id", id);
     toast.success("Eintrag gelöscht");
     load();
+  }
+
+  async function removeOfferte() {
+    if (!offertePdf || !editingId) return;
+    await supabase.storage.from("documents").remove([offertePdf.path]);
+    const c = contacts.find((c) => c.id === editingId);
+    if (c) {
+      let obj: any = {};
+      try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+      if (obj._details) delete obj._details.offerte_pdf;
+      await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
+    }
+    setOffertePdf(null);
+    load();
+    toast.success("PDF entfernt");
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setCategoryPicked(false);
   }
 
   const filtered = contacts
@@ -856,30 +840,14 @@ export default function VertriebPage() {
         size="md"
         closable={!savingTermin}
       >
-        <div>
-          <label className="text-sm font-medium">Datum *</label>
-          <Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1.5 bg-gray-50" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium">Von *</label>
-            <Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1.5 bg-gray-50" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Bis *</label>
-            <Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1.5 bg-gray-50" />
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium">Notiz (optional)</label>
-          <textarea value={terminForm.note} onChange={(e) => setTerminForm({ ...terminForm, note: e.target.value })} placeholder="Worum geht es?" className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={2} />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowTerminModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={saveTermin} disabled={savingTermin} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-            {savingTermin ? "Speichern..." : "Termin erstellen"}
-          </button>
-        </div>
+        <TerminModalBody
+          terminType={terminType}
+          terminForm={terminForm}
+          setTerminForm={setTerminForm}
+          onSave={saveTermin}
+          onClose={() => setShowTerminModal(false)}
+          saving={savingTermin}
+        />
       </Modal>
 
       {/* Auftrag-Modal (Schritt 4) */}
@@ -891,46 +859,14 @@ export default function VertriebPage() {
         size="lg"
         closable={!creatingAuftrag}
       >
-        <p className="text-sm text-gray-700 dark:text-gray-300">Der Auftrag wird mit allen Infos aus dem Lead erstellt. Leo wird per Email benachrichtigt.</p>
-        <div>
-          <label className="text-sm font-medium">Titel *</label>
-          <Input value={auftragForm.title} onChange={(e) => setAuftragForm({ ...auftragForm, title: e.target.value })} className="mt-1.5 bg-gray-50" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium">Startdatum</label>
-            <Input type="date" value={auftragForm.start_date} onChange={(e) => setAuftragForm({ ...auftragForm, start_date: e.target.value })} className="mt-1.5 bg-gray-50" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Enddatum</label>
-            <Input type="date" value={auftragForm.end_date} onChange={(e) => setAuftragForm({ ...auftragForm, end_date: e.target.value })} className="mt-1.5 bg-gray-50" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium">Priorität</label>
-            <select value={auftragForm.priority} onChange={(e) => setAuftragForm({ ...auftragForm, priority: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-              <option value="niedrig">Niedrig</option>
-              <option value="normal">Normal</option>
-              <option value="hoch">Hoch</option>
-              <option value="dringend">Dringend</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Location</label>
-            <select value={auftragForm.location_id} onChange={(e) => setAuftragForm({ ...auftragForm, location_id: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-              <option value="">— Keine —</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>
-        <div className="flex gap-3">
-          <button onClick={() => setShowAuftragModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={createAuftrag} disabled={!auftragForm.title || creatingAuftrag} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
-            <Check className="h-4 w-4" />{creatingAuftrag ? "Erstellen..." : "Auftrag erstellen"}
-          </button>
-        </div>
+        <AuftragModalBody
+          auftragForm={auftragForm}
+          setAuftragForm={setAuftragForm}
+          locations={locations}
+          onCreate={createAuftrag}
+          onClose={() => setShowAuftragModal(false)}
+          creating={creatingAuftrag}
+        />
       </Modal>
 
       {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
@@ -942,23 +878,13 @@ export default function VertriebPage() {
         size="md"
         closable={!sendingBuchhaltung}
       >
-        <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — alle Verrechnungs-Infos werden automatisch mitgeschickt.</p>
-        <div>
-          <label className="text-sm font-medium">Zusätzliche Nachricht (optional)</label>
-          <textarea
-            value={buchhaltungMessage}
-            onChange={(e) => setBuchhaltungMessage(e.target.value)}
-            placeholder="z.B. Bitte Angebot erstellen bis..."
-            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            rows={4}
-          />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowBuchhaltung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={sendBuchhaltungsBenachrichtigung} disabled={sendingBuchhaltung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-            <Mail className="h-4 w-4" />{sendingBuchhaltung ? "Senden..." : "Senden"}
-          </button>
-        </div>
+        <BuchhaltungModalBody
+          buchhaltungMessage={buchhaltungMessage}
+          setBuchhaltungMessage={setBuchhaltungMessage}
+          onSend={sendBuchhaltungsBenachrichtigung}
+          onClose={() => setShowBuchhaltung(false)}
+          sending={sendingBuchhaltung}
+        />
       </Modal>
 
       {/* Verbesserungs-Modal (Schritt 3) */}
@@ -970,24 +896,13 @@ export default function VertriebPage() {
         size="md"
         closable={!sendingVerbesserung}
       >
-        <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — was soll an der Offerte verbessert werden?</p>
-        <div>
-          <label className="text-sm font-medium">Verbesserungen *</label>
-          <textarea
-            value={verbesserungText}
-            onChange={(e) => setVerbesserungText(e.target.value)}
-            placeholder="z.B. Preis anpassen, Leistungen ergänzen, Datum ändern..."
-            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-            rows={5}
-            autoFocus
-          />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowVerbesserung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={sendVerbesserung} disabled={!verbesserungText.trim() || sendingVerbesserung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
-            <Mail className="h-4 w-4" />{sendingVerbesserung ? "Senden..." : "Senden"}
-          </button>
-        </div>
+        <VerbesserungModalBody
+          verbesserungText={verbesserungText}
+          setVerbesserungText={setVerbesserungText}
+          onSend={sendVerbesserung}
+          onClose={() => setShowVerbesserung(false)}
+          sending={sendingVerbesserung}
+        />
       </Modal>
 
       {/* Verloren-Modal */}
@@ -998,460 +913,54 @@ export default function VertriebPage() {
         icon={<AlertTriangle className="h-4 w-4 text-red-600" />}
         size="md"
       >
-        <p className="text-sm text-gray-700 dark:text-gray-300">Gib einen Grund an, warum der Auftrag verloren wurde.</p>
-        <div>
-          <label className="text-sm font-medium">Grund *</label>
-          <textarea
-            value={lostReason}
-            onChange={(e) => setLostReason(e.target.value)}
-            placeholder="z.B. Zu teuer, Konkurrenz gewählt, kein Budget..."
-            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20"
-            rows={3}
-            autoFocus
-          />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowLostModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-          <button onClick={markLost} disabled={!lostReason.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-            <AlertTriangle className="h-4 w-4" />Als verloren markieren
-          </button>
-        </div>
+        <LostModalBody
+          lostReason={lostReason}
+          setLostReason={setLostReason}
+          onConfirm={markLost}
+          onClose={() => setShowLostModal(false)}
+        />
       </Modal>
 
       {showForm && !editingId && !categoryPicked && (
-        <Card className="bg-card border-red-100">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Was für ein Lead?</h3>
-              <button type="button" onClick={() => { setShowForm(false); setCategoryPicked(false); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="grid gap-3">
-              {KATEGORIE_OPTIONS.map((k) => {
-                const Icon = k.icon;
-                return (
-                  <button
-                    key={k.value}
-                    type="button"
-                    onClick={() => pickCategory(k.value)}
-                    className="kasten kasten-red w-full p-4 gap-4 justify-start text-left text-sm"
-                  >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${k.color}`}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{k.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {k.value === "verwaltung" ? "Verwaltungen, Immobilien, WEG-Anfragen" : "Sommerfeste, Jahresanlässe, Firmenevents"}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <CategoryPicker
+          onPick={pickCategory}
+          onClose={() => { setShowForm(false); setCategoryPicked(false); }}
+        />
       )}
 
       {showForm && (editingId || categoryPicked) && (
-        <Card className="bg-card border-red-100">
-          <CardContent className="p-6">
-            <form onSubmit={save} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold">{editingId ? "Kontakt bearbeiten" : "Neuer Kontakt"}</h3>
-                  {(() => {
-                    const k = KATEGORIE_OPTIONS.find((o) => o.value === form.kategorie);
-                    if (!k) return null;
-                    const Icon = k.icon;
-                    return <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border ${k.color}`}><Icon className="h-3 w-3" />{k.label}</span>;
-                  })()}
-                </div>
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
-              </div>
-
-              {/* Step-Progress nur beim Bearbeiten */}
-              {editingId && form.status !== "abgesagt" && (
-                <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-                  <div className="flex items-center gap-0">
-                    {STEPS.map((s, i) => {
-                      const done = editingStep > s.nr;
-                      const active = editingStep === s.nr;
-                      return (
-                        <div key={s.nr} className="flex items-center flex-1">
-                          <div className="flex flex-col items-center w-full relative">
-                            {i > 0 && <div className={`absolute top-3 right-1/2 w-full h-0.5 -z-10 ${done ? "bg-green-400" : "bg-gray-300"}`} />}
-                            <div className={`flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 ${done ? "bg-green-500 text-white" : active ? "bg-blue-500 text-white ring-4 ring-blue-100" : "bg-gray-200 text-gray-400"}`}>
-                              {done ? <Check className="h-4 w-4" /> : <span className="text-xs font-bold">{s.nr}</span>}
-                            </div>
-                            <p className={`text-[10px] font-semibold mt-1.5 text-center ${done ? "text-green-700" : active ? "text-blue-700" : "text-gray-400"}`}>{s.label}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex gap-2 flex-wrap pt-2 border-t border-gray-200">
-                    {/* Schritt 1: Kontakt aufnehmen */}
-                    {editingStep === 1 && (
-                      <button type="button" onClick={advanceStep} className="kasten kasten-blue">
-                        <ArrowRight className="h-3.5 w-3.5" />Kontakt aufnehmen
-                      </button>
-                    )}
-                    {/* Schritt 2-3-4 haben eigene Action-Bars im spezifischen Block */}
-                    {form.status !== "gewonnen" && (
-                      <Button type="button" size="sm" variant="outline" onClick={() => openLostModal(editingId)} className="text-red-600 border-red-200 hover:bg-red-50">
-                        <AlertTriangle className="h-4 w-4 mr-1" />Auftrag verloren
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Gewonnen-Banner */}
-              {editingId && form.status === "gewonnen" && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border-2 border-green-200">
-                  <Check className="h-6 w-6 text-green-600 shrink-0" />
-                  <div>
-                    <p className="font-bold text-green-800">Gewonnen · Auftrag erstellt</p>
-                    {(() => {
-                      const c = contacts.find((c) => c.id === editingId);
-                      const jobNum = (() => { try { return JSON.parse(c?.notizen || "{}")._details?.job_number; } catch { return null; } })();
-                      return jobNum && <p className="text-sm text-green-700 mt-0.5">INT-{jobNum}</p>;
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* SCHRITT 2: Benachrichtigung Buchhaltung + Termine */}
-              {editingId && editingStep === 2 && form.status !== "abgesagt" && (
-                <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200 space-y-3">
-                  <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5"><Mail className="h-4 w-4" />Schritt 2: Kontaktiert</p>
-
-                  <div className="flex gap-2 flex-wrap">
-                    <Button type="button" size="sm" onClick={() => openTerminModal("telefon")} variant="outline" className="bg-card">
-                      <Phone className="h-4 w-4 mr-1" />Telefon-Termin
-                    </Button>
-                    <Button type="button" size="sm" onClick={() => openTerminModal("kunde")} variant="outline" className="bg-card">
-                      <Calendar className="h-4 w-4 mr-1" />Kunden-Termin
-                    </Button>
-                  </div>
-
-                  {/* Erstellte Termine anzeigen */}
-                  {(() => {
-                    const c = currentContactWithDetails();
-                    const termine: any[] = c?.details?.termine || [];
-                    if (termine.length === 0) return null;
-                    return (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Geplante Termine ({termine.length})</p>
-                        {termine.map((t) => (
-                          <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-blue-200 text-xs">
-                            <span className="text-base shrink-0">{t.type === "telefon" ? "📞" : "👥"}</span>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">{t.type === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}</p>
-                              <p className="text-muted-foreground text-[11px]">
-                                {(() => { const [y,m,d] = t.date.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }); })()} · {t.time}{t.end_time ? ` – ${t.end_time}` : ""}
-                              </p>
-                              {t.note && <p className="text-muted-foreground text-[11px] italic mt-0.5">{t.note}</p>}
-                            </div>
-                            <button type="button" onClick={() => deleteTerminFromLead(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  <div className="pt-2 border-t border-blue-200">
-                    <p className="text-xs text-blue-700 mb-2">Buchhaltung mit allen Verrechnungs-Infos benachrichtigen:</p>
-                    <div className="flex gap-2 flex-wrap">
-                      <button type="button" onClick={() => setShowBuchhaltung(true)} className="kasten kasten-blue">
-                        <Mail className="h-3.5 w-3.5" />Benachrichtigung senden
-                      </button>
-                      <Button type="button" size="sm" onClick={advanceStep} variant="outline" className="text-blue-700 border-blue-300">
-                        <ArrowRight className="h-4 w-4 mr-1" />Weiter zu Finalisierung
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SCHRITT 3: Finalisierung */}
-              {editingId && editingStep === 3 && form.status !== "abgesagt" && (
-                <div className="p-4 rounded-xl bg-orange-50 border-2 border-orange-200 space-y-3">
-                  <p className="text-sm font-semibold text-orange-800 flex items-center gap-1.5"><Filter className="h-4 w-4" />Schritt 3: Finalisierung</p>
-                  <div>
-                    <label className="text-xs font-medium">Offerte als PDF</label>
-                    {offertePdf ? (
-                      <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-card border border-orange-200">
-                        <span className="text-sm truncate">{offertePdf.name}</span>
-                        <button type="button" onClick={async () => {
-                          await supabase.storage.from("documents").remove([offertePdf.path]);
-                          const c = contacts.find((c) => c.id === editingId);
-                          if (c) {
-                            let obj: any = {};
-                            try { obj = JSON.parse(c.notizen || "{}"); } catch {}
-                            if (obj._details) delete obj._details.offerte_pdf;
-                            await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
-                          }
-                          setOffertePdf(null);
-                          load();
-                          toast.success("PDF entfernt");
-                        }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
-                      </div>
-                    ) : (
-                      <label className="mt-1.5 flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-orange-300 bg-card text-sm text-orange-700 cursor-pointer hover:border-orange-500 transition-colors">
-                        <Plus className="h-4 w-4" />{uploadingOfferte ? "Hochladen..." : "Offerte PDF hochladen"}
-                        <input type="file" accept=".pdf" onChange={uploadOfferte} className="hidden" disabled={uploadingOfferte} />
-                      </label>
-                    )}
-                  </div>
-                  <div className="flex gap-2 flex-wrap pt-2 border-t border-orange-200">
-                    <Button type="button" size="sm" onClick={() => setShowVerbesserung(true)} variant="outline" className="text-orange-700 border-orange-300 hover:bg-orange-100">
-                      <Mail className="h-4 w-4 mr-1" />Verbesserungs-Nachricht
-                    </Button>
-                    <button type="button" onClick={sendOffertenBestaetigung} disabled={sendingBestaetigung} className="kasten kasten-green">
-                      <Check className="h-3.5 w-3.5" />{sendingBestaetigung ? "Senden..." : "Offerte bestätigt"}
-                    </button>
-                    <button type="button" onClick={advanceStep} className="kasten kasten-blue">
-                      <ArrowRight className="h-3.5 w-3.5" />Weiter zu Operations
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* SCHRITT 4: Operations — Auftrag erstellen */}
-              {editingId && editingStep === 4 && form.status !== "abgesagt" && (
-                <div className="p-4 rounded-xl bg-green-50 border-2 border-green-200 space-y-3">
-                  <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5"><Check className="h-4 w-4" />Schritt 4: Operations</p>
-                  {(() => {
-                    const c = currentContactWithDetails();
-                    const jobNum = c?.details?.job_number;
-                    const jobId = c?.details?.job_id;
-                    if (jobNum && jobId) {
-                      return (
-                        <div className="p-3 rounded-lg bg-card border border-green-200 flex items-center justify-between flex-wrap gap-2">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Auftrag erstellt</p>
-                            <p className="font-semibold text-sm"><span className="font-mono text-green-700">INT-{jobNum}</span></p>
-                          </div>
-                          <a href={`/auftraege/${jobId}`} className="text-sm text-blue-600 hover:underline font-medium">Auftrag öffnen → Schichtplan</a>
-                        </div>
-                      );
-                    }
-                    return (
-                      <>
-                        <p className="text-xs text-green-700">Erstelle aus diesem Lead einen Auftrag. Leo wird automatisch benachrichtigt. Danach kannst du den Schichtplan machen.</p>
-                        <div className="flex gap-2 flex-wrap">
-                          <button type="button" onClick={openAuftragModal} className="kasten kasten-green">
-                            <Plus className="h-3.5 w-3.5" />Auftrag erstellen
-                          </button>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Verloren-Banner */}
-              {editingId && form.status === "abgesagt" && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border-2 border-red-200">
-                  <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
-                  <div>
-                    <p className="font-bold text-red-800">Auftrag verloren</p>
-                    {(() => {
-                      const c = contacts.find((c) => c.id === editingId);
-                      return c?.verloren_grund && <p className="text-sm text-red-700 mt-0.5">Grund: {c.verloren_grund}</p>;
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Kunden-Auswahl: Neu oder Bestehend */}
-              {!editingId && (
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "neu" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
-                      + Neuer Kunde
-                    </button>
-                    <button type="button" onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "bestehend" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
-                      Bestandskunde auswählen
-                    </button>
-                  </div>
-                  {kundenMode === "bestehend" && (
-                    <div>
-                      <label className="text-xs font-medium">Kunde auswählen *</label>
-                      <select value={selectedCustomerId} onChange={(e) => selectExistingCustomer(e.target.value)} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card" required>
-                        <option value="">— Kunde wählen —</option>
-                        {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      {selectedCustomerId && (() => {
-                        const c = customers.find((x) => x.id === selectedCustomerId);
-                        if (!c) return null;
-                        return (
-                          <div className="mt-2 p-2 rounded-lg bg-card border border-gray-100 text-xs space-y-0.5">
-                            <p className="font-semibold">{c.name}</p>
-                            {c.email && <p className="text-muted-foreground">{c.email}</p>}
-                            {c.phone && <p className="text-muted-foreground">{c.phone}</p>}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium">Firma *</label>
-                  <Input value={form.firma} onChange={(e) => setForm({ ...form, firma: e.target.value })} required className="mt-1 bg-gray-50" disabled={kundenMode === "bestehend" && !!selectedCustomerId} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Branche</label>
-                  <Input value={form.branche} onChange={(e) => setForm({ ...form, branche: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Ansprechperson</label>
-                  <Input value={form.ansprechperson} onChange={(e) => setForm({ ...form, ansprechperson: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Position</label>
-                  <Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">E-Mail</label>
-                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Telefon</label>
-                  <Input value={form.telefon} onChange={(e) => setForm({ ...form, telefon: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs font-medium">Event-Typ</label>
-                  <Input value={form.event_typ} onChange={(e) => setForm({ ...form, event_typ: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Datum Kontakt</label>
-                  <Input type="date" value={form.datum_kontakt} onChange={(e) => setForm({ ...form, datum_kontakt: e.target.value })} className="mt-1 bg-gray-50" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VertriebStatus })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                    {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium">Priorität</label>
-                  <select value={form.prioritaet} onChange={(e) => setForm({ ...form, prioritaet: e.target.value as VertriebPriority })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                    {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Veranstaltungs-Datum (nur bei Veranstaltungen, nicht bei Verwaltung) */}
-              {form.kategorie === "veranstaltung" && (
-              <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200 dark:bg-purple-950/30 space-y-3">
-                <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-1.5"><PartyPopper className="h-3.5 w-3.5" />Veranstaltungs-Datum</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium">Anfang</label>
-                    <Input type="date" value={form.event_start} onChange={(e) => setForm({ ...form, event_start: e.target.value })} className="mt-1 bg-card" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Ende</label>
-                    <Input type="date" value={form.event_end} onChange={(e) => setForm({ ...form, event_end: e.target.value })} className="mt-1 bg-card" />
-                  </div>
-                </div>
-              </div>
-              )}
-
-              {/* Kategorienspezifische Felder */}
-              {form.kategorie === "verwaltung" ? (
-                <div className="space-y-3 p-4 rounded-xl bg-blue-50/50 border border-blue-200 dark:bg-blue-950/30">
-                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" />Verwaltungs-Details</p>
-                  <div>
-                    <label className="text-xs font-medium">Gegebene Infrastruktur</label>
-                    <textarea value={form.infrastruktur} onChange={(e) => setForm({ ...form, infrastruktur: e.target.value })} placeholder="Was ist vor Ort vorhanden? Saal, Technik, Parkplätze..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Ort</label>
-                    <Input value={form.ort} onChange={(e) => setForm({ ...form, ort: e.target.value })} placeholder="Adresse oder Bezeichnung" className="mt-1 bg-card" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Zielgruppe</label>
-                    <Input value={form.zielgruppe} onChange={(e) => setForm({ ...form, zielgruppe: e.target.value })} placeholder="Wer wird erreicht?" className="mt-1 bg-card" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Programm</label>
-                    <textarea value={form.programm} onChange={(e) => setForm({ ...form, programm: e.target.value })} placeholder="Geplantes Programm / Ablauf..." className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Bedarf vor Ort</label>
-                    <textarea value={form.bedarf_vor_ort} onChange={(e) => setForm({ ...form, bedarf_vor_ort: e.target.value })} placeholder="Was muss zusätzlich beschafft/organisiert werden?" className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={2} />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3 p-4 rounded-xl bg-purple-50/50 border border-purple-200 dark:bg-purple-950/30">
-                  <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-1.5"><PartyPopper className="h-3.5 w-3.5" />Bedarf (Bereiche auswählen)</p>
-                  {BEDARF_BEREICHE.map((b) => {
-                    const hasText = !!form.bedarf[b.key]?.trim();
-                    const isOpen = visibleBedarf.has(b.key) || hasText;
-                    return (
-                      <div key={b.key}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = new Set(visibleBedarf);
-                            if (isOpen) next.delete(b.key); else next.add(b.key);
-                            setVisibleBedarf(next);
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isOpen ? "bg-purple-600 text-white" : hasText ? "bg-purple-100 text-purple-800 border border-purple-300" : "bg-card text-gray-700 border border-gray-200 hover:border-purple-300"}`}
-                        >
-                          <span className="flex items-center gap-2">
-                            {b.label}
-                            {hasText && !isOpen && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200 text-purple-800">gespeichert</span>}
-                          </span>
-                          <span className="text-xs">{isOpen ? "−" : "+"}</span>
-                        </button>
-                        {isOpen && (
-                          <textarea
-                            value={form.bedarf[b.key] || ""}
-                            onChange={(e) => setForm({ ...form, bedarf: { ...form.bedarf, [b.key]: e.target.value } })}
-                            placeholder={`Details zu ${b.label}...`}
-                            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                            rows={2}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Kontakt als Kunde speichern */}
-              {!editingId && form.firma && kundenMode === "neu" && (
-                <label className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:border-red-300">
-                  <input type="checkbox" checked={form.create_customer} onChange={(e) => setForm({ ...form, create_customer: e.target.checked })} className="h-4 w-4" />
-                  <span className="text-sm">Kontakt zusätzlich als Kunden anlegen ({form.firma})</span>
-                </label>
-              )}
-
-              <div>
-                <label className="text-xs font-medium">Notizen {form.kategorie === "verwaltung" && <span className="text-muted-foreground font-normal">— Beschreibe die Situation detailliert</span>}</label>
-                <textarea
-                  value={form.notizen}
-                  onChange={(e) => setForm({ ...form, notizen: e.target.value })}
-                  placeholder={form.kategorie === "verwaltung" ? "Wie ist die aktuelle Situation? Was sind die Herausforderungen, Hintergründe, wichtige Infos..." : "Notizen..."}
-                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-y focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  rows={form.kategorie === "verwaltung" ? 8 : 3}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCategoryPicked(false); }} className="kasten kasten-muted">Abbrechen</button>
-                <button type="submit" disabled={!form.firma || saving} className="kasten kasten-red">{saving ? "Speichern..." : editingId ? "Änderungen speichern" : "Kontakt hinzufügen"}</button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <LeadForm
+          editingId={editingId}
+          editingStep={editingStep}
+          form={form}
+          setForm={setForm}
+          saving={saving}
+          offertePdf={offertePdf}
+          uploadingOfferte={uploadingOfferte}
+          sendingBestaetigung={sendingBestaetigung}
+          visibleBedarf={visibleBedarf}
+          setVisibleBedarf={setVisibleBedarf}
+          kundenMode={kundenMode}
+          setKundenMode={setKundenMode}
+          selectedCustomerId={selectedCustomerId}
+          setSelectedCustomerId={setSelectedCustomerId}
+          customers={customers}
+          contacts={contacts}
+          onSubmit={save}
+          onClose={closeForm}
+          onAdvanceStep={advanceStep}
+          onOpenLost={openLostModal}
+          onOpenBuchhaltung={() => setShowBuchhaltung(true)}
+          onOpenVerbesserung={() => setShowVerbesserung(true)}
+          onOpenTermin={openTerminModal}
+          onDeleteTermin={deleteTerminFromLead}
+          onUploadOfferte={uploadOfferte}
+          onRemoveOfferte={removeOfferte}
+          onSendBestaetigung={sendOffertenBestaetigung}
+          onOpenAuftrag={openAuftragModal}
+          onSelectExistingCustomer={selectExistingCustomer}
+          currentContactWithDetails={currentContactWithDetails}
+        />
       )}
 
       {/* Liste */}
@@ -1467,126 +976,9 @@ export default function VertriebPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c) => {
-            const statusConf = STATUS_OPTIONS.find((s) => s.value === c.status)!;
-            const prioConf = PRIORITY_OPTIONS.find((p) => p.value === c.prioritaet)!;
-            const katConf = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
-            const KatIcon = katConf?.icon;
-            const currentStepNr = c.step || 1;
-            const stepLabel = STEPS.find((s) => s.nr === currentStepNr)?.label || "";
-            const isGewonnen = c.status === "gewonnen";
-            const isVerloren = c.status === "abgesagt";
-            // Job-Nummer + Event-Datum ermitteln
-            let jobNumber: number | null = null;
-            let eventStart: string | null = null;
-            let eventEnd: string | null = null;
-            try {
-              const parsed = JSON.parse(c.notizen || "{}");
-              jobNumber = parsed._details?.job_number || null;
-              eventStart = parsed._details?.event_start || null;
-              eventEnd = parsed._details?.event_end || null;
-            } catch {}
-            return (
-              <Card
-                key={c.id}
-                onClick={() => openEdit(c)}
-                className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 group relative ${
-                  isGewonnen ? "bg-green-50 border-green-200" :
-                  isVerloren ? "bg-red-50/60 border-red-200 opacity-70" :
-                  "bg-card"
-                }`}
-              >
-                <CardContent className="p-4">
-                  {/* Top row: Number, Firma, Category */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">LEAD-{String(c.nr).padStart(4, "0")}</span>
-                        {katConf && KatIcon && (
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border ${katConf.color}`}>
-                            <KatIcon className="h-2.5 w-2.5" />
-                            {c.kategorie === "verwaltung" ? "Verwaltung" : "Event"}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-[15px] leading-tight truncate">{c.firma}</h3>
-                      {c.branche && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.branche}</p>}
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteContact(c.id); }}
-                      className="p-1.5 rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Löschen"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Contact info */}
-                  {(c.ansprechperson || c.email || c.telefon) && (
-                    <div className="space-y-0.5 mb-3 pb-3 border-b border-gray-100">
-                      {c.ansprechperson && (
-                        <p className="text-xs text-gray-700 truncate">{c.ansprechperson}{c.position ? ` · ${c.position}` : ""}</p>
-                      )}
-                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                        {c.email && <a onClick={(e) => e.stopPropagation()} href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 truncate max-w-[180px]"><Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span></a>}
-                        {c.telefon && <a onClick={(e) => e.stopPropagation()} href={`tel:${c.telefon}`} className="flex items-center gap-1 hover:text-blue-600"><Phone className="h-3 w-3" />{c.telefon}</a>}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Event-Datum */}
-                  {eventStart && (
-                    <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
-                      <PartyPopper className="h-3.5 w-3.5 shrink-0" />
-                      {new Date(eventStart).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                      {eventEnd && eventEnd !== eventStart && ` – ${new Date(eventEnd).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}`}
-                    </div>
-                  )}
-
-                  {/* Step progress bar */}
-                  {!isGewonnen && !isVerloren && (
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Schritt {currentStepNr}/4</span>
-                        <span className="text-[10px] text-gray-500">{stepLabel}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {STEPS.map((s) => (
-                          <div key={s.nr} className={`flex-1 h-1.5 rounded-full ${s.nr <= currentStepNr ? "bg-blue-500" : "bg-gray-200"}`} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Won/Lost Banner */}
-                  {isGewonnen && (
-                    <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-green-100 text-green-800 text-xs font-medium">
-                      <Check className="h-3.5 w-3.5" />
-                      Gewonnen{jobNumber ? ` · INT-${jobNumber}` : ""}
-                    </div>
-                  )}
-                  {isVerloren && (
-                    <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-100 text-red-800 text-xs font-medium">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Verloren{c.verloren_grund ? `: ${c.verloren_grund}` : ""}
-                    </div>
-                  )}
-
-                  {/* Status + Priority als Badges (nicht editierbar) */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${statusConf.color}`}>{statusConf.label}</span>
-                    <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${prioConf.color}`}>{prioConf.label}</span>
-                    {c.datum_kontakt && (
-                      <span className="ml-auto text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-2.5 w-2.5" />
-                        {(() => { const [y,m,d] = c.datum_kontakt!.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }); })()}
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {filtered.map((c) => (
+            <LeadCard key={c.id} contact={c} onClick={openEdit} onDelete={deleteContact} />
+          ))}
         </div>
       )}
     </div>
