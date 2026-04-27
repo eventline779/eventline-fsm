@@ -128,13 +128,15 @@ export async function POST(request: Request) {
       <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button nehmen Sie das Angebot verbindlich an.</p>`;
   }
 
-  // Logo (weisse Variante fuer den schwarzen Header) inline als data URL.
+  // Logo inline als data URL. logo-mail.png ist auf exakt Display-Aspekt
+  // pre-resized (260x60 = 2x retina fuer 130x30) — Outlook clippte das
+  // Original (800x185) weil es nicht sauber herunterskalierte.
   let logoSrc = "";
   try {
-    const logoBuf = readFileSync(join(process.cwd(), "public", "logo-gmbh.png"));
+    const logoBuf = readFileSync(join(process.cwd(), "public", "logo-mail.png"));
     logoSrc = `data:image/png;base64,${logoBuf.toString("base64")}`;
   } catch {
-    logoSrc = `${APP_URL}/logo-gmbh.png`;
+    logoSrc = `${APP_URL}/logo-mail.png`;
   }
 
   const html = `
