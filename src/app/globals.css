@@ -444,23 +444,29 @@ html, body, *, *::before, *::after {
      2px Stroke in der Tone-Farbe + getoenter Fill (12% Light / 18% Dark).
      Identische Werte und Farben wie .tinted-X / .donut-segment, damit
      Buttons und Diagramm-Felder visuell die gleiche Sprache sprechen. */
-  .kasten-red, .kasten-blue, .kasten-green, .kasten-purple { border-width: 2px; }
+  .kasten-red, .kasten-blue, .kasten-green, .kasten-purple, .kasten-bexio { border-width: 2px; }
   .kasten-red    { @apply text-red-700 dark:text-red-300;       border-color: var(--status-red);    background-color: rgba(220,  38,  38, 0.12); }
   .kasten-blue   { @apply text-blue-700 dark:text-blue-300;     border-color: var(--status-blue);   background-color: rgba( 37,  99, 235, 0.12); }
   .kasten-green  { @apply text-green-700 dark:text-green-300;   border-color: var(--status-green);  background-color: rgba(  0, 168, 107, 0.12); }
   .kasten-purple { @apply text-purple-700 dark:text-purple-300; border-color: var(--status-purple); background-color: rgba(124,  58, 237, 0.12); }
+  /* Bexio-Variante: Box in Bexio-Navy, Text + Icon bleiben gruen — passt zum
+     Bexio-Logo (gruener Vogel auf navyblauem Schriftzug). */
+  .kasten-bexio  { @apply text-green-700 dark:text-green-300;   border-color: rgb( 30,  58, 138);    background-color: rgba( 30,  58, 138, 0.12); }
   .dark .kasten-red    { background-color: rgba(220,  38,  38, 0.18); }
   .dark .kasten-blue   { background-color: rgba( 37,  99, 235, 0.18); }
   .dark .kasten-green  { background-color: rgba(  0, 168, 107, 0.18); }
   .dark .kasten-purple { background-color: rgba(124,  58, 237, 0.18); }
+  .dark .kasten-bexio  { background-color: rgba( 30,  58, 138, 0.22); }
   .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.55); border-color: var(--status-red); }
   .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.55); border-color: var(--status-blue); }
   .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.55); border-color: var(--status-green); }
   .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.55); border-color: var(--status-purple); }
+  .kasten-bexio:hover:not(:disabled)  { background-color: rgba( 30,  58, 138, 0.55); border-color: rgb( 30,  58, 138); }
   .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.70); border-color: var(--status-red); }
   .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.70); border-color: var(--status-blue); }
   .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.70); border-color: var(--status-green); }
   .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.70); border-color: var(--status-purple); }
+  .dark .kasten-bexio:hover:not(:disabled)  { background-color: rgba( 30,  58, 138, 0.70); border-color: rgb( 30,  58, 138); }
 
   .kasten-muted  { @apply text-foreground/70; }
   .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
