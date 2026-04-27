@@ -306,6 +306,12 @@
 }
 
 /* === Scrollbar — dezent, integriert, schmal === */
+/* scrollbar-gutter: stable reserviert die Breite der Scrollbar IMMER, auch
+   wenn aktuell keine da ist. Verhindert dass das Layout um ~8px zuckt
+   sobald eine Seite scrollbar wird (oder umgekehrt). */
+html {
+  scrollbar-gutter: stable;
+}
 /* Firefox: scrollbar-width wird NICHT vererbt, daher auf alle Container. */
 html, body, *, *::before, *::after {
   scrollbar-width: thin !important;
