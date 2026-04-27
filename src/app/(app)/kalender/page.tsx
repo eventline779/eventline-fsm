@@ -635,8 +635,8 @@ export default function KalenderPage() {
       {/* Google Kalender Sync Modal */}
       {showSync && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowSync(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowSync(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><LinkIcon className="h-4 w-4" />Google Kalender verbinden</h2>
@@ -689,8 +689,8 @@ export default function KalenderPage() {
       {/* Delete Modal */}
       {deleteTarget && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>

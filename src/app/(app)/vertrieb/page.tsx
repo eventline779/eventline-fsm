@@ -849,8 +849,8 @@ export default function VertriebPage() {
       {/* Termin-Modal (Schritt 2) */}
       {showTerminModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowTerminModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowTerminModal(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2">
@@ -893,8 +893,8 @@ export default function VertriebPage() {
       {/* Auftrag-Modal (Schritt 4) */}
       {showAuftragModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowAuftragModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowAuftragModal(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Check className="h-4 w-4 text-green-600" />Auftrag erstellen</h2>
@@ -950,8 +950,8 @@ export default function VertriebPage() {
       {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
       {showBuchhaltung && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowBuchhaltung(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowBuchhaltung(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-blue-600" />Benachrichtigung Buchhaltung</h2>
@@ -984,8 +984,8 @@ export default function VertriebPage() {
       {/* Verbesserungs-Modal (Schritt 3) */}
       {showVerbesserung && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowVerbesserung(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowVerbesserung(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-orange-600" />Verbesserungs-Vorschlag</h2>
@@ -1019,8 +1019,8 @@ export default function VertriebPage() {
       {/* Verloren-Modal */}
       {showLostModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowLostModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowLostModal(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-red-600" />Auftrag verloren</h2>

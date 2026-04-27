@@ -578,8 +578,8 @@ export default function AuftragDetailPage() {
                       </button>
                       {notifyPopup === appt.id && (
                         <>
-                          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} />
-                          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} />
+                          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-2">
@@ -722,8 +722,8 @@ export default function AuftragDetailPage() {
       {/* Stornieren-Flow: Phase 'confirm' -> 'reason' */}
       {cancelPhase !== "closed" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="flex items-center justify-between px-6 py-4 border-b">
                 <h2 className="font-semibold">
@@ -798,8 +798,8 @@ export default function AuftragDetailPage() {
       {/* Delete Appointment Modal */}
       {deleteApptTarget && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
