@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -12,22 +12,20 @@ import {
   Shield,
   User,
   X,
-  Mail,
-  Phone,
   Users,
   Clock,
   Play,
   Calendar,
-  Plus,
-  Trash2,
   Download,
   Plug,
-  CheckCircle2,
-  AlertCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
-import { JobNumber } from "@/components/job-number";
+import { LiveTimer } from "@/components/einstellungen/live-timer";
+import { TeamMemberCard } from "@/components/einstellungen/team-member-card";
+import { EinstellungenLoadingSkeleton } from "@/components/einstellungen/loading-skeleton";
+import { TeamOverview } from "@/components/einstellungen/team-overview";
+import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
+import { formatTime, formatDate, formatDuration } from "@/lib/format";
 
 type Tab = "team" | "zeiten" | "schichten" | "backup" | "integrationen";
 
@@ -269,7 +267,7 @@ export default function EinstellungenPage() {
 
   async function deleteShift(id: string) {
     await supabase.from("calendar_events").delete().eq("id", id);
-    toast.success("Schicht gelöscht");
+    toast.success("Schicht gelÃ¶scht");
     loadShifts();
   }
 
@@ -281,13 +279,13 @@ export default function EinstellungenPage() {
     (preset) => !existingNames.some((n) => n.includes(preset.name.toLowerCase()))
   );
 
-  // Gruppe Zeiteinträge nach Person
+  // Gruppe ZeiteintrÃ¤ge nach Person
   const activeNow = timeEntries.filter((e) => !e.clock_out);
   const completed = timeEntries.filter((e) => e.clock_out);
 
   function exportCSV() {
     const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Kategorie", "Auftrag"]];
-    const catLabels: Record<string, string> = { scala: "Verwaltung SCALA Basel", barakuba: "Verwaltung Barakuba", bau3: "Verwaltung Theater BAU3", buero: "Büro", meeting: "Meeting" };
+    const catLabels: Record<string, string> = { scala: "Verwaltung SCALA Basel", barakuba: "Verwaltung Barakuba", bau3: "Verwaltung Theater BAU3", buero: "BÃ¼ro", meeting: "Meeting" };
     for (const e of completed) {
       const name = e.profile?.full_name || "Unbekannt";
       const date = formatDate(e.clock_in);
@@ -393,7 +391,7 @@ export default function EinstellungenPage() {
               className="kasten kasten-red"
             >
               {showAdd ? <X className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-              {showAdd ? "Abbrechen" : "Hinzufügen"}
+              {showAdd ? "Abbrechen" : "HinzufÃ¼gen"}
             </button>
           </div>
 
@@ -401,7 +399,7 @@ export default function EinstellungenPage() {
           {!showAdd && availablePresets.length > 0 && (
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="p-4">
-                <p className="text-sm font-medium text-blue-900 mb-3">Schnell hinzufügen</p>
+                <p className="text-sm font-medium text-blue-900 mb-3">Schnell hinzufÃ¼gen</p>
                 <div className="flex flex-wrap gap-2">
                   {availablePresets.map((preset) => (
                     <button
@@ -473,7 +471,7 @@ export default function EinstellungenPage() {
 
           {/* Team List */}
           {loading ? (
-            <LoadingSkeleton />
+            <EinstellungenLoadingSkeleton />
           ) : (
             <div className="space-y-6">
               {admins.length > 0 && (
@@ -569,7 +567,7 @@ export default function EinstellungenPage() {
                             </span>
                             {entry.job && (
                               <span className="text-xs text-green-600">
-                                — {entry.job.title}
+                                â€” {entry.job.title}
                               </span>
                             )}
                           </div>
@@ -585,18 +583,18 @@ export default function EinstellungenPage() {
             </div>
           )}
 
-          {/* Abgeschlossene Einträge */}
+          {/* Abgeschlossene EintrÃ¤ge */}
           <div>
             <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-              {activeNow.length > 0 ? "Abgeschlossene Einträge" : "Stempelzeiten"} ({completed.length})
+              {activeNow.length > 0 ? "Abgeschlossene EintrÃ¤ge" : "Stempelzeiten"} ({completed.length})
             </h2>
             {timeLoading ? (
-              <LoadingSkeleton />
+              <EinstellungenLoadingSkeleton />
             ) : completed.length === 0 ? (
               <Card className="bg-card border-dashed">
                 <CardContent className="py-10 text-center">
                   <Clock className="h-8 w-8 text-gray-300 mx-auto" />
-                  <p className="mt-2 text-sm text-muted-foreground">Keine Einträge im gewählten Zeitraum.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Keine EintrÃ¤ge im gewÃ¤hlten Zeitraum.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -617,11 +615,11 @@ export default function EinstellungenPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-muted-foreground">
-                              {formatTime(entry.clock_in)} – {formatTime(entry.clock_out!)}
+                              {formatTime(entry.clock_in)} â€“ {formatTime(entry.clock_out!)}
                             </span>
                             {entry.job && (
                               <span className="text-xs text-muted-foreground">
-                                — {entry.job.title}
+                                â€” {entry.job.title}
                               </span>
                             )}
                           </div>
@@ -639,7 +637,7 @@ export default function EinstellungenPage() {
         </div>
       )}
 
-      {/* ===== TAB: EINSATZÜBERSICHT ===== */}
+      {/* ===== TAB: EINSATZÃœBERSICHT ===== */}
       {tab === "schichten" && (
         <TeamOverview profiles={profiles} supabase={supabase} />
       )}
@@ -651,7 +649,7 @@ export default function EinstellungenPage() {
       {tab === "backup" && (
         <div className="space-y-6">
           <div>
-            <p className="text-sm text-muted-foreground">Exportiere alle Daten als CSV-Dateien für dein Backup oder die Buchhaltung.</p>
+            <p className="text-sm text-muted-foreground">Exportiere alle Daten als CSV-Dateien fÃ¼r dein Backup oder die Buchhaltung.</p>
           </div>
 
           {/* Alle exportieren */}
@@ -679,14 +677,14 @@ export default function EinstellungenPage() {
             <div className="space-y-2">
               {[
                 { table: "customers", label: "Kunden", desc: "Alle Kundendaten mit Kontaktinfos" },
-                { table: "jobs", label: "Aufträge", desc: "Alle Aufträge mit Status und Details" },
+                { table: "jobs", label: "AuftrÃ¤ge", desc: "Alle AuftrÃ¤ge mit Status und Details" },
                 { table: "time_entries", label: "Zeiterfassung", desc: "Alle Stempelzeiten aller Mitarbeiter" },
                 { table: "service_reports", label: "Rapporte", desc: "Alle Einsatzrapporte" },
                 { table: "locations", label: "Standorte", desc: "Alle Standorte und Adressen" },
                 { table: "profiles", label: "Team", desc: "Alle Teammitglieder" },
                 { table: "job_appointments", label: "Termine", desc: "Alle Auftrags-Termine" },
                 { table: "maintenance_tasks", label: "Instandhaltung", desc: "Alle Instandhaltungsarbeiten" },
-                { table: "calendar_events", label: "Schichten", desc: "Alle Kalendereinträge und Schichten" },
+                { table: "calendar_events", label: "Schichten", desc: "Alle KalendereintrÃ¤ge und Schichten" },
               ].map((item) => (
                 <Card key={item.table} className="bg-card border-gray-100">
                   <CardContent className="p-4 flex items-center justify-between">
@@ -709,392 +707,4 @@ export default function EinstellungenPage() {
       )}
     </div>
   );
-}
-
-// === Helper Components ===
-
-function IntegrationenTab() {
-  const searchParams = useSearchParams();
-  const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [disconnecting, setDisconnecting] = useState(false);
-
-  // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
-  useEffect(() => {
-    const result = searchParams.get("bexio");
-    const msg = searchParams.get("msg");
-    if (result === "connected") {
-      toast.success("Bexio verbunden");
-    } else if (result === "error") {
-      toast.error("Bexio-Verbindung fehlgeschlagen" + (msg ? `: ${msg}` : ""));
-    }
-  }, [searchParams]);
-
-  useEffect(() => { loadStatus(); }, []);
-
-  async function loadStatus() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/bexio/status");
-      const json = await res.json();
-      setStatus(json);
-    } catch {
-      setStatus({ connected: false });
-    }
-    setLoading(false);
-  }
-
-  async function handleDisconnect() {
-    if (!confirm("Bexio-Verbindung wirklich trennen? Du musst danach neu verbinden, um Kontakte anzulegen.")) return;
-    setDisconnecting(true);
-    await fetch("/api/bexio/disconnect", { method: "POST" });
-    setDisconnecting(false);
-    toast.success("Bexio getrennt");
-    loadStatus();
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Verknüpfe Eventline mit externen Tools — z.B. Bexio für Kontaktverwaltung.
-        </p>
-      </div>
-
-      <Card className="bg-card border-gray-100">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold shrink-0">
-                B
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">Bexio</h3>
-                  {loading ? (
-                    <span className="text-xs text-muted-foreground">…</span>
-                  ) : status?.connected ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Verbunden
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300">
-                      <AlertCircle className="h-3 w-3" />
-                      Nicht verbunden
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Kunden direkt in Bexio anlegen — der "In Bexio anlegen"-Button erscheint dann auf jeder Kunden-Detailseite.
-                </p>
-                {status?.connected && status.connectedAt && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Verbunden seit {new Date(status.connectedAt).toLocaleString("de-CH", { timeZone: "Europe/Zurich" })}
-                    {status.bexioEmail && <> · {status.bexioEmail}</>}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="shrink-0">
-              {loading ? null : status?.connected ? (
-                <button
-                  type="button"
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                  className="kasten kasten-muted"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  {disconnecting ? "Trenne…" : "Trennen"}
-                </button>
-              ) : (
-                <a href="/api/bexio/connect" className="kasten kasten-green">
-                  <Plug className="h-3.5 w-3.5" />
-                  Verbinden
-                </a>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function LiveTimer({ clockIn }: { clockIn: string }) {
-  const [elapsed, setElapsed] = useState("");
-
-  useEffect(() => {
-    function update() {
-      const diff = Date.now() - new Date(clockIn).getTime();
-      const h = Math.floor(diff / 3600000).toString().padStart(2, "0");
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, "0");
-      setElapsed(`${h}:${m}`);
-    }
-    update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
-  }, [clockIn]);
-
-  return <span className="text-sm font-mono font-semibold text-green-700">{elapsed}</span>;
-}
-
-function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleRole: (p: Profile) => void }) {
-  const isAdmin = profile.role === "admin";
-  return (
-    <Card className="bg-card border-gray-100 hover:border-gray-200 transition-colors">
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${isAdmin ? "bg-gradient-to-br from-red-500 to-red-700" : "bg-gradient-to-br from-gray-400 to-gray-600"}`}>
-            {profile.full_name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm">{profile.full_name}</h3>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${isAdmin ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
-                {isAdmin ? <Shield className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
-                {USER_ROLES[profile.role]}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 mt-0.5">
-              <a href={`mailto:${profile.email}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
-                <Mail className="h-3 w-3" />{profile.email}
-              </a>
-              {profile.phone && (
-                <a href={`tel:${profile.phone}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
-                  <Phone className="h-3 w-3" />{profile.phone}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onToggleRole(profile)}
-          className="kasten kasten-muted"
-        >
-          {isAdmin ? "Zu Techniker" : "Zu Admin"}
-        </button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
-  const [data, setData] = useState<Record<string, { jobs: any[]; appointments: any[]; hours: number; plannedHours?: number }>>({});
-  const [filter, setFilter] = useState("monat");
-  const [loading, setLoading] = useState(true);
-  const [serverProfiles, setServerProfiles] = useState<Profile[]>(profiles);
-  const [showArchive, setShowArchive] = useState(false);
-  const [archivedJobs, setArchivedJobs] = useState<any[]>([]);
-
-  useEffect(() => { loadOverview(); }, [filter]);
-
-  async function loadOverview() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/team-overview?filter=${filter}`);
-      const json = await res.json();
-      if (json.profiles) setServerProfiles(json.profiles);
-      if (json.data) setData(json.data);
-    } catch (e) {
-      console.error("Team overview error:", e);
-    }
-
-    // Archiv laden
-    try {
-      const archiveRes = await fetch("/api/team-overview?filter=archiv");
-      const archiveJson = await archiveRes.json();
-      if (archiveJson.archivedJobs) setArchivedJobs(archiveJson.archivedJobs);
-    } catch {}
-
-    setLoading(false);
-  }
-
-  if (loading) return <LoadingSkeleton />;
-
-  return (
-    <div className="space-y-6">
-      {/* Filter */}
-      <div className="flex gap-2">
-        {[
-          { key: "woche", label: "Diese Woche" },
-          { key: "monat", label: "Dieser Monat" },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filter === f.key ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Archiv Toggle */}
-      {archivedJobs.length > 0 && (
-        <button
-          onClick={() => setShowArchive(!showArchive)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showArchive ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-        >
-          Archiv ({archivedJobs.length})
-        </button>
-      )}
-
-      {/* Archiv */}
-      {showArchive && archivedJobs.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Abgeschlossene Aufträge</p>
-          {archivedJobs.map((j: any) => (
-            <Link key={j.id} href={`/auftraege/${j.id}`}>
-              <Card className="bg-card border-gray-100 hover:shadow-sm transition-all opacity-70">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <JobNumber number={j.job_number} />
-                    <span className="font-medium text-sm">{j.title}</span>
-                    {j.customer?.name && <span className="text-xs text-muted-foreground">· {j.customer.name}</span>}
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${j.status === "abgeschlossen" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                    {j.status === "abgeschlossen" ? "Erledigt" : "Storniert"}
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Pro Person */}
-      {!showArchive && serverProfiles.map((p) => {
-        const d = data[p.id] || { jobs: [], appointments: [], hours: 0 };
-        return (
-          <Card key={p.id} className="bg-card border-gray-100">
-            <CardContent className="p-5">
-              {/* Person Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold">
-                    {p.full_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{p.full_name}</h3>
-                    <p className="text-xs text-muted-foreground">{p.email}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold">{d.hours}h</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Gestempelt</p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-green-50 text-center">
-                  <p className="text-lg font-bold text-green-700">{d.appointments.length}</p>
-                  <p className="text-[10px] text-green-600 font-medium">Termine</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-blue-50 text-center">
-                  <p className="text-lg font-bold text-blue-700">{d.plannedHours || 0}h</p>
-                  <p className="text-[10px] text-blue-600 font-medium">Geplant</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-amber-50 text-center">
-                  <p className="text-lg font-bold text-amber-700">{d.hours}h</p>
-                  <p className="text-[10px] text-amber-600 font-medium">Gestempelt</p>
-                </div>
-              </div>
-
-              {/* Termine als Wochenansicht */}
-              {d.appointments.length > 0 ? (() => {
-                const days = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-                const fullDays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-                const byDay: Record<string, any[]> = {};
-                for (const a of d.appointments) {
-                  const date = new Date(a.start_time);
-                  const key = date.toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
-                  if (!byDay[key]) byDay[key] = [];
-                  byDay[key].push(a);
-                }
-                const sortedDays = Object.entries(byDay).sort((a, b) => {
-                  const dateA = new Date(a[1][0].start_time).getTime();
-                  const dateB = new Date(b[1][0].start_time).getTime();
-                  return dateA - dateB;
-                });
-                return (
-                  <div className="space-y-2">
-                    {sortedDays.map(([day, appts]) => {
-                      const isToday = new Date(appts[0].start_time).toDateString() === new Date().toDateString();
-                      return (
-                        <div key={day} className={`rounded-xl border ${isToday ? "border-red-200 bg-red-50/30" : "border-gray-100"}`}>
-                          <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-red-600" : "text-muted-foreground"} border-b ${isToday ? "border-red-100" : "border-gray-100"}`}>
-                            {day}{isToday ? " · Heute" : ""}
-                          </div>
-                          <div className="divide-y divide-gray-50">
-                            {appts.map((a: any, i: number) => (
-                              <Link key={i} href={a.job_id ? `/auftraege/${a.job_id}` : "#"}>
-                                <div className="flex items-center justify-between px-3 py-2 hover:bg-gray-50/50 transition-colors">
-                                  <div className="min-w-0">
-                                    <span className={`font-medium text-sm ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
-                                    {a.job?.title && <span className="text-xs text-blue-600 ml-2">→ {a.job.title}</span>}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">
-                                    {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
-                                    {a.end_time ? ` – ${new Date(a.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}
-                                  </span>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })() : d.hours === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-2">Keine Einsätze in diesem Zeitraum</p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-2">
-      {[1, 2, 3].map((i) => (
-        <Card key={i} className="animate-pulse bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-gray-200" />
-              <div className="space-y-2 flex-1">
-                <div className="h-4 bg-gray-200 rounded w-1/3" />
-                <div className="h-3 bg-gray-100 rounded w-1/4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// === Helper Functions ===
-
-function formatTime(date: string) {
-  return new Date(date).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
-}
-
-function formatDuration(clockIn: string, clockOut: string, breakMin: number) {
-  const diff = new Date(clockOut).getTime() - new Date(clockIn).getTime() - breakMin * 60000;
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  return `${h}h ${m}m`;
 }

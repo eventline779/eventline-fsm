@@ -319,9 +319,14 @@ export function AddressAutocomplete({
         (place, status) => {
           if (status !== g.maps.places.PlacesServiceStatus.OK || !place) return;
           if (onPlace) {
-            // Struktur-Modus: Strasse ins Input, restliche Felder via Callback
+            // Struktur-Modus: NUR die Strasse ins Input — die anderen Felder
+            // (PLZ, Ort, Land) bekommt der Caller via onPlace und steckt sie in
+            // die jeweils richtigen Form-Felder. Wenn parsed.street leer ist
+            // (z.B. der Pick war ein POI ohne Strassenname), wird das Feld leer
+            // gesetzt — kein Fallback auf formatted_address, sonst landen PLZ
+            // + Ort doppelt im Strasse-Feld.
             const parsed = parsePlace(place);
-            onChange(parsed.street || place.formatted_address || s.label);
+            onChange(parsed.street);
             onPlace(parsed);
           } else {
             // Legacy-Modus: kompletter Address-String ins Input

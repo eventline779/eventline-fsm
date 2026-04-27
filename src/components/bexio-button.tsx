@@ -159,12 +159,17 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         </p>
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {matches?.map((m) => (
-            <div key={m.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border bg-foreground/[0.02]">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{m.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {[m.email, [m.postcode, m.city].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}
-                </p>
+            <div key={m.id} className="flex items-start justify-between gap-3 p-3 rounded-xl border bg-foreground/[0.02]">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="text-sm font-medium break-words">{m.name}</p>
+                {m.email && (
+                  <p className="text-xs text-muted-foreground break-all">{m.email}</p>
+                )}
+                {(m.postcode || m.city) && (
+                  <p className="text-xs text-muted-foreground break-words">
+                    {[m.postcode, m.city].filter(Boolean).join(" ")}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import type { VertriebContact, VertriebStatus, VertriebPriority, VertriebKategorie } from "@/types";
 import { Plus, TrendingUp, Edit2, Trash2, X, Star, Phone, Mail, Calendar, Filter, Search, Building2, PartyPopper, ArrowRight, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -847,209 +848,175 @@ export default function VertriebPage() {
 
       {/* Form */}
       {/* Termin-Modal (Schritt 2) */}
-      {showTerminModal && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowTerminModal(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold flex items-center gap-2">
-                  {terminType === "telefon" ? <Phone className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
-                  {terminType === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}
-                </h2>
-                <button onClick={() => setShowTerminModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Datum *</label>
-                  <Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1.5 bg-gray-50" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Von *</label>
-                    <Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1.5 bg-gray-50" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Bis *</label>
-                    <Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1.5 bg-gray-50" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Notiz (optional)</label>
-                  <textarea value={terminForm.note} onChange={(e) => setTerminForm({ ...terminForm, note: e.target.value })} placeholder="Worum geht es?" className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={2} />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowTerminModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-                  <button onClick={saveTermin} disabled={savingTermin} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-                    {savingTermin ? "Speichern..." : "Termin erstellen"}
-                  </button>
-                </div>
-              </div>
-            </div>
+      <Modal
+        open={showTerminModal}
+        onClose={() => setShowTerminModal(false)}
+        title={terminType === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}
+        icon={terminType === "telefon" ? <Phone className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
+        size="md"
+        closable={!savingTermin}
+      >
+        <div>
+          <label className="text-sm font-medium">Datum *</label>
+          <Input type="date" value={terminForm.date} onChange={(e) => setTerminForm({ ...terminForm, date: e.target.value })} className="mt-1.5 bg-gray-50" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Von *</label>
+            <Input type="time" value={terminForm.time} onChange={(e) => setTerminForm({ ...terminForm, time: e.target.value })} className="mt-1.5 bg-gray-50" />
           </div>
-        </>
-      )}
+          <div>
+            <label className="text-sm font-medium">Bis *</label>
+            <Input type="time" value={terminForm.end_time} onChange={(e) => setTerminForm({ ...terminForm, end_time: e.target.value })} className="mt-1.5 bg-gray-50" />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Notiz (optional)</label>
+          <textarea value={terminForm.note} onChange={(e) => setTerminForm({ ...terminForm, note: e.target.value })} placeholder="Worum geht es?" className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={2} />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setShowTerminModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={saveTermin} disabled={savingTermin} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+            {savingTermin ? "Speichern..." : "Termin erstellen"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Auftrag-Modal (Schritt 4) */}
-      {showAuftragModal && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowAuftragModal(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold flex items-center gap-2"><Check className="h-4 w-4 text-green-600" />Auftrag erstellen</h2>
-                <button onClick={() => setShowAuftragModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300">Der Auftrag wird mit allen Infos aus dem Lead erstellt. Leo wird per Email benachrichtigt.</p>
-                <div>
-                  <label className="text-sm font-medium">Titel *</label>
-                  <Input value={auftragForm.title} onChange={(e) => setAuftragForm({ ...auftragForm, title: e.target.value })} className="mt-1.5 bg-gray-50" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Startdatum</label>
-                    <Input type="date" value={auftragForm.start_date} onChange={(e) => setAuftragForm({ ...auftragForm, start_date: e.target.value })} className="mt-1.5 bg-gray-50" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Enddatum</label>
-                    <Input type="date" value={auftragForm.end_date} onChange={(e) => setAuftragForm({ ...auftragForm, end_date: e.target.value })} className="mt-1.5 bg-gray-50" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Priorität</label>
-                    <select value={auftragForm.priority} onChange={(e) => setAuftragForm({ ...auftragForm, priority: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                      <option value="niedrig">Niedrig</option>
-                      <option value="normal">Normal</option>
-                      <option value="hoch">Hoch</option>
-                      <option value="dringend">Dringend</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Location</label>
-                    <select value={auftragForm.location_id} onChange={(e) => setAuftragForm({ ...auftragForm, location_id: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                      <option value="">— Keine —</option>
-                      {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowAuftragModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-                  <button onClick={createAuftrag} disabled={!auftragForm.title || creatingAuftrag} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
-                    <Check className="h-4 w-4" />{creatingAuftrag ? "Erstellen..." : "Auftrag erstellen"}
-                  </button>
-                </div>
-              </div>
-            </div>
+      <Modal
+        open={showAuftragModal}
+        onClose={() => setShowAuftragModal(false)}
+        title="Auftrag erstellen"
+        icon={<Check className="h-4 w-4 text-green-600" />}
+        size="lg"
+        closable={!creatingAuftrag}
+      >
+        <p className="text-sm text-gray-700 dark:text-gray-300">Der Auftrag wird mit allen Infos aus dem Lead erstellt. Leo wird per Email benachrichtigt.</p>
+        <div>
+          <label className="text-sm font-medium">Titel *</label>
+          <Input value={auftragForm.title} onChange={(e) => setAuftragForm({ ...auftragForm, title: e.target.value })} className="mt-1.5 bg-gray-50" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Startdatum</label>
+            <Input type="date" value={auftragForm.start_date} onChange={(e) => setAuftragForm({ ...auftragForm, start_date: e.target.value })} className="mt-1.5 bg-gray-50" />
           </div>
-        </>
-      )}
+          <div>
+            <label className="text-sm font-medium">Enddatum</label>
+            <Input type="date" value={auftragForm.end_date} onChange={(e) => setAuftragForm({ ...auftragForm, end_date: e.target.value })} className="mt-1.5 bg-gray-50" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Priorität</label>
+            <select value={auftragForm.priority} onChange={(e) => setAuftragForm({ ...auftragForm, priority: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+              <option value="niedrig">Niedrig</option>
+              <option value="normal">Normal</option>
+              <option value="hoch">Hoch</option>
+              <option value="dringend">Dringend</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Location</label>
+            <select value={auftragForm.location_id} onChange={(e) => setAuftragForm({ ...auftragForm, location_id: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
+              <option value="">— Keine —</option>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>
+        <div className="flex gap-3">
+          <button onClick={() => setShowAuftragModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={createAuftrag} disabled={!auftragForm.title || creatingAuftrag} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+            <Check className="h-4 w-4" />{creatingAuftrag ? "Erstellen..." : "Auftrag erstellen"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
-      {showBuchhaltung && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowBuchhaltung(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-blue-600" />Benachrichtigung Buchhaltung</h2>
-                <button onClick={() => setShowBuchhaltung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — alle Verrechnungs-Infos werden automatisch mitgeschickt.</p>
-                <div>
-                  <label className="text-sm font-medium">Zusätzliche Nachricht (optional)</label>
-                  <textarea
-                    value={buchhaltungMessage}
-                    onChange={(e) => setBuchhaltungMessage(e.target.value)}
-                    placeholder="z.B. Bitte Angebot erstellen bis..."
-                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    rows={4}
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowBuchhaltung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-                  <button onClick={sendBuchhaltungsBenachrichtigung} disabled={sendingBuchhaltung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-                    <Mail className="h-4 w-4" />{sendingBuchhaltung ? "Senden..." : "Senden"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={showBuchhaltung}
+        onClose={() => setShowBuchhaltung(false)}
+        title="Benachrichtigung Buchhaltung"
+        icon={<Mail className="h-4 w-4 text-blue-600" />}
+        size="md"
+        closable={!sendingBuchhaltung}
+      >
+        <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — alle Verrechnungs-Infos werden automatisch mitgeschickt.</p>
+        <div>
+          <label className="text-sm font-medium">Zusätzliche Nachricht (optional)</label>
+          <textarea
+            value={buchhaltungMessage}
+            onChange={(e) => setBuchhaltungMessage(e.target.value)}
+            placeholder="z.B. Bitte Angebot erstellen bis..."
+            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            rows={4}
+          />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setShowBuchhaltung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={sendBuchhaltungsBenachrichtigung} disabled={sendingBuchhaltung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+            <Mail className="h-4 w-4" />{sendingBuchhaltung ? "Senden..." : "Senden"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Verbesserungs-Modal (Schritt 3) */}
-      {showVerbesserung && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowVerbesserung(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-orange-600" />Verbesserungs-Vorschlag</h2>
-                <button onClick={() => setShowVerbesserung(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — was soll an der Offerte verbessert werden?</p>
-                <div>
-                  <label className="text-sm font-medium">Verbesserungen *</label>
-                  <textarea
-                    value={verbesserungText}
-                    onChange={(e) => setVerbesserungText(e.target.value)}
-                    placeholder="z.B. Preis anpassen, Leistungen ergänzen, Datum ändern..."
-                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                    rows={5}
-                    autoFocus
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowVerbesserung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-                  <button onClick={sendVerbesserung} disabled={!verbesserungText.trim() || sendingVerbesserung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
-                    <Mail className="h-4 w-4" />{sendingVerbesserung ? "Senden..." : "Senden"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={showVerbesserung}
+        onClose={() => setShowVerbesserung(false)}
+        title="Verbesserungs-Vorschlag"
+        icon={<Mail className="h-4 w-4 text-orange-600" />}
+        size="md"
+        closable={!sendingVerbesserung}
+      >
+        <p className="text-sm text-gray-700 dark:text-gray-300">An <strong>buchhaltung@eventline-basel.com</strong> — was soll an der Offerte verbessert werden?</p>
+        <div>
+          <label className="text-sm font-medium">Verbesserungen *</label>
+          <textarea
+            value={verbesserungText}
+            onChange={(e) => setVerbesserungText(e.target.value)}
+            placeholder="z.B. Preis anpassen, Leistungen ergänzen, Datum ändern..."
+            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+            rows={5}
+            autoFocus
+          />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setShowVerbesserung(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={sendVerbesserung} disabled={!verbesserungText.trim() || sendingVerbesserung} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
+            <Mail className="h-4 w-4" />{sendingVerbesserung ? "Senden..." : "Senden"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Verloren-Modal */}
-      {showLostModal && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowLostModal(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-red-600" />Auftrag verloren</h2>
-                <button onClick={() => setShowLostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300">Gib einen Grund an, warum der Auftrag verloren wurde.</p>
-                <div>
-                  <label className="text-sm font-medium">Grund *</label>
-                  <textarea
-                    value={lostReason}
-                    onChange={(e) => setLostReason(e.target.value)}
-                    placeholder="z.B. Zu teuer, Konkurrenz gewählt, kein Budget..."
-                    className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                    rows={3}
-                    autoFocus
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowLostModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-                  <button onClick={markLost} disabled={!lostReason.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-                    <AlertTriangle className="h-4 w-4" />Als verloren markieren
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={showLostModal}
+        onClose={() => setShowLostModal(false)}
+        title="Auftrag verloren"
+        icon={<AlertTriangle className="h-4 w-4 text-red-600" />}
+        size="md"
+      >
+        <p className="text-sm text-gray-700 dark:text-gray-300">Gib einen Grund an, warum der Auftrag verloren wurde.</p>
+        <div>
+          <label className="text-sm font-medium">Grund *</label>
+          <textarea
+            value={lostReason}
+            onChange={(e) => setLostReason(e.target.value)}
+            placeholder="z.B. Zu teuer, Konkurrenz gewählt, kein Budget..."
+            className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20"
+            rows={3}
+            autoFocus
+          />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setShowLostModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+          <button onClick={markLost} disabled={!lostReason.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+            <AlertTriangle className="h-4 w-4" />Als verloren markieren
+          </button>
+        </div>
+      </Modal>
 
       {showForm && !editingId && !categoryPicked && (
         <Card className="bg-card border-red-100">
