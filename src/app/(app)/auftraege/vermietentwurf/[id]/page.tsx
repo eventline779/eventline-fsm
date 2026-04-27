@@ -8,7 +8,7 @@ import type { Job } from "@/types";
 import { REQUEST_STEPS } from "@/lib/constants";
 import {
   ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
-  StickyNote, FileText, Send, Download,
+  StickyNote, FileText, Send, Download, Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -85,6 +85,20 @@ export default function AnfrageDetailPage() {
       a.download = name;
       a.click();
     }
+  }
+
+  async function deleteDoc(docId: string, storagePath: string, name: string) {
+    if (!confirm(`Dokument „${name}" wirklich löschen? Diese Aktion ist nicht rückgängig zu machen.`)) return;
+    // Erst aus Storage, dann aus documents-Tabelle. Wenn Storage failt, ueberspringen
+    // wir die DB-Loeschung nicht — die Verwaltung des Files muss schliesslich raus.
+    await supabase.storage.from("documents").remove([storagePath]);
+    const { error } = await supabase.from("documents").delete().eq("id", docId);
+    if (error) {
+      toast.error("Fehler beim Löschen: " + error.message);
+      return;
+    }
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    toast.success("Dokument gelöscht");
   }
 
   async function loadJob() {
@@ -422,14 +436,24 @@ export default function AnfrageDetailPage() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => downloadDoc(doc.storage_path, doc.name)}
-                    className="kasten kasten-muted shrink-0"
-                    title="Herunterladen"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => downloadDoc(doc.storage_path, doc.name)}
+                      className="kasten kasten-muted"
+                      title="Herunterladen"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
+                      className="kasten kasten-red"
+                      title="Löschen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
