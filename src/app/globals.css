@@ -306,10 +306,12 @@
 }
 
 /* === Scrollbar — dezent, integriert, schmal === */
-/* scrollbar-gutter: stable reserviert die Breite der Scrollbar IMMER, auch
-   wenn aktuell keine da ist. Verhindert dass das Layout um ~8px zuckt
-   sobald eine Seite scrollbar wird (oder umgekehrt). */
+/* Layout-Stabilitaet: Scrollbar IMMER da (auch wenn die Seite kurz ist und
+   gar nicht scrollt). overflow-y:scroll zwingt das, scrollbar-gutter:stable
+   ist der moderne Backup falls Browser bei overflow:scroll andere Defaults
+   haetten. So kein Zucken zwischen kurzen und langen Seiten. */
 html {
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 /* Firefox: scrollbar-width wird NICHT vererbt, daher auf alle Container. */
