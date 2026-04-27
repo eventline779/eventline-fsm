@@ -2,8 +2,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 // Customer-facing Confirm-Link aus der Mail. Kein Login.
-// type=konditionen -> request_step >= 3 (Schritt 1 -> Schritt 3, "Konditionen ausgewaehlt" uebersprungen)
-// type=angebot     -> request_step >= 5 (Schritt 3 -> Schritt 5, "Angebot bestaetigt" uebersprungen)
+// Der Kunden-Klick ruckelt das job genau auf den naechstliegenden
+// "bestaetigt"-Step weiter — der Mitarbeiter muss dann selbst weiterklicken
+// auf "senden":
+//   type=konditionen -> request_step >= 2 (Konditionen bestaetigt)
+//   type=angebot     -> request_step >= 4 (Angebot bestaetigt)
 //
 // Idempotent: Klickt der Kunde mehrmals, bleibt der Step beim hoechsten erreichten Wert.
 // Sicherheit: Token-Check ueber base64(jobId + "-confirm"). Reicht fuer den Use-Case
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const targetStep = type === "angebot" ? 5 : 3;
+  const targetStep = type === "angebot" ? 4 : 2;
 
   const { data: existing, error: loadErr } = await supabase
     .from("jobs")
