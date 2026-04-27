@@ -12,6 +12,15 @@ export interface DonutSegment {
   count: number;
   /** CSS-Farbe (z.B. "var(--status-blue)" oder Tailwind hex). */
   color: string;
+  /** Optionales Unter-Segment innerhalb dieses Segments — wird als
+      schmalerer Innenring auf der gleichen Start-Achse gerendert,
+      und in der Legende direkt unter dem Eltern-Eintrag aufgefuehrt.
+      Beispiel: "Vermietung" innerhalb von "Bevorstehend". */
+  sub?: {
+    label: string;
+    count: number;
+    color: string;
+  };
 }
 
 interface DonutChartProps {
@@ -53,9 +62,18 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
     );
   }
 
+  // Sub-Segment-Geometrie: schmalerer Innenring innerhalb des Eltern-Segments.
+  // Start-Achse identisch zum Eltern-Segment, sodass das Sub auf der ersten
+  // (linken) Kante haengt und sich von dort entlang des Eltern-Bogens streckt
+  // proportional zu sub.count / parent.count.
+  const SUB_OUTER_R = INNER_R + RING_WIDTH * 0.55; // ~ obere Haelfte des Rings
+  const SUB_INNER_R = INNER_R + 2;
+  const SUB_RING_DIFF = SUB_OUTER_R - SUB_INNER_R;
+
   // Pfade vorab berechnen
   let cumulativeGapMid = -Math.PI / 2; // Start an einer Gap-Mitte (12 Uhr)
   const segmentPaths: { color: string; d: string }[] = [];
+  const subSegmentPaths: { color: string; d: string }[] = [];
   if (visibleSegments.length > 1) {
     const gapAngle = GAP_ANGLE;
     for (const s of visibleSegments) {
@@ -85,6 +103,31 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
       const largeArc = segAngle > Math.PI ? 1 : 0;
       const d = `M ${ox1} ${oy1} A ${OUTER_R} ${OUTER_R} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${INNER_R} ${INNER_R} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
       segmentPaths.push({ color: s.color, d });
+
+      // Sub-Segment: schmalerer Innenring auf demselben Start-Winkel,
+      // gestreckt ueber sub.count/parent.count vom Eltern-Bogen.
+      if (s.sub && s.sub.count > 0 && s.count > 0) {
+        const subPortion = Math.min(s.sub.count / s.count, 1);
+        const subSegAngle = subPortion * segAngle;
+        const subStartA = startA;
+        const subEndA = startA + subSegAngle;
+        const sox1 = CX + SUB_OUTER_R * Math.cos(subStartA);
+        const soy1 = CY + SUB_OUTER_R * Math.sin(subStartA);
+        const sox2 = CX + SUB_OUTER_R * Math.cos(subEndA);
+        const soy2 = CY + SUB_OUTER_R * Math.sin(subEndA);
+        // Inner-Endpunkte parallel zur Eltern-Achse (gleiche Logik wie aussen)
+        const six1u = sox1 - SUB_RING_DIFF * Math.cos(gapMidPrev);
+        const siy1u = soy1 - SUB_RING_DIFF * Math.sin(gapMidPrev);
+        const subInnerStartA = Math.atan2(siy1u - CY, six1u - CX);
+        const six1 = CX + SUB_INNER_R * Math.cos(subInnerStartA);
+        const siy1 = CY + SUB_INNER_R * Math.sin(subInnerStartA);
+        // Fuer das Sub-Ende nutzen wir radial — kein Gap dahinter.
+        const six2 = CX + SUB_INNER_R * Math.cos(subEndA);
+        const siy2 = CY + SUB_INNER_R * Math.sin(subEndA);
+        const subLargeArc = subSegAngle > Math.PI ? 1 : 0;
+        const subD = `M ${sox1} ${soy1} A ${SUB_OUTER_R} ${SUB_OUTER_R} 0 ${subLargeArc} 1 ${sox2} ${soy2} L ${six2} ${siy2} A ${SUB_INNER_R} ${SUB_INNER_R} 0 ${subLargeArc} 0 ${six1} ${siy1} Z`;
+        subSegmentPaths.push({ color: s.sub.color, d: subD });
+      }
     }
   }
 
@@ -104,17 +147,33 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
                   <circle cx={CX} cy={CY} r={INNER_R} fill="none" stroke={visibleSegments[0].color} strokeWidth={OUTLINE_WIDTH} />
                 </>
               ) : (
-                segmentPaths.map((p, i) => (
-                  <path
-                    key={i}
-                    d={p.d}
-                    fill={p.color}
-                    stroke={p.color}
-                    strokeWidth={OUTLINE_WIDTH}
-                    strokeLinejoin="round"
-                    className="donut-segment"
-                  />
-                ))
+                <>
+                  {segmentPaths.map((p, i) => (
+                    <path
+                      key={i}
+                      d={p.d}
+                      fill={p.color}
+                      stroke={p.color}
+                      strokeWidth={OUTLINE_WIDTH}
+                      strokeLinejoin="round"
+                      className="donut-segment"
+                    />
+                  ))}
+                  {/* Sub-Segmente liegen oben drauf — schmalerer Innenring
+                      innerhalb des Eltern-Segments, gleiche Optik (Outline +
+                      getoenter Fill via .donut-segment). */}
+                  {subSegmentPaths.map((p, i) => (
+                    <path
+                      key={`sub-${i}`}
+                      d={p.d}
+                      fill={p.color}
+                      stroke={p.color}
+                      strokeWidth={OUTLINE_WIDTH}
+                      strokeLinejoin="round"
+                      className="donut-segment"
+                    />
+                  ))}
+                </>
               )}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -126,21 +185,39 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
             <div className="space-y-2.5">
               {segments.map((s) => {
                 const pct = total > 0 ? (s.count / total) * 100 : 0;
+                const subPct = s.sub && s.count > 0 ? (s.sub.count / s.count) * 100 : 0;
                 return (
-                  <div
-                    key={s.label}
-                    className={`flex items-center gap-3 ${s.count === 0 ? "opacity-40" : ""}`}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium truncate">{s.label}</span>
-                        <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                          <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                  <div key={s.label}>
+                    <div className={`flex items-center gap-3 ${s.count === 0 ? "opacity-40" : ""}`}>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium truncate">
+                            {s.label}
+                            {s.sub && s.sub.count > 0 && (
+                              <span className="ml-2 text-xs font-normal" style={{ color: s.sub.color }}>
+                                · {s.sub.label}
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                            <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                            {s.sub && s.sub.count > 0 && (
+                              <span className="ml-2" style={{ color: s.sub.color }}>
+                                <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5 relative">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                          {s.sub && s.sub.count > 0 && (
+                            <div
+                              className="h-full rounded-full transition-all absolute left-0 top-0"
+                              style={{ width: `${(s.sub.count / total) * 100}%`, background: s.sub.color }}
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

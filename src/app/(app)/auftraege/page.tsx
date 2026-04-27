@@ -199,7 +199,18 @@ export default function AuftraegePage() {
         const entwurfCount = jobs.filter((j) => j.status === "entwurf").length;
         const segments = [
           { label: "Vermietentwürfe", count: jobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
-          { label: "Bevorstehend", count: jobs.filter((j) => j.status === "offen").length, color: "var(--status-gray)" },
+          {
+            label: "Bevorstehend",
+            count: jobs.filter((j) => j.status === "offen").length,
+            color: "var(--status-gray)",
+            // Untersegment: Aufträge die aus einer Vermietung kommen — hellblau,
+            // sitzt als schmalerer Innenring innerhalb des Bevorstehend-Segments.
+            sub: {
+              label: "Vermietung",
+              count: jobs.filter((j) => j.status === "offen" && j.was_anfrage).length,
+              color: "#38bdf8",
+            },
+          },
           { label: "Abgeschlossen", count: jobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
           { label: "Storniert", count: jobs.filter((j) => j.status === "storniert" && !j.cancelled_as_anfrage).length, color: "var(--status-red)" },
         ];
@@ -447,6 +458,14 @@ export default function AuftraegePage() {
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                               <AlertCircle className="h-3 w-3" />
                               Dringend
+                            </span>
+                          )}
+                          {/* Aus-Vermietentwurf-Marker — hellblau, dauerhaft sichtbar
+                              auf allen Auftraegen die aus einer Vermietung kommen
+                              (auch wenn Status sich aendert). */}
+                          {job.was_anfrage && job.status !== "anfrage" && (
+                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                              Vermietung
                             </span>
                           )}
                           {job.status !== "offen" && (
