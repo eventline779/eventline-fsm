@@ -24,7 +24,18 @@ interface Body {
   documentPaths: string[];
 }
 
-const APP_URL = "https://eventline-fsm-usyk.vercel.app";
+// Public-facing URL fuer Customer-Confirm-Links. In dieser Reihenfolge:
+//   1. NEXT_PUBLIC_APP_URL (explizit gesetzt fuer Production / Preview / Staging)
+//   2. VERCEL_BRANCH_URL (Branch-Preview-URL, z.B. eventline-fsm-git-redesign-...)
+//   3. VERCEL_URL (Deployment-URL, jede pushed Vercel-Build hat eine)
+//   4. Hardcoded Production-Fallback
+function getAppUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_BRANCH_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "https://eventline-fsm-usyk.vercel.app";
+}
+const APP_URL = getAppUrl();
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "";
