@@ -420,7 +420,7 @@ export default function AuftraegePage() {
                   <div className="flex items-stretch gap-3">
                     {/* LINKS (50%): Titel + Kunde + Beschreibung */}
                     <div className="min-w-0 flex-1 self-center">
-                      <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-3 min-w-0">
                         <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                       </div>

@@ -339,7 +339,7 @@ export default function AuftragDetailPage() {
       <div className="flex items-start gap-4">
         <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-muted transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="space-y-1.5">
             <JobNumber number={job.job_number} size="md" />
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>

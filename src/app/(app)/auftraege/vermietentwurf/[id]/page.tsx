@@ -281,7 +281,7 @@ export default function AnfrageDetailPage() {
           </button>
         </Link>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="space-y-1.5">
             <JobNumber number={job.job_number} size="md" />
             <h1 className="text-2xl font-bold tracking-tight">{job.title}</h1>
           </div>
