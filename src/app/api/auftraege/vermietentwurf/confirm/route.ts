@@ -66,8 +66,8 @@ export async function GET(request: NextRequest) {
     return new NextResponse(
       successPage(customerName, locationName, titleText,
         type === "angebot"
-          ? "Sie haben das Angebot bereits best&auml;tigt. Wir erarbeiten Ihren Mietvertrag und senden ihn Ihnen in K&uuml;rze zu."
-          : "Sie haben die Konditionen bereits best&auml;tigt. Wir erarbeiten Ihr Angebot und senden es Ihnen in K&uuml;rze zu."
+          ? "Sie haben das Angebot bereits best&auml;tigt. Wir erarbeiten Ihren Mietvertrag."
+          : "Sie haben die Konditionen bereits best&auml;tigt. Wir erarbeiten Ihr Angebot."
       ),
       { headers: { "Content-Type": "text/html" } },
     );
@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
   }
 
   const successMsg = type === "angebot"
-    ? "Das Angebot wurde angenommen. Wir erarbeiten Ihren Mietvertrag und senden ihn Ihnen in K&uuml;rze zu."
-    : "Die Konditionen wurden best&auml;tigt. Wir erarbeiten Ihr Angebot und senden es Ihnen in K&uuml;rze zu.";
+    ? "Das Angebot wurde angenommen. Wir erarbeiten Ihren Mietvertrag."
+    : "Die Konditionen wurden best&auml;tigt. Wir erarbeiten Ihr Angebot.";
 
   return new NextResponse(
     successPage(customerName, locationName, titleText, successMsg),
