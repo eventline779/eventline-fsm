@@ -635,7 +635,7 @@ export default function KalenderPage() {
       {/* Google Kalender Sync Modal */}
       {showSync && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowSync(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowSync(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -689,7 +689,7 @@ export default function KalenderPage() {
       {/* Delete Modal */}
       {deleteTarget && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">

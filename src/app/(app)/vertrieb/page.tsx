@@ -849,7 +849,7 @@ export default function VertriebPage() {
       {/* Termin-Modal (Schritt 2) */}
       {showTerminModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowTerminModal(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowTerminModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -893,7 +893,7 @@ export default function VertriebPage() {
       {/* Auftrag-Modal (Schritt 4) */}
       {showAuftragModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowAuftragModal(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowAuftragModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -950,7 +950,7 @@ export default function VertriebPage() {
       {/* Buchhaltungs-Benachrichtigung Modal (Schritt 2) */}
       {showBuchhaltung && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowBuchhaltung(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowBuchhaltung(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -984,7 +984,7 @@ export default function VertriebPage() {
       {/* Verbesserungs-Modal (Schritt 3) */}
       {showVerbesserung && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowVerbesserung(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowVerbesserung(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1019,7 +1019,7 @@ export default function VertriebPage() {
       {/* Verloren-Modal */}
       {showLostModal && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowLostModal(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowLostModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">

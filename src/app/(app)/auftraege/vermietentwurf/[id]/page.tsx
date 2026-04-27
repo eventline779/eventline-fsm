@@ -395,7 +395,7 @@ export default function AnfrageDetailPage() {
       {/* Manuell-bestaetigen-Confirm (Schritt 2/4 — Kunde haette aus Mail bestaetigen sollen) */}
       {showManualConfirm && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowManualConfirm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowManualConfirm(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="px-6 py-4 border-b">
@@ -436,7 +436,7 @@ export default function AnfrageDetailPage() {
       {/* Zurueck-Schritt-Confirm */}
       {showBackConfirm && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setShowBackConfirm(false)} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => setShowBackConfirm(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="px-6 py-4 border-b">
@@ -474,7 +474,7 @@ export default function AnfrageDetailPage() {
       {/* Storno-Flow: Phase 'confirm' -> 'reason' (identisch zum Auftrag) */}
       {cancelPhase !== "closed" && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
               <div className="flex items-center justify-between px-6 py-4 border-b">
@@ -571,7 +571,7 @@ export default function AnfrageDetailPage() {
       {/* Convert-Modal */}
       {showConvert && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => { if (!convertSaving) setShowConvert(false); }} />
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg" onClick={() => { if (!convertSaving) setShowConvert(false); }} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
               <div className="px-6 py-4 border-b">
