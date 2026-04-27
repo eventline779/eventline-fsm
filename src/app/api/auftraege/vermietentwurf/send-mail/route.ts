@@ -24,15 +24,23 @@ interface Body {
   documentPaths: string[];
 }
 
-// Public-facing URL fuer Customer-Confirm-Links. In dieser Reihenfolge:
-//   1. NEXT_PUBLIC_APP_URL (explizit gesetzt fuer Production / Preview / Staging)
-//   2. VERCEL_BRANCH_URL (Branch-Preview-URL, z.B. eventline-fsm-git-redesign-...)
-//   3. VERCEL_URL (Deployment-URL, jede pushed Vercel-Build hat eine)
-//   4. Hardcoded Production-Fallback
+// Public-facing URL fuer Customer-Confirm-Links. Muss auf einen Server
+// zeigen, der die Route /api/auftraege/vermietentwurf/confirm hat (also
+// redesign-Code). Production main hat die Route nicht.
+//
+// Reihenfolge:
+//   1. NEXT_PUBLIC_APP_URL — expliziter Override
+//   2. VERCEL_URL — auf Vercel-Deployments zeigt der Link auf das genau
+//      laufende Deployment (= redesign-Preview, der die Route hat).
+//   3. NEXT_PUBLIC_SITE_URL — lokal in .env.local gesetzt (typisch
+//      http://localhost:3000) — der Klick im Mail oeffnet dann den Dev-
+//      Server, der die redesign-Route bedient.
+//   4. Hardcoded Production-Fallback — main hat die Route nicht, also
+//      nur als allerletzte Reserve.
 function getAppUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_BRANCH_URL}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   return "https://eventline-fsm-usyk.vercel.app";
 }
 const APP_URL = getAppUrl();
