@@ -101,7 +101,7 @@ export function IntegrationenTab() {
                   {disconnecting ? "Trenne…" : "Trennen"}
                 </button>
               ) : (
-                <a href="/api/bexio/connect" className="kasten kasten-green">
+                <a href="/api/bexio/connect" className="kasten kasten-bexio">
                   <Plug className="h-3.5 w-3.5" />
                   Verbinden
                 </a>
