@@ -266,9 +266,11 @@ export default function AnfrageDetailPage() {
 
   const customer = (job.customer as unknown as { name: string }) || null;
   const location = (job.location as unknown as { name: string; address_street: string | null; address_zip: string | null; address_city: string | null }) || null;
-  const currentStep = job.request_step ?? 1;
+  // Step zwischen 1 und REQUEST_STEPS.length clampen — defensiv gegen
+  // Alt-Daten mit request_step ueber dem aktuellen Pipeline-Maximum.
+  const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
   const stepInfo = REQUEST_STEPS[currentStep - 1];
-  const isLastStep = currentStep === 5;
+  const isLastStep = currentStep === REQUEST_STEPS.length;
   const isCancelled = job.status === "storniert";
 
   return (

@@ -397,7 +397,8 @@ export default function AuftraegePage() {
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const isAnfrage = job.status === "anfrage";
-            const currentStep = job.request_step ?? 1;
+            // Defensiv clampen — Alt-Daten koennten request_step > 4 haben (Step 5 ist abgeschafft).
+            const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
             const isMailStep = MAIL_STEPS.has(currentStep);
             // Bei Entwurf/Vermietentwurf macht Terminplanung noch keinen Sinn.
