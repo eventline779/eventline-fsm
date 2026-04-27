@@ -43,32 +43,45 @@ export async function GET(request: NextRequest) {
     return new NextResponse(errorPage("Vermietentwurf nicht gefunden"), { headers: { "Content-Type": "text/html" } });
   }
 
+  const customerName = (existing.customer as unknown as { name: string } | null)?.name ?? "";
+  const locationName = (existing.location as unknown as { name: string } | null)?.name ?? "";
+  const titleText = type === "angebot" ? "Angebot angenommen" : "Konditionen best&auml;tigt";
+
   if (existing.status !== "anfrage") {
+    // Wurde bereits in einen Auftrag konvertiert (Status nicht mehr 'anfrage')
     return new NextResponse(
-      successPage(
-        (existing.customer as unknown as { name: string } | null)?.name ?? "",
-        (existing.location as unknown as { name: string } | null)?.name ?? "",
-        type === "angebot" ? "Angebot angenommen" : "Konditionen best&auml;tigt",
-        "Wir haben Ihre Best&auml;tigung bereits erhalten."
+      successPage(customerName, locationName, titleText,
+        type === "angebot"
+          ? "Sie haben das Angebot bereits best&auml;tigt. Wir erarbeiten Ihren Mietvertrag."
+          : "Sie haben die Konditionen bereits best&auml;tigt. Wir erarbeiten Ihr Angebot."
       ),
       { headers: { "Content-Type": "text/html" } },
     );
   }
 
-  // Nur weiterstellen wenn nicht schon weiter
-  if ((existing.request_step ?? 0) < targetStep) {
-    await supabase.from("jobs").update({ request_step: targetStep }).eq("id", id);
+  // Schon mal geklickt: request_step ist bereits auf oder ueber dem Ziel.
+  // Statt nochmal zu schreiben + zu benachrichtigen, dem Kunden klar machen,
+  // dass wir die Bestaetigung schon haben und am Naechsten arbeiten.
+  if ((existing.request_step ?? 0) >= targetStep) {
+    return new NextResponse(
+      successPage(customerName, locationName, titleText,
+        type === "angebot"
+          ? "Sie haben das Angebot bereits best&auml;tigt. Wir erarbeiten Ihren Mietvertrag und senden ihn Ihnen in K&uuml;rze zu."
+          : "Sie haben die Konditionen bereits best&auml;tigt. Wir erarbeiten Ihr Angebot und senden es Ihnen in K&uuml;rze zu."
+      ),
+      { headers: { "Content-Type": "text/html" } },
+    );
   }
 
-  // Admins benachrichtigen
+  // Erstmaliger Klick — Step weiterstellen + Mitarbeiter benachrichtigen
+  await supabase.from("jobs").update({ request_step: targetStep }).eq("id", id);
+
   const { data: admins } = await supabase
     .from("profiles")
     .select("id")
     .in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
 
   if (admins) {
-    const customerName = (existing.customer as unknown as { name: string } | null)?.name ?? "Kunde";
-    const locationName = (existing.location as unknown as { name: string } | null)?.name ?? "";
     const title = type === "angebot" ? `Angebot angenommen: ${customerName}` : `Konditionen best&auml;tigt: ${customerName}`;
     for (const admin of admins) {
       await supabase.from("notifications").insert({
@@ -83,15 +96,9 @@ export async function GET(request: NextRequest) {
   const successMsg = type === "angebot"
     ? "Das Angebot wurde angenommen. Wir erarbeiten Ihren Mietvertrag und senden ihn Ihnen in K&uuml;rze zu."
     : "Die Konditionen wurden best&auml;tigt. Wir erarbeiten Ihr Angebot und senden es Ihnen in K&uuml;rze zu.";
-  const titleText = type === "angebot" ? "Angebot angenommen" : "Konditionen best&auml;tigt";
 
   return new NextResponse(
-    successPage(
-      (existing.customer as unknown as { name: string } | null)?.name ?? "",
-      (existing.location as unknown as { name: string } | null)?.name ?? "",
-      titleText,
-      successMsg,
-    ),
+    successPage(customerName, locationName, titleText, successMsg),
     { headers: { "Content-Type": "text/html" } },
   );
 }

@@ -64,7 +64,24 @@ export default function AnfrageDetailPage() {
     // dann frisch laden, damit das neue Dokument hier in der Liste auftaucht.
     const handler = () => loadDocuments();
     window.addEventListener("documents:invalidate", handler);
-    return () => window.removeEventListener("documents:invalidate", handler);
+
+    // Supabase-Realtime: sobald jemand (z.B. der Kunde via Mail-Confirm) das
+    // job aktualisiert, hier die Detail-Seite frisch laden — kein manuelles
+    // Refresh noetig. Filter auf genau dieses id, damit wir nur unser Job
+    // mitkriegen, nicht alle.
+    const channel = supabase
+      .channel(`vermietentwurf-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${id}` },
+        () => { loadJob(); }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener("documents:invalidate", handler);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
