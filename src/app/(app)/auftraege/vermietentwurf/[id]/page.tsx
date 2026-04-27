@@ -8,7 +8,7 @@ import type { Job } from "@/types";
 import { REQUEST_STEPS } from "@/lib/constants";
 import {
   ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
-  StickyNote, FileText, Send,
+  StickyNote, FileText, Send, Download,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -26,6 +26,16 @@ export default function AnfrageDetailPage() {
 
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Dokumente am Vermietentwurf — landen automatisch hier sobald via
+  // SendStepModal hochgeladen (job_id = id, RLS via authentifizierten User).
+  const [documents, setDocuments] = useState<Array<{
+    id: string;
+    name: string;
+    storage_path: string;
+    file_size: number | null;
+    created_at: string;
+  }>>([]);
 
   // Notizen — autosave
   const [notesText, setNotesText] = useState("");
@@ -49,8 +59,33 @@ export default function AnfrageDetailPage() {
 
   useEffect(() => {
     loadJob();
+    loadDocuments();
+    // SendStepModal feuert dieses Event nach jedem erfolgreichen Upload —
+    // dann frisch laden, damit das neue Dokument hier in der Liste auftaucht.
+    const handler = () => loadDocuments();
+    window.addEventListener("documents:invalidate", handler);
+    return () => window.removeEventListener("documents:invalidate", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function loadDocuments() {
+    const { data } = await supabase
+      .from("documents")
+      .select("id, name, storage_path, file_size, created_at")
+      .eq("job_id", id)
+      .order("created_at", { ascending: false });
+    setDocuments((data as typeof documents) ?? []);
+  }
+
+  async function downloadDoc(storagePath: string, name: string) {
+    const { data } = await supabase.storage.from("documents").createSignedUrl(storagePath, 3600);
+    if (data?.signedUrl) {
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = name;
+      a.click();
+    }
+  }
 
   async function loadJob() {
     const { data, error } = await supabase
@@ -375,6 +410,49 @@ export default function AnfrageDetailPage() {
             style={{ fieldSizing: "content" } as React.CSSProperties}
             className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
           />
+        </CardContent>
+      </Card>
+
+      {/* Dokumente — automatisch befuellt aus dem SendStepModal-Upload.
+          Read-only hier; hochladen passiert ueber den Mail-Schritt. */}
+      <Card className="bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <FileText className="h-4 w-4" />Dokumente ({documents.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              Noch keine Dokumente. Anhänge aus den Mail-Schritten landen automatisch hier.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-foreground/[0.02] border">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.file_size ? (doc.file_size / 1024).toFixed(0) + " KB" : ""}
+                        {doc.file_size ? " · " : ""}
+                        {new Date(doc.created_at).toLocaleDateString("de-CH")}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadDoc(doc.storage_path, doc.name)}
+                    className="kasten kasten-muted shrink-0"
+                    title="Herunterladen"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

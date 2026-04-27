@@ -118,6 +118,9 @@ export function SendStepModal({
         return;
       }
       setDocs((prev) => [inserted as UploadedDoc, ...prev]);
+      // Detail-Seite ueber neuen Upload informieren — der dortige Dokumente-
+      // Block laedt sich neu und zeigt die frische Datei sofort.
+      window.dispatchEvent(new Event("documents:invalidate"));
       toast.success("Dokument hochgeladen");
     } finally {
       setUploading(false);
