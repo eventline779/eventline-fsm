@@ -52,7 +52,7 @@ export default function BelegePage() {
 
     // Email senden
     try {
-      const emailRes = await fetch("/api/belege/send", {
+      const emailRes = await fetch("/api/invoices/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

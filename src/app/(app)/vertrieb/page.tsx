@@ -379,7 +379,7 @@ export default function VertriebPage() {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
     try {
-      const res = await fetch("/api/vertrieb/buchhaltung", {
+      const res = await fetch("/api/sales/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -440,7 +440,7 @@ export default function VertriebPage() {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
     try {
-      const res = await fetch("/api/vertrieb/buchhaltung", {
+      const res = await fetch("/api/sales/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -479,7 +479,7 @@ export default function VertriebPage() {
       }
     }
     try {
-      const res = await fetch("/api/vertrieb/buchhaltung", {
+      const res = await fetch("/api/sales/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -646,7 +646,7 @@ export default function VertriebPage() {
     // E-Mail an Leo
     let emailOk = false;
     try {
-      const res = await fetch("/api/vertrieb/neuer-auftrag", {
+      const res = await fetch("/api/sales/new-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

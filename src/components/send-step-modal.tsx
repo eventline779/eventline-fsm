@@ -154,7 +154,7 @@ export function SendStepModal({
     }
     setSending(true);
     try {
-      const res = await fetch("/api/auftraege/vermietentwurf/send-mail", {
+      const res = await fetch("/api/jobs/rental-draft/send-mail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

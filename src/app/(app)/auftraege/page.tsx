@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
 import { RequestStepTracker } from "@/components/request-step-tracker";
-import type { Job, JobStatus, Profile } from "@/types";
+import type { JobStatus, Profile, JobWithRelations } from "@/types";
 import Link from "next/link";
 import {
   Plus,
@@ -32,7 +32,7 @@ import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
 
 export default function AuftraegePage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobWithRelations[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
@@ -134,7 +134,7 @@ export default function AuftraegePage() {
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     ]);
-    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    if (jobsRes.data) setJobs(jobsRes.data as unknown as JobWithRelations[]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     setLoading(false);
   }
@@ -142,7 +142,7 @@ export default function AuftraegePage() {
   // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayMs = todayStart.getTime();
-  const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
+  const isArchived = (j: JobWithRelations) => j.status === "abgeschlossen" || j.status === "storniert";
   const filtered = jobs.filter((j) => {
     // Stornierungen, die in der Anfrage-Phase passierten, gehoeren nicht ins
     // Auftrags-Archiv — zu dem Zeitpunkt war es noch kein Auftrag.
@@ -154,7 +154,7 @@ export default function AuftraegePage() {
     const matchesTitle = !titleQ ? true : j.title.toLowerCase().includes(titleQ);
     const matchesSearch = matchesNumber && matchesTitle;
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
-    const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
+    const locName = (j.location?.name || "").toLowerCase();
     const isScala = locName.includes("scala");
     const isBarakuba = locName.includes("barakuba");
     const isBau3 = locName.includes("bau3");
@@ -392,7 +392,7 @@ export default function AuftraegePage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((job) => {
-            const appointments = (job as any).appointments as { id: string; start_time: string }[] | null;
+            const appointments = job.appointments ?? null;
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const isAnfrage = job.status === "anfrage";
@@ -424,19 +424,19 @@ export default function AuftraegePage() {
                       </div>
                       {/* Kunde: eigene Zeile — garantiert immer sichtbar (vorher
                           wurde er bei langen Daten + Location aus der Meta-Zeile geclippt). */}
-                      {(job.customer as unknown as { name: string })?.name && (
+                      {job.customer?.name && (
                         <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground min-w-0">
                           <User className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{(job.customer as unknown as { name: string }).name}</span>
+                          <span className="truncate">{job.customer.name}</span>
                         </div>
                       )}
                       {/* Location + Datum: Sekundaer-Zeile — bei knappem Platz
                           kann hier gekuerzt/geclippt werden, ohne dass der Kunde verschwindet. */}
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground min-w-0">
-                        {(job.location as unknown as { name: string })?.name && (
+                        {job.location?.name && (
                           <span className="flex items-center gap-1.5 min-w-0">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{(job.location as unknown as { name: string }).name}</span>
+                            <span className="truncate">{job.location.name}</span>
                           </span>
                         )}
                         {job.start_date && (
@@ -587,8 +587,8 @@ export default function AuftraegePage() {
       {(() => {
         const activeJob = activeStepJobId ? jobs.find((j) => j.id === activeStepJobId) ?? null : null;
         if (!activeJob) return null;
-        const customer = activeJob.customer as unknown as { name?: string | null; email?: string | null } | undefined;
-        const location = activeJob.location as unknown as { name?: string | null } | undefined;
+        const customer = activeJob.customer;
+        const location = activeJob.location;
         return (
           <SendStepModal
             open={true}

@@ -1,6 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
+// HINWEIS: Diese Route bleibt absichtlich auf dem deutschen Pfad
+// /api/auftraege/vermietentwurf/confirm — sie wird in Mails an Kunden
+// referenziert, die schon im Umlauf sind. Umbenennen wuerde Bestaetigungs-
+// Links aus alten Mails brechen. Neue Routes sind englisch (jobs/rental-draft).
+//
 // Customer-facing Confirm-Link aus der Mail. Kein Login.
 // Der Frontend-Flow rueckelt den Step schon beim "Mail senden" hoch (auf 2
 // bzw. 4 — den Warte-Stand). Der Kunden-Klick:

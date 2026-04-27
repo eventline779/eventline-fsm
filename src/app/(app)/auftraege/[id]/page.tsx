@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JOB_STATUS } from "@/lib/constants";
-import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
+import type { JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus, JobDetailWithRelations, ServiceReport } from "@/types";
+
+// Rapport mit eingebettetem Creator — wie Supabase-Join es liefert.
+type ReportWithCreator = ServiceReport & {
+  creator: { full_name: string } | null;
+};
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
   Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox, ExternalLink,
@@ -24,12 +29,12 @@ export default function AuftragDetailPage() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [job, setJob] = useState<Job | null>(null);
+  const [job, setJob] = useState<JobDetailWithRelations | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
   const [appointments, setAppointments] = useState<JobAppointment[]>([]);
   const [documents, setDocuments] = useState<DocType[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<ReportWithCreator[]>([]);
   const [uploading, setUploading] = useState(false);
 
   // Appointment form
@@ -77,7 +82,7 @@ export default function AuftragDetailPage() {
       supabase.from("service_reports").select("*, creator:profiles!created_by(full_name)").eq("job_id", id).order("created_at", { ascending: false }),
     ]);
     if (jobRes.data) {
-      setJob(jobRes.data as unknown as Job);
+      setJob(jobRes.data as unknown as JobDetailWithRelations);
       // Notizen: alte JSON-Liste -> joined als Text. Plain-Text bleibt as-is.
       let initial = "";
       if (jobRes.data.notes) {
@@ -99,7 +104,7 @@ export default function AuftragDetailPage() {
     if (apptRes.data) setAppointments(apptRes.data as unknown as JobAppointment[]);
     if (docRes.data) setDocuments(docRes.data as DocType[]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
-    if (repRes.data) setReports(repRes.data);
+    if (repRes.data) setReports(repRes.data as unknown as ReportWithCreator[]);
   }
 
   // Notizen autosave: 800ms nach letzter Aenderung in DB schreiben.
@@ -297,14 +302,14 @@ export default function AuftragDetailPage() {
 
   if (!job) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  const customer = job.customer as unknown as { id: string; name: string; address_street?: string; address_zip?: string; address_city?: string; bexio_contact_id?: string | null } | undefined;
-  const location = job.location as unknown as { name: string; address_street?: string; address_zip?: string; address_city?: string } | undefined;
+  const customer = job.customer ?? undefined;
+  const location = job.location ?? undefined;
   const locationAddress = location ? [location.address_street, `${location.address_zip || ""} ${location.address_city || ""}`.trim()].filter(Boolean).join(", ") : "";
   const customerAddress = customer ? [customer.address_street, `${customer.address_zip || ""} ${customer.address_city || ""}`.trim()].filter(Boolean).join(", ") : "";
   const mapsAddress = locationAddress || customerAddress;
   const mapsQuery = mapsAddress || location?.name || customer?.name || "";
   const mapsUrl = mapsQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}` : "";
-  const projectLead = (job as unknown as { project_lead: { full_name: string } | null }).project_lead;
+  const projectLead = job.project_lead;
 
   // Status-Aktionen — knapp: Freigeben (Entwurf → Bevorstehend), Abschliessen, Stornieren.
   // 'Starten' entfernt (siehe in_arbeit-Status weg).
@@ -597,7 +602,7 @@ export default function AuftragDetailPage() {
             )
           )}
           {appointments.map((appt) => {
-            const assignee = (appt as unknown as { assignee: { full_name: string } | null }).assignee;
+            const assignee = appt.assignee;
             return (
               <div key={appt.id} className={`flex items-center justify-between p-3 rounded-xl border ${appt.is_done ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -687,7 +692,7 @@ export default function AuftragDetailPage() {
             <p className="text-sm text-muted-foreground py-2">Noch keine Rapporte für diesen Auftrag.</p>
           ) : (
             <div className="space-y-2">
-              {reports.map((r: any) => (
+              {reports.map((r) => (
                 <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Rapport vom {new Date(r.report_date).toLocaleDateString("de-CH")}</p>

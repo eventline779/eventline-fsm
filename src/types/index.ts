@@ -95,6 +95,52 @@ export interface Job {
   cancelled_by_profile?: { full_name: string };
 }
 
+// === Join-Shapes fuer Supabase-Query-Resultate ===
+// Wenn man `.select("*, customer:customers(name, email), ...")` macht, liefert
+// Supabase nur die expliziten Felder. Das full Customer-Interface waere ein
+// Lie. Deshalb hier schmale Join-Typen die genau das beschreiben was die
+// jeweilige Query selektiert.
+//
+// Vorher: ueberall `as unknown as { name: string }` Casts. Nachher: ein paar
+// klar benannte Typen die du in der Query und im Render-Code wiederverwendest.
+
+/** Was wir typisch in Listen- und Detail-Joins vom Customer selektieren. */
+export type JobCustomerSummary = Pick<
+  Customer,
+  | "id"
+  | "name"
+  | "email"
+  | "address_street"
+  | "address_zip"
+  | "address_city"
+  | "address_country"
+  | "bexio_contact_id"
+>;
+
+/** Was wir typisch vom Location-Join selektieren. */
+export type JobLocationSummary = Pick<
+  Location,
+  "id" | "name" | "address_street" | "address_zip" | "address_city"
+>;
+
+/** Job + joined customer/location/appointments wie auf der Auftrags-Liste. */
+export type JobWithRelations = Omit<Job, "customer" | "location" | "appointments"> & {
+  customer: JobCustomerSummary | null;
+  location: Pick<Location, "id" | "name"> | null;
+  appointments?: Pick<JobAppointment, "id" | "start_time">[] | null;
+};
+
+/** Job + reichere Joins fuer die Auftrags-Detail-Seite. */
+export type JobDetailWithRelations = Omit<
+  Job,
+  "customer" | "location" | "project_lead" | "cancelled_by_profile"
+> & {
+  customer: JobCustomerSummary | null;
+  location: JobLocationSummary | null;
+  project_lead: { full_name: string } | null;
+  cancelled_by_profile: { full_name: string } | null;
+};
+
 export interface JobAppointment {
   id: string;
   job_id: string;
