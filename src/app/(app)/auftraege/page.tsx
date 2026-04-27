@@ -254,7 +254,9 @@ export default function AuftraegePage() {
           <Input
             placeholder="000000"
             value={searchNumber}
-            onChange={(e) => setSearchNumber(e.target.value)}
+            onChange={(e) => setSearchNumber(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="pl-[3rem] h-9 font-mono"
             aria-label="Auftragsnummer"
           />
