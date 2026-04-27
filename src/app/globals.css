@@ -477,19 +477,12 @@ html, body, *, *::before, *::after {
      Off = subtiler aber gleicher Aufbau. So fluchten Toggle-Buttons visuell
      mit dem Rest der kasten-Familie. */
   .kasten-active {
-    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground transition-all;
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground bg-card transition-all;
     border: 2px solid color-mix(in oklab, var(--foreground) 40%, transparent);
-    background-color: color-mix(in oklab, var(--foreground) 12%, transparent);
   }
   .kasten-active:hover:not(:disabled) {
-    background-color: color-mix(in oklab, var(--foreground) 25%, transparent);
+    background-color: color-mix(in oklab, var(--foreground) 8%, transparent);
     border-color: color-mix(in oklab, var(--foreground) 55%, transparent);
-  }
-  .dark .kasten-active {
-    background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
-  }
-  .dark .kasten-active:hover:not(:disabled) {
-    background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
   }
 
   .kasten-toggle-off {
