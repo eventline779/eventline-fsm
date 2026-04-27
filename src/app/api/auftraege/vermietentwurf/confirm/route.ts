@@ -78,8 +78,8 @@ export async function GET(request: NextRequest) {
   }
 
   const successMsg = type === "angebot"
-    ? "Das Angebot wurde angenommen. Wir senden Ihnen den Mietvertrag zu."
-    : "Die Konditionen wurden best&auml;tigt. Wir senden Ihnen das Angebot zu.";
+    ? "Das Angebot wurde angenommen. Wir erarbeiten Ihren Mietvertrag und senden ihn Ihnen in K&uuml;rze zu."
+    : "Die Konditionen wurden best&auml;tigt. Wir erarbeiten Ihr Angebot und senden es Ihnen in K&uuml;rze zu.";
   const titleText = type === "angebot" ? "Angebot angenommen" : "Konditionen best&auml;tigt";
 
   return new NextResponse(
