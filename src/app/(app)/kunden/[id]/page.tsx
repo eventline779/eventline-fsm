@@ -259,12 +259,14 @@ export default function KundenDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
-          <Link
-            href={`/auftraege/neu?customer_id=${id}`}
-            className="kasten kasten-red"
-          >
-            Neuer Auftrag
-          </Link>
+          {!editing && (
+            <Link
+              href={`/auftraege/neu?customer_id=${id}`}
+              className="kasten kasten-red"
+            >
+              Neuer Auftrag
+            </Link>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {jobs.length === 0 ? (
