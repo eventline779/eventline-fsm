@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const customerName = (existing.customer as unknown as { name: string } | null)?.name ?? "";
   const locationName = (existing.location as unknown as { name: string } | null)?.name ?? "";
-  const titleText = type === "angebot" ? "Angebot angenommen" : "Konditionen best&auml;tigt";
+  const titleText = type === "angebot" ? "Angebot best&auml;tigt" : "Konditionen best&auml;tigt";
 
   if (existing.status !== "anfrage") {
     // Wurde bereits in einen Auftrag konvertiert (Status nicht mehr 'anfrage')
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     .in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
 
   if (admins) {
-    const title = type === "angebot" ? `Angebot angenommen: ${customerName}` : `Konditionen best&auml;tigt: ${customerName}`;
+    const title = type === "angebot" ? `Angebot best&auml;tigt: ${customerName}` : `Konditionen best&auml;tigt: ${customerName}`;
     for (const admin of admins) {
       await supabase.from("notifications").insert({
         user_id: admin.id,
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
   }
 
   const successMsg = type === "angebot"
-    ? "Das Angebot wurde angenommen. Wir erarbeiten Ihr Angebot."
+    ? "Das Angebot wurde best&auml;tigt. Wir erarbeiten Ihr Angebot."
     : "Die Konditionen wurden best&auml;tigt. Wir erarbeiten Ihr Angebot.";
 
   return new NextResponse(
