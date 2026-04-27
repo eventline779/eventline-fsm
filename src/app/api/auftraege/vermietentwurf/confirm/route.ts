@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
 // Gemeinsame Page-Shell — Logo oben, zentrale Karte, Footer.
 // Variante "success" (gruener Haken-Kreis) und "error" (roter X-Kreis)
 // teilen sich die Struktur, unterscheiden sich nur im Icon + Akzent.
+// Light + Dark Mode automatisch via prefers-color-scheme. Logo wechselt
+// zwischen logo-gmbh-black.png (light) und logo-gmbh.png (dark).
 function pageShell(opts: {
   variant: "success" | "error";
   title: string;
@@ -113,63 +115,95 @@ function pageShell(opts: {
   message: string;
 }) {
   const { variant, title, sub, message } = opts;
-  const accent = variant === "success" ? "#16a34a" : "#dc2626";
-  const accentBg = variant === "success" ? "#dcfce7" : "#fee2e2";
+  const accentLight = variant === "success" ? "#16a34a" : "#dc2626";
+  const accentDark  = variant === "success" ? "#22c55e" : "#ef4444";
   const icon = variant === "success"
-    ? `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${accent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
-    : `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${accent}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    ? `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+    : `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
   return `<!DOCTYPE html><html lang="de"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f8f9fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
   <title>${title} — EVENTLINE</title>
   <style>
+    :root{
+      --bg-from:#f8f9fb;
+      --bg-to:#eef0f4;
+      --card:#ffffff;
+      --card-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 32px rgba(0,0,0,0.06);
+      --title:#0a0a0a;
+      --sub:#737373;
+      --msg:#404040;
+      --footer:#a3a3a3;
+      --accent:${accentLight};
+      --accent-bg:${variant === "success" ? "#dcfce7" : "#fee2e2"};
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg-from:#0a0a0a;
+        --bg-to:#161616;
+        --card:#1a1a1a;
+        --card-shadow:0 1px 2px rgba(0,0,0,0.4),0 8px 32px rgba(0,0,0,0.5);
+        --title:#fafafa;
+        --sub:#888888;
+        --msg:#cccccc;
+        --footer:#666666;
+        --accent:${accentDark};
+        --accent-bg:${variant === "success" ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)"};
+      }
+    }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
     body{
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;
-      background:linear-gradient(180deg,#f8f9fb 0%,#eef0f4 100%);
+      background:linear-gradient(180deg,var(--bg-from) 0%,var(--bg-to) 100%);
       min-height:100vh;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       padding:32px 20px;
-      color:#1a1a1a;
+      color:var(--title);
       -webkit-font-smoothing:antialiased;
     }
     .wrap{max-width:480px;width:100%;text-align:center}
-    .brand{
-      font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
-      font-weight:300;letter-spacing:0.18em;font-size:14px;
-      color:#1a1a1a;margin-bottom:32px;
+    .brand{margin-bottom:32px;display:flex;justify-content:center}
+    .brand img{height:40px;width:auto;display:block}
+    .brand .logo-light{display:block}
+    .brand .logo-dark{display:none}
+    @media (prefers-color-scheme: dark){
+      .brand .logo-light{display:none}
+      .brand .logo-dark{display:block}
     }
-    .brand strong{font-weight:700;letter-spacing:0.18em}
     .card{
-      background:#ffffff;border-radius:20px;
+      background:var(--card);border-radius:20px;
       padding:48px 32px;
-      box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 32px rgba(0,0,0,0.06);
+      box-shadow:var(--card-shadow);
     }
     .icon-wrap{
       width:72px;height:72px;border-radius:50%;
-      background:${accentBg};
+      background:var(--accent-bg);
+      color:var(--accent);
       display:inline-flex;align-items:center;justify-content:center;
       margin-bottom:24px;
     }
     h1{
       margin:0 0 8px;
       font-size:24px;font-weight:600;letter-spacing:-0.01em;line-height:1.2;
-      color:#0a0a0a;
+      color:var(--title);
     }
     .sub{
-      margin:0 0 20px;color:#737373;font-size:13px;font-weight:500;
+      margin:0 0 20px;color:var(--sub);font-size:13px;font-weight:500;
     }
     .msg{
-      margin:0;color:#404040;font-size:15px;line-height:1.55;
+      margin:0;color:var(--msg);font-size:15px;line-height:1.55;
     }
     .accent-line{
       width:32px;height:3px;border-radius:2px;
-      background:${accent};
+      background:var(--accent);
       margin:20px auto 0;
     }
     footer{
-      margin-top:24px;color:#a3a3a3;font-size:11px;letter-spacing:0.02em;
+      margin-top:24px;color:var(--footer);font-size:11px;letter-spacing:0.02em;
     }
     footer a{color:inherit;text-decoration:none}
     @media (max-width:480px){
@@ -180,7 +214,10 @@ function pageShell(opts: {
   </head>
   <body>
     <div class="wrap">
-      <div class="brand">EVENT<strong>LINE</strong></div>
+      <div class="brand">
+        <img class="logo-light" src="/logo-gmbh-black.png" alt="EVENTLINE GmbH">
+        <img class="logo-dark" src="/logo-gmbh.png" alt="EVENTLINE GmbH">
+      </div>
       <div class="card">
         <div class="icon-wrap">${icon}</div>
         <h1>${title}</h1>
