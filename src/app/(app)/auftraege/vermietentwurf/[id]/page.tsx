@@ -394,25 +394,6 @@ export default function AnfrageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Notizen — autosave */}
-      <Card className="bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <StickyNote className="h-4 w-4" />Notizen
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <textarea
-            value={notesText}
-            onChange={(e) => setNotesText(e.target.value)}
-            placeholder="Reinschreiben — wird automatisch gespeichert."
-            rows={4}
-            style={{ fieldSizing: "content" } as React.CSSProperties}
-            className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-          />
-        </CardContent>
-      </Card>
-
       {/* Dokumente — automatisch befuellt aus dem SendStepModal-Upload.
           Read-only hier; hochladen passiert ueber den Mail-Schritt. */}
       <Card className="bg-card">
@@ -453,6 +434,25 @@ export default function AnfrageDetailPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Notizen — autosave */}
+      <Card className="bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <StickyNote className="h-4 w-4" />Notizen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <textarea
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            placeholder="Reinschreiben — wird automatisch gespeichert."
+            rows={4}
+            style={{ fieldSizing: "content" } as React.CSSProperties}
+            className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+          />
         </CardContent>
       </Card>
 
