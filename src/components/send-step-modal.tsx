@@ -10,6 +10,7 @@
 // Verwendet auf /auftraege/vermietentwurf/[id] (Detailseite) und /auftraege (inline pro Karte).
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { REQUEST_STEPS } from "@/lib/constants";
@@ -194,7 +195,12 @@ export function SendStepModal({
     onClose();
   }
 
-  return (
+  // Modal via Portal direkt an document.body — damit kein Ancestor (sticky
+  // Sidebar, transformierte Container, overflow-hidden Wrapper, etc.) das
+  // fixed inset-0 einschraenken kann. Backdrop und Panel sitzen auf
+  // Root-Stacking-Level und ueberdecken garantiert den vollen Viewport.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <>
       <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={close} />
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
@@ -314,6 +320,7 @@ export function SendStepModal({
             </div>
           </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
