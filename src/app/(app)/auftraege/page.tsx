@@ -435,7 +435,7 @@ export default function AuftraegePage() {
                     {/* VERTIKALER TRENNSTRICH — auf der Card-Mitte. Gleiche Optik
                         wie der Card-Rand (foreground/10). my-2 sodass er die
                         Ober- und Unterkante nicht beruehrt. */}
-                    <div className="self-stretch my-2 w-px bg-foreground/10 shrink-0" aria-hidden="true" />
+                    <div className="self-stretch my-2 w-0.5 bg-foreground/10 shrink-0" aria-hidden="true" />
 
                     {/* RECHTS (50%): Tag+Tracker direkt nach dem Strich +
                         Action ganz rechts. Tag und Tracker linksbuendig

@@ -407,6 +407,16 @@ html, body, *, *::before, *::after {
    Aktive Toggle (z.B. Archiv): kasten-active (gefuellt + invertiert).
    Zusatz-Layout (flex-1, w-full, mt-X, px-6, py-4) als normale Tailwind-Utilities
    daneben — die ueberschreiben dank @layer components / utilities-Reihenfolge. */
+/* Card-Rand app-weit: 2px solid border in foreground/10. Liegt in
+   @layer components, sodass utilities (z.B. border-dashed, hover-Border-Color)
+   die Werte ueberschreiben koennen. Vorher ring-2 — auf border umgestellt
+   damit der Rand zuverlaessig sichtbar ist (gleiche Logik wie Kasten-Buttons). */
+@layer components {
+  [data-slot="card"] {
+    border: 2px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+}
+
 @layer components {
   .kasten {
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-card transition-all;
