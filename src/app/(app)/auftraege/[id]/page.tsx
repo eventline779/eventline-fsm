@@ -562,7 +562,7 @@ export default function AuftragDetailPage() {
                         key={p.id}
                         type="button"
                         onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
-                        className={selected ? "kasten-active" : "kasten kasten-muted"}
+                        className={selected ? "kasten-active" : "kasten-toggle-off"}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
                           {p.full_name.charAt(0)}

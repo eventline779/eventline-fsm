@@ -471,10 +471,11 @@ html, body, *, *::before, *::after {
 
   .kasten-muted  { @apply text-foreground/70; }
   .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
-  /* Aktiv-Variante: tinted-Stil wie die anderen kasten-X (border + getoenter
-     bg), nur in foreground-Farbe statt rot/blau/gruen — damit Toggle-Buttons
-     wie Archiv visuell zur restlichen kasten-Familie passen. Farben bleiben
-     foreground (dunkel im Light, hell im Dark) wie zuvor. */
+  /* Toggle-Buttons (z.B. Archiv-Umschalter, Mitarbeiter-Auswahl):
+     Beide Zustaende im tinted-Stil wie kasten-X (2px Border + getoenter bg),
+     nur in foreground-Farbe statt rot/blau/gruen. Active = staerker getoent,
+     Off = subtiler aber gleicher Aufbau. So fluchten Toggle-Buttons visuell
+     mit dem Rest der kasten-Familie. */
   .kasten-active {
     @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground transition-all;
     border: 2px solid color-mix(in oklab, var(--foreground) 40%, transparent);
@@ -489,6 +490,24 @@ html, body, *, *::before, *::after {
   }
   .dark .kasten-active:hover:not(:disabled) {
     background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+
+  .kasten-toggle-off {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+    border: 2px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+    background-color: color-mix(in oklab, var(--foreground) 4%, transparent);
+  }
+  .kasten-toggle-off:hover:not(:disabled) {
+    color: var(--foreground);
+    background-color: color-mix(in oklab, var(--foreground) 10%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+  .dark .kasten-toggle-off {
+    background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+  }
+  .dark .kasten-toggle-off:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 16%, transparent);
   }
 }
 

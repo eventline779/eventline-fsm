@@ -185,7 +185,7 @@ export default function AuftraegePage() {
           <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Operations Archiv" : "Operations"}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten kasten-muted"}>
+          <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
             <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => !j.cancelled_as_anfrage && (j.status === "abgeschlossen" || j.status === "storniert")).length})`}
           </button>
           {!showArchive && (
