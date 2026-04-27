@@ -107,16 +107,17 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
       const d = `M ${ox1} ${oy1} A ${OUTER_R} ${OUTER_R} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${INNER_R} ${INNER_R} 0 ${largeArc} 0 ${ix1} ${iy1} Z`;
       segmentPaths.push({ color: s.color, d });
 
-      // Sub-Segment: am LINKEN Eltern-Rand ansetzen (wie ursprunglich), aber
-      // gleichmaessiger Abstand zu den anderen 3 Raendern (oben/unten radial,
-      // rechts angular). LEFT flush, RIGHT/TOP/BOTTOM jeweils SUB_PAD Pixel.
+      // Sub-Segment: gleichmaessiger Abstand zu allen 4 Raendern des Eltern-
+      // Bogens — oben/unten radial (SUB_OUTER_R / SUB_INNER_R), links/rechts
+      // angular (SUB_PAD ueber midR umgerechnet). Sitzt damit von links
+      // wachsend mit angularPad-Abstand zur Eltern-Anfangs-Kante.
       if (s.sub && s.sub.count > 0 && s.count > 0) {
         const midR = (OUTER_R + INNER_R) / 2;
         const angularPad = SUB_PAD / midR;
         const subPortion = Math.min(s.sub.count / s.count, 1);
-        const availableAngle = Math.max(segAngle - angularPad, 0);
+        const availableAngle = Math.max(segAngle - 2 * angularPad, 0);
         const subSegAngle = subPortion * availableAngle;
-        const subStartA = startA; // flush links am Eltern-Rand
+        const subStartA = startA + angularPad; // gleicher Abstand links wie rechts
         const subEndA = subStartA + subSegAngle;
         const sox1 = CX + SUB_OUTER_R * Math.cos(subStartA);
         const soy1 = CY + SUB_OUTER_R * Math.sin(subStartA);
