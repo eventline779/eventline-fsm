@@ -2,11 +2,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 // Customer-facing Confirm-Link aus der Mail. Kein Login.
-// Der Kunden-Klick ruckelt das job genau auf den naechstliegenden
-// "bestaetigt"-Step weiter — der Mitarbeiter muss dann selbst weiterklicken
-// auf "senden":
-//   type=konditionen -> request_step >= 2 (Konditionen bestaetigt)
-//   type=angebot     -> request_step >= 4 (Angebot bestaetigt)
+// Der Frontend-Flow rueckelt den Step schon beim "Mail senden" hoch (auf 2
+// bzw. 4 — den Warte-Stand). Der Kunden-Klick rueckelt dann WEITER auf
+// den naechsten Mitarbeiter-Schritt (3 bzw. 5):
+//   type=konditionen -> request_step >= 3 (Naechste Aktion: Angebot senden)
+//   type=angebot     -> request_step >= 5 (Naechste Aktion: Vertrag senden)
+// So sieht der Kunde beim ERSTEN Klick die "Wurde bestaetigt"-Page, nicht
+// die "schon bestaetigt"-Page (die zeigt sich erst beim 2. Klick wenn das
+// Step-Ziel schon erreicht ist).
 //
 // Idempotent: Klickt der Kunde mehrmals, bleibt der Step beim hoechsten erreichten Wert.
 // Sicherheit: Token-Check ueber base64(jobId + "-confirm"). Reicht fuer den Use-Case
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const targetStep = type === "angebot" ? 4 : 2;
+  const targetStep = type === "angebot" ? 5 : 3;
 
   const { data: existing, error: loadErr } = await supabase
     .from("jobs")
