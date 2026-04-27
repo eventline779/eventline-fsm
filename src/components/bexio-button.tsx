@@ -179,7 +179,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
             Abbrechen
           </button>
           <a
-            href={`/kunden/${customerId}`}
+            href={`/kunden/${customerId}?edit=1`}
             className="kasten kasten-purple flex-1"
             onClick={() => setMissingFields(null)}
           >

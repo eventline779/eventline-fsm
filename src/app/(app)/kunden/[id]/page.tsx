@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,10 +30,12 @@ const COUNTRY_OPTIONS = [
 export default function KundenDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [editing, setEditing] = useState(false);
+  // ?edit=1 -> direkt im Bearbeiten-Modus (z.B. vom Bexio-Pflichtfeld-Modal)
+  const [editing, setEditing] = useState(searchParams.get("edit") === "1");
   const [form, setForm] = useState({
     name: "", type: "company" as CustomerType,
     email: "", phone: "",
