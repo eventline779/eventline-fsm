@@ -1,12 +1,11 @@
 "use client";
 
-// 2-Phasen-Modal fuer das Versenden eines Vermietungs-Schritts (1=Konditionen,
-// 3=Angebot, 5=Vertrag).
-//   Phase 1 "compose": Empfaenger ist read-only (kommt vom Kunden), CC frei,
-//     Nachricht optional, Dokumente werden in den Storage-Pfad
-//     anfragen/{jobId}/s{step}/... hochgeladen und an die Anfrage haengen.
-//   Phase 2 "confirm": Bestaetigen ruft onAdvance(); der Aufrufer entscheidet,
-//     ob ein einfaches Step-+1 oder ein Convert-zu-Auftrag passieren soll.
+// Single-Phase-Modal fuer das Versenden eines Vermietungs-Schritts (1=Konditionen,
+// 3=Angebot, 5=Vertrag). Der "Mail senden"-Klick ist gleichzeitig die
+// Bestaetigung — bei Erfolg wird sofort onAdvance() gerufen und das Modal
+// geschlossen. Empfaenger ist read-only (kommt vom Kunden), CC frei,
+// Nachricht optional, Dokumente werden in den Storage-Pfad
+// vermietentwurf/{jobId}/s{step}/... hochgeladen und an die Anfrage haengen.
 //
 // Verwendet auf /auftraege/vermietentwurf/[id] (Detailseite) und /auftraege (inline pro Karte).
 
@@ -14,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { REQUEST_STEPS } from "@/lib/constants";
-import { Check, FileText, Send, Trash2, Upload, X } from "lucide-react";
+import { FileText, Send, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 export type SendStep = 1 | 3 | 5;
@@ -56,14 +55,12 @@ export function SendStepModal({
   onAdvance,
 }: Props) {
   const supabase = createClient();
-  const [phase, setPhase] = useState<"compose" | "confirm">("compose");
   const [email, setEmail] = useState("");
   const [cc, setCc] = useState("");
   const [message, setMessage] = useState("");
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Nur Mail-Schritte (1, 3, 5) zeigen das Modal — andere Schritte sollten den
@@ -74,7 +71,6 @@ export function SendStepModal({
   // Bei jedem Oeffnen Empfaenger + Doks neu laden, alte Eingaben verwerfen.
   useEffect(() => {
     if (!open || !isMailStep) return;
-    setPhase("compose");
     setEmail(customerEmail ?? "");
     setCc("");
     setMessage("");
@@ -181,7 +177,10 @@ export function SendStepModal({
         return;
       }
       toast.success("Mail gesendet");
-      setPhase("confirm");
+      // "Mail senden"-Klick ist gleichzeitig die Bestaetigung — Step direkt
+      // weiterruckeln und Modal zu. Kein zweiter "Bestaetigen"-Schritt mehr.
+      onClose();
+      await onAdvance();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Netzwerkfehler";
       toast.error(msg);
@@ -190,18 +189,8 @@ export function SendStepModal({
     }
   }
 
-  async function confirmAdvance() {
-    setConfirming(true);
-    try {
-      onClose();
-      await onAdvance();
-    } finally {
-      setConfirming(false);
-    }
-  }
-
   function close() {
-    if (sending || confirming) return;
+    if (sending) return;
     onClose();
   }
 
@@ -211,20 +200,17 @@ export function SendStepModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border">
           <div className="flex items-center justify-between px-6 py-4 border-b">
-            <h2 className="font-semibold">
-              {phase === "compose" ? `${stepLabel} an Kunde` : "Schritt bestätigen"}
-            </h2>
+            <h2 className="font-semibold">{stepLabel} an Kunde</h2>
             <button
               onClick={close}
               className="p-1.5 rounded-lg hover:bg-muted"
-              disabled={sending || confirming}
+              disabled={sending}
             >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
 
-          {phase === "compose" ? (
-            <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4">
               <div className="space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Empfänger</p>
                 {email ? (
@@ -326,39 +312,7 @@ export function SendStepModal({
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="p-6 space-y-4">
-              <div className="flex items-start gap-2 p-3 rounded-xl border tinted-emerald text-xs">
-                <Check className="h-4 w-4 mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium">Mail wurde versendet</p>
-                  <p className="opacity-80 mt-0.5">
-                    Bestätige, um den Vermietentwurf zum nächsten Schritt zu bewegen.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={close}
-                  disabled={confirming}
-                  className="kasten kasten-muted flex-1 disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  Später
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmAdvance}
-                  disabled={confirming}
-                  className="kasten kasten-blue flex-1"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  {confirming ? "Bestätige…" : "Bestätigen"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
       </div>
     </>
   );
