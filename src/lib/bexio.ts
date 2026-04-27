@@ -392,7 +392,8 @@ export function bexioContactUrl(contactId: number): string {
   return `https://office.bexio.com/index.php/kontakt/show/id/${contactId}`;
 }
 
-// URL zur Kontakt-Anlegen-Seite in Bexio. Bexio interpretiert id/0 als
-// "neuen Kontakt erstellen" — der User gibt die Daten dort manuell ein.
-// Pre-fill via URL-Parameter unterstuetzt Bexio nicht.
-export const BEXIO_NEW_CONTACT_URL = "https://office.bexio.com/index.php/kontakt/edit/id/0";
+// URL zur Kontakt-Liste in Bexio. /kontakt/edit/id/0 zeigt eine leere Seite,
+// nicht das gehoffte "neuen Kontakt"-Formular. Stattdessen leiten wir auf die
+// Liste — dort ist der "Neuer Kontakt"-Button gross sichtbar oben rechts.
+// Pre-fill via URL-Parameter unterstuetzt Bexio sowieso nicht.
+export const BEXIO_NEW_CONTACT_URL = "https://office.bexio.com/index.php/kontakt/list";

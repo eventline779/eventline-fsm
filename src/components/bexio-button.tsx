@@ -100,8 +100,8 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         return;
       }
       if (json.openCreateUrl) {
-        // Kein Match in Bexio -> direkt Anlegen-Seite oeffnen.
-        toast.message("Trage die Kunden-Infos in Bexio ein");
+        // Kein Match in Bexio -> Bexio-Kontakte-Liste oeffnen.
+        toast.message("Klick in Bexio auf 'Neuer Kontakt'");
         window.open(json.openCreateUrl, "_blank", "noopener,noreferrer");
       }
     } catch (e) {
@@ -112,11 +112,12 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     }
   }
 
-  // Aus dem Match-Modal "Trotzdem neu anlegen" -> direkt Bexio-Anlegen-Seite.
+  // Aus dem Match-Modal "Trotzdem neu anlegen" -> Bexio-Kontakte-Liste, dort
+  // klickt der User auf "Neuer Kontakt".
   function openBexioNewContact() {
     setMatches(null);
-    toast.message("Trage die Kunden-Infos in Bexio ein");
-    window.open("https://office.bexio.com/index.php/kontakt/edit/id/0", "_blank", "noopener,noreferrer");
+    toast.message("Klick in Bexio auf 'Neuer Kontakt'");
+    window.open("https://office.bexio.com/index.php/kontakt/list", "_blank", "noopener,noreferrer");
   }
 
   async function linkExisting(bexioId: number) {
