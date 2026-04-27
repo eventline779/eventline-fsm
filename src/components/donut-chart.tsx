@@ -108,23 +108,32 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
       segmentPaths.push({ color: s.color, d });
 
       // Sub-Segment: gleichmaessiger Abstand zu allen 4 Raendern des Eltern-
-      // Bogens — oben/unten radial (SUB_OUTER_R / SUB_INNER_R), links/rechts
-      // angular (SUB_PAD ueber midR umgerechnet). Sitzt damit von links
-      // wachsend mit angularPad-Abstand zur Eltern-Anfangs-Kante.
+      // Bogens. Linke Kante des Sub ist PARALLEL zur linken Kante des Eltern-
+      // Segments (gapMidPrev-Achse) — gleiche Schraegung. Damit dieselbe Optik
+      // wie bei den Haupt-Segmenten (parallele Cap-Kanten).
       if (s.sub && s.sub.count > 0 && s.count > 0) {
+        const SUB_RING_DIFF = SUB_OUTER_R - SUB_INNER_R;
         const midR = (OUTER_R + INNER_R) / 2;
         const angularPad = SUB_PAD / midR;
         const subPortion = Math.min(s.sub.count / s.count, 1);
         const availableAngle = Math.max(segAngle - 2 * angularPad, 0);
         const subSegAngle = subPortion * availableAngle;
-        const subStartA = startA + angularPad; // gleicher Abstand links wie rechts
+        const subStartA = startA + angularPad;
         const subEndA = subStartA + subSegAngle;
+        // Outer-Endpunkte (radial)
         const sox1 = CX + SUB_OUTER_R * Math.cos(subStartA);
         const soy1 = CY + SUB_OUTER_R * Math.sin(subStartA);
         const sox2 = CX + SUB_OUTER_R * Math.cos(subEndA);
         const soy2 = CY + SUB_OUTER_R * Math.sin(subEndA);
-        const six1 = CX + SUB_INNER_R * Math.cos(subStartA);
-        const siy1 = CY + SUB_INNER_R * Math.sin(subStartA);
+        // Linker Inner-Endpunkt: parallel zur Eltern-Achse (gapMidPrev) statt
+        // radial — gleiche Schraegung wie das graue Eltern-Segment.
+        const six1u = sox1 - SUB_RING_DIFF * Math.cos(gapMidPrev);
+        const siy1u = soy1 - SUB_RING_DIFF * Math.sin(gapMidPrev);
+        const subInnerStartA = Math.atan2(siy1u - CY, six1u - CX);
+        const six1 = CX + SUB_INNER_R * Math.cos(subInnerStartA);
+        const siy1 = CY + SUB_INNER_R * Math.sin(subInnerStartA);
+        // Rechter Inner-Endpunkt: bleibt radial (Sub endet meist mitten im
+        // Eltern-Bogen, kein Gap dahinter zum parallel-ausrichten).
         const six2 = CX + SUB_INNER_R * Math.cos(subEndA);
         const siy2 = CY + SUB_INNER_R * Math.sin(subEndA);
         const subLargeArc = subSegAngle > Math.PI ? 1 : 0;
