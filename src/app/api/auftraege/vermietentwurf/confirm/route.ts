@@ -77,14 +77,17 @@ export async function GET(request: NextRequest) {
   }
 
   // Erstmaliger Klick — Step weiterstellen.
-  // Bei Angebot-Bestaetigung wandeln wir den Vermietentwurf gleichzeitig
-  // in einen Auftrag um (status='entwurf', request_step=null). was_anfrage
-  // bleibt true, damit der hellblaue Vermietung-Tag haengen bleibt. Die
-  // Vermietentwurf-Phase ist mit der Angebot-Bestaetigung abgeschlossen —
-  // ab jetzt sitzt das in der Auftraege-Liste und kann freigegeben werden.
+  // Bei Angebot-Bestaetigung wandeln wir den Vermietentwurf direkt in einen
+  // freigegebenen Auftrag um: status='offen' (nicht 'entwurf' — die Akquise-
+  // Phase war ja schon der Vermietentwurf, kein zweiter Entwurfs-Schritt
+  // noetig) + request_step=null. was_anfrage=true bleibt, damit der
+  // hellblaue Vermietung-Tag auf dem neuen Auftrag haengt. Resultat: in der
+  // Auftraege-Liste taucht er ohne weiteres Status-Tag mit nur Vermietung-
+  // Marker auf, und das Donut-Diagramm zaehlt ihn ins Bevorstehend-Segment
+  // (mit hellblauem Vermietung-Sub).
   if (type === "angebot") {
     await supabase.from("jobs").update({
-      status: "entwurf",
+      status: "offen",
       request_step: null,
     }).eq("id", id);
   } else {
