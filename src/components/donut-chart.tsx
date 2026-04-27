@@ -210,16 +210,16 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
                               <>
                                 <span className="inline-block w-1.5 h-1.5 rounded-full mx-2 align-middle" style={{ background: s.sub.color }} />
                                 <span style={{ color: s.sub.color }}>{s.sub.label}</span>
+                                {/* Vermietungs-Zahl direkt am Label, damit alle grauen
+                                    Eltern-Zahlen rechts auf einer Achse fluchten. */}
+                                <span className="ml-2 tabular-nums" style={{ color: s.sub.color }}>
+                                  <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
+                                </span>
                               </>
                             )}
                           </span>
                           <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                             <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                            {s.sub && s.sub.count > 0 && (
-                              <span className="ml-2" style={{ color: s.sub.color }}>
-                                <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
-                              </span>
-                            )}
                           </span>
                         </div>
                         <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5 relative">
