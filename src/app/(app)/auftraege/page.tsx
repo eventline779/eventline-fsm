@@ -30,7 +30,7 @@ import { DonutChart } from "@/components/donut-chart";
 import { SendStepModal } from "@/components/send-step-modal";
 import { toast } from "sonner";
 
-const MAIL_STEPS = new Set<number>([1, 3, 5]);
+const MAIL_STEPS = new Set<number>([1, 3]);
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -63,16 +63,26 @@ export default function AuftraegePage() {
     return () => window.removeEventListener("jobs:invalidate", handler);
   }, []);
 
-  // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber
-  // - hier landet erst die confirm-Phase nach erfolgreichem Mail-Versand.
+  // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber.
   // Bei Warte-Schritten (2, 4) direkter UPDATE.
+  // Nach Schritt 4 (Angebot bestaetigt) -> direkt umwandeln in Auftrag
+  // (status='offen', kein Entwurf-Zwischenschritt). was_anfrage bleibt true.
   async function advanceAnfrageStep(jobId: string) {
     const job = jobs.find((j) => j.id === jobId);
     if (!job?.request_step) return;
     const nextStep = job.request_step + 1;
-    if (nextStep > 5) {
-      // Letzter Schritt durchlaufen -> Convert-Modal oeffnen
-      setConvertJobId(jobId);
+    if (nextStep > 4) {
+      // Schritt 4 erledigt -> Vermietentwurf -> Auftrag (offen)
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "offen", request_step: null })
+        .eq("id", jobId);
+      if (error) {
+        toast.error("Fehler: " + error.message);
+        return;
+      }
+      toast.success("Vermietentwurf in Auftrag umgewandelt");
+      window.dispatchEvent(new Event("jobs:invalidate"));
       return;
     }
     const { error } = await supabase
@@ -579,7 +589,7 @@ export default function AuftraegePage() {
           <SendStepModal
             open={true}
             jobId={activeJob.id}
-            step={(activeJob.request_step ?? 1) as 1 | 2 | 3 | 4 | 5}
+            step={(activeJob.request_step ?? 1) as 1 | 2 | 3 | 4}
             customerEmail={customer?.email ?? ""}
             customerName={customer?.name ?? null}
             locationName={location?.name ?? null}

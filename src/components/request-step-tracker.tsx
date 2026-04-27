@@ -1,6 +1,6 @@
 "use client";
 
-// Eine zentrale Stelle fuer den 5-Step-Akquise-Tracker einer Mietanfrage.
+// Eine zentrale Stelle fuer den 4-Step-Akquise-Tracker einer Mietanfrage.
 // Wird in der Liste (kompakt) und im Detail (gross) verwendet — eine Quelle der Wahrheit
 // fuer Look + Logik. Die Schritte selbst kommen aus REQUEST_STEPS in constants.ts.
 
@@ -9,7 +9,7 @@ import { Check } from "lucide-react";
 import { REQUEST_STEPS } from "@/lib/constants";
 
 interface RequestStepTrackerProps {
-  /** Aktueller Step (1..5). Schritte davor = abgeschlossen, danach = bevorstehend. */
+  /** Aktueller Step (1..4). Schritte davor = abgeschlossen, danach = bevorstehend. */
   currentStep: number;
   /** Default 'lg' (Detail-Page). 'sm' fuer Liste-Karten. */
   size?: "sm" | "lg";

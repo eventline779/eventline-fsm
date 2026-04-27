@@ -12,11 +12,15 @@ export const JOB_STATUS = {
 } as const;
 
 // === Mietanfrage-Pipeline ===
-// 5 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
+// 4 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
+// Nach Schritt 4 (Angebot bestaetigt durch Kunde) wird der Vermietentwurf
+// automatisch in einen Auftrag (status='offen') umgewandelt — der Vertrag
+// laeuft dann ausserhalb dieser Pipeline (z.B. ueber den normalen Auftrag-
+// Mail-Flow oder direkt am Standort).
 // Labels formuliert als ERREICHTER ZUSTAND — selbsterklaerend, keine Sub-Beschreibung noetig.
 // Single source of truth — sowohl Step-Tracker-UI als auch Listen-Filter ziehen daraus.
 export interface RequestStep {
-  step: 1 | 2 | 3 | 4 | 5;
+  step: 1 | 2 | 3 | 4;
   label: string;
 }
 
@@ -35,7 +39,6 @@ export const REQUEST_STEPS: readonly RequestStep[] = [
   { step: 2, label: "Konditionen bestätigt" },
   { step: 3, label: "Angebot senden" },
   { step: 4, label: "Angebot bestätigt" },
-  { step: 5, label: "Vertrag senden" },
 ] as const;
 
 // Prioritäten — nur 'normal' (default) und 'dringend'

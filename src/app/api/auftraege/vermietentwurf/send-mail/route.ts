@@ -8,8 +8,9 @@ export const maxDuration = 60;
 // step bestimmt Template:
 //   1 = Mietkonditionen (mit Confirm-Link, type=konditionen)
 //   3 = Angebot          (mit Confirm-Link, type=angebot)
-//   5 = Mietvertrag      (ohne Confirm-Link)
-type Step = 1 | 3 | 5;
+// Schritt 5 (Vertrag senden) gibt es nicht mehr — nach Angebot-Bestaetigung
+// (Schritt 4) wird der Vermietentwurf direkt in einen Auftrag umgewandelt.
+type Step = 1 | 3;
 
 interface Body {
   jobId: string;
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as Body;
   const { jobId, step, email, cc, message, customerName, locationName, eventDate, eventEndDate, documentPaths } = body;
 
-  if (![1, 3, 5].includes(step)) {
+  if (![1, 3].includes(step)) {
     return NextResponse.json({ success: false, error: "Ungueltiger Schritt" }, { status: 400 });
   }
   if (!email) return NextResponse.json({ success: false, error: "Empfaenger fehlt" }, { status: 400 });
@@ -111,7 +112,8 @@ export async function POST(request: Request) {
         </a>
       </div>
       <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button best&auml;tigen Sie die Konditionen.</p>`;
-  } else if (step === 3) {
+  } else {
+    // step === 3 (Angebot) — die einzige andere Variante; Step 5 gibt es nicht mehr.
     subject = `Angebot: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
     intro = "Vielen Dank f&uuml;r die Best&auml;tigung unserer Konditionen. Anbei erhalten Sie unser Angebot:";
     const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=angebot`;
@@ -122,10 +124,6 @@ export async function POST(request: Request) {
         </a>
       </div>
       <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button nehmen Sie das Angebot verbindlich an.</p>`;
-  } else {
-    subject = `Mietvertrag: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
-    intro = "Anbei erhalten Sie den Mietvertrag f&uuml;r Ihre Vermietung.";
-    cta = `<p style="margin:16px 0 0;color:#555;font-size:13px">Bitte den Vertrag unterschrieben an uns zur&uuml;cksenden.</p>`;
   }
 
   const html = `

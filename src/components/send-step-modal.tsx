@@ -17,7 +17,7 @@ import { REQUEST_STEPS } from "@/lib/constants";
 import { FileText, Send, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
-export type SendStep = 1 | 3 | 5;
+export type SendStep = 1 | 3;
 
 interface UploadedDoc {
   id: string;
@@ -28,7 +28,7 @@ interface UploadedDoc {
 interface Props {
   open: boolean;
   jobId: string;
-  step: 1 | 2 | 3 | 4 | 5;
+  step: 1 | 2 | 3 | 4;
   customerEmail: string | null | undefined;
   customerName?: string | null;
   locationName?: string | null;
@@ -64,9 +64,9 @@ export function SendStepModal({
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Nur Mail-Schritte (1, 3, 5) zeigen das Modal — andere Schritte sollten den
+  // Nur Mail-Schritte (1, 3) zeigen das Modal — andere Schritte sollten den
   // Modal nie oeffnen, wir verteidigen aber defensiv.
-  const isMailStep = step === 1 || step === 3 || step === 5;
+  const isMailStep = step === 1 || step === 3;
   const stepLabel = REQUEST_STEPS[step - 1]?.label ?? "Schritt";
 
   // Bei jedem Oeffnen alle Felder zuruecksetzen — auch die Anhang-Liste.

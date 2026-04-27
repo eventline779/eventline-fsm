@@ -17,7 +17,7 @@ import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
 
 // Schritte mit Mail-Versand. 2/4 sind Warte-Schritte (kein Mail-Modal).
-const MAIL_STEPS = new Set<number>([1, 3, 5]);
+const MAIL_STEPS = new Set<number>([1, 3]);
 
 export default function AnfrageDetailPage() {
   const { id } = useParams();
@@ -167,9 +167,11 @@ export default function AnfrageDetailPage() {
   async function advanceStepRaw() {
     if (!job?.request_step) return;
     const nextStep = job.request_step + 1;
-    if (nextStep > 5) {
-      // Letzter Schritt erledigt -> Konvertieren-Modal
-      setShowConvert(true);
+    if (nextStep > 4) {
+      // Schritt 4 (Angebot bestaetigt) erledigt -> direkt umwandeln. Kein
+      // Entwurfs-Zwischenschritt, kein Confirm-Modal: die Akquise-Phase war
+      // ja schon der Vermietentwurf, da gibt's nichts mehr zu pruefen.
+      await convertToAuftrag();
       return;
     }
     const { error } = await supabase
@@ -233,10 +235,13 @@ export default function AnfrageDetailPage() {
 
   async function convertToAuftrag() {
     setConvertSaving(true);
+    // status='offen' direkt — kein Entwurf-Zwischenschritt, weil die
+    // Akquise/Pruefung schon im Vermietentwurf-Prozess passiert ist.
+    // was_anfrage bleibt true → hellblauer Vermietung-Tag haengt am Auftrag.
     const { error } = await supabase
       .from("jobs")
       .update({
-        status: "entwurf",
+        status: "offen",
         request_step: null,
       })
       .eq("id", id);
@@ -245,9 +250,9 @@ export default function AnfrageDetailPage() {
       toast.error("Fehler: " + error.message);
       return;
     }
-    toast.success("In Auftrag umgewandelt — bitte vor Freigabe prüfen");
+    toast.success("Vermietentwurf in Auftrag umgewandelt");
     window.dispatchEvent(new Event("jobs:invalidate"));
-    router.push(`/auftraege/${id}/bearbeiten`);
+    router.push(`/auftraege/${id}`);
   }
 
   if (loading || !job) {
@@ -677,7 +682,7 @@ export default function AnfrageDetailPage() {
       <SendStepModal
         open={sendOpen}
         jobId={String(id)}
-        step={(job.request_step ?? 1) as 1 | 2 | 3 | 4 | 5}
+        step={(job.request_step ?? 1) as 1 | 2 | 3 | 4}
         customerEmail={(job.customer as unknown as { email?: string | null } | undefined)?.email ?? ""}
         customerName={customer?.name ?? null}
         locationName={location?.name ?? null}
