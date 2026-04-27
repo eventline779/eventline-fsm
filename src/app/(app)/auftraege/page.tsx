@@ -182,7 +182,7 @@ export default function AuftraegePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Archiv" : "Operations"}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Operations Archiv" : "Operations"}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten kasten-muted"}>

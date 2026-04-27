@@ -471,10 +471,24 @@ html, body, *, *::before, *::after {
 
   .kasten-muted  { @apply text-foreground/70; }
   .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
-  /* Aktiv-Variante: gefuellt + invertiert. Fuer Toggles wie Archiv. */
+  /* Aktiv-Variante: tinted-Stil wie die anderen kasten-X (border + getoenter
+     bg), nur in foreground-Farbe statt rot/blau/gruen — damit Toggle-Buttons
+     wie Archiv visuell zur restlichen kasten-Familie passen. Farben bleiben
+     foreground (dunkel im Light, hell im Dark) wie zuvor. */
   .kasten-active {
-    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-foreground text-background transition-all;
-    border: 1px solid var(--foreground);
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground transition-all;
+    border: 2px solid color-mix(in oklab, var(--foreground) 40%, transparent);
+    background-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+  .kasten-active:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 25%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  }
+  .dark .kasten-active {
+    background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  }
+  .dark .kasten-active:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
   }
 }
 
