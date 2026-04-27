@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Room, RoomContact, RoomPrice } from "@/types";
 import {
   ArrowLeft, Plus, UserPlus, Users, Phone, Mail, Trash2,
-  DoorOpen, StickyNote, X, Banknote, Wrench, FileText, Upload, Download,
+  DoorOpen, StickyNote, X, Banknote, Wrench, FileText, Upload, Download, Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -220,7 +220,7 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Technische Details</CardTitle>
-          {!editingTech && <Button size="sm" variant="outline" onClick={() => setEditingTech(true)}>Bearbeiten</Button>}
+          {!editingTech && <button type="button" onClick={() => setEditingTech(true)} className="kasten kasten-purple"><Pencil className="h-3.5 w-3.5" />Bearbeiten</button>}
         </CardHeader>
         <CardContent>
           {editingTech ? (

@@ -9,6 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CustomerType } from "@/types";
 import { ArrowLeft, Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
+import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
+
+// Land-Optionen — mehr als die Nachbarn macht aktuell keinen Sinn,
+// 99% der Kunden sind Schweizer. Bei Bedarf erweitern.
+const COUNTRY_OPTIONS = [
+  { code: "CH", label: "Schweiz" },
+  { code: "DE", label: "Deutschland" },
+  { code: "AT", label: "Österreich" },
+  { code: "FR", label: "Frankreich" },
+  { code: "IT", label: "Italien" },
+  { code: "LI", label: "Liechtenstein" },
+];
 
 // Erlaubte Return-Pfade — verhindert Open-Redirect via ?return=https://evil.example
 const ALLOWED_RETURN_PREFIXES = ["/auftraege/"];
@@ -37,11 +49,25 @@ function NeuerKundeContent() {
     address_street: "",
     address_zip: "",
     address_city: "",
+    address_country: "CH",
     notes: "",
   });
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // Wird gerufen wenn Google-Maps-Autocomplete eine Adresse aufgeloest hat —
+  // alle Adressfelder auf einen Schlag aktualisieren (User muss nicht alles
+  // manuell tippen). Land kommt als ISO-2, fallt zurueck auf bisheriges wenn leer.
+  function applyPlace(p: ParsedAddress) {
+    setForm((prev) => ({
+      ...prev,
+      address_street: p.street || prev.address_street,
+      address_zip: p.postcode || prev.address_zip,
+      address_city: p.city || prev.address_city,
+      address_country: p.country || prev.address_country,
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,6 +84,7 @@ function NeuerKundeContent() {
         address_street: form.address_street || null,
         address_zip: form.address_zip || null,
         address_city: form.address_city || null,
+        address_country: form.address_country || "CH",
         notes: form.notes || null,
       })
       .select("id")
@@ -203,13 +230,16 @@ function NeuerKundeContent() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="street">Strasse</Label>
-              <Input
-                id="street"
-                placeholder="Strasse und Hausnummer"
-                value={form.address_street}
-                onChange={(e) => update("address_street", e.target.value)}
-                className="mt-1.5 bg-gray-50 border-gray-200"
-              />
+              <div className="mt-1.5">
+                <AddressAutocomplete
+                  id="street"
+                  value={form.address_street}
+                  onChange={(v) => update("address_street", v)}
+                  onPlace={applyPlace}
+                  localLocations={[]}
+                  placeholder="Tippe um aus Google-Vorschlägen zu wählen — füllt PLZ, Ort und Land automatisch"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -232,6 +262,19 @@ function NeuerKundeContent() {
                   className="mt-1.5 bg-gray-50 border-gray-200"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="country">Land</Label>
+              <select
+                id="country"
+                value={form.address_country}
+                onChange={(e) => update("address_country", e.target.value)}
+                className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              >
+                {COUNTRY_OPTIONS.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
             </div>
           </CardContent>
         </Card>

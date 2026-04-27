@@ -21,12 +21,15 @@ import {
   Plus,
   Trash2,
   Download,
+  Plug,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
 
-type Tab = "team" | "zeiten" | "schichten" | "backup";
+type Tab = "team" | "zeiten" | "schichten" | "backup" | "integrationen";
 
 const TEAM_PRESETS = [
   { name: "Dario", email: "dario@eventline-basel.com", role: "admin" as const },
@@ -58,7 +61,7 @@ interface Shift {
 export default function EinstellungenPage() {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab) ? urlTab : "team");
+  const [tab, setTab] = useState<Tab>(urlTab && ["team", "zeiten", "schichten", "backup", "integrationen"].includes(urlTab) ? urlTab : "team");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -90,7 +93,7 @@ export default function EinstellungenPage() {
 
   // Sync tab from URL when navigating via sidebar
   useEffect(() => {
-    if (urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab)) {
+    if (urlTab && ["team", "zeiten", "schichten", "backup", "integrationen"].includes(urlTab)) {
       setTab(urlTab);
     } else if (!urlTab) {
       setTab("team");
@@ -347,6 +350,7 @@ export default function EinstellungenPage() {
     { key: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
     { key: "zeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" /> },
     { key: "schichten", label: "Schichtplanung", icon: <Calendar className="h-4 w-4" /> },
+    { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
     { key: "backup", label: "Backup", icon: <Download className="h-4 w-4" /> },
   ];
 
@@ -640,6 +644,9 @@ export default function EinstellungenPage() {
         <TeamOverview profiles={profiles} supabase={supabase} />
       )}
 
+      {/* ===== TAB: INTEGRATIONEN ===== */}
+      {tab === "integrationen" && <IntegrationenTab />}
+
       {/* ===== TAB: BACKUP ===== */}
       {tab === "backup" && (
         <div className="space-y-6">
@@ -705,6 +712,114 @@ export default function EinstellungenPage() {
 }
 
 // === Helper Components ===
+
+function IntegrationenTab() {
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
+  useEffect(() => {
+    const result = searchParams.get("bexio");
+    const msg = searchParams.get("msg");
+    if (result === "connected") {
+      toast.success("Bexio verbunden");
+    } else if (result === "error") {
+      toast.error("Bexio-Verbindung fehlgeschlagen" + (msg ? `: ${msg}` : ""));
+    }
+  }, [searchParams]);
+
+  useEffect(() => { loadStatus(); }, []);
+
+  async function loadStatus() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/bexio/status");
+      const json = await res.json();
+      setStatus(json);
+    } catch {
+      setStatus({ connected: false });
+    }
+    setLoading(false);
+  }
+
+  async function handleDisconnect() {
+    if (!confirm("Bexio-Verbindung wirklich trennen? Du musst danach neu verbinden, um Kontakte anzulegen.")) return;
+    setDisconnecting(true);
+    await fetch("/api/bexio/disconnect", { method: "POST" });
+    setDisconnecting(false);
+    toast.success("Bexio getrennt");
+    loadStatus();
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          Verknüpfe Eventline mit externen Tools — z.B. Bexio für Kontaktverwaltung.
+        </p>
+      </div>
+
+      <Card className="bg-card border-gray-100">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold shrink-0">
+                B
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Bexio</h3>
+                  {loading ? (
+                    <span className="text-xs text-muted-foreground">…</span>
+                  ) : status?.connected ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Verbunden
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300">
+                      <AlertCircle className="h-3 w-3" />
+                      Nicht verbunden
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kunden direkt in Bexio anlegen — der "In Bexio anlegen"-Button erscheint dann auf jeder Kunden-Detailseite.
+                </p>
+                {status?.connected && status.connectedAt && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Verbunden seit {new Date(status.connectedAt).toLocaleString("de-CH", { timeZone: "Europe/Zurich" })}
+                    {status.bexioEmail && <> · {status.bexioEmail}</>}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="shrink-0">
+              {loading ? null : status?.connected ? (
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="kasten kasten-muted"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {disconnecting ? "Trenne…" : "Trennen"}
+                </button>
+              ) : (
+                <a href="/api/bexio/connect" className="kasten kasten-green">
+                  <Plug className="h-3.5 w-3.5" />
+                  Verbinden
+                </a>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function LiveTimer({ clockIn }: { clockIn: string }) {
   const [elapsed, setElapsed] = useState("");

@@ -30,7 +30,11 @@ export interface Customer {
   address_street: string | null;
   address_zip: string | null;
   address_city: string | null;
+  /** ISO-2-Land-Code, z.B. 'CH', 'DE'. Default 'CH'. Wird per Google-Maps-
+   *  Autocomplete automatisch befuellt, kann manuell ueberschrieben werden. */
   address_country: string;
+  /** Verknuepfung zu Bexio-Kontakt. Gesetzt sobald Sync erfolgt. */
+  bexio_contact_id: string | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;

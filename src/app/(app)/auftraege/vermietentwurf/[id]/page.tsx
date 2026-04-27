@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Job } from "@/types";
-import { REQUEST_STEPS } from "@/lib/constants";
+import { REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
 import {
   ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
   StickyNote, FileText, Send, Download, Trash2,
@@ -15,9 +15,7 @@ import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
-
-// Schritte mit Mail-Versand. 2/4 sind Warte-Schritte (kein Mail-Modal).
-const MAIL_STEPS = new Set<number>([1, 3]);
+import { Modal } from "@/components/ui/modal";
 
 export default function AnfrageDetailPage() {
   const { id } = useParams();
@@ -152,7 +150,7 @@ export default function AnfrageDetailPage() {
 
   async function handleNextStep() {
     if (!job?.request_step) return;
-    if (MAIL_STEPS.has(job.request_step)) {
+    if (REQUEST_MAIL_STEPS.has(job.request_step)) {
       setSendOpen(true);
       return;
     }
@@ -317,7 +315,7 @@ export default function AnfrageDetailPage() {
                   onClick={handleNextStep}
                   className="kasten kasten-blue"
                 >
-                  {MAIL_STEPS.has(currentStep) ? (
+                  {REQUEST_MAIL_STEPS.has(currentStep) ? (
                     <>
                       <Send className="h-3.5 w-3.5" />
                       {stepInfo.label}
@@ -519,167 +517,117 @@ export default function AnfrageDetailPage() {
       )}
 
       {/* Manuell-bestaetigen-Confirm (Schritt 2/4 — Kunde haette aus Mail bestaetigen sollen) */}
-      {showManualConfirm && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowManualConfirm(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
-              <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">
-                  {currentStep === 2 ? "Konditionen manuell bestätigen?" : "Angebot manuell bestätigen?"}
-                </h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Normalerweise bestätigt der Kunde direkt aus der Mail. Bist du sicher, dass{" "}
-                  {currentStep === 2 ? "die Konditionen" : "das Angebot"} bereits bestätigt wurden (z.B. telefonisch)?
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowManualConfirm(false)}
-                    className="kasten kasten-muted flex-1"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setShowManualConfirm(false);
-                      await advanceStepRaw();
-                    }}
-                    className="kasten kasten-blue flex-1"
-                  >
-                    Ja, bestätigen
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={showManualConfirm}
+        onClose={() => setShowManualConfirm(false)}
+        title={currentStep === 2 ? "Konditionen manuell bestätigen?" : "Angebot manuell bestätigen?"}
+      >
+        <p className="text-sm text-muted-foreground">
+          Normalerweise bestätigt der Kunde direkt aus der Mail. Bist du sicher, dass{" "}
+          {currentStep === 2 ? "die Konditionen" : "das Angebot"} bereits bestätigt wurden (z.B. telefonisch)?
+        </p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setShowManualConfirm(false)} className="kasten kasten-muted flex-1">
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              setShowManualConfirm(false);
+              await advanceStepRaw();
+            }}
+            className="kasten kasten-blue flex-1"
+          >
+            Ja, bestätigen
+          </button>
+        </div>
+      </Modal>
 
       {/* Zurueck-Schritt-Confirm */}
-      {showBackConfirm && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowBackConfirm(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
-              <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Schritt zurücksetzen?</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Du gehst zurück zu Schritt {Math.max(1, currentStep - 1)} ({REQUEST_STEPS[Math.max(0, currentStep - 2)].label}). Schon gesendete Mails bleiben beim Kunden — der Klick im Mail würde diesen Schritt wieder vorruckeln.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowBackConfirm(false)}
-                    className="kasten kasten-muted flex-1"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setShowBackConfirm(false);
-                      await previousStep();
-                    }}
-                    className="kasten kasten-blue flex-1"
-                  >
-                    Zurücksetzen
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={showBackConfirm}
+        onClose={() => setShowBackConfirm(false)}
+        title="Schritt zurücksetzen?"
+      >
+        <p className="text-sm text-muted-foreground">
+          Du gehst zurück zu Schritt {Math.max(1, currentStep - 1)} ({REQUEST_STEPS[Math.max(0, currentStep - 2)].label}). Schon gesendete Mails bleiben beim Kunden — der Klick im Mail würde diesen Schritt wieder vorruckeln.
+        </p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setShowBackConfirm(false)} className="kasten kasten-muted flex-1">
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              setShowBackConfirm(false);
+              await previousStep();
+            }}
+            className="kasten kasten-blue flex-1"
+          >
+            Zurücksetzen
+          </button>
+        </div>
+      </Modal>
 
       {/* Storno-Flow: Phase 'confirm' -> 'reason' (identisch zum Auftrag) */}
-      {cancelPhase !== "closed" && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="font-semibold">
-                  {cancelPhase === "confirm" ? "Vermietentwurf stornieren?" : "Grund angeben"}
-                </h2>
-                <button
-                  onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
-                  className="p-1.5 rounded-lg hover:bg-muted"
-                  disabled={cancelSaving}
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {job.job_number ? `INT-${job.job_number} — ` : ""}
-                  <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
-                </p>
-                {cancelPhase === "confirm" ? (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Der Vermietentwurf wird als storniert archiviert. Du kannst ihn nachher noch einsehen.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCancelPhase("closed")}
-                        className="kasten kasten-muted flex-1"
-                      >
-                        Abbrechen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCancelPhase("reason")}
-                        className="kasten kasten-red flex-1"
-                      >
-                        Stornieren
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Bitte gib einen Grund an, warum dieser Vermietentwurf storniert wird.
-                    </p>
-                    <textarea
-                      placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      rows={3}
-                      autoFocus
-                      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCancelPhase("confirm")}
-                        disabled={cancelSaving}
-                        className="kasten kasten-muted flex-1 disabled:opacity-50 disabled:pointer-events-none"
-                      >
-                        Zurück
-                      </button>
-                      <button
-                        type="button"
-                        onClick={confirmCancel}
-                        disabled={cancelSaving || !cancelReason.trim()}
-                        className="kasten kasten-red flex-1"
-                      >
-                        {cancelSaving ? "Storniere…" : "Bestätigen"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+      <Modal
+        open={cancelPhase !== "closed"}
+        onClose={() => { setCancelPhase("closed"); setCancelReason(""); }}
+        title={cancelPhase === "confirm" ? "Vermietentwurf stornieren?" : "Grund angeben"}
+        closable={!cancelSaving}
+      >
+        <p className="text-sm text-muted-foreground">
+          {job.job_number ? `INT-${job.job_number} — ` : ""}
+          <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
+        </p>
+        {cancelPhase === "confirm" ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Der Vermietentwurf wird als storniert archiviert. Du kannst ihn nachher noch einsehen.
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setCancelPhase("closed")} className="kasten kasten-muted flex-1">
+                Abbrechen
+              </button>
+              <button type="button" onClick={() => setCancelPhase("reason")} className="kasten kasten-red flex-1">
+                Stornieren
+              </button>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Bitte gib einen Grund an, warum dieser Vermietentwurf storniert wird.
+            </p>
+            <textarea
+              placeholder="z.B. Termin nicht verfügbar, Kunde hat abgesagt…"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={3}
+              autoFocus
+              className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelPhase("confirm")}
+                disabled={cancelSaving}
+                className="kasten kasten-muted flex-1"
+              >
+                Zurück
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancel}
+                disabled={cancelSaving || !cancelReason.trim()}
+                className="kasten kasten-red flex-1"
+              >
+                {cancelSaving ? "Storniere…" : "Bestätigen"}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       <SendStepModal
         open={sendOpen}
@@ -695,48 +643,32 @@ export default function AnfrageDetailPage() {
       />
 
       {/* Convert-Modal */}
-      {showConvert && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { if (!convertSaving) setShowConvert(false); }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
-              <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Vermietentwurf in Auftrag umwandeln?</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Der Vermietentwurf wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
-                </p>
-                <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
-                  <Check className="h-4 w-4 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-medium">Akquise abgeschlossen</p>
-                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowConvert(false)}
-                    disabled={convertSaving}
-                    className="kasten kasten-muted flex-1 disabled:opacity-50 disabled:pointer-events-none"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={convertToAuftrag}
-                    disabled={convertSaving}
-                    className="kasten kasten-red flex-1"
-                  >
-                    {convertSaving ? "Wandle um…" : "Umwandeln"}
-                  </button>
-                </div>
-              </div>
-            </div>
+      <Modal
+        open={showConvert}
+        onClose={() => setShowConvert(false)}
+        title="Vermietentwurf in Auftrag umwandeln?"
+        size="md"
+        closable={!convertSaving}
+      >
+        <p className="text-sm text-muted-foreground">
+          Der Vermietentwurf wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
+        </p>
+        <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
+          <Check className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">Akquise abgeschlossen</p>
+            <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
           </div>
-        </>
-      )}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setShowConvert(false)} disabled={convertSaving} className="kasten kasten-muted flex-1">
+            Abbrechen
+          </button>
+          <button type="button" onClick={convertToAuftrag} disabled={convertSaving} className="kasten kasten-red flex-1">
+            {convertSaving ? "Wandle um…" : "Umwandeln"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

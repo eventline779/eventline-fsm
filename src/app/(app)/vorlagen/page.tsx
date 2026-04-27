@@ -257,7 +257,7 @@ export default function VorlagenPage() {
                       </button>
                       <button
                         onClick={() => openEdit(t)}
-                        className="p-1.5 rounded hover:bg-muted text-muted-foreground"
+                        className="p-1.5 rounded text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
                         title="Bearbeiten"
                       >
                         <Pencil className="h-3.5 w-3.5" />

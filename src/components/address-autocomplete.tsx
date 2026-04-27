@@ -26,6 +26,16 @@ type Suggestion =
   | { kind: "location"; id: string; label: string; sub: string; value: string }
   | { kind: "google"; placeId: string; label: string; sub: string };
 
+/** Strukturierter Adress-Block — Output an die Form wenn der Caller die einzelnen
+ *  Felder (Strasse / PLZ / Ort / Land) braucht statt eines kombinierten Strings. */
+export interface ParsedAddress {
+  street: string;
+  postcode: string;
+  city: string;
+  /** ISO-2-Code, z.B. 'CH', 'DE'. Leer wenn nicht erkennbar. */
+  country: string;
+}
+
 interface Props {
   value: string;
   onChange: (v: string) => void;
@@ -34,6 +44,11 @@ interface Props {
   placeholder?: string;
   id?: string;
   required?: boolean;
+  /** Wenn gesetzt: Bei Google-Place-Auswahl wird die Adresse strukturiert
+   *  zurueckgegeben (Strasse / PLZ / Ort / Land). onChange bekommt dann nur
+   *  die Strasse — Caller fuellt die anderen Felder via onPlace. Ohne onPlace
+   *  bleibt das Verhalten Legacy (onChange mit kombiniertem formatted_address). */
+  onPlace?: (parsed: ParsedAddress) => void;
 }
 
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -112,6 +127,27 @@ function getGoogle(): GoogleNamespace | null {
   return (window as unknown as { google?: GoogleNamespace }).google ?? null;
 }
 
+function parsePlace(place: {
+  formatted_address?: string;
+  address_components?: Array<{ long_name: string; short_name: string; types: string[] }>;
+}): ParsedAddress {
+  const comps = place.address_components ?? [];
+  const get = (type: string, useShort = false) => {
+    const c = comps.find((c) => c.types.includes(type));
+    if (!c) return "";
+    return useShort ? c.short_name : c.long_name;
+  };
+  const route = get("route");
+  const number = get("street_number");
+  const street = [route, number].filter(Boolean).join(" ");
+  return {
+    street,
+    postcode: get("postal_code"),
+    city: get("locality") || get("postal_town") || get("administrative_area_level_2"),
+    country: get("country", true),
+  };
+}
+
 export function AddressAutocomplete({
   value,
   onChange,
@@ -119,6 +155,7 @@ export function AddressAutocomplete({
   placeholder,
   id,
   required,
+  onPlace,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [googleSuggestions, setGoogleSuggestions] = useState<
@@ -269,7 +306,7 @@ export function AddressAutocomplete({
       onChange(s.value);
       setOpen(false);
     } else {
-      // Google place → details holen → formatierten Address-String setzen
+      // Google place → details holen
       const g = getGoogle();
       if (!g) return;
       const placeholderEl = document.createElement("div");
@@ -281,7 +318,15 @@ export function AddressAutocomplete({
         },
         (place, status) => {
           if (status !== g.maps.places.PlacesServiceStatus.OK || !place) return;
-          onChange(place.formatted_address ?? s.label);
+          if (onPlace) {
+            // Struktur-Modus: Strasse ins Input, restliche Felder via Callback
+            const parsed = parsePlace(place);
+            onChange(parsed.street || place.formatted_address || s.label);
+            onPlace(parsed);
+          } else {
+            // Legacy-Modus: kompletter Address-String ins Input
+            onChange(place.formatted_address ?? s.label);
+          }
           setOpen(false);
         }
       );

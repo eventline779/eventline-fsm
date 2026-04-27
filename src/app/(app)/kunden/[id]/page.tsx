@@ -12,9 +12,20 @@ import {
   ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin,
   ClipboardList, Trash2,
 } from "lucide-react";
+import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
+import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 import Link from "next/link";
 import { toast } from "sonner";
+
+const COUNTRY_OPTIONS = [
+  { code: "CH", label: "Schweiz" },
+  { code: "DE", label: "Deutschland" },
+  { code: "AT", label: "Österreich" },
+  { code: "FR", label: "Frankreich" },
+  { code: "IT", label: "Italien" },
+  { code: "LI", label: "Liechtenstein" },
+];
 
 export default function KundenDetailPage() {
   const { id } = useParams();
@@ -27,8 +38,19 @@ export default function KundenDetailPage() {
     name: "", type: "company" as CustomerType,
     email: "", phone: "",
     address_street: "", address_zip: "", address_city: "",
+    address_country: "CH",
     notes: "",
   });
+
+  function applyPlace(p: ParsedAddress) {
+    setForm((prev) => ({
+      ...prev,
+      address_street: p.street || prev.address_street,
+      address_zip: p.postcode || prev.address_zip,
+      address_city: p.city || prev.address_city,
+      address_country: p.country || prev.address_country,
+    }));
+  }
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -44,6 +66,7 @@ export default function KundenDetailPage() {
         name: c.name, type: c.type,
         email: c.email || "", phone: c.phone || "",
         address_street: c.address_street || "", address_zip: c.address_zip || "", address_city: c.address_city || "",
+        address_country: c.address_country || "CH",
         notes: c.notes || "",
       });
     }
@@ -55,6 +78,7 @@ export default function KundenDetailPage() {
       name: form.name, type: form.type,
       email: form.email || null, phone: form.phone || null,
       address_street: form.address_street || null, address_zip: form.address_zip || null, address_city: form.address_city || null,
+      address_country: form.address_country || "CH",
       notes: form.notes || null,
     }).eq("id", id);
     if (error) { toast.error("Fehler: " + error.message); return; }
@@ -108,10 +132,17 @@ export default function KundenDetailPage() {
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
         </div>
         <div className="flex gap-2">
+          {!editing && customer && (
+            <BexioButton
+              customerId={customer.id}
+              bexioContactId={customer.bexio_contact_id}
+              onLinked={() => loadData()}
+            />
+          )}
           <button
             type="button"
             onClick={() => setEditing(!editing)}
-            className={`kasten ${editing ? "kasten-muted" : "kasten-red"}`}
+            className={`kasten ${editing ? "kasten-muted" : "kasten-purple"}`}
           >
             {editing ? "Abbrechen" : "Bearbeiten"}
           </button>
@@ -173,10 +204,33 @@ export default function KundenDetailPage() {
                 <div><Label>E-Mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
                 <div><Label>Telefon</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
               </div>
+              <div>
+                <Label>Strasse</Label>
+                <div className="mt-1.5">
+                  <AddressAutocomplete
+                    value={form.address_street}
+                    onChange={(v) => setForm({ ...form, address_street: v })}
+                    onPlace={applyPlace}
+                    localLocations={[]}
+                    placeholder="Tippe um aus Google-Vorschlägen zu wählen — füllt PLZ, Ort, Land automatisch"
+                  />
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <div><Label>Strasse</Label><Input value={form.address_street} onChange={(e) => setForm({ ...form, address_street: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
                 <div><Label>PLZ</Label><Input value={form.address_zip} onChange={(e) => setForm({ ...form, address_zip: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
-                <div><Label>Ort</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div className="md:col-span-2"><Label>Ort</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+              </div>
+              <div>
+                <Label>Land</Label>
+                <select
+                  value={form.address_country}
+                  onChange={(e) => setForm({ ...form, address_country: e.target.value })}
+                  className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                >
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
               </div>
               <div><Label>Notizen</Label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
               <button

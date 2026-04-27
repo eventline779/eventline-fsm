@@ -22,6 +22,9 @@ export const JOB_STATUS = {
 export interface RequestStep {
   step: 1 | 2 | 3 | 4;
   label: string;
+  /** True wenn dieser Schritt eine Mail an den Kunden ausloest (Schritt 1+3).
+   *  Auf Warte-Schritten (2+4) ist es false — der Kunde bestaetigt aus der Mail. */
+  sendsMail: boolean;
 }
 
 // Haeufigste Veranstaltungstypen einer Anfrage. UI zeigt diese als Dropdown,
@@ -35,11 +38,17 @@ export const EVENT_TYPES = [
 ] as const;
 
 export const REQUEST_STEPS: readonly RequestStep[] = [
-  { step: 1, label: "Konditionen senden" },
-  { step: 2, label: "Konditionen bestätigt" },
-  { step: 3, label: "Angebot senden" },
-  { step: 4, label: "Angebot bestätigt" },
+  { step: 1, label: "Konditionen senden", sendsMail: true },
+  { step: 2, label: "Konditionen bestätigt", sendsMail: false },
+  { step: 3, label: "Angebot senden", sendsMail: true },
+  { step: 4, label: "Angebot bestätigt", sendsMail: false },
 ] as const;
+
+// Schritt-Nummern die eine Mail ausloesen — abgeleitet aus REQUEST_STEPS.
+// Vorher in 3 Files dupliziert (auftraege/page, vermietentwurf/[id], send-step-modal).
+export const REQUEST_MAIL_STEPS = new Set<number>(
+  REQUEST_STEPS.filter((s) => s.sendsMail).map((s) => s.step),
+);
 
 // Prioritäten — nur 'normal' (default) und 'dringend'
 // 'niedrig' und 'hoch' wurden nie genutzt, der relevante Hinweis ist binär:

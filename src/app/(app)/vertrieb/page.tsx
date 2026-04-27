@@ -1066,18 +1066,18 @@ export default function VertriebPage() {
                     key={k.value}
                     type="button"
                     onClick={() => pickCategory(k.value)}
-                    className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all text-left"
+                    className="kasten kasten-red w-full p-4 gap-4 justify-start text-left text-sm"
                   >
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${k.color}`}>
                       <Icon className="h-6 w-6" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold">{k.label}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {k.value === "verwaltung" ? "Verwaltungen, Immobilien, WEG-Anfragen" : "Sommerfeste, Jahresanlässe, Firmenevents"}
                       </p>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-gray-400" />
+                    <ArrowRight className="h-5 w-5 shrink-0" />
                   </button>
                 );
               })}

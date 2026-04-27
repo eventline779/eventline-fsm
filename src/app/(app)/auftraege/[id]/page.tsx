@@ -10,11 +10,13 @@ import { JOB_STATUS } from "@/lib/constants";
 import type { Job, JobAssignment, JobAppointment, Profile, Document as DocType, JobStatus } from "@/types";
 import {
   ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
-  Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox,
+  Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
+import { Modal } from "@/components/ui/modal";
+import { BexioButton } from "@/components/bexio-button";
 
 export default function AuftragDetailPage() {
   const { id } = useParams();
@@ -49,6 +51,7 @@ export default function AuftragDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
 
+
   useEffect(() => { loadAll(); }, [id]);
 
   // Auto-open Termin-Formular wenn von der Liste mit ?termin=neu hierher navigiert wurde.
@@ -66,7 +69,7 @@ export default function AuftragDetailPage() {
 
   async function loadAll() {
     const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
-      supabase.from("jobs").select("*, customer:customers(name, address_street, address_zip, address_city), location:locations(name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name), cancelled_by_profile:profiles!cancelled_by(full_name)").eq("id", id).single(),
+      supabase.from("jobs").select("*, customer:customers(id, name, address_street, address_zip, address_city, bexio_contact_id), location:locations(name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name), cancelled_by_profile:profiles!cancelled_by(full_name)").eq("id", id).single(),
       supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
       supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
       supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -243,6 +246,26 @@ export default function AuftragDetailPage() {
     setEmailField2("");
   }
 
+  // Mail-Anhaenge aus dem Vermietentwurf duerfen nicht geloescht werden — sie
+  // dokumentieren, was an den Kunden ging (Konditionen/Angebot, das er
+  // bestaetigt hat). Direkt-Uploads aus diesem Auftrag (storage_path beginnt
+  // mit 'jobs/') sind frei loeschbar.
+  function isMailDoc(storagePath: string) {
+    return storagePath.startsWith("vermietentwurf/");
+  }
+
+  async function deleteDoc(docId: string, storagePath: string, name: string) {
+    if (!confirm(`Dokument „${name}" wirklich löschen? Diese Aktion ist nicht rückgängig zu machen.`)) return;
+    await supabase.storage.from("documents").remove([storagePath]);
+    const { error } = await supabase.from("documents").delete().eq("id", docId);
+    if (error) {
+      toast.error("Fehler beim Löschen: " + error.message);
+      return;
+    }
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    toast.success("Dokument gelöscht");
+  }
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -274,7 +297,7 @@ export default function AuftragDetailPage() {
 
   if (!job) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  const customer = job.customer as unknown as { name: string; address_street?: string; address_zip?: string; address_city?: string } | undefined;
+  const customer = job.customer as unknown as { id: string; name: string; address_street?: string; address_zip?: string; address_city?: string; bexio_contact_id?: string | null } | undefined;
   const location = job.location as unknown as { name: string; address_street?: string; address_zip?: string; address_city?: string } | undefined;
   const locationAddress = location ? [location.address_street, `${location.address_zip || ""} ${location.address_city || ""}`.trim()].filter(Boolean).join(", ") : "";
   const customerAddress = customer ? [customer.address_street, `${customer.address_zip || ""} ${customer.address_city || ""}`.trim()].filter(Boolean).join(", ") : "";
@@ -362,11 +385,13 @@ export default function AuftragDetailPage() {
             );
           })}
 
-        {/* Bearbeiten — nur bei Entwuerfen */}
+        {/* Bearbeiten — nur bei Entwuerfen. Violet wie der Entwurf-Status-Tag,
+            damit die Farbsprache app-weit konsistent ist (Bearbeiten == Entwurf-
+            Aktion). */}
         {job.status === "entwurf" && (
           <Link
             href={`/auftraege/${id}/bearbeiten`}
-            className="kasten kasten-muted"
+            className="kasten kasten-purple"
           >
             <Pencil className="h-3.5 w-3.5" />
             Bearbeiten
@@ -393,38 +418,63 @@ export default function AuftragDetailPage() {
       <Card className="bg-card">
         <CardContent className="p-5 space-y-3">
           {customer && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Kunde:</span>
-                <span>{customer.name}{!location && customerAddress ? ` — ${customerAddress}` : ""}</span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-0.5 text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">Kunde:</span>
+                  <span className="truncate">{customer.name}</span>
+                </div>
+                {customerAddress && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="truncate">{customerAddress}</span>
+                  </div>
+                )}
               </div>
-              {!location && mapsUrl && (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted-blue transition-colors"
-                >
-                  <MapPin className="h-3.5 w-3.5" />
-                  Google Maps
-                </a>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {customer.id && (
+                  <BexioButton
+                    customerId={customer.id}
+                    bexioContactId={customer.bexio_contact_id ?? null}
+                    onLinked={() => loadAll()}
+                  />
+                )}
+                {!location && mapsUrl && (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="kasten kasten-blue"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    Google Maps
+                  </a>
+                )}
+              </div>
             </div>
           )}
           {location && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Standort:</span>
-                <span>{location.name}{locationAddress ? ` — ${locationAddress}` : ""}</span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-0.5 text-sm">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">Standort:</span>
+                  <span className="truncate">{location.name}</span>
+                </div>
+                {locationAddress && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="truncate">{locationAddress}</span>
+                  </div>
+                )}
               </div>
               {mapsUrl && (
                 <a
                   href={mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border tinted-blue transition-colors"
+                  className="kasten kasten-blue shrink-0"
                 >
                   <MapPin className="h-3.5 w-3.5" />
                   Google Maps
@@ -506,9 +556,9 @@ export default function AuftragDetailPage() {
                         key={p.id}
                         type="button"
                         onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${selected ? "bg-foreground text-background border-foreground" : "border-border hover:border-foreground/30"}`}
+                        className={selected ? "kasten-active" : "kasten kasten-muted"}
                       >
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-card/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
                           {p.full_name.charAt(0)}
                         </div>
                         {p.full_name.split(" ")[0]}
@@ -566,69 +616,55 @@ export default function AuftragDetailPage() {
                   {!appt.is_done && (
                     <div className="relative">
                       <button
+                        type="button"
                         onClick={() => setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                          notifiedAppts.has(appt.id)
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                        }`}
+                        className={`kasten ${notifiedAppts.has(appt.id) ? "kasten-green" : "kasten-blue"}`}
                       >
                         {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
                         {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
                       </button>
-                      {notifyPopup === appt.id && (
-                        <>
-                          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} />
-                          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-                            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                <div className="flex items-center gap-2">
-                                  <Send className="h-5 w-5 text-blue-500" />
-                                  <h2 className="font-semibold text-gray-900 dark:text-white">Terminbestätigung senden</h2>
-                                </div>
-                                <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                                  <X className="h-4 w-4 text-gray-500" />
-                                </button>
-                              </div>
-                              <div className="p-6 space-y-4">
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">E-Mail 1 *</label>
-                                  <input
-                                    type="email"
-                                    value={emailField1}
-                                    onChange={(e) => setEmailField1(e.target.value)}
-                                    placeholder="empfaenger@beispiel.ch"
-                                    className="mt-1.5 w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">E-Mail 2 (optional)</label>
-                                  <input
-                                    type="email"
-                                    value={emailField2}
-                                    onChange={(e) => setEmailField2(e.target.value)}
-                                    placeholder="weitere@beispiel.ch"
-                                    className="mt-1.5 w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white"
-                                  />
-                                </div>
-                                <div className="flex gap-3 pt-2">
-                                  <button onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                    Abbrechen
-                                  </button>
-                                  <button onClick={() => notifyAppointment(appt.id)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                                    <Send className="h-4 w-4" />Senden
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      )}
+                      <Modal
+                        open={notifyPopup === appt.id}
+                        onClose={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }}
+                        title="Terminbestätigung senden"
+                        icon={<Send className="h-5 w-5 text-blue-500" />}
+                        size="md"
+                      >
+                        <div>
+                          <label className="text-sm font-medium">E-Mail 1 *</label>
+                          <Input
+                            type="email"
+                            value={emailField1}
+                            onChange={(e) => setEmailField1(e.target.value)}
+                            placeholder="empfaenger@beispiel.ch"
+                            className="mt-1.5"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">E-Mail 2 (optional)</label>
+                          <Input
+                            type="email"
+                            value={emailField2}
+                            onChange={(e) => setEmailField2(e.target.value)}
+                            placeholder="weitere@beispiel.ch"
+                            className="mt-1.5"
+                          />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                          <button type="button" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="kasten kasten-muted flex-1">
+                            Abbrechen
+                          </button>
+                          <button type="button" onClick={() => notifyAppointment(appt.id)} className="kasten kasten-blue flex-1">
+                            <Send className="h-3.5 w-3.5" />Senden
+                          </button>
+                        </div>
+                      </Modal>
                     </div>
                   )}
                   <button
+                    type="button"
                     onClick={() => setDeleteApptTarget(appt.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+                    className="kasten kasten-red"
                     title="Termin löschen"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -693,135 +729,130 @@ export default function AuftragDetailPage() {
             <p className="text-sm text-muted-foreground py-2">Keine Dokumente. Klicke auf "Hochladen" um PDFs/Dateien anzuhängen.</p>
           ) : (
             <div className="space-y-2">
-              {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-5 w-5 text-red-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.name}</p>
-                      <p className="text-xs text-muted-foreground">{doc.file_size ? (doc.file_size / 1024).toFixed(0) + " KB" : ""} · {new Date(doc.created_at).toLocaleDateString("de-CH")}</p>
+              {documents.map((doc) => {
+                const fromMail = isMailDoc(doc.storage_path);
+                return (
+                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">{doc.file_size ? (doc.file_size / 1024).toFixed(0) + " KB" : ""} · {new Date(doc.created_at).toLocaleDateString("de-CH")}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Trash links, Download rechts. Bei Mail-Doks Trash unsichtbar (visibility:hidden),
+                          aber Platz reservieren — so verschiebt sich der Download-Pfeil nie. */}
+                      <button
+                        type="button"
+                        onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
+                        className={`kasten kasten-red ${fromMail ? "invisible pointer-events-none" : ""}`}
+                        title="Löschen"
+                        aria-hidden={fromMail || undefined}
+                        tabIndex={fromMail ? -1 : undefined}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const { data } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
+                          if (data?.signedUrl) {
+                            const a = document.createElement("a");
+                            a.href = data.signedUrl;
+                            a.download = doc.name;
+                            a.click();
+                          }
+                        }}
+                        className="kasten kasten-muted"
+                        title="Herunterladen"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    const { data } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
-                    if (data?.signedUrl) {
-                      const a = document.createElement("a");
-                      a.href = data.signedUrl;
-                      a.download = doc.name;
-                      a.click();
-                    }
-                  }}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
       {/* Stornieren-Flow: Phase 'confirm' -> 'reason' */}
-      {cancelPhase !== "closed" && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="font-semibold">
-                  {cancelPhase === "confirm" ? "Auftrag stornieren?" : "Grund angeben"}
-                </h2>
-                <button
-                  onClick={() => { if (!cancelSaving) { setCancelPhase("closed"); setCancelReason(""); } }}
-                  className="p-1.5 rounded-lg hover:bg-muted"
-                  disabled={cancelSaving}
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {job.job_number ? `INT-${job.job_number} — ` : ""}
-                  <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
-                </p>
-                {cancelPhase === "confirm" ? (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
-                    </p>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setCancelPhase("closed")} className="kasten kasten-muted flex-1">
-                        Abbrechen
-                      </button>
-                      <button type="button" onClick={() => setCancelPhase("reason")} className="flex-1 kasten kasten-red">
-                        Stornieren
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Bitte gib einen Grund an, warum dieser Auftrag storniert wird.
-                    </p>
-                    <textarea
-                      placeholder="z.B. Kunde hat abgesagt, Termin verschoben…"
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      rows={3}
-                      autoFocus
-                      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCancelPhase("confirm")}
-                        disabled={cancelSaving}
-                        className="kasten kasten-muted flex-1 disabled:opacity-50 disabled:pointer-events-none"
-                      >
-                        Zurück
-                      </button>
-                      <button
-                        type="button"
-                        onClick={confirmCancel}
-                        disabled={cancelSaving || !cancelReason.trim()}
-                        className="kasten kasten-red flex-1"
-                      >
-                        {cancelSaving ? "Storniere…" : "Bestätigen"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+      <Modal
+        open={cancelPhase !== "closed"}
+        onClose={() => { setCancelPhase("closed"); setCancelReason(""); }}
+        title={cancelPhase === "confirm" ? "Auftrag stornieren?" : "Grund angeben"}
+        closable={!cancelSaving}
+      >
+        <p className="text-sm text-muted-foreground">
+          {job.job_number ? `INT-${job.job_number} — ` : ""}
+          <span className="font-medium text-foreground">&quot;{job.title}&quot;</span>
+        </p>
+        {cancelPhase === "confirm" ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Der Auftrag wird als storniert markiert. Du kannst ihn im Archiv wieder einsehen.
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setCancelPhase("closed")} className="kasten kasten-muted flex-1">
+                Abbrechen
+              </button>
+              <button type="button" onClick={() => setCancelPhase("reason")} className="kasten kasten-red flex-1">
+                Stornieren
+              </button>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Bitte gib einen Grund an, warum dieser Auftrag storniert wird.
+            </p>
+            <textarea
+              placeholder="z.B. Kunde hat abgesagt, Termin verschoben…"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={3}
+              autoFocus
+              className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelPhase("confirm")}
+                disabled={cancelSaving}
+                className="kasten kasten-muted flex-1"
+              >
+                Zurück
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancel}
+                disabled={cancelSaving || !cancelReason.trim()}
+                className="kasten kasten-red flex-1"
+              >
+                {cancelSaving ? "Storniere…" : "Bestätigen"}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       {/* Delete Appointment Modal */}
-      {deleteApptTarget && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
-                <button onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <X className="h-4 w-4 text-gray-500" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-600 dark:text-gray-300">Der Termin wird unwiderruflich gelöscht.</p>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bestätigungscode eingeben</label>
-                  <Input value={deleteApptCode} onChange={(e) => setDeleteApptCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Abbrechen</button>
-                  <button onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-30">Endgültig löschen</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={!!deleteApptTarget}
+        onClose={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }}
+        title="Termin löschen"
+      >
+        <p className="text-sm text-muted-foreground">Der Termin wird unwiderruflich gelöscht.</p>
+        <div>
+          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
+          <Input value={deleteApptCode} onChange={(e) => setDeleteApptCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="kasten kasten-muted flex-1">Abbrechen</button>
+          <button type="button" onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="kasten kasten-red flex-1">Endgültig löschen</button>
+        </div>
+      </Modal>
     </div>
   );
 }

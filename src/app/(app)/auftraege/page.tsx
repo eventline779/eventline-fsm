@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JOB_STATUS, REQUEST_STEPS } from "@/lib/constants";
+import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
 import { RequestStepTracker } from "@/components/request-step-tracker";
 import type { Job, JobStatus, Profile } from "@/types";
 import Link from "next/link";
@@ -28,9 +28,8 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
 import { DonutChart } from "@/components/donut-chart";
 import { SendStepModal } from "@/components/send-step-modal";
+import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
-
-const MAIL_STEPS = new Set<number>([1, 3]);
 
 export default function AuftraegePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -100,7 +99,7 @@ export default function AuftraegePage() {
   async function handleAnfrageNext(jobId: string) {
     const job = jobs.find((j) => j.id === jobId);
     if (!job?.request_step) return;
-    if (MAIL_STEPS.has(job.request_step)) {
+    if (REQUEST_MAIL_STEPS.has(job.request_step)) {
       setActiveStepJobId(jobId);
       return;
     }
@@ -400,7 +399,7 @@ export default function AuftraegePage() {
             // Defensiv clampen — Alt-Daten koennten request_step > 4 haben (Step 5 ist abgeschafft).
             const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
-            const isMailStep = MAIL_STEPS.has(currentStep);
+            const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
             // Bei Entwurf/Vermietentwurf macht Terminplanung noch keinen Sinn.
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
@@ -423,21 +422,25 @@ export default function AuftraegePage() {
                         <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                       </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        {(job.customer as unknown as { name: string })?.name && (
-                          <span className="flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5" />
-                            {(job.customer as unknown as { name: string }).name}
-                          </span>
-                        )}
+                      {/* Kunde: eigene Zeile — garantiert immer sichtbar (vorher
+                          wurde er bei langen Daten + Location aus der Meta-Zeile geclippt). */}
+                      {(job.customer as unknown as { name: string })?.name && (
+                        <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground min-w-0">
+                          <User className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{(job.customer as unknown as { name: string }).name}</span>
+                        </div>
+                      )}
+                      {/* Location + Datum: Sekundaer-Zeile — bei knappem Platz
+                          kann hier gekuerzt/geclippt werden, ohne dass der Kunde verschwindet. */}
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground min-w-0">
                         {(job.location as unknown as { name: string })?.name && (
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {(job.location as unknown as { name: string }).name}
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{(job.location as unknown as { name: string }).name}</span>
                           </span>
                         )}
                         {job.start_date && (
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 shrink-0">
                             <Calendar className="h-3.5 w-3.5" />
                             {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
                             {job.end_date && job.end_date !== job.start_date && (
@@ -602,39 +605,33 @@ export default function AuftraegePage() {
         );
       })()}
 
-      {/* Convert-Modal: Mietentwurf -> Auftrag (nach Schritt 5). Wird auch vom Inline-Flow geoeffnet. */}
-      {convertJobId && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { if (!convertSaving) setConvertJobId(null); }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border">
-              <div className="px-6 py-4 border-b">
-                <h2 className="font-semibold">Vermietentwurf in Auftrag umwandeln?</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Die Anfrage wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
-                </p>
-                <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
-                  <Check className="h-4 w-4 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-medium">Akquise abgeschlossen</p>
-                    <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setConvertJobId(null)} disabled={convertSaving} className="kasten kasten-muted flex-1">
-                    Abbrechen
-                  </button>
-                  <button type="button" onClick={confirmConvert} disabled={convertSaving} className="kasten kasten-red flex-1">
-                    {convertSaving ? "Wandle um…" : "Umwandeln"}
-                  </button>
-                </div>
-              </div>
-            </div>
+      {/* Convert-Modal: Mietentwurf -> Auftrag */}
+      <Modal
+        open={!!convertJobId}
+        onClose={() => setConvertJobId(null)}
+        title="Vermietentwurf in Auftrag umwandeln?"
+        size="md"
+        closable={!convertSaving}
+      >
+        <p className="text-sm text-muted-foreground">
+          Die Anfrage wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
+        </p>
+        <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
+          <Check className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">Akquise abgeschlossen</p>
+            <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
           </div>
-        </>
-      )}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setConvertJobId(null)} disabled={convertSaving} className="kasten kasten-muted flex-1">
+            Abbrechen
+          </button>
+          <button type="button" onClick={confirmConvert} disabled={convertSaving} className="kasten kasten-red flex-1">
+            {convertSaving ? "Wandle um…" : "Umwandeln"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

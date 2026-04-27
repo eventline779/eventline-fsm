@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { JOB_STATUS } from "@/lib/constants";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Modal } from "@/components/ui/modal";
 
 interface CalendarItem {
   id: string;
@@ -687,38 +688,27 @@ export default function KalenderPage() {
       )}
 
       {/* Delete Modal */}
-      {deleteTarget && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">Termin löschen</h2>
-                <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <X className="h-4 w-4 text-gray-500" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-600 dark:text-gray-300">Der Termin wird unwiderruflich gelöscht.</p>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bestätigungscode eingeben</label>
-                  <Input value={deleteCode} onChange={(e) => setDeleteCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Abbrechen</button>
-                  <button onClick={async () => {
-                    if (deleteCode !== "5225") { toast.error("Falscher Code"); return; }
-                    await supabase.from("job_appointments").delete().eq("id", deleteTarget);
-                    setDeleteTarget(null); setDeleteCode("");
-                    toast.success("Termin gelöscht");
-                    window.location.reload();
-                  }} disabled={deleteCode.length < 4} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-30">Endgültig löschen</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteCode(""); }}
+        title="Termin löschen"
+      >
+        <p className="text-sm text-muted-foreground">Der Termin wird unwiderruflich gelöscht.</p>
+        <div>
+          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
+          <Input value={deleteCode} onChange={(e) => setDeleteCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="kasten kasten-muted flex-1">Abbrechen</button>
+          <button type="button" onClick={async () => {
+            if (deleteCode !== "5225") { toast.error("Falscher Code"); return; }
+            await supabase.from("job_appointments").delete().eq("id", deleteTarget);
+            setDeleteTarget(null); setDeleteCode("");
+            toast.success("Termin gelöscht");
+            window.location.reload();
+          }} disabled={deleteCode.length < 4} className="kasten kasten-red flex-1">Endgültig löschen</button>
+        </div>
+      </Modal>
     </div>
   );
 }
