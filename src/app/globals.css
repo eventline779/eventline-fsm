@@ -476,23 +476,14 @@ html, body, *, *::before, *::after {
      nur in foreground-Farbe statt rot/blau/gruen. Active = staerker getoent,
      Off = subtiler aber gleicher Aufbau. So fluchten Toggle-Buttons visuell
      mit dem Rest der kasten-Familie. */
+  /* Active-State invertiert pro Mode: Light -> dunkler Block + helle Schrift,
+     Dark -> heller Block + dunkle Schrift. Maximaler Kontrast in beiden Modi. */
   .kasten-active {
-    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground transition-all;
-    background-color: #ffffff;
-    border: 2px solid color-mix(in oklab, var(--foreground) 25%, transparent);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-foreground text-background transition-all;
+    border: 2px solid var(--foreground);
   }
   .kasten-active:hover:not(:disabled) {
-    border-color: color-mix(in oklab, var(--foreground) 45%, transparent);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
-  }
-  .dark .kasten-active {
-    background-color: #ffffff;
-    color: #0a0a0a;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  }
-  .dark .kasten-active:hover:not(:disabled) {
-    background-color: #f5f5f5;
+    background-color: color-mix(in oklab, var(--foreground) 88%, transparent);
   }
 
   .kasten-toggle-off {
