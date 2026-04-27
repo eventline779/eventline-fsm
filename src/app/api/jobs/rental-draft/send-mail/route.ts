@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export const maxDuration = 60;
 
@@ -126,10 +128,19 @@ export async function POST(request: Request) {
       <p style="margin:0 0 8px;color:#999;font-size:12px;text-align:center">Mit Klick auf den Button nehmen Sie das Angebot verbindlich an.</p>`;
   }
 
+  // Logo (weisse Variante fuer den schwarzen Header) inline als data URL.
+  let logoSrc = "";
+  try {
+    const logoBuf = readFileSync(join(process.cwd(), "public", "logo-gmbh.png"));
+    logoSrc = `data:image/png;base64,${logoBuf.toString("base64")}`;
+  } catch {
+    logoSrc = `${APP_URL}/logo-gmbh.png`;
+  }
+
   const html = `
     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
       <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
-        <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+        <img src="${logoSrc}" alt="EVENTLINE GmbH" width="130" height="30" style="display:block;border:0;outline:none;text-decoration:none">
       </div>
       <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
         <p style="margin:0 0 12px">${greeting}</p>
