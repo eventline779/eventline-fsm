@@ -42,7 +42,6 @@ type Partner = {
   website: string | null;
   address_city: string | null;
   notes: string | null;
-  rating: number | null;
   is_active: boolean;
 };
 
@@ -55,7 +54,6 @@ const EMPTY_FORM: Omit<Partner, "id" | "is_active"> = {
   website: "",
   address_city: "",
   notes: "",
-  rating: null,
 };
 
 export default function PartnerPage() {
@@ -100,7 +98,6 @@ export default function PartnerPage() {
       website: p.website ?? "",
       address_city: p.address_city ?? "",
       notes: p.notes ?? "",
-      rating: p.rating,
     });
     setShowForm(true);
   }
@@ -121,7 +118,6 @@ export default function PartnerPage() {
       website: form.website?.trim() || null,
       address_city: form.address_city?.trim() || null,
       notes: form.notes?.trim() || null,
-      rating: form.rating || null,
     };
     if (editing) {
       const { error } = await supabase
