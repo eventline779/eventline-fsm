@@ -593,40 +593,59 @@ export default function AuftraegePage() {
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Zwei-zeilige Card. Oben: Titel + Badges (Status/Vermietung/Dringend).
-                    Unten: bei Anfragen der Step-Tracker, sonst Meta (Kunde · Ort · Datum).
-                    Rechts: Hint-Text + Action-Icon, beide vertikal zentriert.
-                    Gesamthoehe gleich wie vorher dank py-1.5 statt py-2. */}
+                {/* Zwei-zeilige Card, links UND rechts mit eigenen Sub-Zeilen:
+                      Links Zeile 1: Titel + Badges
+                      Links Zeile 2: Meta (Kunde · Ort · Datum)
+                      Rechts Zeile 1: Hint-Text + Action-Icon
+                      Rechts Zeile 2: Step-Tracker (nur bei Vermietentwuerfen, sonst leer)
+                    Card-Hoehe gleich wie vorher dank py-1.5. */}
                 <div className="flex items-center gap-3 px-4 py-1.5">
                   <JobNumber number={job.job_number} />
-                  <div className="min-w-0 flex-1">
-                    {/* Zeile 1: Titel + Status-/Vermietungs-/Dringend-Badges */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-sm truncate">{job.title}</span>
-                      {job.priority === "dringend" && isActive && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
-                          <AlertCircle className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                      {job.was_anfrage && job.status !== "anfrage" && (
-                        <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
-                          Vermietung
-                        </span>
-                      )}
-                      {job.status !== "offen" && (
-                        <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
-                          {JOB_STATUS[job.status].label}
-                        </span>
-                      )}
-                    </div>
-                    {/* Zeile 2: bei Vermietentwuerfen der Step-Tracker
-                        (Workflow-Status wichtiger als Meta), sonst Meta. */}
-                    {isAnfrage ? (
-                      <div className="mt-0.5">
-                        <RequestStepTracker currentStep={currentStep} size="sm" />
+                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                    {/* OBERE ZEILE: Titel links, Hint+Action rechts */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="font-medium text-sm truncate">{job.title}</span>
+                        {job.priority === "dringend" && isActive && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                            <AlertCircle className="h-2.5 w-2.5" />
+                          </span>
+                        )}
+                        {job.was_anfrage && job.status !== "anfrage" && (
+                          <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                            Vermietung
+                          </span>
+                        )}
+                        {job.status !== "offen" && (
+                          <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
+                            {JOB_STATUS[job.status].label}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 min-w-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isAnfrage && isMailStep && (
+                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                            {stepInfo.label}
+                          </span>
+                        )}
+                        {isAnfrage && !isMailStep && (
+                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                            Manuell in Details bestätigen
+                          </span>
+                        )}
+                        {!isAnfrage && noTermin && (
+                          <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
+                            Kein Termin geplant
+                          </span>
+                        )}
+                        <div className="flex items-center justify-center w-9">
+                          {renderActionIcon("sm")}
+                        </div>
+                      </div>
+                    </div>
+                    {/* UNTERE ZEILE: Meta links, Step-Tracker rechts (nur Anfrage) */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 flex-1">
                         {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
                         {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
                         {placeLabel && <span className="truncate">{placeLabel}</span>}
@@ -636,30 +655,11 @@ export default function AuftraegePage() {
                           <span className="text-muted-foreground/40">—</span>
                         )}
                       </div>
-                    )}
-                  </div>
-                  {/* Rechts: Hint-Text neben Action-Icon. Hint kontextabhaengig:
-                      Mail-Schritt zeigt Step-Label (blau), Warte-Schritt zeigt
-                      "Manuell in Details bestaetigen" (blau), kein-Termin zeigt
-                      "Kein Termin geplant" (amber). */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isAnfrage && isMailStep && (
-                      <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
-                        {stepInfo.label}
-                      </span>
-                    )}
-                    {isAnfrage && !isMailStep && (
-                      <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
-                        Manuell in Details bestätigen
-                      </span>
-                    )}
-                    {!isAnfrage && noTermin && (
-                      <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
-                        Kein Termin geplant
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center w-9">
-                      {renderActionIcon("sm")}
+                      {isAnfrage && (
+                        <div className="shrink-0">
+                          <RequestStepTracker currentStep={currentStep} size="sm" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
