@@ -67,7 +67,6 @@ export function CustomerWorldMap() {
           <div
             key={d.country}
             className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/50 text-sm"
-            title={`${countryName(d.country)}: ${d.count} ${d.count === 1 ? "Kunde" : "Kunden"}`}
           >
             {/* flag-icons CSS-Klasse: fi-{iso2-lowercase}, default 4:3-Verhaeltnis.
                 Inline-block mit fester em-Breite damit alle Flaggen gleich gross
