@@ -414,10 +414,10 @@ export default function KundenPage() {
             <span>Ort</span>
             <span aria-hidden />
           </div>
-          {/* Rows-Container mit p-1.5 Inset, sodass die rounded-lg-Highlights
-              der einzelnen Zeilen vom Card-Rand abgesetzt sind. space-y-0.5
-              gibt subtile Trennung zwischen Zeilen statt harter divide-y-Linien. */}
-          <div className="p-1.5 space-y-0.5">
+          {/* Rows-Container mit p-1.5 Inset. Zwischen den Zeilen kommt eine
+              dezente Linie via after-Pseudo (10px vom Rand abgesetzt) — bei
+              der letzten Zeile via last:after:hidden ausgeblendet. */}
+          <div className="p-1.5">
             {customers.map((c) => {
               const Icon = TYPE_ICONS[c.type];
               const totalRel = relCount(c.jobs) + relCount(c.documents) + relCount(c.locations) + relCount(c.rental_requests);
@@ -439,7 +439,7 @@ export default function KundenPage() {
                 : action.kind === "archive" ? "hover:!text-foreground"
                 : "hover:!text-green-500";
               return (
-                <div key={c.id} className="group">
+                <div key={c.id} className="group relative after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-px after:bg-foreground/10 dark:after:bg-foreground/15 last:after:hidden">
                   <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-2.5 py-2 rounded-lg hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
                     <span className="font-mono text-xs">
                       {c.bexio_nr ? (
