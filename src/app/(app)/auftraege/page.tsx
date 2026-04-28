@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
 import type { JobStatus, Profile, JobWithRelations } from "@/types";
 import Link from "next/link";
+import { RequestStepTracker } from "@/components/request-step-tracker";
 import {
   Plus,
   Search,
@@ -592,13 +593,13 @@ export default function AuftraegePage() {
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Zwei-zeilige Card mit gleicher Gesamthoehe wie vorher: oben
-                    Titel + Badges, unten Meta (Kunde · Ort · Datum). py-1.5 statt
-                    py-2 damit die zwei Text-Zeilen reinpassen ohne dass die Card
-                    waechst. Klick fuehrt zur Detail-Seite. */}
-                <div className="grid grid-cols-[110px_1fr_36px] gap-3 items-center px-4 py-1.5">
+                {/* Zwei-zeilige Card. Oben: Titel + Badges (Status/Vermietung/Dringend).
+                    Unten: bei Anfragen der Step-Tracker, sonst Meta (Kunde · Ort · Datum).
+                    Rechts: Hint-Text + Action-Icon, beide vertikal zentriert.
+                    Gesamthoehe gleich wie vorher dank py-1.5 statt py-2. */}
+                <div className="flex items-center gap-3 px-4 py-1.5">
                   <JobNumber number={job.job_number} />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     {/* Zeile 1: Titel + Status-/Vermietungs-/Dringend-Badges */}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium text-sm truncate">{job.title}</span>
@@ -618,20 +619,48 @@ export default function AuftraegePage() {
                         </span>
                       )}
                     </div>
-                    {/* Zeile 2: Meta (Kunde · Ort · Datum), via Middot getrennt */}
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 min-w-0">
-                      {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
-                      {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
-                      {placeLabel && <span className="truncate">{placeLabel}</span>}
-                      {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
-                      {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
-                      {!displayCustomerName && !placeLabel && !dateText && (
-                        <span className="text-muted-foreground/40">—</span>
-                      )}
-                    </div>
+                    {/* Zeile 2: bei Vermietentwuerfen der Step-Tracker
+                        (Workflow-Status wichtiger als Meta), sonst Meta. */}
+                    {isAnfrage ? (
+                      <div className="mt-0.5">
+                        <RequestStepTracker currentStep={currentStep} size="sm" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 min-w-0">
+                        {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
+                        {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
+                        {placeLabel && <span className="truncate">{placeLabel}</span>}
+                        {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
+                        {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
+                        {!displayCustomerName && !placeLabel && !dateText && (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-center">
-                    {renderActionIcon("sm")}
+                  {/* Rechts: Hint-Text neben Action-Icon. Hint kontextabhaengig:
+                      Mail-Schritt zeigt Step-Label (blau), Warte-Schritt zeigt
+                      "Manuell in Details bestaetigen" (blau), kein-Termin zeigt
+                      "Kein Termin geplant" (amber). */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isAnfrage && isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                        {stepInfo.label}
+                      </span>
+                    )}
+                    {isAnfrage && !isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                        Manuell in Details bestätigen
+                      </span>
+                    )}
+                    {!isAnfrage && noTermin && (
+                      <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
+                        Kein Termin geplant
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center w-9">
+                      {renderActionIcon("sm")}
+                    </div>
                   </div>
                 </div>
               </Card>
