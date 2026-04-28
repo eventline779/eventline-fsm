@@ -66,7 +66,6 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         target="_blank"
         rel="noopener noreferrer"
         className="kasten kasten-bexio shrink-0"
-        title="Diesen Kunden in Bexio oeffnen"
       >
         <ExternalLink className="h-3.5 w-3.5" />
         In Bexio öffnen
@@ -151,7 +150,6 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         onClick={() => attemptCreate(false)}
         disabled={busy}
         className="kasten kasten-bexio shrink-0"
-        title="Diesen Kunden in Bexio als Kontakt anlegen"
       >
         <ExternalLink className="h-3.5 w-3.5" />
         {busy ? "Prüfe…" : "In Bexio anlegen"}
@@ -229,7 +227,6 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
                 onClick={() => linkExisting(m.id, m.nr)}
                 disabled={busy}
                 className="kasten kasten-bexio shrink-0"
-                title="Diesen Bexio-Kontakt mit Eventline-Kunden verknuepfen"
               >
                 <Link2 className="h-3.5 w-3.5" />
                 Verknüpfen
@@ -246,7 +243,6 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
             onClick={() => { setMatches(null); attemptCreate(true); }}
             disabled={busy}
             className="kasten kasten-red flex-1"
-            title="Trotzdem neuen Bexio-Kontakt anlegen (riskiert Duplikat)"
           >
             Trotzdem neu anlegen
           </button>

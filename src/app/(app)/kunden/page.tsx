@@ -356,7 +356,6 @@ export default function KundenPage() {
             type="button"
             onClick={() => setFilterBexio(filterBexio === "linked" ? "all" : "linked")}
             className={filterBexio === "linked" ? "kasten kasten-bexio" : "kasten-toggle-off"}
-            title="Nur Kunden anzeigen die mit Bexio verknüpft sind"
           >
             Mit Bexio
           </button>
@@ -364,7 +363,6 @@ export default function KundenPage() {
             type="button"
             onClick={() => setFilterBexio(filterBexio === "unlinked" ? "all" : "unlinked")}
             className={filterBexio === "unlinked" ? "kasten-active" : "kasten-toggle-off"}
-            title="Nur Kunden anzeigen die noch nicht in Bexio sind"
           >
             Ohne Bexio
           </button>
@@ -374,7 +372,6 @@ export default function KundenPage() {
             type="button"
             onClick={() => { setSearch(""); setFilterType("all"); setFilterBexio("all"); }}
             className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
-            title="Filter zurücksetzen"
           >
             <X className="h-3.5 w-3.5" />
             Reset
@@ -451,7 +448,7 @@ export default function KundenPage() {
                           {c.bexio_nr}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground/40" title="Noch nicht mit Bexio synchronisiert">—</span>
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </span>
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-2 min-w-0 hover:text-red-600 dark:hover:text-red-400 transition-colors">
@@ -471,7 +468,6 @@ export default function KundenPage() {
                       type="button"
                       onClick={() => setActionTarget(action)}
                       className={`p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 ${hoverColor} transition-all`}
-                      title={actionTitle}
                       aria-label={`${c.name}: ${actionTitle}`}
                     >
                       <ActionIcon className="h-3.5 w-3.5" />
@@ -498,7 +494,6 @@ export default function KundenPage() {
                       type="button"
                       onClick={() => setActionTarget(action)}
                       className="p-2 rounded-lg text-muted-foreground/40"
-                      title={actionTitle}
                       aria-label={`${c.name}: ${actionTitle}`}
                     >
                       <ActionIcon className="h-4 w-4" />

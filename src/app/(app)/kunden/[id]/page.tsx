@@ -219,7 +219,6 @@ export default function KundenDetailPage() {
               // konsistenten visuellen Bezug zu Bexio.
               <span
                 className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)]"
-                title="Bexio-Kundennummer"
               >
                 Nr. {customer.bexio_nr}
               </span>
@@ -227,7 +226,6 @@ export default function KundenDetailPage() {
             {customer.archived_at && (
               <span
                 className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0"
-                title={`Archiviert am ${new Date(customer.archived_at).toLocaleDateString("de-CH")}`}
               >
                 Archiviert
               </span>
@@ -261,11 +259,6 @@ export default function KundenDetailPage() {
             aria-label={
               primaryAction === "delete" ? "Löschen"
               : primaryAction === "archive" ? "Archivieren"
-              : "Reaktivieren"
-            }
-            title={
-              primaryAction === "delete" ? "Endgültig löschen"
-              : primaryAction === "archive" ? "Ins Archiv verschieben"
               : "Reaktivieren"
             }
           >
