@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,28 @@ export default function KundenDetailPage() {
   // entfaltet die volle Liste. Spiegelt das "Mehr laden"-Pattern aus
   // /auftraege, nur client-seitig (Daten sind schon da).
   const [showAllJobs, setShowAllJobs] = useState(false);
+
+  // Sortierung wie auf /auftraege: kommende Termine zuerst (naechster oben),
+  // vergangene danach (neueste zuerst). Datum-loose ans Ende. Konsistent zur
+  // Hauptliste damit der "naechste Termin" immer oben steht.
+  const sortedJobs = useMemo(() => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayMs = todayStart.getTime();
+    return [...jobs].sort((a, b) => {
+      // Referenz-Datum: end_date wenn vorhanden, sonst start_date — damit
+      // mehrtaegige Events bis zum letzten Tag als "kommend" gelten.
+      const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
+      const bRef = b.end_date ? new Date(b.end_date).getTime() : b.start_date ? new Date(b.start_date).getTime() : Infinity;
+      const aPast = aRef < todayMs;
+      const bPast = bRef < todayMs;
+      if (aPast && !bPast) return 1;
+      if (!aPast && bPast) return -1;
+      const aSort = a.start_date ? new Date(a.start_date).getTime() : Infinity;
+      const bSort = b.start_date ? new Date(b.start_date).getTime() : Infinity;
+      if (!aPast && !bPast) return aSort - bSort; // kommend: aufsteigend
+      return bSort - aSort; // vergangen: absteigend
+    });
+  }, [jobs]);
   // Verknuepfungs-Counts entscheiden ob die Hauptaktion Hard-Delete oder
   // Archivieren ist. jobs.length koennen wir aus dem Auftraege-Join ziehen,
   // documents/locations/rental_requests holen wir separat (head:true Counts).
@@ -401,11 +423,11 @@ export default function KundenDetailPage() {
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {jobs.length === 0 ? (
+          {sortedJobs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">Keine Aufträge für diesen Kunden.</p>
           ) : (
             <>
-              {(showAllJobs ? jobs : jobs.slice(0, 2)).map((j) => (
+              {(showAllJobs ? sortedJobs : sortedJobs.slice(0, 2)).map((j) => (
                 <Link key={j.id} href={`/auftraege/${j.id}`}>
                   <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer">
                     <div>
@@ -419,14 +441,14 @@ export default function KundenDetailPage() {
                   </div>
                 </Link>
               ))}
-              {jobs.length > 2 && !showAllJobs && (
+              {sortedJobs.length > 2 && !showAllJobs && (
                 <button
                   type="button"
                   onClick={() => setShowAllJobs(true)}
                   className="w-full pt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
-                  Mehr anzeigen ({jobs.length - 2})
+                  Mehr anzeigen ({sortedJobs.length - 2})
                 </button>
               )}
             </>
