@@ -32,6 +32,7 @@ const PARTNER_TYPES = {
   mobiliar: { label: "Mobiliar", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
   reinigung: { label: "Reinigung", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" },
   security: { label: "Security", color: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
+  logistik: { label: "Logistik", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
   sonstiges: { label: "Sonstiges", color: "bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300" },
 } as const;
 
