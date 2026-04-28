@@ -5,12 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Modal } from "@/components/ui/modal";
 import {
   Plus,
   Search,
@@ -196,9 +191,9 @@ export default function PartnerPage() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Partner
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Catering, Technik, AV, Mobiliar — alle Partner an einem Ort.
-          </p>
+          {/* Leerer Subtitle-Platzhalter — Header-Hoehe identisch zu /kunden,
+              damit die Action-Buttons rechts auf gleicher Linie sitzen. */}
+          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
         <button
           type="button"
@@ -377,20 +372,26 @@ export default function PartnerPage() {
         </div>
       )}
 
-      <Sheet open={showForm} onOpenChange={setShowForm}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {editing ? "Partner bearbeiten" : "Neuer Partner"}
-            </SheetTitle>
-          </SheetHeader>
-          <form onSubmit={handleSave} className="px-4 pb-6 space-y-4">
+      {/* Bearbeitungs-Modal — zentriert auf der Page (size="lg" = max-w-lg).
+          Vorher als Sheet rechts angedockt, Form-Inhalte wirkten dort eingequetscht
+          und Labels wurden teilweise gecclippt. Modal mit ordentlichem Innen-Padding
+          und mehr Breite ist sauberer. */}
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? "Partner bearbeiten" : "Neuer Partner"}
+        size="lg"
+        closable={!saving}
+      >
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-3">
             <div>
               <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="mt-1.5"
                 required
               />
             </div>
@@ -402,7 +403,7 @@ export default function PartnerPage() {
                 onChange={(e) =>
                   setForm({ ...form, type: e.target.value as PartnerType })
                 }
-                className="w-full h-9 rounded-lg border bg-background px-3 text-sm"
+                className="mt-1.5 w-full h-9 rounded-xl border bg-background px-3 text-sm"
               >
                 {(Object.keys(PARTNER_TYPES) as PartnerType[]).map((t) => (
                   <option key={t} value={t}>
@@ -411,35 +412,43 @@ export default function PartnerPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="contact_person">Ansprechperson</Label>
+            <Input
+              id="contact_person"
+              value={form.contact_person ?? ""}
+              onChange={(e) =>
+                setForm({ ...form, contact_person: e.target.value })
+              }
+              className="mt-1.5"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="contact_person">Ansprechperson</Label>
+              <Label htmlFor="email">E-Mail</Label>
               <Input
-                id="contact_person"
-                value={form.contact_person ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, contact_person: e.target.value })
-                }
+                id="email"
+                type="email"
+                value={form.email ?? ""}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="mt-1.5"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="email">E-Mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Telefon</Label>
-                <Input
-                  id="phone"
-                  value={form.phone ?? ""}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </div>
+            <div>
+              <Label htmlFor="phone">Telefon</Label>
+              <Input
+                id="phone"
+                value={form.phone ?? ""}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="mt-1.5"
+              />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3">
             <div>
               <Label htmlFor="website">Website</Label>
               <Input
@@ -447,6 +456,7 @@ export default function PartnerPage() {
                 placeholder="https://…"
                 value={form.website ?? ""}
                 onChange={(e) => setForm({ ...form, website: e.target.value })}
+                className="mt-1.5"
               />
             </div>
             <div>
@@ -457,63 +467,68 @@ export default function PartnerPage() {
                 onChange={(e) =>
                   setForm({ ...form, address_city: e.target.value })
                 }
+                className="mt-1.5"
               />
             </div>
-            <div>
-              <Label>Bewertung</Label>
-              <div className="flex gap-1 mt-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        rating: form.rating === n ? null : n,
-                      })
-                    }
-                    className="p-1 hover:scale-110 transition"
-                  >
-                    <Star
-                      className={`h-5 w-5 ${
-                        n <= (form.rating ?? 0)
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-muted-foreground/40"
-                      }`}
-                    />
-                  </button>
-                ))}
-              </div>
+          </div>
+
+          <div>
+            <Label>Bewertung</Label>
+            <div className="flex gap-1 mt-1.5">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      rating: form.rating === n ? null : n,
+                    })
+                  }
+                  className="p-1 hover:scale-110 transition"
+                >
+                  <Star
+                    className={`h-5 w-5 ${
+                      n <= (form.rating ?? 0)
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground/40"
+                    }`}
+                  />
+                </button>
+              ))}
             </div>
-            <div>
-              <Label htmlFor="notes">Notizen</Label>
-              <textarea
-                id="notes"
-                rows={3}
-                value={form.notes ?? ""}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="w-full rounded-lg border bg-background p-2 text-sm"
-              />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="kasten kasten-muted flex-1"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="kasten kasten-red flex-1"
-              >
-                {saving ? "Speichert…" : editing ? "Speichern" : "Anlegen"}
-              </button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
+          </div>
+
+          <div>
+            <Label htmlFor="notes">Notizen</Label>
+            <textarea
+              id="notes"
+              rows={3}
+              value={form.notes ?? ""}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+              className="kasten kasten-muted flex-1"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="kasten kasten-red flex-1"
+            >
+              {saving ? "Speichert…" : editing ? "Speichern" : "Anlegen"}
+            </button>
+          </div>
+        </form>
+      </Modal>
       {ConfirmModalElement}
     </div>
   );
