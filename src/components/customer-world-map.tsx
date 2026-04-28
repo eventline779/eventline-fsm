@@ -29,11 +29,13 @@ const EUROPE_ISO = new Set([
 const SVG_WIDTH = 2400;
 const SVG_HEIGHT = SVG_WIDTH * 0.75; // = 1800, lib's heightRatio
 const VIEW_HEIGHT = 360;
-// Europa-Mittelpunkt im 2400×1800-Mercator (longitude ~12°, latitude ~52°):
-// x = (12+180)/360 * 2400 = 1280, y = ~525 (visuell justiert)
-// Wrapper soll Europa zentrieren — d.h. center-of-europe minus halbe wrapper-dim.
-const EUROPE_CENTER_X = 1280;
-const EUROPE_CENTER_Y = 525;
+// Europa-Mittelpunkt im 2400×1800-Mercator (lib nutzt geoMercator().fitSize
+// auf World-Atlas-Daten ohne Antarktis, lat-range ~-60 bis 84°):
+// x = (12+180)/360 * 2400 = 1240 (Geometrie-Mitte zwischen Island und Ukraine)
+// y berechnet aus Mercator: lat 50° in fitSize-Koordinaten ergibt ~793
+// Dazwischen liegen Skandinavien (oben) und Mittelmeer (unten).
+const EUROPE_CENTER_X = 1240;
+const EUROPE_CENTER_Y = 793;
 
 export function CustomerWorldMap() {
   const [data, setData] = useState<CountryDatum[]>([]);
