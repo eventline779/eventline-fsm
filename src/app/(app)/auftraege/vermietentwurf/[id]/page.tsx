@@ -16,6 +16,7 @@ import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
 import { Modal } from "@/components/ui/modal";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 export default function AnfrageDetailPage() {
   const { id } = useParams();
@@ -54,6 +55,8 @@ export default function AnfrageDetailPage() {
   // Confirm-Dialoge fuer Manuell-Bestaetigen (Warte-Schritte 2/4) und Zurueck.
   const [showManualConfirm, setShowManualConfirm] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
     loadJob();
@@ -103,7 +106,13 @@ export default function AnfrageDetailPage() {
   }
 
   async function deleteDoc(docId: string, storagePath: string, name: string) {
-    if (!confirm(`Dokument „${name}" wirklich löschen? Diese Aktion ist nicht rückgängig zu machen.`)) return;
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${name}" wird unwiderruflich entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     // Erst aus Storage, dann aus documents-Tabelle. Wenn Storage failt, ueberspringen
     // wir die DB-Loeschung nicht — die Verwaltung des Files muss schliesslich raus.
     await supabase.storage.from("documents").remove([storagePath]);
@@ -669,6 +678,7 @@ export default function AnfrageDetailPage() {
           </button>
         </div>
       </Modal>
+      {ConfirmModalElement}
     </div>
   );
 }

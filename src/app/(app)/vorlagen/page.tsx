@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { Plus, Send, Pencil, Trash2, Eye, Variable } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   bestätigung: {
@@ -85,6 +86,7 @@ export default function VorlagenPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
     load();
@@ -172,7 +174,13 @@ export default function VorlagenPage() {
   }
 
   async function handleDelete(t: Template) {
-    if (!confirm(`Vorlage "${t.name}" wirklich löschen?`)) return;
+    const ok = await confirm({
+      title: "Vorlage löschen?",
+      message: `"${t.name}" wird entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("email_templates").delete().eq("id", t.id);
     if (error) {
       toast.error("Fehler beim Löschen");
@@ -446,6 +454,7 @@ export default function VorlagenPage() {
           )}
         </SheetContent>
       </Sheet>
+      {ConfirmModalElement}
     </div>
   );
 }

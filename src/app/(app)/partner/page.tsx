@@ -23,6 +23,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 const PARTNER_TYPES = {
   catering: { label: "Catering", color: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
@@ -72,6 +73,7 @@ export default function PartnerPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
     load();
@@ -153,7 +155,13 @@ export default function PartnerPage() {
   }
 
   async function handleDelete(p: Partner) {
-    if (!confirm(`Partner "${p.name}" wirklich löschen?`)) return;
+    const ok = await confirm({
+      title: "Partner löschen?",
+      message: `"${p.name}" wird entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("partners")
       .update({ is_active: false })
@@ -505,6 +513,7 @@ export default function PartnerPage() {
           </form>
         </SheetContent>
       </Sheet>
+      {ConfirmModalElement}
     </div>
   );
 }

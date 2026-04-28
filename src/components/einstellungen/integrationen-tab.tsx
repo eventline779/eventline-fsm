@@ -5,12 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, CheckCircle2, Plug, X } from "lucide-react";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 export function IntegrationenTab() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
   useEffect(() => {
@@ -38,7 +40,13 @@ export function IntegrationenTab() {
   }
 
   async function handleDisconnect() {
-    if (!confirm("Bexio-Verbindung wirklich trennen? Du musst danach neu verbinden, um Kontakte anzulegen.")) return;
+    const ok = await confirm({
+      title: "Bexio trennen?",
+      message: "Du musst danach neu verbinden, um Kontakte anzulegen.",
+      confirmLabel: "Trennen",
+      variant: "red",
+    });
+    if (!ok) return;
     setDisconnecting(true);
     await fetch("/api/bexio/disconnect", { method: "POST" });
     setDisconnecting(false);
@@ -110,6 +118,7 @@ export function IntegrationenTab() {
           </div>
         </CardContent>
       </Card>
+      {ConfirmModalElement}
     </div>
   );
 }

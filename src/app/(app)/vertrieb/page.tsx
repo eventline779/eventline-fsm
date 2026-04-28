@@ -26,6 +26,7 @@ import { LostModalBody } from "@/components/vertrieb/lost-modal-body";
 import { LeadCard } from "@/components/vertrieb/lead-card";
 import { LeadForm } from "@/components/vertrieb/lead-form";
 import { CategoryPicker } from "@/components/vertrieb/category-picker";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 export default function VertriebPage() {
   const router = useRouter();
@@ -76,6 +77,7 @@ export default function VertriebPage() {
   const [kundenMode, setKundenMode] = useState<"neu" | "bestehend">("neu");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
     if (typeof window !== "undefined" && sessionStorage.getItem("vertrieb-unlocked") === "1") {
@@ -527,7 +529,13 @@ export default function VertriebPage() {
   }
 
   async function deleteTerminFromLead(terminId: string) {
-    if (!editingId || !confirm("Termin löschen?")) return;
+    if (!editingId) return;
+    const ok = await confirm({
+      title: "Termin löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     const c = contacts.find((x) => x.id === editingId);
     if (!c) return;
     // Aus Kalender löschen
@@ -658,7 +666,12 @@ export default function VertriebPage() {
   }
 
   async function deleteContact(id: string) {
-    if (!confirm("Eintrag wirklich löschen?")) return;
+    const ok = await confirm({
+      title: "Lead löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     await supabase.from("vertrieb_contacts").delete().eq("id", id);
     toast.success("Eintrag gelöscht");
     load();
@@ -991,6 +1004,7 @@ export default function VertriebPage() {
           ))}
         </div>
       )}
+      {ConfirmModalElement}
     </div>
   );
 }

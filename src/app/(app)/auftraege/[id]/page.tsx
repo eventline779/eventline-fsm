@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
 import { Modal } from "@/components/ui/modal";
 import { BexioButton } from "@/components/bexio-button";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 export default function AuftragDetailPage() {
   const { id } = useParams();
@@ -56,6 +57,7 @@ export default function AuftragDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
 
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -260,7 +262,13 @@ export default function AuftragDetailPage() {
   }
 
   async function deleteDoc(docId: string, storagePath: string, name: string) {
-    if (!confirm(`Dokument „${name}" wirklich löschen? Diese Aktion ist nicht rückgängig zu machen.`)) return;
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${name}" wird unwiderruflich entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     await supabase.storage.from("documents").remove([storagePath]);
     const { error } = await supabase.from("documents").delete().eq("id", docId);
     if (error) {
@@ -859,6 +867,7 @@ export default function AuftragDetailPage() {
           <button type="button" onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="kasten kasten-red flex-1">Endgültig löschen</button>
         </div>
       </Modal>
+      {ConfirmModalElement}
     </div>
   );
 }

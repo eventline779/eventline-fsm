@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface MaintenanceTaskWithPhoto extends MaintenanceTask {
   photo_url?: string | null;
@@ -49,6 +50,7 @@ export default function StandortDetailPage() {
   const [docs, setDocs] = useState<{ name: string; path: string; uploaded_at: string }[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -161,7 +163,13 @@ export default function StandortDetailPage() {
   }
 
   async function deleteDoc(doc: { name: string; path: string }) {
-    if (!confirm(`"${doc.name}" wirklich löschen?`)) return;
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${doc.name}" wird entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     await supabase.storage.from("documents").remove([doc.path]);
     const newDocs = docs.filter((d) => d.path !== doc.path);
     await fetch(`/api/locations/${id}/docs`, {
@@ -237,7 +245,12 @@ export default function StandortDetailPage() {
   }
 
   async function deleteTask(task: MaintenanceTaskWithPhoto) {
-    if (!confirm("Arbeit wirklich löschen?")) return;
+    const ok = await confirm({
+      title: "Arbeit löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     if (task.photo_url) {
       await supabase.storage.from("documents").remove([task.photo_url]);
     }
@@ -542,6 +555,7 @@ export default function StandortDetailPage() {
           ))}
         </CardContent>
       </Card>
+      {ConfirmModalElement}
     </div>
   );
 }

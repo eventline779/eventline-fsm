@@ -20,6 +20,7 @@ import {
   ArrowLeft, Upload, FileText, Image as ImageIcon, X, Download, Archive,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface TodoAttachment {
   name: string;
@@ -40,6 +41,7 @@ export default function TodosPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => { loadData(); }, []);
 
@@ -110,7 +112,12 @@ export default function TodosPage() {
   }
 
   async function deleteTodo(id: string) {
-    if (!confirm("Todo wirklich löschen?")) return;
+    const ok = await confirm({
+      title: "Todo löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     // Delete attachments from storage
     if (attachments.length > 0) {
       await supabase.storage.from("documents").remove(attachments.map((a) => a.path));
@@ -289,6 +296,7 @@ export default function TodosPage() {
             </div>
           </CardContent>
         </Card>
+        {ConfirmModalElement}
       </div>
     );
   }
@@ -404,6 +412,7 @@ export default function TodosPage() {
           })}
         </div>
       )}
+      {ConfirmModalElement}
     </div>
   );
 }

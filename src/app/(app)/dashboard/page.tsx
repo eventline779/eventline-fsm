@@ -13,6 +13,7 @@ import { JOB_PRIORITY } from "@/lib/constants";
 import type { Todo } from "@/types";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 const CATEGORY_ICONS: Record<string, any> = {
   bestellung: ShoppingCart,
@@ -51,6 +52,7 @@ export default function DashboardPage() {
   const [linkForm, setLinkForm] = useState({ name: "", url: "" });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   const [currentUserId, setCurrentUserId] = useState("");
 
@@ -146,7 +148,13 @@ export default function DashboardPage() {
   }
 
   async function completeTicket(ticket: TicketItem) {
-    if (!confirm("Ticket als erledigt markieren? Der Ersteller wird benachrichtigt.")) return;
+    const ok = await confirm({
+      title: "Ticket als erledigt markieren?",
+      message: "Der Ersteller wird benachrichtigt.",
+      confirmLabel: "Erledigt",
+      variant: "blue",
+    });
+    if (!ok) return;
     try {
       const res = await fetch("/api/tickets/complete", {
         method: "POST",
@@ -474,6 +482,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+      {ConfirmModalElement}
     </div>
   );
 }

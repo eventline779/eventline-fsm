@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface TicketItem {
   id: string;
@@ -42,6 +43,7 @@ export default function TicketsPage() {
   const [submitted, setSubmitted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => { loadData(); }, []);
 
@@ -125,7 +127,12 @@ export default function TicketsPage() {
   }
 
   async function deleteTicket(id: string) {
-    if (!confirm("Ticket wirklich löschen?")) return;
+    const ok = await confirm({
+      title: "Ticket löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     await supabase.from("tickets").delete().eq("id", id);
     setSelectedTicket(null);
     loadData();
@@ -133,7 +140,13 @@ export default function TicketsPage() {
   }
 
   async function completeTicket(ticket: TicketItem) {
-    if (!confirm("Ticket als erledigt markieren? Der Ersteller wird benachrichtigt.")) return;
+    const ok = await confirm({
+      title: "Ticket als erledigt markieren?",
+      message: "Der Ersteller wird benachrichtigt.",
+      confirmLabel: "Erledigt",
+      variant: "blue",
+    });
+    if (!ok) return;
     const { data: { user } } = await supabase.auth.getUser();
     const me = profiles.find((p) => p.id === user?.id);
     try {
@@ -268,6 +281,7 @@ export default function TicketsPage() {
             </div>
           </CardContent>
         </Card>
+        {ConfirmModalElement}
       </div>
     );
   }
@@ -294,6 +308,7 @@ export default function TicketsPage() {
             </button>
           </CardContent>
         </Card>
+        {ConfirmModalElement}
       </div>
     );
   }
@@ -427,6 +442,7 @@ export default function TicketsPage() {
           </CardContent>
         </Card>
       )}
+      {ConfirmModalElement}
     </div>
   );
 }
