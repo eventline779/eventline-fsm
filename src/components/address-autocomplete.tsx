@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Building2 } from "lucide-react";
+import { MapPin, Building2, DoorOpen } from "lucide-react";
 
 type LocalLocation = {
   id: string;
@@ -22,8 +22,12 @@ type LocalLocation = {
   address_city: string | null;
 };
 
+// Raeume haben das gleiche Adress-Shape wie Locations — Type-Alias macht das explizit.
+type LocalRoom = LocalLocation;
+
 type Suggestion =
   | { kind: "location"; id: string; label: string; sub: string; value: string }
+  | { kind: "room"; id: string; label: string; sub: string; value: string }
   | { kind: "google"; placeId: string; label: string; sub: string };
 
 /** Strukturierter Adress-Block — Output an die Form wenn der Caller die einzelnen
@@ -41,6 +45,10 @@ interface Props {
   onChange: (v: string) => void;
   /** Eigene Locations werden direkt vor Google geladen — match per Substring auf name + city */
   localLocations: LocalLocation[];
+  /** Optional: bekannte externe Veranstaltungsraeume — werden zwischen
+   *  Locations und Google als Vorschlaege gezeigt. Pickt der User einen Raum,
+   *  feuert onRoomPick statt nur onChange. */
+  localRooms?: LocalRoom[];
   placeholder?: string;
   id?: string;
   required?: boolean;
@@ -49,6 +57,12 @@ interface Props {
    *  die Strasse — Caller fuellt die anderen Felder via onPlace. Ohne onPlace
    *  bleibt das Verhalten Legacy (onChange mit kombiniertem formatted_address). */
   onPlace?: (parsed: ParsedAddress) => void;
+  /** Wird gefeuert wenn der User einen Raum aus den Vorschlaegen pickt.
+   *  Der Caller setzt damit room_id im Form-State. Bei freier Eingabe wird
+   *  dieser Callback NICHT gefeuert — der Caller sollte room_id in seinem
+   *  onChange-Handler clearen, damit getipptes nicht versehentlich an einem
+   *  vorher ausgewaehlten Raum kleben bleibt. */
+  onRoomPick?: (roomId: string, addressText: string) => void;
 }
 
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -152,10 +166,12 @@ export function AddressAutocomplete({
   value,
   onChange,
   localLocations,
+  localRooms,
   placeholder,
   id,
   required,
   onPlace,
+  onRoomPick,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [googleSuggestions, setGoogleSuggestions] = useState<
@@ -258,8 +274,10 @@ export function AddressAutocomplete({
     };
   }, [value, googleEnabled]);
 
-  // Lokale Locations: nur Wort-Start-Treffer (vermeidet Zufallsmatches in der Mitte von Strings)
-  function locationMatches(loc: LocalLocation, q: string): boolean {
+  // Wort-Start-Treffer auf den Adress-Feldern eines Eintrags. Gleiche Logik
+  // fuer Locations und Raeume — Matching ist datenstrukturell identisch, nur
+  // die Quelle (eigene Standorte vs. externe Raeume) ist semantisch anders.
+  function placeMatches(loc: LocalLocation, q: string): boolean {
     const lq = q.toLowerCase();
     const fields = [
       loc.name,
@@ -278,7 +296,12 @@ export function AddressAutocomplete({
 
   const localMatches = (() => {
     if (!value || value.length < 1) return [];
-    return localLocations.filter((l) => locationMatches(l, value)).slice(0, 4);
+    return localLocations.filter((l) => placeMatches(l, value)).slice(0, 4);
+  })();
+
+  const roomMatches = (() => {
+    if (!localRooms || !value || value.length < 1) return [];
+    return localRooms.filter((r) => placeMatches(r, value)).slice(0, 4);
   })();
 
   const suggestions: Suggestion[] = [
@@ -293,6 +316,17 @@ export function AddressAutocomplete({
         .filter(Boolean)
         .join(", "),
     })),
+    ...roomMatches.map((r) => ({
+      kind: "room" as const,
+      id: r.id,
+      label: r.name,
+      sub: [r.address_street, r.address_zip, r.address_city]
+        .filter(Boolean)
+        .join(", "),
+      value: [r.name, r.address_street, r.address_zip, r.address_city]
+        .filter(Boolean)
+        .join(", "),
+    })),
     ...googleSuggestions.map((g) => ({
       kind: "google" as const,
       placeId: g.place_id,
@@ -304,6 +338,13 @@ export function AddressAutocomplete({
   function pickSuggestion(s: Suggestion) {
     if (s.kind === "location") {
       onChange(s.value);
+      setOpen(false);
+    } else if (s.kind === "room") {
+      onChange(s.value);
+      // onRoomPick erst NACH onChange: parent kann in onChange room_id clearen
+      // (Defensive Default), und onRoomPick setzt sie dann wieder explizit auf
+      // diesen Raum. Reihenfolge stabil dank React-Batching im selben Frame.
+      if (onRoomPick) onRoomPick(s.id, s.value);
       setOpen(false);
     } else {
       // Google place → details holen
@@ -366,42 +407,54 @@ export function AddressAutocomplete({
         }}
         className="z-[100] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
       >
-        {suggestions.map((s, i) => (
-          <li
-            key={s.kind === "location" ? `loc-${s.id}` : `g-${s.placeId}`}
-            role="option"
-            aria-selected={i === highlight}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              pickSuggestion(s);
-            }}
-            onMouseEnter={() => setHighlight(i)}
-            className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
-              i === highlight
-                ? "bg-foreground/[0.08]"
-                : "hover:bg-foreground/[0.05]"
-            }`}
-          >
-            {s.kind === "location" ? (
-              <Building2 className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-            ) : (
-              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{s.label}</div>
-              {s.sub && (
-                <div className="truncate text-xs text-muted-foreground">
-                  {s.sub}
-                </div>
+        {suggestions.map((s, i) => {
+          const key = s.kind === "location" ? `loc-${s.id}`
+            : s.kind === "room" ? `room-${s.id}`
+            : `g-${s.placeId}`;
+          return (
+            <li
+              key={key}
+              role="option"
+              aria-selected={i === highlight}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pickSuggestion(s);
+              }}
+              onMouseEnter={() => setHighlight(i)}
+              className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
+                i === highlight
+                  ? "bg-foreground/[0.08]"
+                  : "hover:bg-foreground/[0.05]"
+              }`}
+            >
+              {s.kind === "location" ? (
+                <Building2 className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+              ) : s.kind === "room" ? (
+                <DoorOpen className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+              ) : (
+                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               )}
-            </div>
-            {s.kind === "location" && (
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60 shrink-0">
-                Eigene
-              </span>
-            )}
-          </li>
-        ))}
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{s.label}</div>
+                {s.sub && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {s.sub}
+                  </div>
+                )}
+              </div>
+              {s.kind === "location" && (
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60 shrink-0">
+                  Standort
+                </span>
+              )}
+              {s.kind === "room" && (
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60 shrink-0">
+                  Raum
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     ) : null;
 

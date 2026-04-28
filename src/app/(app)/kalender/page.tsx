@@ -74,7 +74,7 @@ export default function KalenderPage() {
   useEffect(() => {
     async function load() {
       const [jobsRes, apptsRes, profRes, activeJobsRes] = await Promise.all([
-        supabase.from("jobs").select("*, job_number, customer:customers(name), location:locations(name)").not("start_date", "is", null).neq("is_deleted", true),
+        supabase.from("jobs").select("*, job_number, customer:customers(name), location:locations(name, customer:customers(id, name)), room:rooms(id, name)").not("start_date", "is", null).neq("is_deleted", true),
         supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name), job:jobs(title, id)").not("start_time", "is", null),
         supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
         supabase.from("jobs").select("id, title, job_number").eq("status", "offen").neq("is_deleted", true).order("created_at", { ascending: false }),
@@ -91,8 +91,12 @@ export default function KalenderPage() {
           if (j.status === "storniert") continue;
           const d = new Date(j.start_date);
           const endD = j.end_date ? new Date(j.end_date) : undefined;
-          const loc = (j.location as unknown as { name: string })?.name;
-          const cust = (j.customer as unknown as { name: string })?.name;
+          // Wo-Anzeige: Standort > Raum (Aufträge ohne Standort koennen einen Raum haben).
+          const locObj = j.location as unknown as { name: string; customer?: { name: string } | null } | null;
+          const roomObj = j.room as unknown as { name: string } | null;
+          const loc = locObj?.name ?? roomObj?.name;
+          // Kunde-Anzeige: jobs.customer (extern-Auftrag) > location.customer (Verwaltungs-Kunde)
+          const cust = (j.customer as unknown as { name: string } | null)?.name ?? locObj?.customer?.name;
           if (j.status === "anfrage") {
             calItems.push({
               id: j.id, title: `Vermietentwurf: ${cust || j.title}`, date: d, endDate: endD,

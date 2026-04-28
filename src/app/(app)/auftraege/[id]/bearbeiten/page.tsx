@@ -8,6 +8,7 @@ import {
   type AuftragFormState,
   type Customer,
   type Location,
+  type Room,
 } from "@/components/auftrag-form-fields";
 import { ArrowLeft, Save, CheckCircle } from "lucide-react";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export default function AuftragBearbeitenPage() {
   const [originalStatus, setOriginalStatus] = useState<string>("");
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [locations, setLocations] = useState<Location[] | null>(null);
+  const [rooms, setRooms] = useState<Room[] | null>(null);
 
   const [form, setForm] = useState<AuftragFormState>({
     job_type: "location",
@@ -42,6 +44,7 @@ export default function AuftragBearbeitenPage() {
     location_id: "",
     customer_id: "",
     external_address: "",
+    room_id: "",
     start_date: "",
     end_date: "",
     urgent: false,
@@ -49,11 +52,11 @@ export default function AuftragBearbeitenPage() {
 
   useEffect(() => {
     async function loadAll() {
-      const [jobRes, custRes, locRes] = await Promise.all([
+      const [jobRes, custRes, locRes, roomRes] = await Promise.all([
         supabase
           .from("jobs")
           .select(
-            "id, job_number, job_type, title, description, status, priority, customer_id, location_id, external_address, start_date, end_date"
+            "id, job_number, job_type, title, description, status, priority, customer_id, location_id, room_id, external_address, start_date, end_date"
           )
           .eq("id", jobId)
           .single(),
@@ -63,10 +66,16 @@ export default function AuftragBearbeitenPage() {
           .select("id, name, address_street, address_zip, address_city")
           .eq("is_active", true)
           .order("name"),
+        supabase
+          .from("rooms")
+          .select("id, name, address_street, address_zip, address_city")
+          .eq("is_active", true)
+          .order("name"),
       ]);
 
       setCustomers((custRes.data as Customer[]) ?? []);
       setLocations((locRes.data as Location[]) ?? []);
+      setRooms((roomRes.data as Room[]) ?? []);
 
       if (jobRes.error || !jobRes.data) {
         toast.error("Auftrag nicht gefunden");
@@ -94,6 +103,7 @@ export default function AuftragBearbeitenPage() {
           location_id: j.location_id ?? "",
           customer_id: newCustomerId,
           external_address: j.external_address ?? "",
+          room_id: j.room_id ?? "",
           start_date: dateToISODate(j.start_date),
           end_date: dateToISODate(j.end_date),
           urgent: j.priority === "dringend",
@@ -107,6 +117,7 @@ export default function AuftragBearbeitenPage() {
           location_id: j.location_id ?? "",
           customer_id: j.customer_id ?? "",
           external_address: j.external_address ?? "",
+          room_id: j.room_id ?? "",
           start_date: dateToISODate(j.start_date),
           end_date: dateToISODate(j.end_date),
           urgent: j.priority === "dringend",
@@ -163,6 +174,7 @@ export default function AuftragBearbeitenPage() {
       priority: form.urgent ? "dringend" : "normal",
       customer_id: form.job_type === "extern" && form.customer_id ? form.customer_id : null,
       location_id: form.job_type === "location" && form.location_id ? form.location_id : null,
+      room_id: form.job_type === "extern" && form.room_id ? form.room_id : null,
       external_address: form.job_type === "extern" ? form.external_address.trim() || null : null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
@@ -230,6 +242,7 @@ export default function AuftragBearbeitenPage() {
           onChange={setForm}
           customers={customers}
           locations={locations}
+          rooms={rooms}
           enforceNoPastDates={false}
           onCreateCustomer={startCreateCustomer}
         />

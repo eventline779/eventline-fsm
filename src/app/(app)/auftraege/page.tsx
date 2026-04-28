@@ -26,7 +26,10 @@ import {
 } from "lucide-react";
 
 const ARCHIVE_PAGE_SIZE = 100;
-const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)";
+// Location wird mit dem Verwaltungs-Kunden gejoint, sodass Standort-Auftraege
+// (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
+// Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
+const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
@@ -537,6 +540,12 @@ export default function AuftraegePage() {
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
             const isAnfrage = job.status === "anfrage";
+            // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
+            // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
+            // Daher: wenn customer fehlt, location.customer (= Verwaltung) anzeigen.
+            const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
+            // Wo: Standort > Raum > external_address (in der Reihenfolge ihrer Spezifizitaet)
+            const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
             // Defensiv clampen — Alt-Daten koennten request_step > 4 haben (Step 5 ist abgeschafft).
             const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
@@ -564,20 +573,21 @@ export default function AuftraegePage() {
                         <h3 className="font-semibold truncate">{job.title}</h3>
                       </div>
                       {/* Kunde: eigene Zeile — garantiert immer sichtbar (vorher
-                          wurde er bei langen Daten + Location aus der Meta-Zeile geclippt). */}
-                      {job.customer?.name && (
+                          wurde er bei langen Daten + Location aus der Meta-Zeile geclippt).
+                          Bei Standort-Auftraegen ist customer NULL — Verwaltungs-Kunde
+                          aus location.customer wird als Fallback gezogen. */}
+                      {displayCustomerName && (
                         <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground min-w-0">
                           <User className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{job.customer.name}</span>
+                          <span className="truncate">{displayCustomerName}</span>
                         </div>
                       )}
-                      {/* Location + Datum: Sekundaer-Zeile — bei knappem Platz
-                          kann hier gekuerzt/geclippt werden, ohne dass der Kunde verschwindet. */}
+                      {/* Wo + Datum: Sekundaer-Zeile — Standort > Raum > freie Adresse. */}
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground min-w-0">
-                        {job.location?.name && (
+                        {placeLabel && (
                           <span className="flex items-center gap-1.5 min-w-0">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{job.location.name}</span>
+                            <span className="truncate">{placeLabel}</span>
                           </span>
                         )}
                         {job.start_date && (

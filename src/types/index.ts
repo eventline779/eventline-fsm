@@ -63,8 +63,20 @@ export interface Job {
   description: string | null;
   status: JobStatus;
   priority: JobPriority;
-  customer_id: string;
+  /** 'location' = Auftrag in unserem Standort (location_id gesetzt, customer_id i.d.R. NULL,
+   *  Verwaltungs-Kunde kommt ueber locations.customer_id).
+   *  'extern'   = Auftrag fuer externen Kunden — entweder room_id (bekannter Raum)
+   *  oder external_address (freie Adresse) ist gesetzt. */
+  job_type: "location" | "extern";
+  /** Bei location-Auftraegen typisch NULL — der Verwaltungs-Kunde aus
+   *  locations.customer_id ist die Quelle der Wahrheit. Bei extern-Auftraegen Pflicht. */
+  customer_id: string | null;
   location_id: string | null;
+  /** Bei job_type='extern': optional ein bekannter Raum aus der rooms-Tabelle.
+   *  Wenn gesetzt, wird die Adresse vom Raum gezogen — sonst external_address als Freitext. */
+  room_id: string | null;
+  /** Freie Adresse fuer extern-Auftraege ohne hinterlegten Raum. */
+  external_address: string | null;
   project_lead_id: string | null;
   start_date: string | null;
   end_date: string | null;
@@ -89,6 +101,7 @@ export interface Job {
   // Joined data
   customer?: Customer;
   location?: Location;
+  room?: Room;
   assignments?: JobAssignment[];
   project_lead?: Profile;
   appointments?: JobAppointment[];
@@ -117,26 +130,44 @@ export type JobCustomerSummary = Pick<
   | "bexio_contact_id"
 >;
 
-/** Was wir typisch vom Location-Join selektieren. */
+/** Verwaltungs-Kunde eines Standorts — wird ueberall mitgejoint, damit
+ *  Location-Auftraege (jobs.customer_id = NULL) trotzdem einen Kundennamen
+ *  anzeigen koennen (= der Standort-Betreiber, der die Rechnung bekommt). */
+export type LocationAdminCustomer = Pick<Customer, "id" | "name">;
+
+/** Was wir typisch vom Location-Join selektieren. Inkludiert immer den
+ *  Verwaltungs-Kunden, sodass die UI ueberall denselben Fallback anwenden kann. */
 export type JobLocationSummary = Pick<
   Location,
   "id" | "name" | "address_street" | "address_zip" | "address_city"
+> & {
+  customer: LocationAdminCustomer | null;
+};
+
+/** Was wir typisch vom Room-Join selektieren. Spiegelt Location-Summary fuer
+ *  konsistente Adress-Anzeige (das gleiche Pattern in Liste + Detail). */
+export type JobRoomSummary = Pick<
+  Room,
+  "id" | "name" | "address_street" | "address_zip" | "address_city"
 >;
 
-/** Job + joined customer/location/appointments wie auf der Auftrags-Liste. */
-export type JobWithRelations = Omit<Job, "customer" | "location" | "appointments"> & {
+/** Job + joined customer/location/room/appointments wie auf der Auftrags-Liste.
+ *  Location-Join inkludiert id+name und den Verwaltungs-Kunden (Fallback). */
+export type JobWithRelations = Omit<Job, "customer" | "location" | "room" | "appointments"> & {
   customer: JobCustomerSummary | null;
-  location: Pick<Location, "id" | "name"> | null;
+  location: (Pick<Location, "id" | "name"> & { customer: LocationAdminCustomer | null }) | null;
+  room: Pick<Room, "id" | "name"> | null;
   appointments?: Pick<JobAppointment, "id" | "start_time">[] | null;
 };
 
 /** Job + reichere Joins fuer die Auftrags-Detail-Seite. */
 export type JobDetailWithRelations = Omit<
   Job,
-  "customer" | "location" | "project_lead" | "cancelled_by_profile"
+  "customer" | "location" | "room" | "project_lead" | "cancelled_by_profile"
 > & {
   customer: JobCustomerSummary | null;
   location: JobLocationSummary | null;
+  room: JobRoomSummary | null;
   project_lead: { full_name: string } | null;
   cancelled_by_profile: { full_name: string } | null;
 };

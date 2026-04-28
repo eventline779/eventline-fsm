@@ -20,6 +20,10 @@ export type AuftragFormState = {
   location_id: string;
   customer_id: string;
   external_address: string;
+  /** Bei job_type='extern': optional ein bekannter Raum aus rooms-Tabelle.
+   *  Wird gesetzt sobald der User aus den Adress-Vorschlaegen einen Raum
+   *  pickt; wird wieder geleert sobald er die Adresse manuell aendert. */
+  room_id: string;
   start_date: string;
   end_date: string;
   urgent: boolean;
@@ -33,6 +37,8 @@ export type Location = {
   address_zip: string | null;
   address_city: string | null;
 };
+// Raeume haben dasselbe Adress-Shape wie Locations — Type-Alias macht das explizit.
+export type Room = Location;
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -53,6 +59,7 @@ interface Props {
   onChange: (form: AuftragFormState) => void;
   customers: Customer[] | null;
   locations: Location[] | null;
+  rooms: Room[] | null;
   /** Bei Edit-Page wollen wir nicht zwingend "Datum nicht in der Vergangenheit" enforcen. */
   enforceNoPastDates?: boolean;
   /** Wird beim Klick auf "Neuer Kunde" im Kunden-Dropdown aufgerufen. Parent kuemmert sich um Draft-Speichern + Navigation. */
@@ -64,6 +71,7 @@ export function AuftragFormFields({
   onChange,
   customers,
   locations,
+  rooms,
   enforceNoPastDates = true,
   onCreateCustomer,
 }: Props) {
@@ -78,6 +86,7 @@ export function AuftragFormFields({
       location_id: t === "location" ? form.location_id : "",
       customer_id: t === "extern" ? form.customer_id : "",
       external_address: t === "extern" ? form.external_address : "",
+      room_id: t === "extern" ? form.room_id : "",
     });
   }
 
@@ -196,9 +205,17 @@ export function AuftragFormFields({
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Ort *</p>
                 <AddressAutocomplete
                   value={form.external_address}
-                  onChange={(v) => update("external_address", v)}
+                  onChange={(v) =>
+                    // Beim Tippen room_id leeren — andernfalls "kleben" alte
+                    // Raum-Picks an einer manuell veraenderten Adresse.
+                    onChange({ ...form, external_address: v, room_id: "" })
+                  }
+                  onRoomPick={(roomId, addressText) =>
+                    onChange({ ...form, external_address: addressText, room_id: roomId })
+                  }
                   localLocations={locations ?? []}
-                  placeholder="Ort / Adresse…"
+                  localRooms={rooms ?? []}
+                  placeholder="Raum auswählen oder Adresse tippen…"
                   required
                 />
               </div>

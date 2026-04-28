@@ -8,6 +8,7 @@ import {
   type AuftragFormState,
   type Customer,
   type Location,
+  type Room,
   todayLocalISO,
 } from "@/components/auftrag-form-fields";
 import { ArrowLeft, Save, FileEdit } from "lucide-react";
@@ -25,6 +26,7 @@ function NeuerAuftragPageContent() {
   const [saving, setSaving] = useState<"draft" | "create" | null>(null);
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [locations, setLocations] = useState<Location[] | null>(null);
+  const [rooms, setRooms] = useState<Room[] | null>(null);
   const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
 
   const [form, setForm] = useState<AuftragFormState>({
@@ -34,6 +36,7 @@ function NeuerAuftragPageContent() {
     location_id: searchParams.get("location_id") || "",
     customer_id: searchParams.get("customer_id") || "",
     external_address: "",
+    room_id: "",
     start_date: "",
     end_date: "",
     urgent: false,
@@ -59,10 +62,15 @@ function NeuerAuftragPageContent() {
 
   useEffect(() => {
     async function loadData() {
-      const [custRes, locRes, maxRes] = await Promise.all([
+      const [custRes, locRes, roomRes, maxRes] = await Promise.all([
         supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
         supabase
           .from("locations")
+          .select("id, name, address_street, address_zip, address_city")
+          .eq("is_active", true)
+          .order("name"),
+        supabase
+          .from("rooms")
           .select("id, name, address_street, address_zip, address_city")
           .eq("is_active", true)
           .order("name"),
@@ -75,6 +83,7 @@ function NeuerAuftragPageContent() {
       ]);
       setCustomers((custRes.data as Customer[]) ?? []);
       setLocations((locRes.data as Location[]) ?? []);
+      setRooms((roomRes.data as Room[]) ?? []);
       const maxRow = maxRes.data?.[0] as { job_number: number } | undefined;
       setNextJobNumber(maxRow?.job_number ? maxRow.job_number + 1 : 26200);
     }
@@ -127,6 +136,7 @@ function NeuerAuftragPageContent() {
       priority: form.urgent ? "dringend" : "normal",
       customer_id: form.job_type === "extern" && form.customer_id ? form.customer_id : null,
       location_id: form.job_type === "location" && form.location_id ? form.location_id : null,
+      room_id: form.job_type === "extern" && form.room_id ? form.room_id : null,
       external_address: form.job_type === "extern" ? form.external_address.trim() || null : null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
@@ -200,6 +210,7 @@ function NeuerAuftragPageContent() {
           onChange={setForm}
           customers={customers}
           locations={locations}
+          rooms={rooms}
           onCreateCustomer={startCreateCustomer}
         />
 
