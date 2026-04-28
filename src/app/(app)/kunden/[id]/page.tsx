@@ -15,8 +15,11 @@ import {
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
+import { Modal } from "@/components/ui/modal";
 import Link from "next/link";
 import { toast } from "sonner";
+
+const DELETE_CODE = "5225";
 
 const COUNTRY_OPTIONS = [
   { code: "CH", label: "Schweiz" },
@@ -90,35 +93,38 @@ export default function KundenDetailPage() {
   }
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCode, setDeleteCode] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Konsistent zur Liste: Soft-Delete via /api/customers/delete (is_active=false).
+  // Auftraege/Termine/Dokumente bleiben erhalten — sie haengen weiterhin am Kunden,
+  // werden aber in keiner aktiven Liste mehr angezeigt sobald is_active=false.
+  // Hard-Delete waere durch Foreign Keys (jobs, locations, documents) blockiert
+  // und wuerde die Historie zerreissen.
   async function handleDelete() {
-    setDeleting(true);
-
-    // Verknüpfte Daten löschen
-    const { data: jobIds } = await supabase.from("jobs").select("id").eq("customer_id", id);
-    const ids = jobIds?.map((j: any) => j.id) || [];
-
-    if (ids.length > 0) {
-      await supabase.from("job_assignments").delete().in("job_id", ids);
-      await supabase.from("job_appointments").delete().in("job_id", ids);
-      await supabase.from("service_reports").delete().in("job_id", ids);
-      await supabase.from("documents").delete().in("job_id", ids);
-      await supabase.from("time_entries").delete().in("job_id", ids);
-    }
-    // Anfragen sind seit Migration 026 auch jobs (status='anfrage'), also reicht jobs-delete.
-    await supabase.from("jobs").delete().eq("customer_id", id);
-
-    const { error } = await supabase.from("customers").delete().eq("id", id);
-
-    if (error) {
-      toast.error("Fehler: " + error.message);
-      setDeleting(false);
+    if (deleteCode !== DELETE_CODE) {
+      toast.error("Falscher Code");
       return;
     }
-
-    toast.success("Kunde gelöscht");
-    router.push("/kunden");
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/customers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: id, code: deleteCode }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error("Fehler: " + (json.error || "Unbekannt"));
+        setDeleting(false);
+        return;
+      }
+      toast.success("Kunde gelöscht");
+      router.push("/kunden");
+    } catch (e) {
+      toast.error("Fehler beim Löschen: " + (e instanceof Error ? e.message : "unbekannt"));
+      setDeleting(false);
+    }
   }
 
   if (!customer) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
@@ -170,32 +176,46 @@ export default function KundenDetailPage() {
         </div>
       </div>
 
-      {/* Löschen Bestätigung */}
-      {showDeleteConfirm && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-5">
-            <h3 className="font-semibold text-red-800">Kunde "{customer.name}" wirklich löschen?</h3>
-            <p className="text-sm text-red-600 mt-1">Alle verknüpften Aufträge, Vermietentwürfe und Dokumente werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
-            <div className="flex gap-3 mt-4">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="kasten kasten-muted"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="kasten kasten-red"
-              >
-                <Trash2 className="h-3.5 w-3.5" />{deleting ? "Löschen..." : "Endgültig löschen"}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Löschen-Modal — gleiche UX wie auf der Kunden-Liste (Code-Bestaetigung) */}
+      <Modal
+        open={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setDeleteCode(""); }}
+        title="Kunde löschen"
+      >
+        <p className="text-sm text-muted-foreground">
+          <strong>{customer.name}</strong> wird aus der Kundenliste entfernt.
+          Bestehende Aufträge und Dokumente bleiben für die Historie erhalten.
+        </p>
+        <div>
+          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
+          <Input
+            value={deleteCode}
+            onChange={(e) => setDeleteCode(e.target.value)}
+            placeholder="Code eingeben..."
+            className="mt-1.5 text-center text-lg tracking-widest font-mono"
+            maxLength={4}
+          />
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => { setShowDeleteConfirm(false); setDeleteCode(""); }}
+            disabled={deleting}
+            className="kasten kasten-muted flex-1"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting || deleteCode.length < 4}
+            className="kasten kasten-red flex-1"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {deleting ? "Löschen…" : "Endgültig löschen"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Kundendaten */}
       <Card className="bg-card">
