@@ -186,11 +186,9 @@ export default function PartnerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-            Partner
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Partner</h1>
           {/* Leerer Subtitle-Platzhalter — Header-Hoehe identisch zu /kunden,
               damit die Action-Buttons rechts auf gleicher Linie sitzen. */}
           <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
