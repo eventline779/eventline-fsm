@@ -10,7 +10,7 @@ import { CUSTOMER_TYPES, JOB_STATUS } from "@/lib/constants";
 import type { Customer, Job, CustomerType } from "@/types";
 import {
   ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
-  ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote,
+  ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote, ChevronDown,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
@@ -37,6 +37,10 @@ export default function KundenDetailPage() {
   const supabase = createClient();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  // Auftrags-Liste ist initial auf 2 Eintraege begrenzt; "Mehr anzeigen"
+  // entfaltet die volle Liste. Spiegelt das "Mehr laden"-Pattern aus
+  // /auftraege, nur client-seitig (Daten sind schon da).
+  const [showAllJobs, setShowAllJobs] = useState(false);
   // Verknuepfungs-Counts entscheiden ob die Hauptaktion Hard-Delete oder
   // Archivieren ist. jobs.length koennen wir aus dem Auftraege-Join ziehen,
   // documents/locations/rental_requests holen wir separat (head:true Counts).
@@ -399,20 +403,34 @@ export default function KundenDetailPage() {
         <CardContent className="space-y-2">
           {jobs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">Keine Aufträge für diesen Kunden.</p>
-          ) : jobs.map((j) => (
-            <Link key={j.id} href={`/auftraege/${j.id}`}>
-              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <JobNumber number={j.job_number} />
-                    <span className="font-medium text-sm">{j.title}</span>
-                    <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_STATUS[j.status].color}`}>{JOB_STATUS[j.status].label}</span>
+          ) : (
+            <>
+              {(showAllJobs ? jobs : jobs.slice(0, 2)).map((j) => (
+                <Link key={j.id} href={`/auftraege/${j.id}`}>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <JobNumber number={j.job_number} />
+                        <span className="font-medium text-sm">{j.title}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_STATUS[j.status].color}`}>{JOB_STATUS[j.status].label}</span>
+                      </div>
+                      {(j.location as unknown as { name: string })?.name && <p className="text-xs text-muted-foreground mt-0.5">{(j.location as unknown as { name: string }).name}</p>}
+                    </div>
                   </div>
-                  {(j.location as unknown as { name: string })?.name && <p className="text-xs text-muted-foreground mt-0.5">{(j.location as unknown as { name: string }).name}</p>}
-                </div>
-              </div>
-            </Link>
-          ))}
+                </Link>
+              ))}
+              {jobs.length > 2 && !showAllJobs && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllJobs(true)}
+                  className="w-full pt-1 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Mehr anzeigen ({jobs.length - 2})
+                </button>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
