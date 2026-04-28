@@ -34,14 +34,12 @@ export function CustomerWorldMap() {
   useEffect(() => {
     const supabase = createClient();
     async function load() {
-      // Filter konsistent zur /kunden-Liste: nur archived_at — is_active ist
-      // Legacy aus dem alten Soft-Delete-System und wird nicht mehr aktiv genutzt.
-      // Wuerden wir hier zusaetzlich is_active=true filtern, zaehlt die Karte
-      // weniger Kunden als die Liste anzeigt.
+      // Zaehlt aktive UND archivierte Kunden — die geographische Verteilung
+      // ist eine historische Sicht und soll zeigen wo wir je Kunden hatten,
+      // nicht nur wo wir aktuell aktive Kunden haben.
       const { data: rows } = await supabase
         .from("customers")
-        .select("address_country")
-        .is("archived_at", null);
+        .select("address_country");
       const counts = new Map<string, number>();
       for (const r of (rows ?? []) as { address_country: string | null }[]) {
         if (!r.address_country) continue;

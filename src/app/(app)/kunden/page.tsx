@@ -300,9 +300,9 @@ export default function KundenPage() {
         </div>
       </div>
 
-      {/* Weltkarte — nur in der aktiven Ansicht (Archivierte sind historisch,
-          fuer geographische Verteilung nicht relevant) */}
-      {!showArchive && <CustomerWorldMap />}
+      {/* Laender-Auflistung — zeigt aktive UND archivierte Kunden, also die
+          gesamte geographische Historie. Steht oben in beiden Ansichten. */}
+      <CustomerWorldMap />
 
       {/* Bexio-Nr-Backfill-Banner — nur in Aktiv-Ansicht relevant */}
       {!showArchive && unsyncedCount > 0 && (
