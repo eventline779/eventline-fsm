@@ -414,7 +414,10 @@ export default function KundenPage() {
             <span>Ort</span>
             <span aria-hidden />
           </div>
-          <div className="divide-y">
+          {/* Rows-Container mit p-1.5 Inset, sodass die rounded-lg-Highlights
+              der einzelnen Zeilen vom Card-Rand abgesetzt sind. space-y-0.5
+              gibt subtile Trennung zwischen Zeilen statt harter divide-y-Linien. */}
+          <div className="p-1.5 space-y-0.5">
             {customers.map((c) => {
               const Icon = TYPE_ICONS[c.type];
               const totalRel = relCount(c.jobs) + relCount(c.documents) + relCount(c.locations) + relCount(c.rental_requests);
@@ -437,7 +440,7 @@ export default function KundenPage() {
                 : "hover:!text-green-500";
               return (
                 <div key={c.id} className="group">
-                  <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-4 py-2 hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
+                  <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-2.5 py-2 rounded-lg hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
                     <span className="font-mono text-xs">
                       {c.bexio_nr ? (
                         // Bexio-Lime-Pill — gleicher tinted Stil wie kasten-bexio
@@ -473,7 +476,7 @@ export default function KundenPage() {
                       <ActionIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="md:hidden flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors">
+                  <div className="md:hidden flex items-center gap-3 px-2.5 py-3 rounded-lg hover:bg-foreground/[0.04] transition-colors">
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                       <span className="font-mono text-[10px] shrink-0">
                         {c.bexio_nr ? (
