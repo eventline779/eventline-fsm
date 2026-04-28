@@ -440,9 +440,11 @@ export default function KundenPage() {
                   <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-4 py-2 hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
                     <span className="font-mono text-xs">
                       {c.bexio_nr ? (
-                        // Bexio-Lime — gleiche Farbe wie kasten-bexio Buttons,
-                        // damit der visuelle Bezug zu Bexio direkt klar ist.
-                        <span className="text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)]">
+                        // Bexio-Lime-Pill — gleicher tinted Stil wie kasten-bexio
+                        // Buttons. Im Light-Mode hebt der lime-Hintergrund die
+                        // Nummer klar vom weissen Card-Background ab; im Dark-Mode
+                        // genauso konsistent zum Bexio-Button.
+                        <span className="font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.15)] dark:bg-[rgba(196,214,0,0.2)]">
                           {c.bexio_nr}
                         </span>
                       ) : (
@@ -474,11 +476,11 @@ export default function KundenPage() {
                   </div>
                   <div className="md:hidden flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors">
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="font-mono text-[10px] w-12 shrink-0">
+                      <span className="font-mono text-[10px] shrink-0">
                         {c.bexio_nr ? (
-                          <span className="text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)]">{c.bexio_nr}</span>
+                          <span className="font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.15)] dark:bg-[rgba(196,214,0,0.2)]">{c.bexio_nr}</span>
                         ) : (
-                          <span className="text-muted-foreground/40">—</span>
+                          <span className="text-muted-foreground/40 w-12 inline-block">—</span>
                         )}
                       </span>
                       <Icon className="h-4 w-4 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
