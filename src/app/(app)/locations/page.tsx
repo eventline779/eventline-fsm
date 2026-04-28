@@ -18,6 +18,7 @@ import Link from "next/link";
 import {
   Plus, Search, MapPin, Users as UsersIcon, Building, DoorOpen, X,
 } from "lucide-react";
+import { LocationsSwitzerlandMap } from "@/components/locations-switzerland-map";
 
 type OrtType = "standort" | "raum";
 
@@ -139,6 +140,9 @@ export default function OrtePage() {
           </button>
         </div>
       </div>
+
+      {/* Schweizer Karte mit Punkten fuer alle Verwaltungen + Raeume */}
+      <LocationsSwitzerlandMap />
 
       {/* Inline Form — gleiche Felder, nur Header und Submit-Label aendern sich.
           Standort = Verwaltung (intern, mit Customer-Verknuepfung in Details).
