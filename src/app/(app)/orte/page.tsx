@@ -305,9 +305,12 @@ export default function OrtePage() {
             return (
               <Link key={`${it.type}-${it.id}`} href={detailHref}>
                 <Card className="bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 group cursor-pointer h-full">
-                  <CardContent className="p-5">
+                  <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gray-100 dark:bg-foreground/[0.06] text-gray-500 dark:text-muted-foreground group-hover:bg-red-50 group-hover:text-red-500 dark:group-hover:bg-red-500/15 dark:group-hover:text-red-400 transition-colors shrink-0">
+                      {/* Icon-Pad — Hover-Rot in Dark gleich kraeftig wie in Light:
+                          bg-Tint 20% statt 15%, text-red-500 statt -400. Mit !-Modifier
+                          damit es das Default-text-muted-foreground sicher uebersteuert. */}
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 dark:bg-foreground/[0.06] text-gray-500 dark:text-muted-foreground group-hover:bg-red-50 group-hover:text-red-500 dark:group-hover:!bg-red-500/20 dark:group-hover:!text-red-500 transition-colors shrink-0">
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -326,7 +329,7 @@ export default function OrtePage() {
                         {it.type === "standort" ? "Verwaltung" : "Raum"}
                       </span>
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       {it.capacity && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300">
                           <UsersIcon className="h-3 w-3" />
@@ -339,11 +342,6 @@ export default function OrtePage() {
                         </span>
                       )}
                     </div>
-                    {it.technical_details && (
-                      <p className="mt-3 text-xs text-muted-foreground line-clamp-2">
-                        {it.technical_details}
-                      </p>
-                    )}
                   </CardContent>
                 </Card>
               </Link>
