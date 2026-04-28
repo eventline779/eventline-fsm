@@ -63,8 +63,13 @@ export default function StandortDetailPage() {
     ]);
     if (locRes.data) {
       setLocation(locRes.data as Location);
+      // Wichtig: linkedCustomer IMMER setzen — auch auf null wenn customer_id
+      // entfernt wurde. Sonst bleibt der vorherige State stehen und User
+      // muss manuell refreshen damit die Aenderung sichtbar wird.
       if (locRes.data.customer_id && custRes.data) {
         setLinkedCustomer((custRes.data as Customer[]).find((c) => c.id === locRes.data.customer_id) || null);
+      } else {
+        setLinkedCustomer(null);
       }
     }
     if (contRes.data) setContacts(contRes.data as LocationContact[]);
