@@ -64,6 +64,9 @@ export default function KundenPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<CustomerType | "all">("all");
+  // Bexio-Filter: "all" zeigt alle, "linked" nur die mit bexio_contact_id,
+  // "unlinked" nur die ohne. Hilft beim manuellen Bexio-Sync.
+  const [filterBexio, setFilterBexio] = useState<"all" | "linked" | "unlinked">("all");
   const [showArchive, setShowArchive] = useState(false);
   const [archiveCount, setArchiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -95,6 +98,8 @@ export default function KundenPage() {
     }
 
     if (filterType !== "all") q = q.eq("type", filterType);
+    if (filterBexio === "linked") q = q.not("bexio_contact_id", "is", null);
+    else if (filterBexio === "unlinked") q = q.is("bexio_contact_id", null);
     const term = search.trim();
     if (term.length > 0) {
       const like = `%${term}%`;
@@ -104,7 +109,7 @@ export default function KundenPage() {
       q = q.or(`and(name.eq.${cursor.name},id.gt.${cursor.id}),name.gt.${cursor.name}`);
     }
     return q.order("name", { ascending: true }).order("id", { ascending: true }).limit(PAGE_SIZE + 1);
-  }, [supabase, filterType, search, showArchive]);
+  }, [supabase, filterType, filterBexio, search, showArchive]);
 
   const loadCustomers = useCallback(async () => {
     const myId = ++queryIdRef.current;
@@ -245,7 +250,7 @@ export default function KundenPage() {
     }
   }
 
-  const hasFilter = !!search.trim() || filterType !== "all";
+  const hasFilter = !!search.trim() || filterType !== "all" || filterBexio !== "all";
 
   // Aktions-Modal-Texte
   const actionLabel = !actionTarget ? "" :
@@ -324,7 +329,7 @@ export default function KundenPage() {
             className="pl-10 h-9"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(["all", "company", "individual", "organization"] as const).map((t) => (
             <button
               key={t}
@@ -335,11 +340,31 @@ export default function KundenPage() {
               {t === "all" ? "Alle" : CUSTOMER_TYPES[t]}
             </button>
           ))}
+          {/* Visueller Trenner zwischen Type-Filter und Bexio-Filter */}
+          <span className="w-px self-stretch bg-border mx-0.5" aria-hidden="true" />
+          {/* Bexio-Filter — drei Zustaende: Alle / Mit / Ohne. "Mit" nutzt
+              kasten-bexio (Lime) damit der Bezug zu Bexio sofort sichtbar ist. */}
+          <button
+            type="button"
+            onClick={() => setFilterBexio(filterBexio === "linked" ? "all" : "linked")}
+            className={filterBexio === "linked" ? "kasten kasten-bexio" : "kasten-toggle-off"}
+            title="Nur Kunden anzeigen die mit Bexio verknüpft sind"
+          >
+            Mit Bexio
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterBexio(filterBexio === "unlinked" ? "all" : "unlinked")}
+            className={filterBexio === "unlinked" ? "kasten-active" : "kasten-toggle-off"}
+            title="Nur Kunden anzeigen die noch nicht in Bexio sind"
+          >
+            Ohne Bexio
+          </button>
         </div>
         {hasFilter && (
           <button
             type="button"
-            onClick={() => { setSearch(""); setFilterType("all"); }}
+            onClick={() => { setSearch(""); setFilterType("all"); setFilterBexio("all"); }}
             className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
             title="Filter zurücksetzen"
           >
