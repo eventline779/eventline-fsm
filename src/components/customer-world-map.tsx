@@ -2,28 +2,21 @@
 
 /**
  * Auflistung der Laender aus denen unsere Kunden kommen — Flagge + Land + Anzahl.
- * Sortiert nach Kundenzahl (haeufigste zuerst). Flaggen via Emoji (Regional-
- * Indicator-Codepoints), keine externen Assets noetig.
+ * Sortiert nach Kundenzahl (haeufigste zuerst).
  *
- * Komponentenname bleibt "CustomerWorldMap" fuer Import-Kompatibilitaet —
- * die Karte selbst war zu fragil bei den Cropping-Math, eine Liste ist
- * deterministisch und skaliert.
+ * Flaggen via flag-icons (CSS, selbst-gehostet) — nicht via Emoji, weil Windows
+ * keine Flag-Emoji-Font hat und die Codepoints stattdessen als ISO-Buchstaben-
+ * paare gerendert werden.
+ *
+ * Komponentenname bleibt "CustomerWorldMap" fuer Import-Kompatibilitaet — die
+ * urspruengliche Karte war zu fragil bei der Crop-Math, Liste ist deterministisch.
  */
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import "flag-icons/css/flag-icons.min.css";
 
 type CountryDatum = { country: string; count: number };
-
-// ISO-2 → Emoji-Flag via Regional-Indicator-Symbol (U+1F1E6 + Buchstabe-A-Offset).
-function flagEmoji(iso: string): string {
-  if (!iso || iso.length !== 2) return "";
-  return iso
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-    .join("");
-}
 
 // Lokalisiert via Intl — kein externes Mapping noetig. Fallback: ISO-Code.
 const REGION_NAMES = typeof Intl !== "undefined" && "DisplayNames" in Intl
@@ -76,7 +69,14 @@ export function CustomerWorldMap() {
             className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/50 text-sm"
             title={`${countryName(d.country)}: ${d.count} ${d.count === 1 ? "Kunde" : "Kunden"}`}
           >
-            <span className="text-base leading-none" aria-hidden>{flagEmoji(d.country)}</span>
+            {/* flag-icons CSS-Klasse: fi-{iso2-lowercase}, default 4:3-Verhaeltnis.
+                Inline-block mit fester em-Breite damit alle Flaggen gleich gross
+                erscheinen unabhaengig vom rendering. */}
+            <span
+              className={`fi fi-${d.country.toLowerCase()} inline-block shrink-0 rounded-sm shadow-sm`}
+              style={{ width: "1.4em", height: "1.05em" }}
+              aria-hidden
+            />
             <span className="font-medium">{countryName(d.country)}</span>
             <span className="text-muted-foreground tabular-nums text-xs">
               {d.count}
