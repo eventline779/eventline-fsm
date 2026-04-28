@@ -593,18 +593,16 @@ export default function AuftraegePage() {
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Zwei-zeilige Card, links UND rechts mit eigenen Sub-Zeilen:
-                      Links Zeile 1: Titel + Badges
-                      Links Zeile 2: Meta (Kunde · Ort · Datum)
-                      Rechts Zeile 1: Hint-Text + Action-Icon
-                      Rechts Zeile 2: Step-Tracker (nur bei Vermietentwuerfen, sonst leer)
-                    Card-Hoehe gleich wie vorher dank py-1.5. */}
+                {/* Zwei-spaltiges Layout, jede Spalte eigene 2 Zeilen.
+                    Rechte Spalte ist eigenes flex-col mit items-end, sodass
+                    sowohl Action-Icon (oben) als auch Step-Tracker (unten)
+                    am rechten Rand der Spalte enden — buendig zueinander. */}
                 <div className="flex items-center gap-3 px-4 py-1.5">
                   <JobNumber number={job.job_number} />
-                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                    {/* OBERE ZEILE: Titel links, Hint+Action rechts */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex-1 flex items-center gap-3 min-w-0">
+                    {/* LINKE SPALTE: Titel-Zeile + Meta-Zeile */}
+                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span className="font-medium text-sm truncate">{job.title}</span>
                         {job.priority === "dringend" && isActive && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
@@ -622,7 +620,21 @@ export default function AuftraegePage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                        {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
+                        {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
+                        {placeLabel && <span className="truncate">{placeLabel}</span>}
+                        {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
+                        {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
+                        {!displayCustomerName && !placeLabel && !dateText && (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* RECHTE SPALTE: items-end sorgt fuer rechts-buendige Stapelung
+                        von Hint+Action (oben) und Tracker (unten). */}
+                    <div className="shrink-0 flex flex-col gap-0.5 items-end">
+                      <div className="flex items-center gap-1.5">
                         {isAnfrage && isMailStep && (
                           <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
                             {stepInfo.label}
@@ -642,23 +654,8 @@ export default function AuftraegePage() {
                           {renderActionIcon("sm")}
                         </div>
                       </div>
-                    </div>
-                    {/* UNTERE ZEILE: Meta links, Step-Tracker rechts (nur Anfrage) */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 flex-1">
-                        {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
-                        {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
-                        {placeLabel && <span className="truncate">{placeLabel}</span>}
-                        {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
-                        {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
-                        {!displayCustomerName && !placeLabel && !dateText && (
-                          <span className="text-muted-foreground/40">—</span>
-                        )}
-                      </div>
                       {isAnfrage && (
-                        <div className="shrink-0">
-                          <RequestStepTracker currentStep={currentStep} size="sm" />
-                        </div>
+                        <RequestStepTracker currentStep={currentStep} size="sm" />
                       )}
                     </div>
                   </div>
