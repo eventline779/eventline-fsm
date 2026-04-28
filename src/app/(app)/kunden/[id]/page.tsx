@@ -220,7 +220,7 @@ export default function KundenDetailPage() {
             onClick={() => setActionKind(primaryAction)}
             className={
               primaryAction === "delete" ? "kasten kasten-red"
-              : primaryAction === "archive" ? "kasten kasten-purple"
+              : primaryAction === "archive" ? "kasten kasten-muted"
               : "kasten kasten-green"
             }
             aria-label={
@@ -275,7 +275,7 @@ export default function KundenDetailPage() {
             disabled={actionRunning}
             className={
               actionKind === "delete" ? "kasten kasten-red flex-1"
-              : actionKind === "archive" ? "kasten kasten-purple flex-1"
+              : actionKind === "archive" ? "kasten kasten-muted flex-1"
               : "kasten kasten-green flex-1"
             }
           >
