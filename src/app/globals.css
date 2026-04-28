@@ -494,6 +494,28 @@ html, body, *, *::before, *::after {
     background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
   }
 
+  /* Archive-Action-Button — visuell zur kasten-X-Familie (2px Border + tinted Bg)
+     aber neutral grau statt schwarz/weiss wie kasten-active. Dezenter, weil
+     "Archivieren" nicht so prominent sein soll wie "Loeschen" (rot) oder
+     "Reaktivieren" (gruen). */
+  .kasten-archive {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
+    color: var(--muted-foreground);
+    border: 2px solid color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+    background-color: color-mix(in oklab, var(--muted-foreground) 10%, transparent);
+  }
+  .kasten-archive:hover:not(:disabled) {
+    color: var(--foreground);
+    background-color: color-mix(in oklab, var(--muted-foreground) 18%, transparent);
+    border-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+  }
+  .dark .kasten-archive {
+    background-color: color-mix(in oklab, var(--muted-foreground) 14%, transparent);
+  }
+  .dark .kasten-archive:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--muted-foreground) 24%, transparent);
+  }
+
   .kasten-toggle-off {
     @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
     color: color-mix(in oklab, var(--foreground) 70%, transparent);

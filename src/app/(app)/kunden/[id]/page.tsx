@@ -42,13 +42,22 @@ export default function KundenDetailPage() {
   // /auftraege, nur client-seitig (Daten sind schon da).
   const [showAllJobs, setShowAllJobs] = useState(false);
 
-  // Sortierung wie auf /auftraege: kommende Termine zuerst (naechster oben),
-  // vergangene danach (neueste zuerst). Datum-loose ans Ende. Konsistent zur
-  // Hauptliste damit der "naechste Termin" immer oben steht.
+  // Sortierung wie auf /auftraege, plus: stornierte Auftraege landen ans
+  // absolute Ende (unabhaengig vom Datum) — sie sind nicht relevant fuer
+  // "naechster Termin"-Logik. Innerhalb der nicht-stornierten:
+  //   - kommende zuerst (aufsteigend, naechster oben)
+  //   - vergangene danach (absteigend, neueste zuerst)
+  //   - datum-loose ans Ende
   const sortedJobs = useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayMs = todayStart.getTime();
     return [...jobs].sort((a, b) => {
+      // Stornierte immer nach unten — egal ob ihr (geplantes) Datum in der
+      // Zukunft liegt: die Veranstaltung findet nicht statt.
+      const aCancelled = a.status === "storniert";
+      const bCancelled = b.status === "storniert";
+      if (aCancelled && !bCancelled) return 1;
+      if (!aCancelled && bCancelled) return -1;
       // Referenz-Datum: end_date wenn vorhanden, sonst start_date — damit
       // mehrtaegige Events bis zum letzten Tag als "kommend" gelten.
       const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -246,7 +255,7 @@ export default function KundenDetailPage() {
             onClick={() => setActionKind(primaryAction)}
             className={
               primaryAction === "delete" ? "kasten kasten-red"
-              : primaryAction === "archive" ? "kasten-active"
+              : primaryAction === "archive" ? "kasten-archive"
               : "kasten kasten-green"
             }
             aria-label={
@@ -301,7 +310,7 @@ export default function KundenDetailPage() {
             disabled={actionRunning}
             className={
               actionKind === "delete" ? "kasten kasten-red flex-1"
-              : actionKind === "archive" ? "kasten-active flex-1"
+              : actionKind === "archive" ? "kasten-archive flex-1"
               : "kasten kasten-green flex-1"
             }
           >

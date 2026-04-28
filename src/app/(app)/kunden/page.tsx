@@ -264,11 +264,11 @@ export default function KundenPage() {
     : actionTarget.kind === "archive"
       ? `${actionTarget.customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
     : `${actionTarget.customer.name} wird wieder als aktiver Kunde geführt.`;
-  // Archive nutzt kasten-active (2px Border + neutrales Foreground-Tint) damit
-  // die Optik mit den anderen kasten-X-Buttons fluchtet — neutral aber nicht
-  // ohne Border wie kasten-muted.
+  // Archive nutzt kasten-archive (2px Border + grauer Tint) damit die Optik
+  // mit den anderen kasten-X-Buttons fluchtet ohne so hart wie schwarz/weiss
+  // (kasten-active) zu wirken.
   const actionButtonClass = actionTarget?.kind === "delete" ? "kasten kasten-red"
-    : actionTarget?.kind === "archive" ? "kasten-active"
+    : actionTarget?.kind === "archive" ? "kasten-archive"
     : "kasten kasten-green";
   const actionButtonLabel = actionTarget?.kind === "delete" ? "Löschen"
     : actionTarget?.kind === "archive" ? "Archivieren"
