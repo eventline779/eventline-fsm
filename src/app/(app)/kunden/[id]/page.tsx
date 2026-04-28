@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CUSTOMER_TYPES, JOB_STATUS } from "@/lib/constants";
 import type { Customer, Job, CustomerType } from "@/types";
 import {
-  ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin,
-  ClipboardList, Trash2, Archive, ArchiveRestore,
+  ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
+  ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
@@ -344,12 +344,48 @@ export default function KundenDetailPage() {
               </button>
             </div>
           ) : (
+            // Lese-Ansicht: alle Felder werden immer dargestellt — leere mit
+            // Platzhalter "—". So bleibt die Card-Hoehe pro Kunde konsistent
+            // und keine Position springt je nach gefuellten Werten.
             <div className="space-y-3">
-              {customer.email && <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm hover:text-blue-600 transition-colors"><Mail className="h-4 w-4 text-gray-400" />{customer.email}</a>}
-              {customer.phone && <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm hover:text-blue-600 transition-colors"><Phone className="h-4 w-4 text-gray-400" />{customer.phone}</a>}
-              {customer.address_street && <div className="flex items-center gap-3 text-sm"><MapPin className="h-4 w-4 text-gray-400" />{customer.address_street}, {customer.address_zip} {customer.address_city}</div>}
-              {customer.notes && <div className="mt-3 p-3 rounded-lg bg-gray-50 text-sm text-gray-600">{customer.notes}</div>}
-              {!customer.email && !customer.phone && !customer.address_street && !customer.notes && <p className="text-sm text-muted-foreground">Keine weiteren Daten hinterlegt.</p>}
+              <FieldRow icon={Mail} label="E-Mail">
+                {customer.email ? (
+                  <a href={`mailto:${customer.email}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{customer.email}</a>
+                ) : (
+                  <EmptyValue />
+                )}
+              </FieldRow>
+              <FieldRow icon={Phone} label="Telefon">
+                {customer.phone ? (
+                  <a href={`tel:${customer.phone}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{customer.phone}</a>
+                ) : (
+                  <EmptyValue />
+                )}
+              </FieldRow>
+              <FieldRow icon={MapPin} label="Adresse">
+                {(customer.address_street || customer.address_zip || customer.address_city) ? (
+                  <span>
+                    {[customer.address_street, [customer.address_zip, customer.address_city].filter(Boolean).join(" ")]
+                      .filter(Boolean).join(", ") || "—"}
+                  </span>
+                ) : (
+                  <EmptyValue />
+                )}
+              </FieldRow>
+              <FieldRow icon={Flag} label="Land">
+                {customer.address_country ? (
+                  <span>{COUNTRY_OPTIONS.find(c => c.code === customer.address_country)?.label ?? customer.address_country}</span>
+                ) : (
+                  <EmptyValue />
+                )}
+              </FieldRow>
+              <FieldRow icon={StickyNote} label="Notizen" align="start">
+                {customer.notes ? (
+                  <span className="whitespace-pre-wrap">{customer.notes}</span>
+                ) : (
+                  <EmptyValue />
+                )}
+              </FieldRow>
             </div>
           )}
         </CardContent>
@@ -381,4 +417,31 @@ export default function KundenDetailPage() {
       </Card>
     </div>
   );
+}
+
+// FieldRow + EmptyValue: kleine Helfer fuer die Kundendaten-Lese-Ansicht.
+// Sorgen dafuer dass jedes Feld immer dieselbe Hoehe + Position einnimmt,
+// auch wenn der Wert leer ist (Card-Layout bleibt pro Kunde konsistent).
+function FieldRow({
+  icon: Icon,
+  label,
+  children,
+  align = "center",
+}: {
+  icon: typeof Mail;
+  label: string;
+  children: React.ReactNode;
+  align?: "center" | "start";
+}) {
+  return (
+    <div className={`grid grid-cols-[auto_80px_1fr] gap-3 text-sm items-${align}`}>
+      <Icon className={`h-4 w-4 text-muted-foreground/60 shrink-0 ${align === "start" ? "mt-0.5" : ""}`} />
+      <span className="text-muted-foreground/80">{label}</span>
+      <span className="min-w-0 break-words">{children}</span>
+    </div>
+  );
+}
+
+function EmptyValue() {
+  return <span className="text-muted-foreground/40">—</span>;
 }
