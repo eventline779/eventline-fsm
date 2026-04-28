@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,15 +8,19 @@ import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
 import Link from "next/link";
 import {
-  Plus, Search, Building2, User, Globe, Mail, Phone, MapPin, Users, Trash2, X,
+  Plus, Search, Building2, User, Globe, Mail, Phone, MapPin, Users, Trash2, X, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
 const DELETE_CODE = "5225";
+const PAGE_SIZE = 50;
 
 export default function KundenPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<CustomerType | "all">("all");
   const [loading, setLoading] = useState(true);
@@ -24,12 +28,70 @@ export default function KundenPage() {
   const [deleteCode, setDeleteCode] = useState("");
   const supabase = createClient();
 
-  useEffect(() => { loadCustomers(); }, []);
+  // Debounce-Ref damit Tippen nicht jeden Tastenanschlag eine Query feuert.
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Race-Guard: alte Antwort, die nach neuerer Query zurueckkommt, ignorieren.
+  const queryIdRef = useRef(0);
 
-  async function loadCustomers() {
-    const { data } = await supabase.from("customers").select("*").eq("is_active", true).order("name");
-    if (data) setCustomers(data as Customer[]);
+  // Eine Query baut sich aus aktuellem Filter+Suche zusammen — server-seitig,
+  // damit Suche/Filter ueber den vollen Datenbestand laufen, nicht nur ueber
+  // den geladenen Chunk. Skaliert auch bei tausenden Kunden sauber.
+  // Composite Cursor (name, id): bei doppelten Namen wuerde reines name>cursor
+  // einen Eintrag ueberspringen — daher Tie-Break ueber id.
+  const buildQuery = useCallback((cursor: { name: string; id: string } | null) => {
+    let q = supabase
+      .from("customers")
+      .select("*", { count: "exact" })
+      .eq("is_active", true);
+    if (filterType !== "all") q = q.eq("type", filterType);
+    const term = search.trim();
+    if (term.length > 0) {
+      const like = `%${term}%`;
+      q = q.or(`name.ilike.${like},email.ilike.${like}`);
+    }
+    if (cursor !== null) {
+      // (name = cursor.name AND id > cursor.id) OR (name > cursor.name)
+      q = q.or(`and(name.eq.${cursor.name},id.gt.${cursor.id}),name.gt.${cursor.name}`);
+    }
+    return q.order("name", { ascending: true }).order("id", { ascending: true }).limit(PAGE_SIZE + 1);
+  }, [supabase, filterType, search]);
+
+  const loadCustomers = useCallback(async () => {
+    const myId = ++queryIdRef.current;
+    setLoading(true);
+    const { data, count } = await buildQuery(null);
+    if (myId !== queryIdRef.current) return; // ueberholte Query verwerfen
+    if (data) {
+      const rows = data as Customer[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setCustomers(rows.slice(0, PAGE_SIZE));
+    }
+    if (typeof count === "number") setTotalCount(count);
     setLoading(false);
+  }, [buildQuery]);
+
+  // Initial + bei Filter-Aenderung neu laden. Bei Tippen mit 250ms Debounce.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      loadCustomers();
+    }, 250);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [loadCustomers]);
+
+  async function loadMore() {
+    if (loadingMore || customers.length === 0) return;
+    setLoadingMore(true);
+    const last = customers[customers.length - 1];
+    const { data } = await buildQuery({ name: last.name, id: last.id });
+    if (data) {
+      const rows = data as Customer[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setCustomers((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    }
+    setLoadingMore(false);
   }
 
   async function confirmDelete() {
@@ -46,6 +108,7 @@ export default function KundenPage() {
       const json = await res.json();
       if (json.success) {
         setCustomers(customers.filter((c) => c.id !== deleteTarget.id));
+        setTotalCount((c) => Math.max(0, c - 1));
         toast.success(`${deleteTarget.name} gelöscht`);
       } else {
         toast.error("Fehler: " + (json.error || "Unbekannt"));
@@ -56,12 +119,6 @@ export default function KundenPage() {
     setDeleteTarget(null);
     setDeleteCode("");
   }
-
-  const filtered = customers.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || (c.email?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchesType = filterType === "all" || c.type === filterType;
-    return matchesSearch && matchesType;
-  });
 
   const typeIcon = (type: CustomerType) => {
     switch (type) {
@@ -77,7 +134,10 @@ export default function KundenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kunden</h1>
-          <p className="text-sm text-muted-foreground mt-1">{customers.length} Kunden gesamt</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {totalCount} {totalCount === 1 ? "Kunde" : "Kunden"}
+            {(search.trim() || filterType !== "all") ? " (gefiltert)" : " gesamt"}
+          </p>
         </div>
         <Link
           href="/kunden/neu"
@@ -111,7 +171,7 @@ export default function KundenPage() {
             <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-2/3" /></CardContent></Card>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : customers.length === 0 ? (
         <Card className="border-dashed bg-card">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Users className="h-7 w-7 text-gray-400" /></div>
@@ -129,7 +189,7 @@ export default function KundenPage() {
             <span>Ort</span>
             <span></span>
           </div>
-          {filtered.map((customer) => (
+          {customers.map((customer) => (
             <Card key={customer.id} className="bg-card hover:shadow-sm transition-all group">
               <CardContent className="p-0">
                 {/* Desktop */}
@@ -175,6 +235,19 @@ export default function KundenPage() {
               </CardContent>
             </Card>
           ))}
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="kasten kasten-muted"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                {loadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

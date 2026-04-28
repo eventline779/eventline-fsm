@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import type { TimeEntry, Job } from "@/types";
-import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, Tag, Building2, MapPin, Music } from "lucide-react";
+import { Clock, Play, Square, Coffee, Briefcase, Home, Wrench, Truck, Monitor, Tag, Building2, MapPin, Music, ChevronDown } from "lucide-react";
+
+const PAGE_SIZE = 20;
 
 const CATEGORIES = [
   { value: "", label: "Keine Kategorie", icon: Tag, color: "border-gray-200 bg-gray-50 text-gray-500" },
@@ -23,6 +25,8 @@ export default function ZeiterfassungPage() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [elapsed, setElapsed] = useState("00:00:00");
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const supabase = createClient();
 
   const loadData = useCallback(async () => {
@@ -31,12 +35,16 @@ export default function ZeiterfassungPage() {
 
     const [activeRes, entriesRes, jobsRes] = await Promise.all([
       supabase.from("time_entries").select("*").eq("profile_id", user.id).is("clock_out", null).single(),
-      supabase.from("time_entries").select("*, job:jobs(title)").eq("profile_id", user.id).not("clock_out", "is", null).order("clock_in", { ascending: false }).limit(20),
+      supabase.from("time_entries").select("*, job:jobs(title)").eq("profile_id", user.id).not("clock_out", "is", null).order("clock_in", { ascending: false }).limit(PAGE_SIZE + 1),
       supabase.from("jobs").select("id, title, job_number, start_date, end_date").eq("status", "offen").neq("is_deleted", true).order("start_date", { ascending: true }),
     ]);
 
     if (activeRes.data) setActiveEntry(activeRes.data as TimeEntry);
-    if (entriesRes.data) setEntries(entriesRes.data as unknown as TimeEntry[]);
+    if (entriesRes.data) {
+      const rows = entriesRes.data as unknown as TimeEntry[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setEntries(rows.slice(0, PAGE_SIZE));
+    }
     if (jobsRes.data) {
       // Nur Aufträge aus dem aktuellen Monat (Zeitraum berührt den aktuellen Monat)
       const now = new Date();
@@ -54,6 +62,28 @@ export default function ZeiterfassungPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function loadMore() {
+    if (loadingMore || entries.length === 0) return;
+    setLoadingMore(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoadingMore(false); return; }
+    const cursor = entries[entries.length - 1].clock_in;
+    const { data } = await supabase
+      .from("time_entries")
+      .select("*, job:jobs(title)")
+      .eq("profile_id", user.id)
+      .not("clock_out", "is", null)
+      .lt("clock_in", cursor)
+      .order("clock_in", { ascending: false })
+      .limit(PAGE_SIZE + 1);
+    if (data) {
+      const rows = data as unknown as TimeEntry[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setEntries((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    }
+    setLoadingMore(false);
+  }
 
   useEffect(() => {
     if (!activeEntry) { setElapsed("00:00:00"); return; }
@@ -230,6 +260,19 @@ export default function ZeiterfassungPage() {
                 </Card>
               );
             })}
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="kasten kasten-muted"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  {loadingMore ? "Lade…" : "Mehr laden"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

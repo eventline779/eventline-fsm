@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,7 +22,11 @@ import {
   Pencil,
   Check,
   Send,
+  ChevronDown,
 } from "lucide-react";
+
+const ARCHIVE_PAGE_SIZE = 100;
+const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
@@ -31,8 +35,36 @@ import { SendStepModal } from "@/components/send-step-modal";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
 
+type DonutCounts = {
+  anfrage: number;
+  offen: number;
+  offenVermietung: number;
+  abgeschlossen: number;
+  storniert: number;
+  entwurf: number;
+};
+
+const EMPTY_COUNTS: DonutCounts = {
+  anfrage: 0,
+  offen: 0,
+  offenVermietung: 0,
+  abgeschlossen: 0,
+  storniert: 0,
+  entwurf: 0,
+};
+
 export default function AuftraegePage() {
-  const [jobs, setJobs] = useState<JobWithRelations[]>([]);
+  // Active = alle nicht-archivierten Jobs (status ≠ abgeschlossen|storniert).
+  // Bounded set, voll geladen für saubere client-seitige Suche/Filter.
+  const [activeJobs, setActiveJobs] = useState<JobWithRelations[]>([]);
+  // Archive = paginiert (kann über Jahre wachsen). Erste Seite eager,
+  // weitere via "Mehr laden".
+  const [archiveJobs, setArchiveJobs] = useState<JobWithRelations[]>([]);
+  const [archiveHasMore, setArchiveHasMore] = useState(false);
+  const [archiveLoadingMore, setArchiveLoadingMore] = useState(false);
+  // Counts kommen ausschliesslich aus der DB — entkoppelt vom geladenen State,
+  // damit der Donut auch bei paginierter Archive-Liste korrekt bleibt.
+  const [counts, setCounts] = useState<DonutCounts>(EMPTY_COUNTS);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
@@ -48,6 +80,11 @@ export default function AuftraegePage() {
   const supabase = createClient();
   const router = useRouter();
 
+  // Race-Guard fuer Archive-Queries (alte Antworten verwerfen, wenn neuere unterwegs sind)
+  const archiveQueryIdRef = useRef(0);
+  // Debounce-Timer fuer Suche (Tippen feuert nicht jede Query sofort)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Filter in localStorage speichern
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-number", searchNumber); }, [searchNumber]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-title", searchTitle); }, [searchTitle]);
@@ -55,19 +92,26 @@ export default function AuftraegePage() {
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
 
+  // Active + Counts + Profiles: filter-unabhaengig, wird bei Mount und Invalidate geladen.
+  // Archive: filter-abhaengig, eigener Effect mit Debounce (siehe weiter unten).
   useEffect(() => {
-    loadJobs();
-    const handler = () => loadJobs();
+    loadActiveAndCounts();
+    const handler = () => {
+      loadActiveAndCounts();
+      // Bei Datenaenderung im Archive-Modus auch die Archive-Liste neu ziehen.
+      if (showArchive) reloadArchive();
+    };
     window.addEventListener("jobs:invalidate", handler);
     return () => window.removeEventListener("jobs:invalidate", handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchive]);
 
   // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber.
   // Bei Warte-Schritten (2, 4) direkter UPDATE.
   // Nach Schritt 4 (Angebot bestaetigt) -> direkt umwandeln in Auftrag
   // (status='offen', kein Entwurf-Zwischenschritt). was_anfrage bleibt true.
   async function advanceAnfrageStep(jobId: string) {
-    const job = jobs.find((j) => j.id === jobId);
+    const job = activeJobs.find((j) => j.id === jobId);
     if (!job?.request_step) return;
     const nextStep = job.request_step + 1;
     if (nextStep > 4) {
@@ -97,7 +141,7 @@ export default function AuftraegePage() {
   }
 
   async function handleAnfrageNext(jobId: string) {
-    const job = jobs.find((j) => j.id === jobId);
+    const job = activeJobs.find((j) => j.id === jobId);
     if (!job?.request_step) return;
     if (REQUEST_MAIL_STEPS.has(job.request_step)) {
       setActiveStepJobId(jobId);
@@ -125,29 +169,124 @@ export default function AuftraegePage() {
     router.push(`/auftraege/${id}/bearbeiten`);
   }
 
-  async function loadJobs() {
-    const [jobsRes, profRes] = await Promise.all([
+  // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
+  // Damit ist der Donut entkoppelt vom geladenen State und auch bei paginierter
+  // Archive-Liste korrekt — und skaliert auf beliebig viele Jobs in der DB.
+  // cancelled_as_anfrage darf nicht via .neq(true) gefiltert werden, da das auch
+  // NULL-Zeilen ausschliessen wuerde — daher .or(is.null OR eq.false).
+  async function loadCounts(): Promise<DonutCounts> {
+    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    const [anfrage, offen, offenVerm, abg, sto, ent] = await Promise.all([
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "anfrage").neq("is_deleted", true).or(cancelledFilter),
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "offen").neq("is_deleted", true),
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "offen").eq("was_anfrage", true).neq("is_deleted", true),
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "abgeschlossen").neq("is_deleted", true),
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "storniert").neq("is_deleted", true).or(cancelledFilter),
+      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "entwurf").neq("is_deleted", true),
+    ]);
+    return {
+      anfrage: anfrage.count ?? 0,
+      offen: offen.count ?? 0,
+      offenVermietung: offenVerm.count ?? 0,
+      abgeschlossen: abg.count ?? 0,
+      storniert: sto.count ?? 0,
+      entwurf: ent.count ?? 0,
+    };
+  }
+
+  async function loadActiveAndCounts() {
+    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    const [activeRes, profRes, freshCounts] = await Promise.all([
+      // Active: alle nicht-archivierten Jobs voll geladen (bounded set,
+      // typischerweise <200 — joins waeren bei Pagination + Sort-Logik teuer).
       supabase
         .from("jobs")
-        .select("*, customer:customers(name, email), location:locations(name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)")
+        .select(JOBS_SELECT)
         .neq("is_deleted", true)
+        .or(cancelledFilter)
+        .not("status", "in", '("abgeschlossen","storniert")')
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+      loadCounts(),
     ]);
-    if (jobsRes.data) setJobs(jobsRes.data as unknown as JobWithRelations[]);
+    if (activeRes.data) setActiveJobs(activeRes.data as unknown as JobWithRelations[]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
+    setCounts(freshCounts);
     setLoading(false);
+  }
+
+  // Archive-Query mit Filtern: status, title, exakte Nummer — alles server-seitig.
+  // Location bleibt client-seitig (joined-table-Filter wuerde die Datenform aendern).
+  // job_number ist Integer — partial-Match nicht via PostgREST moeglich, daher
+  // nur bei vollstaendiger Eingabe (6 Ziffern) als exact-Filter.
+  const buildArchiveQuery = useCallback((cursor: string | null) => {
+    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    let q = supabase
+      .from("jobs")
+      .select(JOBS_SELECT)
+      .neq("is_deleted", true)
+      .or(cancelledFilter);
+
+    if (filterStatus === "abgeschlossen" || filterStatus === "storniert") {
+      q = q.eq("status", filterStatus);
+    } else {
+      q = q.in("status", ["abgeschlossen", "storniert"]);
+    }
+
+    const titleQ = searchTitle.trim();
+    if (titleQ) q = q.ilike("title", `%${titleQ}%`);
+
+    const numQ = searchNumber.trim();
+    if (numQ.length === 6 && /^\d+$/.test(numQ)) {
+      q = q.eq("job_number", parseInt(numQ, 10));
+    }
+
+    if (cursor !== null) q = q.lt("created_at", cursor);
+    return q.order("created_at", { ascending: false }).limit(ARCHIVE_PAGE_SIZE + 1);
+  }, [supabase, filterStatus, searchTitle, searchNumber]);
+
+  const reloadArchive = useCallback(async () => {
+    const myId = ++archiveQueryIdRef.current;
+    const { data } = await buildArchiveQuery(null);
+    if (myId !== archiveQueryIdRef.current) return; // ueberholt — verwerfen
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setArchiveJobs(rows.slice(0, ARCHIVE_PAGE_SIZE));
+    }
+  }, [buildArchiveQuery]);
+
+  // Archive: erst-laden bei Mount/Modus-Wechsel; bei Filter/Suche-Aenderung
+  // mit 250ms Debounce neu ziehen (nicht jeden Tastenanschlag).
+  useEffect(() => {
+    if (!showArchive) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => { reloadArchive(); }, 250);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [showArchive, reloadArchive]);
+
+  async function loadArchiveMore() {
+    if (archiveLoadingMore || archiveJobs.length === 0) return;
+    setArchiveLoadingMore(true);
+    const cursor = archiveJobs[archiveJobs.length - 1].created_at;
+    const { data } = await buildArchiveQuery(cursor);
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setArchiveJobs((prev) => [...prev, ...rows.slice(0, ARCHIVE_PAGE_SIZE)]);
+    }
+    setArchiveLoadingMore(false);
   }
 
   // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayMs = todayStart.getTime();
-  const isArchived = (j: JobWithRelations) => j.status === "abgeschlossen" || j.status === "storniert";
-  const filtered = jobs.filter((j) => {
-    // Stornierungen, die in der Anfrage-Phase passierten, gehoeren nicht ins
-    // Auftrags-Archiv — zu dem Zeitpunkt war es noch kein Auftrag.
-    if (j.cancelled_as_anfrage) return false;
-    const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
+  // Quelle haengt vom Modus ab — Active ist voll geladen, Archive ist paginiert.
+  const sourceJobs = showArchive ? archiveJobs : activeJobs;
+  const totalForSource = showArchive ? counts.abgeschlossen + counts.storniert : counts.anfrage + counts.offen + counts.entwurf;
+  const filtered = sourceJobs.filter((j) => {
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
     const matchesNumber = !numQ ? true : String(j.job_number ?? "").includes(numQ);
@@ -163,7 +302,7 @@ export default function AuftraegePage() {
     else if (filterLocation === "barakuba") matchesLocation = isBarakuba;
     else if (filterLocation === "bau3") matchesLocation = isBau3;
     else if (filterLocation === "sonstige") matchesLocation = !isScala && !isBarakuba && !isBau3;
-    return matchesArchive && matchesSearch && matchesStatus && matchesLocation;
+    return matchesSearch && matchesStatus && matchesLocation;
   }).sort((a, b) => {
     // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
     const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -186,7 +325,7 @@ export default function AuftraegePage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
-            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => !j.cancelled_as_anfrage && (j.status === "abgeschlossen" || j.status === "storniert")).length})`}
+            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${counts.abgeschlossen + counts.storniert})`}
           </button>
           {!showArchive && (
             <>
@@ -203,25 +342,25 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm — Entwuerfe stehen separat, sonstiges direkt im Donut */}
-      {jobs.length > 0 && (() => {
-        const entwurfCount = jobs.filter((j) => j.status === "entwurf").length;
+      {/* Kreis-Diagramm — Counts kommen aus DB-Count-Queries (entkoppelt vom geladenen State) */}
+      {(counts.anfrage + counts.offen + counts.abgeschlossen + counts.storniert + counts.entwurf) > 0 && (() => {
+        const entwurfCount = counts.entwurf;
         const segments = [
-          { label: "Vermietentwürfe", count: jobs.filter((j) => j.status === "anfrage").length, color: "var(--status-blue)" },
+          { label: "Vermietentwürfe", count: counts.anfrage, color: "var(--status-blue)" },
           {
             label: "Bevorstehend",
-            count: jobs.filter((j) => j.status === "offen").length,
+            count: counts.offen,
             color: "var(--status-gray)",
             // Untersegment: Aufträge die aus einer Vermietung kommen — hellblau,
             // sitzt als schmalerer Innenring innerhalb des Bevorstehend-Segments.
             sub: {
               label: "Vermietung",
-              count: jobs.filter((j) => j.status === "offen" && j.was_anfrage).length,
+              count: counts.offenVermietung,
               color: "#38bdf8",
             },
           },
-          { label: "Abgeschlossen", count: jobs.filter((j) => j.status === "abgeschlossen").length, color: "var(--status-green)" },
-          { label: "Storniert", count: jobs.filter((j) => j.status === "storniert" && !j.cancelled_as_anfrage).length, color: "var(--status-red)" },
+          { label: "Abgeschlossen", count: counts.abgeschlossen, color: "var(--status-green)" },
+          { label: "Storniert", count: counts.storniert, color: "var(--status-red)" },
         ];
         const entwurfPill = entwurfCount > 0 && (
           <button
@@ -359,7 +498,7 @@ export default function AuftraegePage() {
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {hasFilter
-                    ? `${jobs.length} Auftrag${jobs.length === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
+                    ? `${totalForSource} Auftrag${totalForSource === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
                     : "Erstelle deinen ersten Auftrag."}
                 </p>
                 {hasFilter ? (
@@ -580,6 +719,19 @@ export default function AuftraegePage() {
             </Link>
             );
           })}
+          {showArchive && archiveHasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadArchiveMore}
+                disabled={archiveLoadingMore}
+                className="kasten kasten-muted"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                {archiveLoadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -587,7 +739,8 @@ export default function AuftraegePage() {
           Anfrage-Karte gefuettert. Beim Bestaetigen ruft onAdvance den entsprechenden
           Step-+1 (oder oeffnet den Convert-Modal) auf. */}
       {(() => {
-        const activeJob = activeStepJobId ? jobs.find((j) => j.id === activeStepJobId) ?? null : null;
+        // Nur Active-Anfragen bekommen das Mail-Modal — Anfragen sind nie im Archiv.
+        const activeJob = activeStepJobId ? activeJobs.find((j) => j.id === activeStepJobId) ?? null : null;
         if (!activeJob) return null;
         const customer = activeJob.customer;
         const location = activeJob.location;
