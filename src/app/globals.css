@@ -497,23 +497,23 @@ html, body, *, *::before, *::after {
   /* Archive-Action-Button — visuell zur kasten-X-Familie (2px Border + tinted Bg)
      aber neutral grau statt schwarz/weiss wie kasten-active. Dezenter, weil
      "Archivieren" nicht so prominent sein soll wie "Loeschen" (rot) oder
-     "Reaktivieren" (gruen). */
+     "Reaktivieren" (gruen) — aber Border muss klar sichtbar sein, sonst sieht
+     der Icon-only-Header-Button auf weisser Card aus wie kein Button. */
   .kasten-archive {
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
     color: var(--muted-foreground);
-    border: 2px solid color-mix(in oklab, var(--muted-foreground) 35%, transparent);
-    background-color: color-mix(in oklab, var(--muted-foreground) 10%, transparent);
+    border: 2px solid var(--muted-foreground);
+    background-color: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
   }
   .kasten-archive:hover:not(:disabled) {
     color: var(--foreground);
-    background-color: color-mix(in oklab, var(--muted-foreground) 18%, transparent);
-    border-color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+    background-color: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
   }
   .dark .kasten-archive {
-    background-color: color-mix(in oklab, var(--muted-foreground) 14%, transparent);
+    background-color: color-mix(in oklab, var(--muted-foreground) 18%, transparent);
   }
   .dark .kasten-archive:hover:not(:disabled) {
-    background-color: color-mix(in oklab, var(--muted-foreground) 24%, transparent);
+    background-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
   }
 
   .kasten-toggle-off {
