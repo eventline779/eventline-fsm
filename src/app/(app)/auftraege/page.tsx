@@ -539,6 +539,7 @@ export default function AuftraegePage() {
             // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
             // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
             const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
+            const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
             const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
             const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
@@ -591,35 +592,44 @@ export default function AuftraegePage() {
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Kompakte Zeile, ~44px. Klick auf die Card oeffnet die Detail-
-                    Seite (dort stehen Beschreibung, Tracker, alle Hints). Keine
-                    Hover-Expansion mehr — Listen-Browsing soll ruhig sein. */}
-                <div className="grid grid-cols-[110px_1fr_200px_140px_36px] gap-3 items-center px-4 py-2">
+                {/* Zwei-zeilige Card mit gleicher Gesamthoehe wie vorher: oben
+                    Titel + Badges, unten Meta (Kunde · Ort · Datum). py-1.5 statt
+                    py-2 damit die zwei Text-Zeilen reinpassen ohne dass die Card
+                    waechst. Klick fuehrt zur Detail-Seite. */}
+                <div className="grid grid-cols-[110px_1fr_36px] gap-3 items-center px-4 py-1.5">
                   <JobNumber number={job.job_number} />
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-sm truncate">{job.title}</span>
-                    {job.priority === "dringend" && isActive && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
-                        <AlertCircle className="h-2.5 w-2.5" />
-                      </span>
-                    )}
-                    {job.was_anfrage && job.status !== "anfrage" && (
-                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
-                        Vermietung
-                      </span>
-                    )}
-                    {job.status !== "offen" && (
-                      <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
-                        {JOB_STATUS[job.status].label}
-                      </span>
-                    )}
+                  <div className="min-w-0">
+                    {/* Zeile 1: Titel + Status-/Vermietungs-/Dringend-Badges */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-sm truncate">{job.title}</span>
+                      {job.priority === "dringend" && isActive && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                          <AlertCircle className="h-2.5 w-2.5" />
+                        </span>
+                      )}
+                      {job.was_anfrage && job.status !== "anfrage" && (
+                        <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                          Vermietung
+                        </span>
+                      )}
+                      {job.status !== "offen" && (
+                        <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
+                          {JOB_STATUS[job.status].label}
+                        </span>
+                      )}
+                    </div>
+                    {/* Zeile 2: Meta (Kunde · Ort · Datum), via Middot getrennt */}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 min-w-0">
+                      {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
+                      {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
+                      {placeLabel && <span className="truncate">{placeLabel}</span>}
+                      {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
+                      {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
+                      {!displayCustomerName && !placeLabel && !dateText && (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-sm text-muted-foreground truncate">
-                    {displayCustomerName ?? <span className="text-muted-foreground/40">—</span>}
-                  </span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
-                    {dateText || <span className="text-muted-foreground/40">—</span>}
-                  </span>
                   <div className="flex items-center justify-center">
                     {renderActionIcon("sm")}
                   </div>
