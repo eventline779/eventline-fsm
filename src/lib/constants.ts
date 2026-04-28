@@ -124,7 +124,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Kontakte",
     items: [
       { href: "/kunden", label: "Kunden", icon: "Users" },
-      { href: "/partner", label: "Partner & Lieferanten", icon: "Briefcase" },
+      { href: "/partner", label: "Partner", icon: "Briefcase" },
     ],
   },
   {
