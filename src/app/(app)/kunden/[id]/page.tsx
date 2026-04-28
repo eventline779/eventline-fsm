@@ -180,8 +180,10 @@ export default function KundenDetailPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight truncate">{customer.name}</h1>
             {customer.bexio_nr && (
+              // Bexio-Lime-Pill — selbe Farbe wie kasten-bexio Buttons fuer
+              // konsistenten visuellen Bezug zu Bexio.
               <span
-                className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-foreground/[0.08] text-muted-foreground shrink-0"
+                className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)]"
                 title="Bexio-Kundennummer"
               >
                 Nr. {customer.bexio_nr}

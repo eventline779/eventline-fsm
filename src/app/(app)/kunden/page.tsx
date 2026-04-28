@@ -403,14 +403,20 @@ export default function KundenPage() {
                 : action.kind === "archive" ? "Ins Archiv verschieben"
                 : "Reaktivieren";
               const hoverColor = action.kind === "delete" ? "hover:!text-red-500"
-                : action.kind === "archive" ? "hover:!text-purple-500"
+                : action.kind === "archive" ? "hover:!text-foreground"
                 : "hover:!text-green-500";
               return (
                 <div key={c.id} className="group">
                   <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-4 py-2 hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {c.bexio_nr ? c.bexio_nr : (
-                        <span className="opacity-40" title="Noch nicht mit Bexio synchronisiert">—</span>
+                    <span className="font-mono text-xs">
+                      {c.bexio_nr ? (
+                        // Bexio-Lime — gleiche Farbe wie kasten-bexio Buttons,
+                        // damit der visuelle Bezug zu Bexio direkt klar ist.
+                        <span className="text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)]">
+                          {c.bexio_nr}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40" title="Noch nicht mit Bexio synchronisiert">—</span>
                       )}
                     </span>
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-2 min-w-0 hover:text-red-600 dark:hover:text-red-400 transition-colors">
@@ -438,8 +444,12 @@ export default function KundenPage() {
                   </div>
                   <div className="md:hidden flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors">
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="font-mono text-[10px] text-muted-foreground w-12 shrink-0">
-                        {c.bexio_nr ?? <span className="opacity-40">—</span>}
+                      <span className="font-mono text-[10px] w-12 shrink-0">
+                        {c.bexio_nr ? (
+                          <span className="text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)]">{c.bexio_nr}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
                       </span>
                       <Icon className="h-4 w-4 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
                       <div className="min-w-0 flex-1">
