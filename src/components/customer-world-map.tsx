@@ -1,47 +1,42 @@
 "use client";
 
 /**
- * Europa-Karte mit Kunden-Heatmap pro Land. Faerbt nur europaeische Laender,
- * der Rest der Welt wird transparent gerendert. Das SVG der Library wird
- * gross gerendert (2400px) und absolut positioniert in einem kleineren
- * Wrapper, sodass nur der Europa-Ausschnitt sichtbar ist.
+ * Auflistung der Laender aus denen unsere Kunden kommen — Flagge + Land + Anzahl.
+ * Sortiert nach Kundenzahl (haeufigste zuerst). Flaggen via Emoji (Regional-
+ * Indicator-Codepoints), keine externen Assets noetig.
+ *
+ * Komponentenname bleibt "CustomerWorldMap" fuer Import-Kompatibilitaet —
+ * die Karte selbst war zu fragil bei den Cropping-Math, eine Liste ist
+ * deterministisch und skaliert.
  */
 
 import { useEffect, useState } from "react";
-import { WorldMap } from "react-svg-worldmap";
 import { createClient } from "@/lib/supabase/client";
-import { useTheme } from "next-themes";
 
-type CountryDatum = { country: string; value: number };
+type CountryDatum = { country: string; count: number };
 
-// Europa (inkl. UK + EFTA + Westbalkan + Tuerkei). Russland bewusst ausgelassen
-// (sonst zoomt die Karte zu weit raus). Anpassbar wenn Kundenkreis sich aendert.
-const EUROPE_ISO = new Set([
-  "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR",
-  "HR", "HU", "IE", "IS", "IT", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT",
-  "RO", "SE", "SI", "SK", "CH", "LI",
-  "AL", "BA", "BY", "MD", "ME", "MK", "RS", "UA", "XK", "TR",
-]);
+// ISO-2 → Emoji-Flag via Regional-Indicator-Symbol (U+1F1E6 + Buchstabe-A-Offset).
+function flagEmoji(iso: string): string {
+  if (!iso || iso.length !== 2) return "";
+  return iso
+    .toUpperCase()
+    .split("")
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join("");
+}
 
-// Karten-Layout — fixe Pixel-Werte, damit die Europa-Position deterministisch
-// ist. SVG wird auf 2400 Pixel breit gerendert; Offsets verschieben den
-// Europa-Bereich in die Mitte des sichtbaren Wrappers.
-const SVG_WIDTH = 2400;
-const SVG_HEIGHT = SVG_WIDTH * 0.75; // = 1800, lib's heightRatio
-const VIEW_HEIGHT = 360;
-// Europa-Mittelpunkt im 2400×1800-Mercator (lib nutzt geoMercator().fitSize
-// auf World-Atlas-Daten ohne Antarktis, lat-range ~-60 bis 84°):
-// x = (12+180)/360 * 2400 = 1240 (Geometrie-Mitte zwischen Island und Ukraine)
-// y berechnet aus Mercator: lat 50° in fitSize-Koordinaten ergibt ~793
-// Dazwischen liegen Skandinavien (oben) und Mittelmeer (unten).
-const EUROPE_CENTER_X = 1240;
-const EUROPE_CENTER_Y = 793;
+// Lokalisiert via Intl — kein externes Mapping noetig. Fallback: ISO-Code.
+const REGION_NAMES = typeof Intl !== "undefined" && "DisplayNames" in Intl
+  ? new Intl.DisplayNames(["de"], { type: "region" })
+  : null;
+
+function countryName(iso: string): string {
+  return REGION_NAMES?.of(iso.toUpperCase()) ?? iso;
+}
 
 export function CustomerWorldMap() {
   const [data, setData] = useState<CountryDatum[]>([]);
   const [loading, setLoading] = useState(true);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
 
   useEffect(() => {
     const supabase = createClient();
@@ -55,10 +50,12 @@ export function CustomerWorldMap() {
       for (const r of (rows ?? []) as { address_country: string | null }[]) {
         if (!r.address_country) continue;
         const code = r.address_country.toUpperCase();
-        if (!EUROPE_ISO.has(code)) continue;
         counts.set(code, (counts.get(code) ?? 0) + 1);
       }
-      setData(Array.from(counts.entries()).map(([country, value]) => ({ country, value })));
+      const sorted: CountryDatum[] = Array.from(counts.entries())
+        .map(([country, count]) => ({ country, count }))
+        .sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
+      setData(sorted);
       setLoading(false);
     }
     load();
@@ -70,62 +67,22 @@ export function CustomerWorldMap() {
 
   if (loading || data.length === 0) return null;
 
-  // Theme-abhaengige Farben
-  const baseLand = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
-  const baseStroke = isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.18)";
-  const activeColor = isDark ? "248, 113, 113" : "220, 38, 38"; // red-400 / red-600
-
   return (
-    <div className="rounded-xl border bg-card overflow-hidden">
-      {/* Wrapper: feste Hoehe, max. Breite, overflow:hidden — clipped auf Europa.
-          Mittelpunkt-Offsets sind in JS-Konstanten oben definiert. */}
-      <div
-        className="relative overflow-hidden mx-auto"
-        style={{ height: VIEW_HEIGHT, maxWidth: 900 }}
-      >
-        {/* Wrapper-Breite kennen wir nicht (responsiv) — wir verschieben das
-            grosse SVG so, dass Europa in der wrapper-Mitte landet. transform:
-            translate dynamisch via inline style mit calc auf 50%. */}
-        <div
-          className="absolute"
-          style={{
-            width: SVG_WIDTH,
-            height: SVG_HEIGHT,
-            // Europa-Mittelpunkt soll auf wrapper-Mittelpunkt landen:
-            // left so, dass EUROPE_CENTER_X auf 50% der Wrapper-Breite faellt
-            left: `calc(50% - ${EUROPE_CENTER_X}px)`,
-            top: -(EUROPE_CENTER_Y - VIEW_HEIGHT / 2),
-          }}
-        >
-          <WorldMap
-            color="transparent"
-            backgroundColor="transparent"
-            size={SVG_WIDTH}
-            data={data as Parameters<typeof WorldMap>[0]["data"]}
-            styleFunction={(ctx) => {
-              const isEurope = EUROPE_ISO.has(ctx.countryCode);
-              if (!isEurope) {
-                return { fill: "transparent", stroke: "transparent" };
-              }
-              const v = Number(ctx.countryValue ?? 0);
-              const maxV = Math.max(Number(ctx.maxValue) || 0, 1);
-              if (v <= 0) {
-                return { fill: baseLand, stroke: baseStroke, strokeWidth: 0.5 };
-              }
-              // Linear-Schattierung: 0.3 (min) bis 1.0 (max) — auch 1-Kunden-Laender
-              // sind klar sichtbar.
-              const intensity = 0.3 + (v / maxV) * 0.7;
-              return {
-                fill: `rgba(${activeColor}, ${intensity})`,
-                stroke: baseStroke,
-                strokeWidth: 0.5,
-              };
-            }}
-            tooltipTextFunction={(ctx) =>
-              `${ctx.countryName}: ${ctx.countryValue ?? 0} ${(ctx.countryValue ?? 0) === 1 ? "Kunde" : "Kunden"}`
-            }
-          />
-        </div>
+    <div className="rounded-xl border bg-card px-4 py-3">
+      <div className="flex flex-wrap gap-2">
+        {data.map((d) => (
+          <div
+            key={d.country}
+            className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/50 text-sm"
+            title={`${countryName(d.country)}: ${d.count} ${d.count === 1 ? "Kunde" : "Kunden"}`}
+          >
+            <span className="text-base leading-none" aria-hidden>{flagEmoji(d.country)}</span>
+            <span className="font-medium">{countryName(d.country)}</span>
+            <span className="text-muted-foreground tabular-nums text-xs">
+              {d.count}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
