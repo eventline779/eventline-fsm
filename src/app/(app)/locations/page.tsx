@@ -123,7 +123,7 @@ export default function OrtePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Orte</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {standortCount} {standortCount === 1 ? "Standort" : "Standorte"} · {raumCount} {raumCount === 1 ? "Raum" : "Räume"}
           </p>
@@ -288,7 +288,7 @@ export default function OrtePage() {
               <Building className="h-7 w-7 text-gray-400" />
             </div>
             <h3 className="font-semibold text-gray-900 text-lg">
-              {search || filterType !== "all" ? "Keine Ergebnisse" : "Noch keine Orte"}
+              {search || filterType !== "all" ? "Keine Ergebnisse" : "Noch keine Locations"}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
               {search || filterType !== "all"

@@ -48,7 +48,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     // Top-level singletons: exact match only, so deeper paths don't bleed into the highlight.
     if (href === "/heute" || href === "/kalender") return pathname === href;
     if (pathname.startsWith(href)) return true;
-    // Zusatz-Prefixe (z.B. /standorte und /raeume gehoeren zu /orte)
+    // Zusatz-Prefixe (z.B. /standorte und /raeume gehoeren zu /locations)
     if (matchPrefixes?.some((p) => pathname.startsWith(p))) return true;
     return false;
   }

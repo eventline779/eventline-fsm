@@ -86,7 +86,7 @@ export interface NavItem {
   mobile?: boolean;
   /** Zusatz-Pfade die als "in diesem Bereich" gelten — fuer Routen die unter
    *  einem anderen Top-Level-Pfad liegen aber semantisch hierher gehoeren
-   *  (z.B. /standorte/[id] und /raeume/[id] gehoeren zu /orte). */
+   *  (z.B. /standorte/[id] und /raeume/[id] gehoeren zu /locations). */
   matchPrefixes?: string[];
 }
 
@@ -116,8 +116,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/belegungsplan", label: "Belegungsplan", icon: "CalendarClock", simplified: true },
       // Standorte (Verwaltungen, intern) und Räume (externe Reference) leben
-      // gemeinsam unter /orte — Detail-Routen bleiben getrennt.
-      { href: "/orte", label: "Orte", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
+      // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
+      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
     ],
   },
   {
