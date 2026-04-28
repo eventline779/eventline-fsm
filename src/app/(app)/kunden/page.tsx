@@ -3,11 +3,19 @@
 /**
  * Kunden-Liste — kompakte Tabellen-Ansicht, skaliert auf 1000+ Eintraege.
  *
- * - Server-seitige Suche + Type-Filter (ilike auf name+email, Debounce 250ms)
- * - Cursor-Pagination "Mehr laden" (composite cursor name+id, 50 pro Seite)
- * - Counts kommen aus separater Count-Query — nicht aus dem geladenen State
- * - Bexio-Kundennummer (`bexio_nr`) prominent links — synchron zu Bexio sichtbar.
- *   "—" wenn noch nicht in Bexio synchronisiert.
+ * Drei-Zustand-Modell:
+ *  - Aktiv (archived_at IS NULL)            — Standardansicht
+ *  - Archiviert (archived_at IS NOT NULL)   — versteckt, ueber Toggle sichtbar
+ *  - Hart geloescht                          — nur ohne Verknuepfungen moeglich
+ *
+ * Aktion pro Zeile:
+ *  - Mit Auftraegen/Dokumenten/Locations: Archiv-Symbol  → /api/customers/archive
+ *  - Ohne Verknuepfungen:                  Trash-Symbol  → /api/customers/delete
+ *  - Im Archiv-Modus:                      Reaktivieren  → /api/customers/unarchive
+ *
+ * Auto-Archiv: Beim Mounten POST /api/customers/auto-archive — verschiebt Kunden
+ * mit mindestens einem Auftrag aber ohne neuen Auftrag in den letzten 12 Monaten
+ * automatisch ins Archiv (ausgenommen Verwaltungs-Customers).
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -17,12 +25,11 @@ import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
 import Link from "next/link";
 import {
-  Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, RefreshCw,
+  Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, RefreshCw, Archive, ArchiveRestore,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
-const DELETE_CODE = "5225";
 const PAGE_SIZE = 50;
 
 const TYPE_ICONS: Record<CustomerType, typeof Building2> = {
@@ -31,50 +38,73 @@ const TYPE_ICONS: Record<CustomerType, typeof Building2> = {
   organization: Globe,
 };
 
+// PostgREST-Aggregat: zaehlt verknuepfte Zeilen pro Tabelle. Gibt
+// `[{ count: N }]` zurueck — leer wenn keine Verknuepfungen.
+type RelationCount = { count: number }[];
+type CustomerRow = Customer & {
+  jobs: RelationCount;
+  documents: RelationCount;
+  locations: RelationCount;
+  rental_requests: RelationCount;
+};
+
+function relCount(arr: RelationCount | undefined | null): number {
+  return arr?.[0]?.count ?? 0;
+}
+
+type ActionTarget =
+  | { kind: "delete"; customer: CustomerRow }
+  | { kind: "archive"; customer: CustomerRow }
+  | { kind: "unarchive"; customer: CustomerRow };
+
 export default function KundenPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<CustomerType | "all">("all");
+  const [showArchive, setShowArchive] = useState(false);
+  const [archiveCount, setArchiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
-  const [deleteCode, setDeleteCode] = useState("");
-  // Banner-Status: wieviele Kunden haben bexio_contact_id aber noch keine
-  // bexio_nr? Wird beim Mount geprueft und nach erfolgreichem Sync aktualisiert.
+  const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null);
+  const [actionRunning, setActionRunning] = useState(false);
+
+  // Bexio-Nr-Backfill
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const supabase = createClient();
 
-  // Debounce-Ref damit Tippen nicht jeden Tastenanschlag eine Query feuert.
+  const supabase = createClient();
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Race-Guard: alte Antwort, die nach neuerer Query zurueckkommt, ignorieren.
   const queryIdRef = useRef(0);
 
-  // Eine Query baut sich aus aktuellem Filter+Suche zusammen — server-seitig,
-  // damit Suche/Filter ueber den vollen Datenbestand laufen, nicht nur ueber
-  // den geladenen Chunk. Skaliert auch bei tausenden Kunden sauber.
-  // Composite Cursor (name, id): bei doppelten Namen wuerde reines name>cursor
-  // einen Eintrag ueberspringen — daher Tie-Break ueber id.
+  // Server-seitige Suche + Filter, composite cursor (name+id) gegen Doppelnamen.
   const buildQuery = useCallback((cursor: { name: string; id: string } | null) => {
     let q = supabase
       .from("customers")
-      .select("*", { count: "exact" })
-      .eq("is_active", true);
+      .select(
+        "*, jobs(count), documents(count), locations(count), rental_requests(count)",
+        { count: "exact" },
+      );
+
+    // Archiv-Toggle
+    if (showArchive) {
+      q = q.not("archived_at", "is", null);
+    } else {
+      q = q.is("archived_at", null);
+    }
+
     if (filterType !== "all") q = q.eq("type", filterType);
     const term = search.trim();
     if (term.length > 0) {
       const like = `%${term}%`;
-      // Suche in Name, Email UND Bexio-Nr — Mitarbeiter koennen direkt nach
-      // der Kundennummer aus einer Rechnung suchen.
       q = q.or(`name.ilike.${like},email.ilike.${like},bexio_nr.ilike.${like}`);
     }
     if (cursor !== null) {
       q = q.or(`and(name.eq.${cursor.name},id.gt.${cursor.id}),name.gt.${cursor.name}`);
     }
     return q.order("name", { ascending: true }).order("id", { ascending: true }).limit(PAGE_SIZE + 1);
-  }, [supabase, filterType, search]);
+  }, [supabase, filterType, search, showArchive]);
 
   const loadCustomers = useCallback(async () => {
     const myId = ++queryIdRef.current;
@@ -82,7 +112,7 @@ export default function KundenPage() {
     const { data, count } = await buildQuery(null);
     if (myId !== queryIdRef.current) return;
     if (data) {
-      const rows = data as Customer[];
+      const rows = data as CustomerRow[];
       setHasMore(rows.length > PAGE_SIZE);
       setCustomers(rows.slice(0, PAGE_SIZE));
     }
@@ -90,26 +120,48 @@ export default function KundenPage() {
     setLoading(false);
   }, [buildQuery]);
 
+  // Beim Mount: auto-archive laufen lassen, dann Liste + Counts laden.
+  // Auto-Archive ist idempotent — laeuft bei jedem Page-Visit, fasst aber nur
+  // Kunden an deren letzter Auftrag >365 Tage alt ist.
+  useEffect(() => {
+    fetch("/api/customers/auto-archive", { method: "POST" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.archived > 0) {
+          toast.info(`${j.archived} ${j.archived === 1 ? "Kunde" : "Kunden"} automatisch ins Archiv (>1 Jahr inaktiv)`);
+        }
+      })
+      .catch(() => { /* ignore — Liste laed trotzdem */ });
+  }, []);
+
+  // Initial + bei Filter-/Modus-Aenderung neu laden, mit 250ms Debounce auf Suche.
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      loadCustomers();
-    }, 250);
+    searchDebounceRef.current = setTimeout(() => { loadCustomers(); }, 250);
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, [loadCustomers]);
 
-  // Unsynced-Count: Kunden die mit Bexio verknuepft sind aber noch keine
-  // Kundennummer haben. Server-seitig gezaehlt, weil das Banner unabhaengig
-  // vom geladenen Page-Chunk korrekt sein muss.
+  // Archiv-Count fuer den Toggle-Badge — entkoppelt von der Liste.
+  const refreshArchiveCount = useCallback(async () => {
+    const { count } = await supabase
+      .from("customers")
+      .select("*", { count: "exact", head: true })
+      .not("archived_at", "is", null);
+    setArchiveCount(count ?? 0);
+  }, [supabase]);
+
+  useEffect(() => { refreshArchiveCount(); }, [refreshArchiveCount, customers.length]);
+
+  // Bexio-Nr-Backfill-Banner
   const checkUnsynced = useCallback(async () => {
     const { count } = await supabase
       .from("customers")
       .select("*", { count: "exact", head: true })
       .not("bexio_contact_id", "is", null)
       .is("bexio_nr", null)
-      .eq("is_active", true);
+      .is("archived_at", null);
     setUnsyncedCount(count ?? 0);
   }, [supabase]);
 
@@ -145,65 +197,105 @@ export default function KundenPage() {
     const last = customers[customers.length - 1];
     const { data } = await buildQuery({ name: last.name, id: last.id });
     if (data) {
-      const rows = data as Customer[];
+      const rows = data as CustomerRow[];
       setHasMore(rows.length > PAGE_SIZE);
       setCustomers((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
     }
     setLoadingMore(false);
   }
 
-  async function confirmDelete() {
-    if (deleteCode !== DELETE_CODE || !deleteTarget) {
-      toast.error("Falscher Code");
-      return;
-    }
+  async function runAction() {
+    if (!actionTarget || actionRunning) return;
+    setActionRunning(true);
+    const { kind, customer } = actionTarget;
     try {
-      const res = await fetch("/api/customers/delete", {
+      const endpoint =
+        kind === "delete" ? "/api/customers/delete"
+        : kind === "archive" ? "/api/customers/archive"
+        : "/api/customers/unarchive";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: deleteTarget.id, code: deleteCode }),
+        body: JSON.stringify({ customerId: customer.id }),
       });
       const json = await res.json();
-      if (json.success) {
-        // Callback-Form damit zwischenzeitliche State-Updates (z.B. ein laufender
-        // "Mehr laden") nicht von einem stale-Closure ueberschrieben werden.
-        const targetId = deleteTarget.id;
-        setCustomers((prev) => prev.filter((c) => c.id !== targetId));
-        setTotalCount((c) => Math.max(0, c - 1));
-        toast.success(`${deleteTarget.name} gelöscht`);
-      } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
+      if (!json.success) {
+        // Wenn Hard-Delete vom Server abgelehnt wird wegen Verknuepfungen,
+        // verstaendliches Feedback geben statt rohem Fehler.
+        if (json.reason === "has-references") {
+          toast.error(`${customer.name} hat noch Verknüpfungen — bitte archivieren statt löschen.`);
+        } else {
+          toast.error("Fehler: " + (json.error || "Unbekannt"));
+        }
+        return;
       }
-    } catch {
-      toast.error("Fehler beim Löschen");
+      const verb = kind === "delete" ? "gelöscht" : kind === "archive" ? "archiviert" : "reaktiviert";
+      toast.success(`${customer.name} ${verb}`);
+      // Lokal entfernen — Liste filtert je nach showArchive
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      setTotalCount((c) => Math.max(0, c - 1));
+      // Archiv-Count + Bexio-Banner ggf. anpassen
+      refreshArchiveCount();
+      checkUnsynced();
+    } catch (e) {
+      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+    } finally {
+      setActionRunning(false);
+      setActionTarget(null);
     }
-    setDeleteTarget(null);
-    setDeleteCode("");
   }
 
   const hasFilter = !!search.trim() || filterType !== "all";
+
+  // Aktions-Modal-Texte
+  const actionLabel = !actionTarget ? "" :
+    actionTarget.kind === "delete" ? "Kunde unwiderruflich löschen?" :
+    actionTarget.kind === "archive" ? "Kunde ins Archiv verschieben?" :
+    "Kunde reaktivieren?";
+  const actionBody = !actionTarget ? "" :
+    actionTarget.kind === "delete"
+      ? `${actionTarget.customer.name} hat keine verknüpften Daten und kann komplett gelöscht werden.`
+    : actionTarget.kind === "archive"
+      ? `${actionTarget.customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
+    : `${actionTarget.customer.name} wird wieder als aktiver Kunde geführt.`;
+  const actionButtonClass = actionTarget?.kind === "delete" ? "kasten-red"
+    : actionTarget?.kind === "archive" ? "kasten-purple"
+    : "kasten-green";
+  const actionButtonLabel = actionTarget?.kind === "delete" ? "Löschen"
+    : actionTarget?.kind === "archive" ? "Archivieren"
+    : "Reaktivieren";
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Kunden</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Kunden-Archiv" : "Kunden"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {totalCount} {totalCount === 1 ? "Kunde" : "Kunden"}
-            {hasFilter ? " (gefiltert)" : " gesamt"}
+            {hasFilter ? " (gefiltert)" : showArchive ? " im Archiv" : " gesamt"}
           </p>
         </div>
-        <Link href="/kunden/neu" className="kasten kasten-red">
-          <Plus className="h-3.5 w-3.5" />
-          Neuer Kunde
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowArchive(!showArchive)}
+            className={showArchive ? "kasten-active" : "kasten-toggle-off"}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            {showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}
+          </button>
+          {!showArchive && (
+            <Link href="/kunden/neu" className="kasten kasten-red">
+              <Plus className="h-3.5 w-3.5" />
+              Neuer Kunde
+            </Link>
+          )}
+        </div>
       </div>
 
-      {/* Bexio-Nr-Backfill-Banner — nur sichtbar wenn es Kunden gibt die mit
-          Bexio verknuepft sind, aber noch keine Kundennummer im FSM haben.
-          Verschwindet automatisch nach erfolgreichem Sync. */}
-      {unsyncedCount > 0 && (
+      {/* Bexio-Nr-Backfill-Banner — nur in Aktiv-Ansicht relevant */}
+      {!showArchive && unsyncedCount > 0 && (
         <div className="rounded-xl border bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 px-4 py-3 flex items-center gap-3 flex-wrap">
           <RefreshCw className="h-4 w-4 text-blue-700 dark:text-blue-300 shrink-0" />
           <p className="text-sm text-blue-900 dark:text-blue-100 flex-1 min-w-0">
@@ -221,7 +313,7 @@ export default function KundenPage() {
         </div>
       )}
 
-      {/* Such- + Filter-Bar — gleiches Pattern wie /auftraege und /orte */}
+      {/* Such- + Filter-Bar */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -257,8 +349,6 @@ export default function KundenPage() {
         )}
       </div>
 
-      {/* Tabellen-Container — eine umschliessende Card statt eine pro Row.
-          Spart bei 50+ Eintraegen massiv Render-Aufwand und sieht auch dichter aus. */}
       {loading ? (
         <div className="rounded-xl border bg-card divide-y">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -273,14 +363,19 @@ export default function KundenPage() {
           <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Users className="h-6 w-6 text-muted-foreground" />
           </div>
-          <h3 className="font-semibold text-lg">{hasFilter ? "Keine Treffer" : "Noch keine Kunden"}</h3>
+          <h3 className="font-semibold text-lg">
+            {hasFilter ? "Keine Treffer" : showArchive ? "Archiv ist leer" : "Noch keine Kunden"}
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            {hasFilter ? "Andere Suche oder Filter zurücksetzen." : "Lege deinen ersten Kunden an."}
+            {hasFilter
+              ? "Andere Suche oder Filter zurücksetzen."
+              : showArchive
+                ? "Es sind keine Kunden archiviert."
+                : "Lege deinen ersten Kunden an."}
           </p>
         </div>
       ) : (
         <div className="rounded-xl border bg-card overflow-hidden">
-          {/* Desktop-Header — sticky innerhalb der scrollbaren Liste */}
           <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b bg-muted/30">
             <span>Nr.</span>
             <span>Name</span>
@@ -289,20 +384,32 @@ export default function KundenPage() {
             <span>Ort</span>
             <span aria-hidden />
           </div>
-          {/* Rows */}
           <div className="divide-y">
             {customers.map((c) => {
               const Icon = TYPE_ICONS[c.type];
+              const totalRel = relCount(c.jobs) + relCount(c.documents) + relCount(c.locations) + relCount(c.rental_requests);
+              const canHardDelete = totalRel === 0;
+              // Action-Definition: in Archiv-Mode kann nur reaktiviert werden;
+              // in Aktiv-Mode entweder hard-delete (keine Refs) oder archive.
+              const action: ActionTarget = showArchive
+                ? { kind: "unarchive", customer: c }
+                : canHardDelete
+                  ? { kind: "delete", customer: c }
+                  : { kind: "archive", customer: c };
+              const ActionIcon = action.kind === "delete" ? Trash2
+                : action.kind === "archive" ? Archive
+                : ArchiveRestore;
+              const actionTitle = action.kind === "delete" ? "Endgültig löschen"
+                : action.kind === "archive" ? "Ins Archiv verschieben"
+                : "Reaktivieren";
+              const hoverColor = action.kind === "delete" ? "hover:!text-red-500"
+                : action.kind === "archive" ? "hover:!text-purple-500"
+                : "hover:!text-green-500";
               return (
                 <div key={c.id} className="group">
-                  {/* Desktop-Zeile — eine Grid-Reihe, ~44px hoch.
-                      Name-Zelle ist Link zur Detail-Seite; Email/Telefon sind eigene
-                      Anker (mailto:/tel:) damit der Klick die richtige Aktion ausloest. */}
                   <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-4 py-2 hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
                     <span className="font-mono text-xs text-muted-foreground">
-                      {c.bexio_nr ? (
-                        c.bexio_nr
-                      ) : (
+                      {c.bexio_nr ? c.bexio_nr : (
                         <span className="opacity-40" title="Noch nicht mit Bexio synchronisiert">—</span>
                       )}
                     </span>
@@ -311,33 +418,24 @@ export default function KundenPage() {
                       <span className="font-medium text-sm truncate">{c.name}</span>
                     </Link>
                     {c.email ? (
-                      <a href={`mailto:${c.email}`} className="text-sm text-muted-foreground hover:text-foreground truncate transition-colors">
-                        {c.email}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-muted-foreground/40">—</span>
-                    )}
+                      <a href={`mailto:${c.email}`} className="text-sm text-muted-foreground hover:text-foreground truncate transition-colors">{c.email}</a>
+                    ) : <span className="text-sm text-muted-foreground/40">—</span>}
                     {c.phone ? (
-                      <a href={`tel:${c.phone}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        {c.phone}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-muted-foreground/40">—</span>
-                    )}
+                      <a href={`tel:${c.phone}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{c.phone}</a>
+                    ) : <span className="text-sm text-muted-foreground/40">—</span>}
                     <span className="text-sm text-muted-foreground truncate">
                       {c.address_city || <span className="opacity-40">—</span>}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setDeleteTarget(c)}
-                      className="p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 hover:!text-red-500 transition-all"
-                      title="Kunde löschen"
-                      aria-label={`Kunde ${c.name} löschen`}
+                      onClick={() => setActionTarget(action)}
+                      className={`p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 ${hoverColor} transition-all`}
+                      title={actionTitle}
+                      aria-label={`${c.name}: ${actionTitle}`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <ActionIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  {/* Mobile-Zeile — kompakt, 2-zeilig: Nr+Name oben, Email/Ort unten */}
                   <div className="md:hidden flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors">
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                       <span className="font-mono text-[10px] text-muted-foreground w-12 shrink-0">
@@ -353,19 +451,18 @@ export default function KundenPage() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => setDeleteTarget(c)}
+                      onClick={() => setActionTarget(action)}
                       className="p-2 rounded-lg text-muted-foreground/40"
-                      title="Kunde löschen"
-                      aria-label={`Kunde ${c.name} löschen`}
+                      title={actionTitle}
+                      aria-label={`${c.name}: ${actionTitle}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <ActionIcon className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               );
             })}
           </div>
-          {/* Mehr laden — innerhalb der Card-Box, dezent */}
           {hasMore && (
             <div className="border-t flex justify-center py-2">
               <button
@@ -382,31 +479,31 @@ export default function KundenPage() {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Aktions-Modal — eine Komponente fuer alle drei Aktionen, Wording haengt
+          vom Target-Kind ab. Code-Bestaetigung gibt's nicht mehr (ersetzen wir
+          spaeter durch User-Rollen). */}
       <Modal
-        open={!!deleteTarget}
-        onClose={() => { setDeleteTarget(null); setDeleteCode(""); }}
-        title="Kunde löschen"
+        open={!!actionTarget}
+        onClose={() => !actionRunning && setActionTarget(null)}
+        title={actionLabel}
       >
-        <p className="text-sm text-muted-foreground">
-          <strong>{deleteTarget?.name}</strong> wird unwiderruflich gelöscht.
-        </p>
-        <div>
-          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
-          <Input
-            value={deleteCode}
-            onChange={(e) => setDeleteCode(e.target.value)}
-            placeholder="Code eingeben..."
-            className="mt-1.5 text-center text-lg tracking-widest font-mono"
-            maxLength={4}
-          />
-        </div>
+        <p className="text-sm text-muted-foreground">{actionBody}</p>
         <div className="flex gap-3">
-          <button type="button" onClick={() => { setDeleteTarget(null); setDeleteCode(""); }} className="kasten kasten-muted flex-1">
+          <button
+            type="button"
+            onClick={() => setActionTarget(null)}
+            disabled={actionRunning}
+            className="kasten kasten-muted flex-1"
+          >
             Abbrechen
           </button>
-          <button type="button" onClick={confirmDelete} disabled={deleteCode.length < 4} className="kasten kasten-red flex-1">
-            Endgültig löschen
+          <button
+            type="button"
+            onClick={runAction}
+            disabled={actionRunning}
+            className={`kasten ${actionButtonClass} flex-1`}
+          >
+            {actionRunning ? "Bitte warten…" : actionButtonLabel}
           </button>
         </div>
       </Modal>

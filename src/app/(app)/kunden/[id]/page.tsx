@@ -10,7 +10,7 @@ import { CUSTOMER_TYPES, JOB_STATUS } from "@/lib/constants";
 import type { Customer, Job, CustomerType } from "@/types";
 import {
   ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin,
-  ClipboardList, Trash2,
+  ClipboardList, Trash2, Archive, ArchiveRestore,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
@@ -19,7 +19,7 @@ import { Modal } from "@/components/ui/modal";
 import Link from "next/link";
 import { toast } from "sonner";
 
-const DELETE_CODE = "5225";
+type ActionKind = "delete" | "archive" | "unarchive";
 
 const COUNTRY_OPTIONS = [
   { code: "CH", label: "Schweiz" },
@@ -37,6 +37,10 @@ export default function KundenDetailPage() {
   const supabase = createClient();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  // Verknuepfungs-Counts entscheiden ob die Hauptaktion Hard-Delete oder
+  // Archivieren ist. jobs.length koennen wir aus dem Auftraege-Join ziehen,
+  // documents/locations/rental_requests holen wir separat (head:true Counts).
+  const [relationTotals, setRelationTotals] = useState<number>(0);
   // ?edit=1 -> direkt im Bearbeiten-Modus (z.B. vom Bexio-Pflichtfeld-Modal)
   const [editing, setEditing] = useState(searchParams.get("edit") === "1");
   const [form, setForm] = useState({
@@ -60,9 +64,12 @@ export default function KundenDetailPage() {
   useEffect(() => { loadData(); }, [id]);
 
   async function loadData() {
-    const [custRes, jobsRes] = await Promise.all([
+    const [custRes, jobsRes, docsRes, locsRes, rrRes] = await Promise.all([
       supabase.from("customers").select("*").eq("id", id).single(),
       supabase.from("jobs").select("*, location:locations(name)").eq("customer_id", id).neq("is_deleted", true).order("created_at", { ascending: false }),
+      supabase.from("documents").select("id", { count: "exact", head: true }).eq("customer_id", id),
+      supabase.from("locations").select("id", { count: "exact", head: true }).eq("customer_id", id),
+      supabase.from("rental_requests").select("id", { count: "exact", head: true }).eq("customer_id", id),
     ]);
     if (custRes.data) {
       const c = custRes.data as Customer;
@@ -75,7 +82,22 @@ export default function KundenDetailPage() {
         notes: c.notes || "",
       });
     }
-    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    const jobsList = (jobsRes.data ?? []) as unknown as Job[];
+    setJobs(jobsList);
+    // Auftraege werden via jobsRes.data ohne Filter gezaehlt — wir wollen
+    // aktive UND geloeschte (is_deleted) als Verknuepfung sehen, da die FK
+    // weiterhin existiert. Daher hier neq("is_deleted", true) entfernen waere
+    // korrekt, aber: jobs.length aus dem geladenen jobsList nutzen wir nur
+    // fuer die "Auftraege"-Section. Fuer can-hard-delete brauchen wir den vollen
+    // Count inklusive geloeschter — separater head-count waere praeziser.
+    // Pragmatisch: fuer Verknuepfungs-Check holen wir's separat:
+    const { count: jobCount } = await supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", id);
+    setRelationTotals(
+      (jobCount ?? 0) + (docsRes.count ?? 0) + (locsRes.count ?? 0) + (rrRes.count ?? 0),
+    );
   }
 
   async function handleSave() {
@@ -92,38 +114,57 @@ export default function KundenDetailPage() {
     loadData();
   }
 
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteCode, setDeleteCode] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [actionKind, setActionKind] = useState<ActionKind | null>(null);
+  const [actionRunning, setActionRunning] = useState(false);
 
-  // Konsistent zur Liste: Soft-Delete via /api/customers/delete (is_active=false).
-  // Auftraege/Termine/Dokumente bleiben erhalten — sie haengen weiterhin am Kunden,
-  // werden aber in keiner aktiven Liste mehr angezeigt sobald is_active=false.
-  // Hard-Delete waere durch Foreign Keys (jobs, locations, documents) blockiert
-  // und wuerde die Historie zerreissen.
-  async function handleDelete() {
-    if (deleteCode !== DELETE_CODE) {
-      toast.error("Falscher Code");
-      return;
-    }
-    setDeleting(true);
+  // Hauptaktion abhaengig von zwei Fragen:
+  //   1. Ist der Kunde archiviert?           -> Reaktivieren
+  //   2. Hat er irgendwelche Verknuepfungen? -> Archivieren (Hard-Delete unmoeglich)
+  //   3. Sonst                                -> Hard-Delete (komplett entfernen)
+  const isArchived = !!customer?.archived_at;
+  const canHardDelete = relationTotals === 0;
+  const primaryAction: ActionKind = isArchived
+    ? "unarchive"
+    : canHardDelete ? "delete" : "archive";
+
+  async function runAction() {
+    if (!actionKind || actionRunning) return;
+    setActionRunning(true);
     try {
-      const res = await fetch("/api/customers/delete", {
+      const endpoint =
+        actionKind === "delete" ? "/api/customers/delete"
+        : actionKind === "archive" ? "/api/customers/archive"
+        : "/api/customers/unarchive";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: id, code: deleteCode }),
+        body: JSON.stringify({ customerId: id }),
       });
       const json = await res.json();
       if (!json.success) {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
-        setDeleting(false);
+        if (json.reason === "has-references") {
+          toast.error("Kunde hat noch Verknüpfungen — bitte archivieren statt löschen.");
+        } else {
+          toast.error("Fehler: " + (json.error || "Unbekannt"));
+        }
+        setActionRunning(false);
+        setActionKind(null);
         return;
       }
-      toast.success("Kunde gelöscht");
-      router.push("/kunden");
+      const verb = actionKind === "delete" ? "gelöscht" : actionKind === "archive" ? "archiviert" : "reaktiviert";
+      toast.success(`Kunde ${verb}`);
+      // Bei delete/archive zurueck zur Liste, bei unarchive auf der Detail-Seite bleiben.
+      if (actionKind === "unarchive") {
+        setActionKind(null);
+        setActionRunning(false);
+        await loadData();
+      } else {
+        router.push("/kunden");
+      }
     } catch (e) {
-      toast.error("Fehler beim Löschen: " + (e instanceof Error ? e.message : "unbekannt"));
-      setDeleting(false);
+      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+      setActionRunning(false);
+      setActionKind(null);
     }
   }
 
@@ -146,6 +187,14 @@ export default function KundenDetailPage() {
                 Nr. {customer.bexio_nr}
               </span>
             )}
+            {customer.archived_at && (
+              <span
+                className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0"
+                title={`Archiviert am ${new Date(customer.archived_at).toLocaleDateString("de-CH")}`}
+              >
+                Archiviert
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
         </div>
@@ -166,53 +215,72 @@ export default function KundenDetailPage() {
           </button>
           <button
             type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="kasten kasten-red"
-            aria-label="Löschen"
-            title="Löschen"
+            onClick={() => setActionKind(primaryAction)}
+            className={
+              primaryAction === "delete" ? "kasten kasten-red"
+              : primaryAction === "archive" ? "kasten kasten-purple"
+              : "kasten kasten-green"
+            }
+            aria-label={
+              primaryAction === "delete" ? "Löschen"
+              : primaryAction === "archive" ? "Archivieren"
+              : "Reaktivieren"
+            }
+            title={
+              primaryAction === "delete" ? "Endgültig löschen"
+              : primaryAction === "archive" ? "Ins Archiv verschieben"
+              : "Reaktivieren"
+            }
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            {primaryAction === "delete" ? <Trash2 className="h-3.5 w-3.5" />
+              : primaryAction === "archive" ? <Archive className="h-3.5 w-3.5" />
+              : <ArchiveRestore className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* Löschen-Modal — gleiche UX wie auf der Kunden-Liste (Code-Bestaetigung) */}
+      {/* Aktions-Modal — Wording wechselt je nach Aktion (delete/archive/unarchive).
+          Kein Code mehr (kommt spaeter via User-Rollen). */}
       <Modal
-        open={showDeleteConfirm}
-        onClose={() => { setShowDeleteConfirm(false); setDeleteCode(""); }}
-        title="Kunde löschen"
+        open={!!actionKind}
+        onClose={() => !actionRunning && setActionKind(null)}
+        title={
+          actionKind === "delete" ? "Kunde unwiderruflich löschen?"
+          : actionKind === "archive" ? "Kunde ins Archiv verschieben?"
+          : actionKind === "unarchive" ? "Kunde reaktivieren?"
+          : ""
+        }
       >
         <p className="text-sm text-muted-foreground">
-          <strong>{customer.name}</strong> wird aus der Kundenliste entfernt.
-          Bestehende Aufträge und Dokumente bleiben für die Historie erhalten.
+          {actionKind === "delete"
+            ? `${customer.name} hat keine verknüpften Daten und kann komplett gelöscht werden.`
+            : actionKind === "archive"
+              ? `${customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
+              : `${customer.name} wird wieder als aktiver Kunde geführt.`}
         </p>
-        <div>
-          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
-          <Input
-            value={deleteCode}
-            onChange={(e) => setDeleteCode(e.target.value)}
-            placeholder="Code eingeben..."
-            className="mt-1.5 text-center text-lg tracking-widest font-mono"
-            maxLength={4}
-          />
-        </div>
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => { setShowDeleteConfirm(false); setDeleteCode(""); }}
-            disabled={deleting}
+            onClick={() => setActionKind(null)}
+            disabled={actionRunning}
             className="kasten kasten-muted flex-1"
           >
             Abbrechen
           </button>
           <button
             type="button"
-            onClick={handleDelete}
-            disabled={deleting || deleteCode.length < 4}
-            className="kasten kasten-red flex-1"
+            onClick={runAction}
+            disabled={actionRunning}
+            className={
+              actionKind === "delete" ? "kasten kasten-red flex-1"
+              : actionKind === "archive" ? "kasten kasten-purple flex-1"
+              : "kasten kasten-green flex-1"
+            }
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            {deleting ? "Löschen…" : "Endgültig löschen"}
+            {actionRunning ? "Bitte warten…" :
+              actionKind === "delete" ? "Endgültig löschen" :
+              actionKind === "archive" ? "Archivieren" :
+              "Reaktivieren"}
           </button>
         </div>
       </Modal>

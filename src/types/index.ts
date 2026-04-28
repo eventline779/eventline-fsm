@@ -40,6 +40,9 @@ export interface Customer {
   bexio_nr: string | null;
   notes: string | null;
   is_active: boolean;
+  /** Wenn gesetzt: Kunde ist im Archiv. Standard-Listen filtern auf NULL.
+   *  Auto-archiviert nach 1 Jahr ohne neuen Auftrag (siehe /api/customers/auto-archive). */
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
