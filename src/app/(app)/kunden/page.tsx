@@ -265,7 +265,7 @@ export default function KundenPage() {
       ? `${actionTarget.customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
     : `${actionTarget.customer.name} wird wieder als aktiver Kunde geführt.`;
   const actionButtonClass = actionTarget?.kind === "delete" ? "kasten-red"
-    : actionTarget?.kind === "archive" ? "kasten-purple"
+    : actionTarget?.kind === "archive" ? "kasten-muted"
     : "kasten-green";
   const actionButtonLabel = actionTarget?.kind === "delete" ? "Löschen"
     : actionTarget?.kind === "archive" ? "Archivieren"
