@@ -5,17 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
-import { RequestStepTracker } from "@/components/request-step-tracker";
 import type { JobStatus, Profile, JobWithRelations } from "@/types";
 import Link from "next/link";
 import {
   Plus,
   Search,
   ClipboardList,
-  Calendar,
   CalendarPlus,
-  MapPin,
-  User,
   AlertCircle,
   Archive,
   X,
@@ -543,7 +539,6 @@ export default function AuftraegePage() {
             // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
             // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
             const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
-            const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
             const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
             const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
@@ -555,9 +550,10 @@ export default function AuftraegePage() {
                 + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
               : "";
 
-            // Action-Icon-Logik: gleicher Pfad wie vorher, kompaktere Darstellung
-            // (kleinere Icons, keine Labels in der Default-Zeile — Labels nur bei Hover).
-            function renderActionIcon(size: "sm" | "lg") {
+            // Action-Icon-Logik: kleines Icon in der Compact-Zeile.
+            // Volle Action-Behandlung (Send-Modal, Bearbeiten-Page, Termin-Plan)
+            // bleibt identisch zum vorherigen Verhalten.
+            function renderActionIcon(size: "sm") {
               const iconCls = size === "sm" ? "h-4 w-4" : "h-5 w-5";
               const padCls = size === "sm" ? "p-1.5" : "p-2.5";
               if (isAnfrage) {
@@ -589,25 +585,16 @@ export default function AuftraegePage() {
               return null;
             }
 
-            // Action-Hint-Text (nur in der expanded Hover-Ansicht):
-            const hintText =
-              isAnfrage && isMailStep ? stepInfo.label
-              : isAnfrage ? "Manuell in Details bestätigen"
-              : noTermin ? `Kein Termin geplant${job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}`
-              : null;
-            const hintTone =
-              isAnfrage ? "text-blue-700 dark:text-blue-300"
-              : noTermin ? "text-amber-700 dark:text-amber-300"
-              : "text-muted-foreground";
 
             return (
             <Link key={job.id} href={detailHref} className="block group">
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* KOMPAKTE ZEILE — feste Spaltenbreiten damit Kunde/Datum/
-                    Action ueber alle Zeilen vertikal fluchten. ~44px hoch. */}
-                <div className="grid grid-cols-[88px_1fr_200px_140px_36px] gap-3 items-center px-4 py-2 group-hover:hidden">
+                {/* Kompakte Zeile, ~44px. Klick auf die Card oeffnet die Detail-
+                    Seite (dort stehen Beschreibung, Tracker, alle Hints). Keine
+                    Hover-Expansion mehr — Listen-Browsing soll ruhig sein. */}
+                <div className="grid grid-cols-[110px_1fr_200px_140px_36px] gap-3 items-center px-4 py-2">
                   <JobNumber number={job.job_number} />
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-sm truncate">{job.title}</span>
@@ -637,78 +624,6 @@ export default function AuftraegePage() {
                     {renderActionIcon("sm")}
                   </div>
                 </div>
-
-                {/* HOVER-VOLLANSICHT — exakt wie vorher (Trennstrich + 2-Spalten-
-                    Layout mit Tracker, Hint, gross gerenderter Action). */}
-                <CardContent className="hidden group-hover:block p-4">
-                  <div className="flex items-stretch gap-3">
-                    <div className="min-w-0 flex-1 self-center">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <JobNumber number={job.job_number} />
-                        <h3 className="font-semibold truncate">{job.title}</h3>
-                      </div>
-                      {displayCustomerName && (
-                        <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground min-w-0">
-                          <User className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{displayCustomerName}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground min-w-0">
-                        {placeLabel && (
-                          <span className="flex items-center gap-1.5 min-w-0">
-                            <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{placeLabel}</span>
-                          </span>
-                        )}
-                        {dateText && (
-                          <span className="flex items-center gap-1.5 shrink-0">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {dateText}
-                          </span>
-                        )}
-                      </div>
-                      {job.description && (
-                        <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
-                      )}
-                    </div>
-                    <div className="self-stretch my-2 w-0.5 bg-foreground/10 shrink-0" aria-hidden="true" />
-                    <div className="min-w-0 flex-1 self-center flex items-center gap-3">
-                      <div className="flex flex-col items-start gap-2 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {job.priority === "dringend" && isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                              <AlertCircle className="h-3 w-3" />
-                              Dringend
-                            </span>
-                          )}
-                          {job.was_anfrage && job.status !== "anfrage" && (
-                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                              Vermietung
-                            </span>
-                          )}
-                          {job.status !== "offen" && (
-                            <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                              {JOB_STATUS[job.status].label}
-                            </span>
-                          )}
-                        </div>
-                        {isAnfrage && (
-                          <RequestStepTracker currentStep={currentStep} size="sm" />
-                        )}
-                      </div>
-                      <div className="ml-auto flex items-center shrink-0 gap-1">
-                        {hintText && (
-                          <span className={`text-xs font-medium whitespace-nowrap pr-1 ${hintTone}`}>
-                            {hintText}
-                          </span>
-                        )}
-                        <div className="w-10 h-10 flex items-center justify-center">
-                          {renderActionIcon("lg")}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
               </Card>
             </Link>
             );
