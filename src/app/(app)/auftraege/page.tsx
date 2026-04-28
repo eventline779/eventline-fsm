@@ -322,6 +322,10 @@ export default function AuftraegePage() {
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Operations Archiv" : "Operations"}</h1>
+          {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
+              identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
+              auf gleicher Linie sitzen wie auf den anderen Seiten. */}
+          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
