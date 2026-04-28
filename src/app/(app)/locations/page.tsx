@@ -125,13 +125,13 @@ export default function OrtePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {standortCount} {standortCount === 1 ? "Standort" : "Standorte"} · {raumCount} {raumCount === 1 ? "Raum" : "Räume"}
+            {standortCount} {standortCount === 1 ? "Verwaltung" : "Verwaltungen"} · {raumCount} {raumCount === 1 ? "Raum" : "Räume"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setShowForm(showForm === "standort" ? null : "standort")} className="kasten kasten-red">
             <Plus className="h-3.5 w-3.5" />
-            Neuer Standort
+            Neue Verwaltung
           </button>
           <button type="button" onClick={() => setShowForm(showForm === "raum" ? null : "raum")} className="kasten kasten-blue">
             <Plus className="h-3.5 w-3.5" />
@@ -148,7 +148,7 @@ export default function OrtePage() {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <h3 className="font-semibold">
-                {showForm === "standort" ? "Neuen Standort erfassen" : "Neuen Raum erfassen"}
+                {showForm === "standort" ? "Neue Verwaltung erfassen" : "Neuen Raum erfassen"}
               </h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -224,7 +224,7 @@ export default function OrtePage() {
                   disabled={!form.name || saving}
                   className={`kasten ${showForm === "standort" ? "kasten-red" : "kasten-blue"}`}
                 >
-                  {saving ? "Speichern…" : (showForm === "standort" ? "Standort erstellen" : "Raum erstellen")}
+                  {saving ? "Speichern…" : (showForm === "standort" ? "Verwaltung erstellen" : "Raum erstellen")}
                 </button>
               </div>
             </form>
@@ -251,7 +251,7 @@ export default function OrtePage() {
               onClick={() => setFilterType(t)}
               className={filterType === t ? "kasten-active" : "kasten-toggle-off"}
             >
-              {t === "all" ? "Alle" : t === "standort" ? "Standorte" : "Räume"}
+              {t === "all" ? "Alle" : t === "standort" ? "Verwaltungen" : "Räume"}
             </button>
           ))}
         </div>
@@ -293,7 +293,7 @@ export default function OrtePage() {
             <p className="text-sm text-muted-foreground mt-1">
               {search || filterType !== "all"
                 ? "Andere Suche oder Filter zurücksetzen."
-                : "Erfasse deinen ersten Standort oder Raum."}
+                : "Erfasse deine erste Verwaltung oder einen Raum."}
             </p>
           </CardContent>
         </Card>
