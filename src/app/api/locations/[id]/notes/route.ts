@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 interface Note {
   id: string;
@@ -18,6 +19,8 @@ function parseNotes(raw: string | null): Note[] {
 }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { id } = await params;
   const supabase = createAdminClient();
   const { data } = await supabase.from("locations").select("notes").eq("id", id).single();
@@ -25,6 +28,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { id } = await params;
   const { content } = await request.json();
   const supabase = createAdminClient();
@@ -43,6 +48,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { id } = await params;
   const { notes } = await request.json();
   const supabase = createAdminClient();
@@ -53,6 +60,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { id } = await params;
   const { noteId } = await request.json();
   const supabase = createAdminClient();

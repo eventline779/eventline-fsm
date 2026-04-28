@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bexioContactUrl } from "@/lib/bexio";
+import { requireUser } from "@/lib/api-auth";
 
 // POST { customerId, bexioContactId }
 //
@@ -11,6 +12,8 @@ import { bexioContactUrl } from "@/lib/bexio";
 // Service-Role-Update damit RLS nicht blockt.
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
     const { customerId, bexioContactId } = await request.json();
     if (!customerId || !bexioContactId) {
       return NextResponse.json(

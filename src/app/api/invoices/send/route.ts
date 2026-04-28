@@ -1,10 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
 
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { filePath, fileName, date, reason, creatorName } = await request.json();
 
   const resendKey = process.env.RESEND_API_KEY;

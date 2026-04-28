@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const userId = request.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ quick_links: [] });
 
@@ -20,6 +23,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { userId, quick_links } = await request.json();
   if (!userId) return NextResponse.json({ success: false }, { status: 400 });
 

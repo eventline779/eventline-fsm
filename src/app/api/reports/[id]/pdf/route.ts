@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { jsPDF } from "jspdf";
 import LOGO_BASE64 from "@/lib/logo-base64";
+import { requireUser } from "@/lib/api-auth";
 
 interface TimeRange {
   date: string;
@@ -14,6 +15,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { id } = await params;
   const supabase = createAdminClient();
 

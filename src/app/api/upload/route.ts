@@ -1,10 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const path = formData.get("path") as string;

@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 export async function POST() {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const supabase = createAdminClient();
   let fixed = 0;
   let shiftsCreated = 0;

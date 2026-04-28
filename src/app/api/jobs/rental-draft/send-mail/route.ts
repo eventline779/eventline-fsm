@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { requireUser } from "@/lib/api-auth";
 
 export const maxDuration = 60;
 
@@ -61,6 +62,8 @@ function confirmToken(jobId: string) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const body = (await request.json()) as Body;
   const { jobId, step, email, cc, message, customerName, locationName, eventDate, eventEndDate, documentPaths } = body;
 

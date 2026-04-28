@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 export async function GET() {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const supabase = createAdminClient();
 
   const now = new Date();

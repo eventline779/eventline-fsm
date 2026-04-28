@@ -1,8 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/api-auth";
 
 // POST: Create notification for one or more users
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { userIds, title, message, link } = await request.json();
 
   if (!userIds || !title) {
