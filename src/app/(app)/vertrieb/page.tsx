@@ -86,8 +86,14 @@ export default function VertriebPage() {
   useEffect(() => {
     if (!unlocked) return;
     load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
+    // Realtime statt Polling: nur reload wenn sich an den Vertrieb-Contacts
+    // wirklich was aendert. Vorher: 10-Sekunden-Polling auch wenn nichts passiert.
+    const channel = supabase
+      .channel("vertrieb-contacts")
+      .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked]);
 
   function tryUnlock(e: React.FormEvent) {

@@ -50,12 +50,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   }
 
-  // Auto-Refresh alle 10 Sekunden
+  // Realtime statt Polling: globale Subscription auf jobs + customers — bei
+  // jedem INSERT/UPDATE/DELETE feuern wir einen window-Event den alle Listen
+  // abonnieren ("jobs:invalidate" / "customers:invalidate"). Damit aktualisieren
+  // sich Listen ohne 10-Sekunden-Polling, und Form-Eingaben werden nicht durch
+  // einen Re-Render zerschossen. Skaliert deutlich besser als das vorige
+  // setInterval(refresh, 10000) — eine WebSocket-Verbindung statt Dauer-Queries.
   useEffect(() => {
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 10000);
-    return () => clearInterval(interval);
+    const channel = supabase
+      .channel("global-invalidate")
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+        window.dispatchEvent(new Event("jobs:invalidate"));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => {
+        window.dispatchEvent(new Event("customers:invalidate"));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
