@@ -650,9 +650,7 @@ export default function AuftraegePage() {
                             Kein Termin geplant
                           </span>
                         )}
-                        <div className="flex items-center justify-center w-9">
-                          {renderActionIcon("sm")}
-                        </div>
+                        {renderActionIcon("sm")}
                       </div>
                       {isAnfrage && (
                         <RequestStepTracker currentStep={currentStep} size="sm" />
