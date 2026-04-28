@@ -36,7 +36,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     ? [...NAV_GROUPS, ADMIN_NAV_GROUP]
     : [...NAV_GROUPS];
 
-  function isActive(href: string) {
+  function isActive(href: string, matchPrefixes?: string[]) {
     // Exact match for items with query params (e.g. /einstellungen?tab=zeiten)
     if (href.includes("?")) {
       return fullUrl === href;
@@ -47,7 +47,10 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     }
     // Top-level singletons: exact match only, so deeper paths don't bleed into the highlight.
     if (href === "/heute" || href === "/kalender") return pathname === href;
-    return pathname.startsWith(href);
+    if (pathname.startsWith(href)) return true;
+    // Zusatz-Prefixe (z.B. /standorte und /raeume gehoeren zu /orte)
+    if (matchPrefixes?.some((p) => pathname.startsWith(p))) return true;
+    return false;
   }
 
   return (
@@ -77,7 +80,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
               <div className="space-y-0.5">
                 {items.map((item) => {
                   const Icon = NAV_ICON_MAP[item.icon];
-                  const active = isActive(item.href);
+                  const active = isActive(item.href, item.matchPrefixes);
                   return (
                     <Link
                       key={item.href}
