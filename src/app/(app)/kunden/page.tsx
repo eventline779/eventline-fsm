@@ -165,7 +165,10 @@ export default function KundenPage() {
       });
       const json = await res.json();
       if (json.success) {
-        setCustomers(customers.filter((c) => c.id !== deleteTarget.id));
+        // Callback-Form damit zwischenzeitliche State-Updates (z.B. ein laufender
+        // "Mehr laden") nicht von einem stale-Closure ueberschrieben werden.
+        const targetId = deleteTarget.id;
+        setCustomers((prev) => prev.filter((c) => c.id !== targetId));
         setTotalCount((c) => Math.max(0, c - 1));
         toast.success(`${deleteTarget.name} gelöscht`);
       } else {
