@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           needsLinkConfirmation: true,
           matches: matches.map((m) => ({
             id: m.id,
+            nr: m.nr ?? null,
             name: [m.name_2, m.name_1].filter(Boolean).join(" ").trim() || m.name_1,
             email: m.mail ?? null,
             city: m.city ?? null,
@@ -113,16 +114,22 @@ export async function POST(request: NextRequest) {
       name: customer.name,
     });
 
-    // Bexio-ID am Kunden speichern (Service-Role)
+    // Bexio-ID + menschenlesbare nr am Kunden speichern (Service-Role).
+    // nr ist die Kundennummer die in Bexio sichtbar ist (z.B. "21001") — wird
+    // im FSM angezeigt, damit beide Systeme dieselbe Nummer fuehren.
     const admin = createAdminClient();
     await admin
       .from("customers")
-      .update({ bexio_contact_id: String(result.id) })
+      .update({
+        bexio_contact_id: String(result.id),
+        bexio_nr: result.nr ?? null,
+      })
       .eq("id", customerId);
 
     return NextResponse.json({
       success: true,
       bexioContactId: String(result.id),
+      bexioNr: result.nr ?? null,
       bexioContactUrl: bexioContactUrl(result.id),
     });
   } catch (e) {

@@ -19,6 +19,9 @@ import { Modal } from "@/components/ui/modal";
 
 interface MatchCandidate {
   id: number;
+  /** Menschenlesbare Bexio-Kundennummer (z.B. "21001"). Wird angezeigt im Match-Modal
+   *  und an /link weitergereicht damit wir keinen extra GET-Call brauchen. */
+  nr: string | null;
   name: string;
   email: string | null;
   city: string | null;
@@ -114,13 +117,13 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     }
   }
 
-  async function linkExisting(bexioId: number) {
+  async function linkExisting(bexioId: number, bexioNr: string | null) {
     setBusy(true);
     try {
       const res = await fetch("/api/bexio/contacts/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, bexioContactId: bexioId }),
+        body: JSON.stringify({ customerId, bexioContactId: bexioId, bexioNr }),
       });
       const json = await res.json();
       if (!json.success) {
@@ -204,7 +207,14 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
           {matches?.map((m) => (
             <div key={m.id} className="flex items-start justify-between gap-3 p-3 rounded-xl border bg-foreground/[0.02]">
               <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="text-sm font-medium break-words">{m.name}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {m.nr && (
+                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-foreground/[0.08] text-muted-foreground">
+                      Nr. {m.nr}
+                    </span>
+                  )}
+                  <p className="text-sm font-medium break-words">{m.name}</p>
+                </div>
                 {m.email && (
                   <p className="text-xs text-muted-foreground break-all">{m.email}</p>
                 )}
@@ -216,7 +226,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => linkExisting(m.id)}
+                onClick={() => linkExisting(m.id, m.nr)}
                 disabled={busy}
                 className="kasten kasten-bexio shrink-0"
                 title="Diesen Bexio-Kontakt mit Eventline-Kunden verknuepfen"

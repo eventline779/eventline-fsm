@@ -33,8 +33,11 @@ export interface Customer {
   /** ISO-2-Land-Code, z.B. 'CH', 'DE'. Default 'CH'. Wird per Google-Maps-
    *  Autocomplete automatisch befuellt, kann manuell ueberschrieben werden. */
   address_country: string;
-  /** Verknuepfung zu Bexio-Kontakt. Gesetzt sobald Sync erfolgt. */
+  /** Verknuepfung zu Bexio-Kontakt (interne Bexio-ID). Gesetzt sobald Sync erfolgt. */
   bexio_contact_id: string | null;
+  /** Menschenlesbare Bexio-Kundennummer (z.B. "21001"). Sichtbar in der UI,
+   *  damit Eventline und Bexio dieselbe Nummer fuehren. NULL bis Sync passiert. */
+  bexio_nr: string | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;

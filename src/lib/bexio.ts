@@ -387,6 +387,15 @@ export async function findMatchingContacts(opts: {
   return Array.from(seen.values());
 }
 
+// Holt einen Bexio-Kontakt per ID. Wird genutzt um die menschenlesbare 'nr'
+// (Kundennummer) bei einem schon existierenden Kontakt nachzuladen, wenn wir
+// ihn ueber das Match-Modal verknuepfen statt neu anlegen.
+export async function getContactById(contactId: number): Promise<BexioContactSearchResult | null> {
+  const res = await bexioFetch(`/2.0/contact/${contactId}`, { method: "GET" });
+  if (!res.ok) return null;
+  return (await res.json()) as BexioContactSearchResult;
+}
+
 // URL zur Kontakt-Detailseite in Bexio (zum Oeffnen nach Anlegen).
 export function bexioContactUrl(contactId: number): string {
   return `https://office.bexio.com/index.php/kontakt/show/id/${contactId}`;

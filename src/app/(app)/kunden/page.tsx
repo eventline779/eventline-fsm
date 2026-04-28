@@ -1,20 +1,35 @@
 "use client";
 
+/**
+ * Kunden-Liste — kompakte Tabellen-Ansicht, skaliert auf 1000+ Eintraege.
+ *
+ * - Server-seitige Suche + Type-Filter (ilike auf name+email, Debounce 250ms)
+ * - Cursor-Pagination "Mehr laden" (composite cursor name+id, 50 pro Seite)
+ * - Counts kommen aus separater Count-Query — nicht aus dem geladenen State
+ * - Bexio-Kundennummer (`bexio_nr`) prominent links — synchron zu Bexio sichtbar.
+ *   "—" wenn noch nicht in Bexio synchronisiert.
+ */
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
 import Link from "next/link";
 import {
-  Plus, Search, Building2, User, Globe, Mail, Phone, MapPin, Users, Trash2, X, ChevronDown,
+  Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
 const DELETE_CODE = "5225";
 const PAGE_SIZE = 50;
+
+const TYPE_ICONS: Record<CustomerType, typeof Building2> = {
+  company: Building2,
+  individual: User,
+  organization: Globe,
+};
 
 export default function KundenPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -26,6 +41,10 @@ export default function KundenPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleteCode, setDeleteCode] = useState("");
+  // Banner-Status: wieviele Kunden haben bexio_contact_id aber noch keine
+  // bexio_nr? Wird beim Mount geprueft und nach erfolgreichem Sync aktualisiert.
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const supabase = createClient();
 
   // Debounce-Ref damit Tippen nicht jeden Tastenanschlag eine Query feuert.
@@ -47,10 +66,11 @@ export default function KundenPage() {
     const term = search.trim();
     if (term.length > 0) {
       const like = `%${term}%`;
-      q = q.or(`name.ilike.${like},email.ilike.${like}`);
+      // Suche in Name, Email UND Bexio-Nr — Mitarbeiter koennen direkt nach
+      // der Kundennummer aus einer Rechnung suchen.
+      q = q.or(`name.ilike.${like},email.ilike.${like},bexio_nr.ilike.${like}`);
     }
     if (cursor !== null) {
-      // (name = cursor.name AND id > cursor.id) OR (name > cursor.name)
       q = q.or(`and(name.eq.${cursor.name},id.gt.${cursor.id}),name.gt.${cursor.name}`);
     }
     return q.order("name", { ascending: true }).order("id", { ascending: true }).limit(PAGE_SIZE + 1);
@@ -60,7 +80,7 @@ export default function KundenPage() {
     const myId = ++queryIdRef.current;
     setLoading(true);
     const { data, count } = await buildQuery(null);
-    if (myId !== queryIdRef.current) return; // ueberholte Query verwerfen
+    if (myId !== queryIdRef.current) return;
     if (data) {
       const rows = data as Customer[];
       setHasMore(rows.length > PAGE_SIZE);
@@ -70,7 +90,6 @@ export default function KundenPage() {
     setLoading(false);
   }, [buildQuery]);
 
-  // Initial + bei Filter-Aenderung neu laden. Bei Tippen mit 250ms Debounce.
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
@@ -80,6 +99,45 @@ export default function KundenPage() {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, [loadCustomers]);
+
+  // Unsynced-Count: Kunden die mit Bexio verknuepft sind aber noch keine
+  // Kundennummer haben. Server-seitig gezaehlt, weil das Banner unabhaengig
+  // vom geladenen Page-Chunk korrekt sein muss.
+  const checkUnsynced = useCallback(async () => {
+    const { count } = await supabase
+      .from("customers")
+      .select("*", { count: "exact", head: true })
+      .not("bexio_contact_id", "is", null)
+      .is("bexio_nr", null)
+      .eq("is_active", true);
+    setUnsyncedCount(count ?? 0);
+  }, [supabase]);
+
+  useEffect(() => { checkUnsynced(); }, [checkUnsynced]);
+
+  async function syncBexioNrs() {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/bexio/contacts/sync-nrs", { method: "POST" });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error("Sync fehlgeschlagen: " + (json.error || "Unbekannt"));
+        return;
+      }
+      const parts = [
+        json.updated > 0 ? `${json.updated} aktualisiert` : null,
+        json.skipped > 0 ? `${json.skipped} ohne Nr in Bexio` : null,
+        json.failed > 0 ? `${json.failed} Fehler` : null,
+      ].filter(Boolean);
+      toast.success("Bexio-Nrn synchronisiert" + (parts.length ? ` — ${parts.join(", ")}` : ""));
+      await Promise.all([loadCustomers(), checkUnsynced()]);
+    } catch (e) {
+      toast.error("Netzwerkfehler: " + (e instanceof Error ? e.message : "unbekannt"));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function loadMore() {
     if (loadingMore || customers.length === 0) return;
@@ -120,123 +178,193 @@ export default function KundenPage() {
     setDeleteCode("");
   }
 
-  const typeIcon = (type: CustomerType) => {
-    switch (type) {
-      case "company": return <Building2 className="h-4 w-4" />;
-      case "individual": return <User className="h-4 w-4" />;
-      case "organization": return <Globe className="h-4 w-4" />;
-    }
-  };
+  const hasFilter = !!search.trim() || filterType !== "all";
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kunden</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {totalCount} {totalCount === 1 ? "Kunde" : "Kunden"}
-            {(search.trim() || filterType !== "all") ? " (gefiltert)" : " gesamt"}
+            {hasFilter ? " (gefiltert)" : " gesamt"}
           </p>
         </div>
-        <Link
-          href="/kunden/neu"
-          className="kasten kasten-red"
-        >
+        <Link href="/kunden/neu" className="kasten kasten-red">
           <Plus className="h-3.5 w-3.5" />
           Neuer Kunde
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Kunden suchen..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-gray-200" />
+      {/* Bexio-Nr-Backfill-Banner — nur sichtbar wenn es Kunden gibt die mit
+          Bexio verknuepft sind, aber noch keine Kundennummer im FSM haben.
+          Verschwindet automatisch nach erfolgreichem Sync. */}
+      {unsyncedCount > 0 && (
+        <div className="rounded-xl border bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 px-4 py-3 flex items-center gap-3 flex-wrap">
+          <RefreshCw className="h-4 w-4 text-blue-700 dark:text-blue-300 shrink-0" />
+          <p className="text-sm text-blue-900 dark:text-blue-100 flex-1 min-w-0">
+            <strong>{unsyncedCount}</strong> {unsyncedCount === 1 ? "Kunde ist" : "Kunden sind"} mit Bexio verknüpft, aber ohne Kundennummer im FSM.
+          </p>
+          <button
+            type="button"
+            onClick={syncBexioNrs}
+            disabled={syncing}
+            className="kasten kasten-bexio shrink-0"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Synchronisiere…" : "Jetzt synchronisieren"}
+          </button>
+        </div>
+      )}
+
+      {/* Such- + Filter-Bar — gleiches Pattern wie /auftraege und /orte */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Name, E-Mail oder Kundennummer suchen…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-9"
+          />
         </div>
         <div className="flex gap-2">
-          {(["all", "company", "individual", "organization"] as const).map((type) => (
-            <button key={type} onClick={() => setFilterType(type)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filterType === type ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
-              {type === "all" ? "Alle" : CUSTOMER_TYPES[type]}
+          {(["all", "company", "individual", "organization"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setFilterType(t)}
+              className={filterType === t ? "kasten-active" : "kasten-toggle-off"}
+            >
+              {t === "all" ? "Alle" : CUSTOMER_TYPES[t]}
             </button>
           ))}
         </div>
+        {hasFilter && (
+          <button
+            type="button"
+            onClick={() => { setSearch(""); setFilterType("all"); }}
+            className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
+            title="Filter zurücksetzen"
+          >
+            <X className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        )}
       </div>
 
-      {/* Customer List */}
+      {/* Tabellen-Container — eine umschliessende Card statt eine pro Row.
+          Spart bei 50+ Eintraegen massiv Render-Aufwand und sieht auch dichter aus. */}
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-2/3" /></CardContent></Card>
+        <div className="rounded-xl border bg-card divide-y">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-11 px-4 flex items-center">
+              <div className="h-3 w-16 bg-muted rounded animate-pulse mr-4" />
+              <div className="h-3 w-48 bg-muted rounded animate-pulse" />
+            </div>
           ))}
         </div>
       ) : customers.length === 0 ? (
-        <Card className="border-dashed bg-card">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Users className="h-7 w-7 text-gray-400" /></div>
-            <h3 className="font-semibold text-lg">{search ? "Keine Ergebnisse" : "Noch keine Kunden"}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{search ? "Versuche einen anderen Suchbegriff." : "Erstelle deinen ersten Kunden."}</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed bg-card py-16 text-center">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <Users className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="font-semibold text-lg">{hasFilter ? "Keine Treffer" : "Noch keine Kunden"}</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            {hasFilter ? "Andere Suche oder Filter zurücksetzen." : "Lege deinen ersten Kunden an."}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-1">
-          {/* Table Header */}
-          <div className="hidden md:grid grid-cols-[1fr_200px_150px_150px_40px] gap-4 px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="rounded-xl border bg-card overflow-hidden">
+          {/* Desktop-Header — sticky innerhalb der scrollbaren Liste */}
+          <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b bg-muted/30">
+            <span>Nr.</span>
             <span>Name</span>
             <span>E-Mail</span>
             <span>Telefon</span>
             <span>Ort</span>
-            <span></span>
+            <span aria-hidden />
           </div>
-          {customers.map((customer) => (
-            <Card key={customer.id} className="bg-card hover:shadow-sm transition-all group">
-              <CardContent className="p-0">
-                {/* Desktop */}
-                <div className="hidden md:grid grid-cols-[1fr_200px_150px_150px_40px] gap-4 items-center px-4 py-3">
-                  <Link href={`/kunden/${customer.id}`} className="flex items-center gap-3 min-w-0">
-                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 text-gray-500 shrink-0 group-hover:bg-red-50 group-hover:text-red-500 transition-colors text-sm font-bold">
-                      {customer.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{customer.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{CUSTOMER_TYPES[customer.type]}</p>
-                    </div>
-                  </Link>
-                  {customer.email ? (
-                    <a href={`mailto:${customer.email}`} className="text-sm text-gray-500 hover:text-blue-600 truncate transition-colors">{customer.email}</a>
-                  ) : <span className="text-sm text-gray-300">–</span>}
-                  {customer.phone ? (
-                    <a href={`tel:${customer.phone}`} className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{customer.phone}</a>
-                  ) : <span className="text-sm text-gray-300">–</span>}
-                  <span className="text-sm text-gray-500 truncate">{customer.address_city || "–"}</span>
-                  <button onClick={(e) => { e.preventDefault(); setDeleteTarget(customer); }} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                {/* Mobile */}
-                <div className="md:hidden p-4">
-                  <Link href={`/kunden/${customer.id}`} className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 text-gray-500 shrink-0 text-sm font-bold">
-                      {customer.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{customer.name}</p>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                        {customer.address_city && <span>{customer.address_city}</span>}
-                        {customer.email && <span className="truncate">{customer.email}</span>}
+          {/* Rows */}
+          <div className="divide-y">
+            {customers.map((c) => {
+              const Icon = TYPE_ICONS[c.type];
+              return (
+                <div key={c.id} className="group">
+                  {/* Desktop-Zeile — eine Grid-Reihe, ~44px hoch.
+                      Name-Zelle ist Link zur Detail-Seite; Email/Telefon sind eigene
+                      Anker (mailto:/tel:) damit der Klick die richtige Aktion ausloest. */}
+                  <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-4 py-2 hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {c.bexio_nr ? (
+                        c.bexio_nr
+                      ) : (
+                        <span className="opacity-40" title="Noch nicht mit Bexio synchronisiert">—</span>
+                      )}
+                    </span>
+                    <Link href={`/kunden/${c.id}`} className="flex items-center gap-2 min-w-0 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                      <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
+                      <span className="font-medium text-sm truncate">{c.name}</span>
+                    </Link>
+                    {c.email ? (
+                      <a href={`mailto:${c.email}`} className="text-sm text-muted-foreground hover:text-foreground truncate transition-colors">
+                        {c.email}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted-foreground/40">—</span>
+                    )}
+                    {c.phone ? (
+                      <a href={`tel:${c.phone}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        {c.phone}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted-foreground/40">—</span>
+                    )}
+                    <span className="text-sm text-muted-foreground truncate">
+                      {c.address_city || <span className="opacity-40">—</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(c)}
+                      className="p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 hover:!text-red-500 transition-all"
+                      title="Kunde löschen"
+                      aria-label={`Kunde ${c.name} löschen`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {/* Mobile-Zeile — kompakt, 2-zeilig: Nr+Name oben, Email/Ort unten */}
+                  <div className="md:hidden flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors">
+                    <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className="font-mono text-[10px] text-muted-foreground w-12 shrink-0">
+                        {c.bexio_nr ?? <span className="opacity-40">—</span>}
+                      </span>
+                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {[c.email, c.address_city].filter(Boolean).join(" · ") || "—"}
+                        </p>
                       </div>
-                    </div>
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(customer); }} className="p-1.5 rounded-lg text-gray-300">
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(c)}
+                      className="p-2 rounded-lg text-muted-foreground/40"
+                      title="Kunde löschen"
+                      aria-label={`Kunde ${c.name} löschen`}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  </Link>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              );
+            })}
+          </div>
+          {/* Mehr laden — innerhalb der Card-Box, dezent */}
           {hasMore && (
-            <div className="flex justify-center pt-2">
+            <div className="border-t flex justify-center py-2">
               <button
                 type="button"
                 onClick={loadMore}

@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { bexioContactUrl } from "@/lib/bexio";
+import { bexioContactUrl, getContactById } from "@/lib/bexio";
 import { requireUser } from "@/lib/api-auth";
 
-// POST { customerId, bexioContactId }
+// POST { customerId, bexioContactId, bexioNr? }
 //
 // Verknuepft einen Eventline-Kunden mit einem existierenden Bexio-Kontakt.
 // Wird vom Match-Modal aufgerufen wenn der User einen Kandidaten auswaehlt
 // statt neu anzulegen.
+//
+// bexioNr: optional — wenn das Frontend die Nummer aus der Match-Suche schon
+// hat, sparen wir uns den extra GET-Call. Sonst holen wir sie via getContactById.
 //
 // Service-Role-Update damit RLS nicht blockt.
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireUser();
     if (auth.error) return auth.error;
-    const { customerId, bexioContactId } = await request.json();
+    const { customerId, bexioContactId, bexioNr } = await request.json();
     if (!customerId || !bexioContactId) {
       return NextResponse.json(
         { success: false, error: "customerId + bexioContactId noetig" },
@@ -22,10 +25,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Wenn nr nicht mitkam — vom Bexio-Kontakt nachladen.
+    let nr: string | null = bexioNr ?? null;
+    if (!nr) {
+      const contact = await getContactById(parseInt(String(bexioContactId), 10));
+      nr = contact?.nr ?? null;
+    }
+
     const admin = createAdminClient();
     const { error } = await admin
       .from("customers")
-      .update({ bexio_contact_id: String(bexioContactId) })
+      .update({
+        bexio_contact_id: String(bexioContactId),
+        bexio_nr: nr,
+      })
       .eq("id", customerId);
 
     if (error) {
@@ -34,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      bexioNr: nr,
       bexioContactUrl: bexioContactUrl(parseInt(String(bexioContactId), 10)),
     });
   } catch (e) {

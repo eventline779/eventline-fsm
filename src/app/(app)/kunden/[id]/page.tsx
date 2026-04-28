@@ -129,8 +129,18 @@ export default function KundenDetailPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
         <Link href="/kunden"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">{customer.name}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight truncate">{customer.name}</h1>
+            {customer.bexio_nr && (
+              <span
+                className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-foreground/[0.08] text-muted-foreground shrink-0"
+                title="Bexio-Kundennummer"
+              >
+                Nr. {customer.bexio_nr}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">{CUSTOMER_TYPES[customer.type]}</p>
         </div>
         <div className="flex gap-2">
