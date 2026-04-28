@@ -15,6 +15,9 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
+// Leaflet-CSS muss statisch importiert werden — Turbopack kann CSS nicht
+// via runtime-import laden. Greift kein window an, daher SSR-safe.
+import "leaflet/dist/leaflet.css";
 
 // City -> [lat, lng] Lookup. Erweitern bei Bedarf.
 const CITY_COORDS: Record<string, [number, number]> = {
@@ -85,7 +88,6 @@ type MapItem = {
 const MapInner = dynamic(
   async () => {
     const { MapContainer, TileLayer, CircleMarker, Tooltip } = await import("react-leaflet");
-    await import("leaflet/dist/leaflet.css");
     function Inner({ items }: { items: MapItem[] }) {
       return (
         <MapContainer
