@@ -12,7 +12,6 @@ import {
   Mail,
   Phone,
   Globe,
-  Star,
   MapPin,
   Trash2,
   Pencil,
@@ -64,7 +63,6 @@ export default function PartnerPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<PartnerType | "all">("all");
   const [editing, setEditing] = useState<Partner | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
@@ -171,7 +169,6 @@ export default function PartnerPage() {
   }
 
   const filtered = partners.filter((p) => {
-    if (filterType !== "all" && p.type !== filterType) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -212,35 +209,6 @@ export default function PartnerPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
-        </div>
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setFilterType("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-              filterType === "all"
-                ? "bg-foreground text-background"
-                : "bg-muted hover:bg-muted/70"
-            }`}
-          >
-            Alle ({partners.length})
-          </button>
-          {(Object.keys(PARTNER_TYPES) as PartnerType[]).map((t) => {
-            const count = partners.filter((p) => p.type === t).length;
-            if (count === 0) return null;
-            return (
-              <button
-                key={t}
-                onClick={() => setFilterType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  filterType === t
-                    ? "bg-foreground text-background"
-                    : "bg-muted hover:bg-muted/70"
-                }`}
-              >
-                {PARTNER_TYPES[t].label} ({count})
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -301,20 +269,7 @@ export default function PartnerPage() {
                   </div>
                 </div>
 
-                {p.rating && (
-                  <div className="flex gap-0.5 mt-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-3.5 w-3.5 ${
-                          i < (p.rating ?? 0)
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/30"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
+
 
                 <div className="mt-3 space-y-1 text-xs">
                   {p.contact_person && (
@@ -467,33 +422,6 @@ export default function PartnerPage() {
                 }
                 className="mt-1.5"
               />
-            </div>
-          </div>
-
-          <div>
-            <Label>Bewertung</Label>
-            <div className="flex gap-1 mt-1.5">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      rating: form.rating === n ? null : n,
-                    })
-                  }
-                  className="p-1 hover:scale-110 transition"
-                >
-                  <Star
-                    className={`h-5 w-5 ${
-                      n <= (form.rating ?? 0)
-                        ? "fill-amber-400 text-amber-400"
-                        : "text-muted-foreground/40"
-                    }`}
-                  />
-                </button>
-              ))}
             </div>
           </div>
 
