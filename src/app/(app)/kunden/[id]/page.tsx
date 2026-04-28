@@ -255,7 +255,7 @@ export default function KundenDetailPage() {
       >
         <p className="text-sm text-muted-foreground">
           {actionKind === "delete"
-            ? `${customer.name} hat keine verknüpften Daten und kann komplett gelöscht werden.`
+            ? `Möchtest du ${customer.name} unwiderruflich löschen? Es gibt keine Aufträge oder anderen Daten, die an diesem Kunden hängen.`
             : actionKind === "archive"
               ? `${customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
               : `${customer.name} wird wieder als aktiver Kunde geführt.`}

@@ -260,7 +260,7 @@ export default function KundenPage() {
     "Kunde reaktivieren?";
   const actionBody = !actionTarget ? "" :
     actionTarget.kind === "delete"
-      ? `${actionTarget.customer.name} hat keine verknüpften Daten und kann komplett gelöscht werden.`
+      ? `Möchtest du ${actionTarget.customer.name} unwiderruflich löschen? Es gibt keine Aufträge oder anderen Daten, die an diesem Kunden hängen.`
     : actionTarget.kind === "archive"
       ? `${actionTarget.customer.name} verschwindet aus der aktiven Liste. Bestehende Aufträge und Dokumente bleiben erhalten.`
     : `${actionTarget.customer.name} wird wieder als aktiver Kunde geführt.`;
