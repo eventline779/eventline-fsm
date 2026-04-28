@@ -458,18 +458,27 @@ html, body, *, *::before, *::after {
   .dark .kasten-green  { background-color: rgba(  0, 168, 107, 0.18); }
   .dark .kasten-purple { background-color: rgba(124,  58, 237, 0.18); }
   .dark .kasten-bexio  { color: rgb(196, 214,   0); background-color: rgba(196, 214,   0, 0.18); }
-  /* Hover-Tint nur ~+5pp Light / +6pp Dark staerker als Default — gerade noch
-     erkennbar, nicht aufdringlich. Vorher waren Vibrant-Farben (besonders
-     bexio-Lime) auf 22% zu satt. */
-  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.18); border-color: var(--status-red); }
-  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.18); border-color: var(--status-blue); }
-  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.18); border-color: var(--status-green); }
-  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.18); border-color: var(--status-purple); }
+  /* Hover-Tint linear an die wahrgenommene Helligkeit des Basistons gekoppelt:
+     je heller die Farbe, desto kleiner der Sprung beim Hovern. Helle Farben
+     (Lime) sind schon bei 12% gut sichtbar — 18% reichen. Dunkle Farben
+     (Rot, Violett) wirken bei 18% kaum veraendert — daher 32-34%. So fuehlt
+     sich der Hover-Effekt ueber alle Akzentfarben gleich an, statt mal
+     "wuchtig" mal "tot". Werte handgefittet auf Basis relativer Luminanz:
+       Lime    L ≈ 195 → 0.18 / 0.26
+       Green   L ≈ 128 → 0.22 / 0.30
+       Blue    L ≈  96 → 0.26 / 0.36
+       Purple  L ≈  85 → 0.30 / 0.40
+       Red     L ≈  77 → 0.32 / 0.42
+     (Light / Dark, Default-State bleibt bei 0.12 / 0.18). */
+  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.32); border-color: var(--status-red); }
+  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.26); border-color: var(--status-blue); }
+  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.22); border-color: var(--status-green); }
+  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.30); border-color: var(--status-purple); }
   .kasten-bexio:hover:not(:disabled)  { background-color: rgba(196, 214,   0, 0.18); border-color: rgb(196, 214,   0); }
-  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.26); border-color: var(--status-red); }
-  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.26); border-color: var(--status-blue); }
-  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.26); border-color: var(--status-green); }
-  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.26); border-color: var(--status-purple); }
+  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.42); border-color: var(--status-red); }
+  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.36); border-color: var(--status-blue); }
+  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.30); border-color: var(--status-green); }
+  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.40); border-color: var(--status-purple); }
   .dark .kasten-bexio:hover:not(:disabled)  { background-color: rgba(196, 214,   0, 0.26); border-color: rgb(196, 214,   0); }
 
   .kasten-muted  { @apply text-foreground/70; }
