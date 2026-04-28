@@ -605,10 +605,9 @@ export default function AuftraegePage() {
               <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* KOMPAKTE ZEILE — Default-Sicht, ~44px hoch.
-                    Bei Hover wird sie ausgeblendet; die Card-Vollansicht
-                    erscheint stattdessen. */}
-                <div className="grid grid-cols-[88px_1fr_auto_auto_36px] gap-3 items-center px-4 py-2 group-hover:hidden">
+                {/* KOMPAKTE ZEILE — feste Spaltenbreiten damit Kunde/Datum/
+                    Action ueber alle Zeilen vertikal fluchten. ~44px hoch. */}
+                <div className="grid grid-cols-[88px_1fr_200px_140px_36px] gap-3 items-center px-4 py-2 group-hover:hidden">
                   <JobNumber number={job.job_number} />
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-sm truncate">{job.title}</span>
@@ -628,10 +627,10 @@ export default function AuftraegePage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-sm text-muted-foreground truncate max-w-[180px]">
+                  <span className="text-sm text-muted-foreground truncate">
                     {displayCustomerName ?? <span className="text-muted-foreground/40">—</span>}
                   </span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap min-w-[80px] text-right">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
                     {dateText || <span className="text-muted-foreground/40">—</span>}
                   </span>
                   <div className="flex items-center justify-center">
