@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { CustomerWorldMap } from "@/components/customer-world-map";
 
 const PAGE_SIZE = 50;
 
@@ -298,6 +299,10 @@ export default function KundenPage() {
           )}
         </div>
       </div>
+
+      {/* Weltkarte — nur in der aktiven Ansicht (Archivierte sind historisch,
+          fuer geographische Verteilung nicht relevant) */}
+      {!showArchive && <CustomerWorldMap />}
 
       {/* Bexio-Nr-Backfill-Banner — nur in Aktiv-Ansicht relevant */}
       {!showArchive && unsyncedCount > 0 && (
