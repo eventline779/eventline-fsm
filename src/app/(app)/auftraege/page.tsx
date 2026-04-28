@@ -534,7 +534,7 @@ export default function AuftraegePage() {
           );
         })()
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {filtered.map((job) => {
             const appointments = job.appointments ?? null;
             const hasAppointment = appointments && appointments.length > 0;
@@ -542,47 +542,118 @@ export default function AuftraegePage() {
             const isAnfrage = job.status === "anfrage";
             // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
             // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
-            // Daher: wenn customer fehlt, location.customer (= Verwaltung) anzeigen.
             const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
-            // Wo: Standort > Raum > external_address (in der Reihenfolge ihrer Spezifizitaet)
             const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
-            // Defensiv clampen — Alt-Daten koennten request_step > 4 haben (Step 5 ist abgeschafft).
             const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
             const stepInfo = REQUEST_STEPS[currentStep - 1];
             const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
-            // Bei Entwurf/Vermietentwurf macht Terminplanung noch keinen Sinn.
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
+            const dateText = job.start_date
+              ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
+                + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
+              : "";
+
+            // Action-Icon-Logik: gleicher Pfad wie vorher, kompaktere Darstellung
+            // (kleinere Icons, keine Labels in der Default-Zeile — Labels nur bei Hover).
+            function renderActionIcon(size: "sm" | "lg") {
+              const iconCls = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+              const padCls = size === "sm" ? "p-1.5" : "p-2.5";
+              if (isAnfrage) {
+                if (isMailStep) return (
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAnfrageNext(job.id); }}
+                    className={`${padCls} rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors`} aria-label={stepInfo.label}>
+                    <Send className={iconCls} />
+                  </button>
+                );
+                return null;
+              }
+              if (job.status === "entwurf") return (
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}/bearbeiten`); }}
+                  className={`${padCls} rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors`} aria-label="Bearbeiten">
+                  <Pencil className={iconCls} />
+                </button>
+              );
+              if (noTermin) return (
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}?termin=neu`); }}
+                  className={`${padCls} rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors`} aria-label="Termin planen">
+                  <CalendarPlus className={iconCls} />
+                </button>
+              );
+              if (allGood) return (
+                <span className={`${padCls} rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex`} aria-label="Alles bereit">
+                  <Check className={iconCls} strokeWidth={3} />
+                </span>
+              );
+              return null;
+            }
+
+            // Action-Hint-Text (nur in der expanded Hover-Ansicht):
+            const hintText =
+              isAnfrage && isMailStep ? stepInfo.label
+              : isAnfrage ? "Manuell in Details bestätigen"
+              : noTermin ? `Kein Termin geplant${job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}`
+              : null;
+            const hintTone =
+              isAnfrage ? "text-blue-700 dark:text-blue-300"
+              : noTermin ? "text-amber-700 dark:text-amber-300"
+              : "text-muted-foreground";
+
             return (
-            <Link key={job.id} href={detailHref} className="block">
-              <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group ${
+            <Link key={job.id} href={detailHref} className="block group">
+              <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                <CardContent className="p-4">
-                  {/* Layout: Linke Card-Haelfte = Inhalt, vertikaler Trennstrich
-                      auf der Card-Mitte, rechte Card-Haelfte = Tag+Tracker
-                      direkt nach dem Strich + Action ganz rechts.
-                      Beide Aussen-Spalten flex-1 mit min-w-0, damit der Strich
-                      gleichmaessig zur Mitte rutscht. */}
+                {/* KOMPAKTE ZEILE — Default-Sicht, ~44px hoch.
+                    Bei Hover wird sie ausgeblendet; die Card-Vollansicht
+                    erscheint stattdessen. */}
+                <div className="grid grid-cols-[88px_1fr_auto_auto_36px] gap-3 items-center px-4 py-2 group-hover:hidden">
+                  <JobNumber number={job.job_number} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-sm truncate">{job.title}</span>
+                    {job.priority === "dringend" && isActive && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                        <AlertCircle className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                    {job.was_anfrage && job.status !== "anfrage" && (
+                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                        Vermietung
+                      </span>
+                    )}
+                    {job.status !== "offen" && (
+                      <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
+                        {JOB_STATUS[job.status].label}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground truncate max-w-[180px]">
+                    {displayCustomerName ?? <span className="text-muted-foreground/40">—</span>}
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap min-w-[80px] text-right">
+                    {dateText || <span className="text-muted-foreground/40">—</span>}
+                  </span>
+                  <div className="flex items-center justify-center">
+                    {renderActionIcon("sm")}
+                  </div>
+                </div>
+
+                {/* HOVER-VOLLANSICHT — exakt wie vorher (Trennstrich + 2-Spalten-
+                    Layout mit Tracker, Hint, gross gerenderter Action). */}
+                <CardContent className="hidden group-hover:block p-4">
                   <div className="flex items-stretch gap-3">
-                    {/* LINKS (50%): Titel + Kunde + Beschreibung */}
                     <div className="min-w-0 flex-1 self-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <JobNumber number={job.job_number} />
                         <h3 className="font-semibold truncate">{job.title}</h3>
                       </div>
-                      {/* Kunde: eigene Zeile — garantiert immer sichtbar (vorher
-                          wurde er bei langen Daten + Location aus der Meta-Zeile geclippt).
-                          Bei Standort-Auftraegen ist customer NULL — Verwaltungs-Kunde
-                          aus location.customer wird als Fallback gezogen. */}
                       {displayCustomerName && (
                         <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground min-w-0">
                           <User className="h-3.5 w-3.5 shrink-0" />
                           <span className="truncate">{displayCustomerName}</span>
                         </div>
                       )}
-                      {/* Wo + Datum: Sekundaer-Zeile — Standort > Raum > freie Adresse. */}
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground min-w-0">
                         {placeLabel && (
                           <span className="flex items-center gap-1.5 min-w-0">
@@ -590,16 +661,10 @@ export default function AuftraegePage() {
                             <span className="truncate">{placeLabel}</span>
                           </span>
                         )}
-                        {job.start_date && (
+                        {dateText && (
                           <span className="flex items-center gap-1.5 shrink-0">
                             <Calendar className="h-3.5 w-3.5" />
-                            {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
-                            {job.end_date && job.end_date !== job.start_date && (
-                              <>
-                                {" – "}
-                                {new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
-                              </>
-                            )}
+                            {dateText}
                           </span>
                         )}
                       </div>
@@ -607,27 +672,16 @@ export default function AuftraegePage() {
                         <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       )}
                     </div>
-
-                    {/* VERTIKALER TRENNSTRICH — auf der Card-Mitte. Gleiche Optik
-                        wie der Card-Rand (foreground/10). my-2 sodass er die
-                        Ober- und Unterkante nicht beruehrt. */}
                     <div className="self-stretch my-2 w-0.5 bg-foreground/10 shrink-0" aria-hidden="true" />
-
-                    {/* RECHTS (50%): Tag+Tracker direkt nach dem Strich +
-                        Action ganz rechts. Tag und Tracker linksbuendig
-                        zueinander (items-start). */}
                     <div className="min-w-0 flex-1 self-center flex items-center gap-3">
                       <div className="flex flex-col items-start gap-2 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {job.priority === "dringend" && isActive && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                               <AlertCircle className="h-3 w-3" />
                               Dringend
                             </span>
                           )}
-                          {/* Aus-Vermietentwurf-Marker — hellblau, dauerhaft sichtbar
-                              auf allen Auftraegen die aus einer Vermietung kommen
-                              (auch wenn Status sich aendert). */}
                           {job.was_anfrage && job.status !== "anfrage" && (
                             <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
                               Vermietung
@@ -643,84 +697,15 @@ export default function AuftraegePage() {
                           <RequestStepTracker currentStep={currentStep} size="sm" />
                         )}
                       </div>
-                      <div className="ml-auto flex items-center shrink-0">
-                      {isAnfrage ? (
-                        isMailStep ? (
-                          <div className="flex items-center gap-0.5">
-                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap pr-1">
-                              {stepInfo.label}
-                            </span>
-                            <div className="w-10 h-10 flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleAnfrageNext(job.id);
-                                }}
-                                className="p-2.5 rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
-                                aria-label={stepInfo.label}
-                                title={stepInfo.label}
-                              >
-                                <Send className="h-5 w-5" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="pr-2">
-                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                              Manuell in Details bestätigen
-                            </span>
-                          </div>
-                        )
-                      ) : (noTermin || job.status === "entwurf" || allGood) ? (
-                        <div className="flex items-center gap-0.5">
-                          {noTermin && (
-                            <span className="text-xs font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap pr-1">
-                              Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                            </span>
-                          )}
-                          <div className="w-10 h-10 flex items-center justify-center">
-                            {job.status === "entwurf" ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  router.push(`/auftraege/${job.id}/bearbeiten`);
-                                }}
-                                className="p-2.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
-                                aria-label="Bearbeiten"
-                                title="Entwurf bearbeiten"
-                              >
-                                <Pencil className="h-5 w-5" />
-                              </button>
-                            ) : noTermin ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  router.push(`/auftraege/${job.id}?termin=neu`);
-                                }}
-                                className="p-2.5 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
-                                aria-label="Termin planen"
-                                title="Termin planen"
-                              >
-                                <CalendarPlus className="h-5 w-5" />
-                              </button>
-                            ) : allGood ? (
-                              <span
-                                className="p-2.5 rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex"
-                                aria-label="Alles bereit"
-                                title="Alles bereit"
-                              >
-                                <Check className="h-5 w-5" strokeWidth={3} />
-                              </span>
-                            ) : null}
-                          </div>
+                      <div className="ml-auto flex items-center shrink-0 gap-1">
+                        {hintText && (
+                          <span className={`text-xs font-medium whitespace-nowrap pr-1 ${hintTone}`}>
+                            {hintText}
+                          </span>
+                        )}
+                        <div className="w-10 h-10 flex items-center justify-center">
+                          {renderActionIcon("lg")}
                         </div>
-                      ) : null}
                       </div>
                     </div>
                   </div>

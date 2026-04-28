@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+/**
+ * Todos — Liste, server-seitig gefiltert+paginiert (PAGE_SIZE 50).
+ * Layout ist von Haus aus kompakt (~50px pro Zeile), das Skalierungs-
+ * Problem war Daten-Loading: vorher voll geladen + JS-Filter+Sort. Bei
+ * 1000+ Todos friert das ein. Jetzt: WHERE-Klauseln + ORDER BY in der DB,
+ * Cursor-Pagination "Mehr laden".
+ */
+
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Todo, Profile } from "@/types";
 
-// Todos haben eigene Priority-Levels (nicht aus jobs übernommen) — bewusst 4 Stufen
 type TodoPriority = "niedrig" | "normal" | "hoch" | "dringend";
 const TODO_PRIORITY_COLOR: Record<TodoPriority, string> = {
   niedrig: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300",
@@ -17,7 +24,7 @@ const TODO_PRIORITY_COLOR: Record<TodoPriority, string> = {
 };
 import {
   Plus, Check, CheckSquare, Calendar, User, Trash2,
-  ArrowLeft, Upload, FileText, Image as ImageIcon, X, Download, Archive,
+  ArrowLeft, Upload, FileText, Image as ImageIcon, Download, Archive, ChevronDown, Search, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/use-confirm";
@@ -28,12 +35,19 @@ interface TodoAttachment {
   uploaded_at: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [openCount, setOpenCount] = useState(0);
+  const [archiveCount, setArchiveCount] = useState(0);
   const [filter, setFilter] = useState<"offen" | "erledigt">("offen");
   const [personFilter, setPersonFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", priority: "normal" as TodoPriority, due_date: "", assigned_to: "" });
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
@@ -43,16 +57,84 @@ export default function TodosPage() {
   const supabase = createClient();
   const { confirm, ConfirmModalElement } = useConfirm();
 
-  useEffect(() => { loadData(); }, []);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryIdRef = useRef(0);
 
-  async function loadData() {
-    const [todosRes, profRes] = await Promise.all([
-      supabase.from("todos").select("*, assignee:profiles!assigned_to(full_name)").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
-    ]);
-    if (todosRes.data) setTodos(todosRes.data as unknown as Todo[]);
-    if (profRes.data) setProfiles(profRes.data as Profile[]);
+  // Server-seitiger Filter+Sort. Sortierung: Faelligkeit aufsteigend (NULLs ans
+  // Ende via order with nullsFirst:false). PostgREST: title-Suche per ilike.
+  const buildQuery = useCallback((cursor: { sortKey: string; id: string } | null) => {
+    let q = supabase
+      .from("todos")
+      .select("*, assignee:profiles!assigned_to(full_name)")
+      .eq("status", filter);
+    if (personFilter) q = q.eq("assigned_to", personFilter);
+    const term = search.trim();
+    if (term.length > 0) {
+      const like = `%${term}%`;
+      q = q.or(`title.ilike.${like},description.ilike.${like}`);
+    }
+    if (cursor !== null) {
+      // Composite cursor — due_date kann null sein, daher ist das Sortier-
+      // Kriterium kompliziert; wir paginieren via id-cursor (DESC) bei ORDER BY id.
+      q = q.lt("id", cursor.id);
+    }
+    // Sortierung: Faelligkeit zuerst (asc, nulls last), dann id desc als Tiebreak/Cursor.
+    return q
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: false })
+      .limit(PAGE_SIZE + 1);
+  }, [supabase, filter, personFilter, search]);
+
+  const loadTodos = useCallback(async () => {
+    const myId = ++queryIdRef.current;
+    setLoading(true);
+    const { data } = await buildQuery(null);
+    if (myId !== queryIdRef.current) return;
+    if (data) {
+      const rows = data as unknown as Todo[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setTodos(rows.slice(0, PAGE_SIZE));
+    }
     setLoading(false);
+  }, [buildQuery]);
+
+  // Counts kommen aus separaten Queries — entkoppelt vom geladenen Page-Chunk,
+  // sodass die Anzeige "Offen (X) / Archiv (Y)" auch bei Pagination korrekt bleibt.
+  const refreshCounts = useCallback(async () => {
+    const [openRes, doneRes] = await Promise.all([
+      supabase.from("todos").select("*", { count: "exact", head: true }).eq("status", "offen"),
+      supabase.from("todos").select("*", { count: "exact", head: true }).eq("status", "erledigt"),
+    ]);
+    setOpenCount(openRes.count ?? 0);
+    setArchiveCount(doneRes.count ?? 0);
+  }, [supabase]);
+
+  useEffect(() => {
+    supabase.from("profiles").select("*").eq("is_active", true).order("full_name")
+      .then(({ data }) => { if (data) setProfiles(data as Profile[]); });
+    refreshCounts();
+  }, [refreshCounts, supabase]);
+
+  // Filter/Suche/Person triggert Reload mit 250ms Debounce auf der Suche.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => { loadTodos(); }, 250);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [loadTodos]);
+
+  async function loadMore() {
+    if (loadingMore || todos.length === 0) return;
+    setLoadingMore(true);
+    const last = todos[todos.length - 1];
+    const { data } = await buildQuery({ sortKey: last.due_date ?? "", id: last.id });
+    if (data) {
+      const rows = data as unknown as Todo[];
+      setHasMore(rows.length > PAGE_SIZE);
+      setTodos((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    }
+    setLoadingMore(false);
   }
 
   async function addTodo(e: React.FormEvent) {
@@ -67,7 +149,6 @@ export default function TodosPage() {
       created_by: user?.id,
     });
 
-    // Push-Benachrichtigung an zugewiesene Person
     if (form.assigned_to) {
       const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
       await fetch("/api/notifications", {
@@ -80,7 +161,6 @@ export default function TodosPage() {
           link: "/todos",
         }),
       });
-      // Bei dringend: zusätzlich E-Mail senden
       if (form.priority === "dringend") {
         await fetch("/api/todos/urgent-notify", {
           method: "POST",
@@ -99,16 +179,16 @@ export default function TodosPage() {
 
     setForm({ title: "", description: "", priority: "normal", due_date: "", assigned_to: "" });
     setShowForm(false);
-    loadData();
+    await Promise.all([loadTodos(), refreshCounts()]);
   }
 
   async function toggleTodo(id: string, currentStatus: string) {
     const newStatus = currentStatus === "offen" ? "erledigt" : "offen";
     await supabase.from("todos").update({ status: newStatus, completed_at: newStatus === "erledigt" ? new Date().toISOString() : null }).eq("id", id);
-    loadData();
     if (selectedTodo?.id === id) {
       setSelectedTodo({ ...selectedTodo, status: newStatus as "offen" | "erledigt" });
     }
+    await Promise.all([loadTodos(), refreshCounts()]);
   }
 
   async function deleteTodo(id: string) {
@@ -118,13 +198,12 @@ export default function TodosPage() {
       variant: "red",
     });
     if (!ok) return;
-    // Delete attachments from storage
     if (attachments.length > 0) {
       await supabase.storage.from("documents").remove(attachments.map((a) => a.path));
     }
     await supabase.from("todos").delete().eq("id", id);
     setSelectedTodo(null);
-    loadData();
+    await Promise.all([loadTodos(), refreshCounts()]);
     toast.success("Todo gelöscht");
   }
 
@@ -149,8 +228,8 @@ export default function TodosPage() {
 
   async function saveAttachments(todoId: string, newAttachments: TodoAttachment[]) {
     const { data } = await supabase.from("todos").select("description").eq("id", todoId).single();
-    let desc = data?.description || "";
-    let parsed: any = {};
+    const desc = data?.description || "";
+    let parsed: { _text?: string; _attachments?: TodoAttachment[] } = {};
     try {
       parsed = JSON.parse(desc);
     } catch {
@@ -204,23 +283,14 @@ export default function TodosPage() {
     }
   }
 
-  const filtered = todos
-    .filter((t) => t.status === filter)
-    .filter((t) => !personFilter || t.assigned_to === personFilter)
-    .sort((a, b) => {
-      if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      if (a.due_date) return -1;
-      if (b.due_date) return 1;
-      return 0;
-    });
-  const openCount = todos.filter((t) => t.status === "offen").length;
-
   const priorities: { value: TodoPriority; label: string }[] = [
     { value: "niedrig", label: "Niedrig" },
     { value: "normal", label: "Normal" },
     { value: "hoch", label: "Hoch" },
     { value: "dringend", label: "Dringend" },
   ];
+
+  const hasFilter = !!search.trim() || !!personFilter;
 
   // Detail view
   if (selectedTodo) {
@@ -238,7 +308,6 @@ export default function TodosPage() {
           </div>
         </div>
 
-        {/* Info */}
         <Card className="bg-card">
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center gap-4">
@@ -263,7 +332,6 @@ export default function TodosPage() {
           </CardContent>
         </Card>
 
-        {/* Anhänge */}
         <Card className="bg-card">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
@@ -303,10 +371,10 @@ export default function TodosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Todos</h1>
-          <p className="text-sm text-muted-foreground mt-1">{openCount} offen von {todos.length}</p>
+          <p className="text-sm text-muted-foreground mt-1">{openCount} offen · {archiveCount} archiviert</p>
         </div>
         <button
           type="button"
@@ -352,39 +420,68 @@ export default function TodosPage() {
         </Card>
       )}
 
-      {/* Filter */}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setFilter("offen")} className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "offen" ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
-          Offen ({openCount})
-        </button>
-        <button onClick={() => setFilter("erledigt")} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${filter === "erledigt" ? "bg-gray-700 text-white border-gray-700" : "bg-card text-gray-500 border-gray-200"}`}>
-          <Archive className="h-3 w-3" />Archiv ({todos.length - openCount})
-        </button>
-        <span className="border-l border-gray-200 mx-1" />
-        <select
-          value={personFilter}
-          onChange={(e) => setPersonFilter(e.target.value)}
-          className="px-3 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-card text-gray-600"
-        >
-          <option value="">Alle Personen</option>
-          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-        </select>
+      {/* Such- + Filter-Bar — gleiche UX wie /kunden */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Titel oder Beschreibung suchen…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-9"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter("offen")}
+            className={filter === "offen" ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Offen ({openCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter("erledigt")}
+            className={filter === "erledigt" ? "kasten-active" : "kasten-toggle-off"}
+          >
+            <Archive className="h-3 w-3" />
+            Archiv ({archiveCount})
+          </button>
+          <select
+            value={personFilter}
+            onChange={(e) => setPersonFilter(e.target.value)}
+            className="kasten-toggle-off"
+          >
+            <option value="">Alle Personen</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </select>
+        </div>
+        {hasFilter && (
+          <button
+            type="button"
+            onClick={() => { setSearch(""); setPersonFilter(""); }}
+            className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        )}
       </div>
 
       {/* Todo List */}
       {loading ? (
         <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4"><div className="h-5 bg-gray-200 rounded w-1/2" /></CardContent></Card>)}</div>
-      ) : filtered.length === 0 ? (
+      ) : todos.length === 0 ? (
         <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><CheckSquare className="h-7 w-7 text-gray-400" /></div>
-            <h3 className="font-semibold text-lg">{filter === "erledigt" ? "Archiv ist leer" : "Keine offenen Todos"}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{filter === "offen" && !personFilter ? "Erstelle dein erstes Todo." : ""}</p>
+            <h3 className="font-semibold text-lg">{filter === "erledigt" ? "Archiv ist leer" : hasFilter ? "Keine Treffer" : "Keine offenen Todos"}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{filter === "offen" && !hasFilter ? "Erstelle dein erstes Todo." : ""}</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((todo) => {
+          {todos.map((todo) => {
             const assignee = (todo as unknown as { assignee: { full_name: string } | null }).assignee;
             const overdue = todo.status === "offen" && todo.due_date && new Date(todo.due_date) < new Date(new Date().toDateString());
             return (
@@ -410,6 +507,19 @@ export default function TodosPage() {
               </Card>
             );
           })}
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="kasten kasten-muted"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                {loadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
         </div>
       )}
       {ConfirmModalElement}
