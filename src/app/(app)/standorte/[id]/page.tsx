@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Location, LocationContact, MaintenanceTask, Customer } from "@/types";
@@ -321,13 +320,13 @@ export default function StandortDetailPage() {
                   {linkedCustomer.address_city && <p className="text-xs text-muted-foreground">{linkedCustomer.address_zip} {linkedCustomer.address_city}</p>}
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => linkCustomer("")} className="text-xs text-red-500 border-red-200 hover:bg-red-50">Entfernen</Button>
+              <button type="button" onClick={() => linkCustomer("")} className="kasten kasten-muted">Entfernen</button>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <select
                 onChange={(e) => { if (e.target.value) linkCustomer(e.target.value); }}
-                className="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                className="flex-1 h-9 px-3 text-sm rounded-lg border border-border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-red-500/20"
                 defaultValue=""
               >
                 <option value="">Kunde auswählen...</option>
@@ -342,15 +341,15 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
-            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+          <button type="button" onClick={() => setShowNoteForm(!showNoteForm)} className="kasten kasten-muted">
+            {showNoteForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </Button>
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
+            <form onSubmit={addNote} className="p-4 rounded-xl bg-muted/40 border space-y-3">
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
                 <button type="button" onClick={() => { setShowNoteForm(false); setNewNote(""); }} className="kasten kasten-muted">Abbrechen</button>
                 <button type="submit" className="kasten kasten-red">Speichern</button>
@@ -359,7 +358,7 @@ export default function StandortDetailPage() {
           )}
           {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
           {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-muted/40 border">
               <div className="min-w-0 flex-1">
                 <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
                   part.match(/^https?:\/\//) ? (
@@ -368,7 +367,7 @@ export default function StandortDetailPage() {
                 )}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -378,15 +377,16 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
-            <Upload className="h-4 w-4 mr-1" />{uploadingDoc ? "Hochladen..." : "PDF hochladen"}
-          </Button>
+          <button type="button" onClick={() => docRef.current?.click()} disabled={uploadingDoc} className="kasten kasten-muted">
+            <Upload className="h-3.5 w-3.5" />
+            {uploadingDoc ? "Hochladen…" : "PDF hochladen"}
+          </button>
           <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
         </CardHeader>
         <CardContent className="space-y-3">
           {docs.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Dokumente.</p>}
           {docs.map((d) => (
-            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <button onClick={() => openDoc(d.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-600 transition-colors">
                 <FileText className="h-5 w-5 text-red-500 shrink-0" />
                 <div className="min-w-0">
@@ -395,8 +395,8 @@ export default function StandortDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Öffnen"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Löschen"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground/60 hover:text-blue-500 transition-colors" title="Öffnen"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors" title="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
@@ -407,11 +407,14 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Kontaktpersonen ({contacts.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowContactForm(!showContactForm)}><UserPlus className="h-4 w-4 mr-1" />Hinzufügen</Button>
+          <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
+            <UserPlus className="h-3.5 w-3.5" />
+            Hinzufügen
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {showContactForm && (
-            <form onSubmit={addContact} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+            <form onSubmit={addContact} className="p-4 rounded-xl bg-muted/40 border space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Name *" value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} required />
                 <Input placeholder="Funktion (z.B. Hausmeister)" value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} />
@@ -428,18 +431,18 @@ export default function StandortDetailPage() {
           )}
           {contacts.length === 0 && !showContactForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Kontaktpersonen.</p>}
           {contacts.map((c) => (
-            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{c.name}</span>
-                  {c.role && <span className="text-xs text-muted-foreground bg-gray-200 px-2 py-0.5 rounded-full">{c.role}</span>}
+                  {c.role && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{c.role}</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                   {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Mail className="h-3 w-3" />{c.email}</a>}
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -449,16 +452,16 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Instandhaltung ({tasks.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowTaskForm(!showTaskForm)}>
-            {showTaskForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+          <button type="button" onClick={() => setShowTaskForm(!showTaskForm)} className="kasten kasten-muted">
+            {showTaskForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {showTaskForm ? "Abbrechen" : "Neue Arbeit"}
-          </Button>
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filter */}
           <div className="flex gap-2">
             {(["all", "offen", "erledigt"] as const).map((f) => (
-              <button key={f} onClick={() => setTaskFilter(f)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${taskFilter === f ? "bg-black text-white border-black" : "bg-card text-gray-600 border-gray-200"}`}>
+              <button key={f} type="button" onClick={() => setTaskFilter(f)} className={taskFilter === f ? "kasten-active" : "kasten-toggle-off"}>
                 {f === "all" ? "Alle" : f === "offen" ? "Offen" : "Erledigt"}
               </button>
             ))}
@@ -466,14 +469,14 @@ export default function StandortDetailPage() {
 
           {/* Neue Arbeit Formular */}
           {showTaskForm && (
-            <form onSubmit={addTask} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+            <form onSubmit={addTask} className="p-4 rounded-xl bg-muted/40 border space-y-3">
               <Input placeholder="Titel der Arbeit *" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} required />
-              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
+              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none" rows={2} />
               <Input type="date" value={taskForm.due_date} onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })} />
 
               {/* Foto */}
               {taskPhoto ? (
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 w-fit">
+                <div className="relative rounded-xl overflow-hidden border border-border w-fit">
                   <img src={taskPhoto.preview} alt="Foto" className="h-32 w-auto object-cover rounded-xl" />
                   <button
                     type="button"
@@ -485,10 +488,10 @@ export default function StandortDetailPage() {
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-border text-xs font-medium text-muted-foreground/60 hover:border-red-300 hover:text-red-500 transition-colors">
                     <Camera className="h-4 w-4" />Foto aufnehmen
                   </button>
-                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-border text-xs font-medium text-muted-foreground/60 hover:border-red-300 hover:text-red-500 transition-colors">
                     <ImageIcon className="h-4 w-4" />Aus Galerie
                   </button>
                 </div>
@@ -507,7 +510,7 @@ export default function StandortDetailPage() {
           {filteredTasks.length === 0 && !showTaskForm && <p className="text-sm text-muted-foreground py-4 text-center">Keine Instandhaltungsarbeiten.</p>}
 
           {filteredTasks.map((t) => (
-            <div key={t.id} className={`p-3 rounded-xl border ${t.status === "erledigt" ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
+            <div key={t.id} className={`p-3 rounded-xl border ${t.status === "erledigt" ? "bg-green-50 border-green-100" : "bg-muted/40 border-border"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0 flex-1">
                   <button onClick={() => toggleTask(t.id, t.status)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all mt-0.5 shrink-0 ${t.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
@@ -526,7 +529,7 @@ export default function StandortDetailPage() {
                         <img
                           src={photoUrls[t.id]}
                           alt="Foto"
-                          className="h-24 w-auto rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          className="h-24 w-auto rounded-lg border border-border object-cover cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => window.open(photoUrls[t.id], "_blank")}
                         />
                       </div>

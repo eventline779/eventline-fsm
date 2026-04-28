@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Room, RoomContact, RoomPrice } from "@/types";
@@ -211,9 +210,10 @@ export default function RaumDetailPage() {
             {room.capacity ? ` · ${room.capacity} Personen` : ""}
           </p>
         </div>
-        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 ml-auto" onClick={() => { setShowDelete(true); setDeleteCode(""); setDeleteError(false); }}>
-          <Trash2 className="h-4 w-4 mr-1" />Löschen
-        </Button>
+        <button type="button" className="kasten kasten-red ml-auto" onClick={() => { setShowDelete(true); setDeleteCode(""); setDeleteError(false); }}>
+          <Trash2 className="h-3.5 w-3.5" />
+          Löschen
+        </button>
       </div>
 
       {/* Technische Details */}
@@ -225,9 +225,9 @@ export default function RaumDetailPage() {
         <CardContent>
           {editingTech ? (
             <div className="space-y-3">
-              <textarea value={techText} onChange={(e) => setTechText(e.target.value)} placeholder="Bühne, Licht, Ton, Strom, Bestuhlung..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={4} />
+              <textarea value={techText} onChange={(e) => setTechText(e.target.value)} placeholder="Bühne, Licht, Ton, Strom, Bestuhlung..." className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/40 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={4} />
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setEditingTech(false); setTechText(room.technical_details || ""); }}>Abbrechen</Button>
+                <button type="button" onClick={() => { setEditingTech(false); setTechText(room.technical_details || ""); }} className="kasten kasten-muted">Abbrechen</button>
                 <button type="button" onClick={saveTech} className="kasten kasten-red">Speichern</button>
               </div>
             </div>
@@ -241,28 +241,28 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4" />Preise ({prices.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowPriceForm(!showPriceForm)}>
-            {showPriceForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+          <button type="button" onClick={() => setShowPriceForm(!showPriceForm)} className="kasten kasten-muted">
+            {showPriceForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {showPriceForm ? "Abbrechen" : "Preis hinzufügen"}
-          </Button>
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {showPriceForm && (
-            <form onSubmit={addPrice} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+            <form onSubmit={addPrice} className="p-4 rounded-xl bg-muted/40 border space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Bezeichnung * (z.B. Tagesmiete)" value={priceForm.label} onChange={(e) => setPriceForm({ ...priceForm, label: e.target.value })} required />
                 <Input type="number" step="0.01" placeholder="Betrag (CHF) *" value={priceForm.amount} onChange={(e) => setPriceForm({ ...priceForm, amount: e.target.value })} required />
               </div>
               <Input placeholder="Bemerkung (optional)" value={priceForm.notes} onChange={(e) => setPriceForm({ ...priceForm, notes: e.target.value })} />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowPriceForm(false)}>Abbrechen</Button>
+                <button type="button" onClick={() => setShowPriceForm(false)} className="kasten kasten-muted">Abbrechen</button>
                 <button type="submit" className="kasten kasten-red">Speichern</button>
               </div>
             </form>
           )}
           {prices.length === 0 && !showPriceForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Preise erfasst.</p>}
           {prices.map((p) => (
-            <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{p.label}</span>
@@ -270,7 +270,7 @@ export default function RaumDetailPage() {
                 </div>
                 {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
               </div>
-              <button onClick={() => deletePrice(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deletePrice(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -280,11 +280,14 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Ansprechpartner ({contacts.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowContactForm(!showContactForm)}><UserPlus className="h-4 w-4 mr-1" />Hinzufügen</Button>
+          <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
+            <UserPlus className="h-3.5 w-3.5" />
+            Hinzufügen
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {showContactForm && (
-            <form onSubmit={addContact} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+            <form onSubmit={addContact} className="p-4 rounded-xl bg-muted/40 border space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Name *" value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} required />
                 <Input placeholder="Funktion (z.B. Vermietung)" value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} />
@@ -294,25 +297,25 @@ export default function RaumDetailPage() {
                 <Input placeholder="Telefon" value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowContactForm(false)}>Abbrechen</Button>
+                <button type="button" onClick={() => setShowContactForm(false)} className="kasten kasten-muted">Abbrechen</button>
                 <button type="submit" className="kasten kasten-red">Speichern</button>
               </div>
             </form>
           )}
           {contacts.length === 0 && !showContactForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Ansprechpartner.</p>}
           {contacts.map((c) => (
-            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{c.name}</span>
-                  {c.role && <span className="text-xs text-muted-foreground bg-gray-200 px-2 py-0.5 rounded-full">{c.role}</span>}
+                  {c.role && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{c.role}</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                   {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Mail className="h-3 w-3" />{c.email}</a>}
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -322,29 +325,29 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
-            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+          <button type="button" onClick={() => setShowNoteForm(!showNoteForm)} className="kasten kasten-muted">
+            {showNoteForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </Button>
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
+            <form onSubmit={addNote} className="p-4 rounded-xl bg-muted/40 border space-y-3">
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
+                <button type="button" onClick={() => { setShowNoteForm(false); setNewNote(""); }} className="kasten kasten-muted">Abbrechen</button>
                 <button type="submit" className="kasten kasten-red">Speichern</button>
               </div>
             </form>
           )}
           {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
           {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-muted/40 border">
               <div className="min-w-0 flex-1">
                 <p className="text-sm whitespace-pre-wrap">{n.content}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -354,15 +357,16 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
-            <Upload className="h-4 w-4 mr-1" />{uploadingDoc ? "Hochladen..." : "PDF hochladen"}
-          </Button>
+          <button type="button" onClick={() => docRef.current?.click()} disabled={uploadingDoc} className="kasten kasten-muted">
+            <Upload className="h-3.5 w-3.5" />
+            {uploadingDoc ? "Hochladen…" : "PDF hochladen"}
+          </button>
           <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
         </CardHeader>
         <CardContent className="space-y-3">
           {docs.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Dokumente.</p>}
           {docs.map((d) => (
-            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <button onClick={() => openDoc(d.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-600 transition-colors">
                 <FileText className="h-5 w-5 text-red-500 shrink-0" />
                 <div className="min-w-0">
@@ -371,8 +375,8 @@ export default function RaumDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground/60 hover:text-blue-500 transition-colors"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
@@ -385,7 +389,7 @@ export default function RaumDetailPage() {
           <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowDelete(false)} />
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Raum löschen</h2>
                 <button onClick={() => setShowDelete(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
               </div>
@@ -396,11 +400,11 @@ export default function RaumDetailPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Code eingeben</label>
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-blue-500 focus:border-blue-500"}`} />
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-border focus:ring-blue-500 focus:border-blue-500"}`} />
                   {deleteError && <p className="text-xs text-red-600 mt-1">Falscher Code</p>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowDelete(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                  <button onClick={() => setShowDelete(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-border text-gray-700 hover:bg-muted/40">Abbrechen</button>
                   <button onClick={deleteRoom} disabled={!deleteCode || deleting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
                     <Trash2 className="h-4 w-4" />{deleting ? "Löschen..." : "Endgültig löschen"}
                   </button>
