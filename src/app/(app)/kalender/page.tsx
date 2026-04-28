@@ -57,6 +57,14 @@ export default function KalenderPage() {
   const [deleteCode, setDeleteCode] = useState("");
   const [showSync, setShowSync] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Calendar-Feed-URL aus Env-Var (NEXT_PUBLIC_APP_URL bzw. window.location)
+  // + Token aus Env. Vorher hardcoded — bei Redeploy/Domain-Wechsel kaputt.
+  const calendarFeedUrl = (() => {
+    const base = process.env.NEXT_PUBLIC_APP_URL
+      ?? (typeof window !== "undefined" ? window.location.origin : "");
+    const token = process.env.NEXT_PUBLIC_CALENDAR_FEED_TOKEN ?? "";
+    return `${base}/api/calendar/feed?token=${token}`;
+  })();
   const [form, setForm] = useState({
     title: "", date: new Date().toISOString().split("T")[0],
     time: "08:00", end_time: "17:00", assigned_to: [] as string[], job_id: "",
@@ -651,13 +659,13 @@ export default function KalenderPage() {
                   <div className="mt-1.5 flex items-center gap-2">
                     <input
                       readOnly
-                      value="https://eventline-fsm-usyk.vercel.app/api/calendar/feed?token=eventline-cal-5225"
+                      value={calendarFeedUrl}
                       className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800 font-mono"
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText("https://eventline-fsm-usyk.vercel.app/api/calendar/feed?token=eventline-cal-5225");
+                        navigator.clipboard.writeText(calendarFeedUrl);
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}

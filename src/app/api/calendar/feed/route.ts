@@ -1,7 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
-const CALENDAR_TOKEN = "eventline-cal-5225";
+// Token aus Env. Bei nicht-gesetztem Wert blockt die Route alles —
+// verhindert dass jemand mit Repo-Zugriff den alten hardcoded Token weiter nutzen kann.
+const CALENDAR_TOKEN = process.env.CALENDAR_FEED_TOKEN ?? "";
 
 function escape(text: string): string {
   return (text || "")
@@ -22,7 +24,7 @@ function formatDateOnly(dateStr: string): string {
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
-  if (token !== CALENDAR_TOKEN) {
+  if (!CALENDAR_TOKEN || token !== CALENDAR_TOKEN) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

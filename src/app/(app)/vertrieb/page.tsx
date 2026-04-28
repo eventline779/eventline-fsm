@@ -211,6 +211,10 @@ export default function VertriebPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    // Guard gegen Doppelklick: React state-Updates sind async, der Button-
+    // disabled-State wird erst nach dem Re-Render wirksam. Synchroner Check
+    // hier verhindert dass ein schneller zweiter Klick einen zweiten Insert ausloest.
+    if (saving) return;
     setSaving(true);
 
     // Details als JSON in notizen speichern (_text = freie Notiz, _details = kategorienspezifisch)

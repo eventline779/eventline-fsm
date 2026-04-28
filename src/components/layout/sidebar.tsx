@@ -16,7 +16,6 @@ import {
   Moon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useNotificationCounts } from "@/components/layout/notification-bell";
 import type { Profile } from "@/types";
 
 interface SidebarProps {
@@ -31,7 +30,6 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
-  const badgeCounts = useNotificationCounts();
 
 
   const groups: NavGroup[] = profile.role === "admin"
@@ -102,12 +100,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
                         </div>
                       )}
                       <span className="flex-1">{item.label}</span>
-                      {badgeCounts[item.href] > 0 && (
-                        <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                          {badgeCounts[item.href]}
-                        </span>
-                      )}
-                      {active && !badgeCounts[item.href] && (
+                      {active && (
                         <ChevronRight className="h-3 w-3 text-sidebar-foreground/30" />
                       )}
                     </Link>
