@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
+import { validateFileList } from "@/lib/file-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,21 +16,29 @@ type ReportWithCreator = ServiceReport & {
   creator: { full_name: string } | null;
 };
 import {
-  ArrowLeft, MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
+  MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
   Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox, ExternalLink,
+  Phone, Mail,
 } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { JobNumber } from "@/components/job-number";
 import { Modal } from "@/components/ui/modal";
 import { BexioButton } from "@/components/bexio-button";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { AppointmentsSection } from "@/components/auftrag/appointments-section";
+import { RapportFormModal } from "@/components/auftrag/rapport-form-modal";
+import { JobStempelButton } from "@/components/stempel/job-stempel-button";
+import { usePermissions } from "@/lib/use-permissions";
 
 export default function AuftragDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { can } = usePermissions();
 
   const [job, setJob] = useState<JobDetailWithRelations | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
@@ -37,16 +47,10 @@ export default function AuftragDetailPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<ReportWithCreator[]>([]);
   const [uploading, setUploading] = useState(false);
-
-  // Appointment form
-  const [showApptForm, setShowApptForm] = useState(false);
-  const [apptForm, setApptForm] = useState({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: [] as string[], description: "" });
-  const [notifiedAppts, setNotifiedAppts] = useState<Set<string>>(new Set());
-  const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
-  const [emailField1, setEmailField1] = useState("");
-  const [emailField2, setEmailField2] = useState("");
-  const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
-  const [deleteApptCode, setDeleteApptCode] = useState("");
+  const [showRapportModal, setShowRapportModal] = useState(false);
+  // Auftrag stammt aus einer Instandhaltung (FK maintenance_tasks.job_id).
+  // Steuert den Rapport-Flow: keine Kunden-Unterschrift bei technischen Arbeiten.
+  const [isMaintenanceJob, setIsMaintenanceJob] = useState(false);
 
   // Notizen — eine Freitext-Notiz pro Auftrag, autosave on debounce
   const [notesText, setNotesText] = useState("");
@@ -61,28 +65,30 @@ export default function AuftragDetailPage() {
 
   useEffect(() => { loadAll(); }, [id]);
 
-  // Auto-open Termin-Formular wenn von der Liste mit ?termin=neu hierher navigiert wurde.
+  // Auto-open-Termin-Form: ?termin=neu in der URL ist der Trigger.
+  // AppointmentsSection liest defaultOpen beim Mount; wir entfernen den
+  // Param nach Mount damit Refresh das Formular nicht wieder oeffnet.
+  const autoOpenAppt = searchParams.get("termin") === "neu";
   useEffect(() => {
-    if (searchParams.get("termin") === "neu") {
-      setShowApptForm(true);
-      // Param entfernen, damit Refresh nicht erneut das Formular oeffnet
+    if (autoOpenAppt) {
       router.replace(`/auftraege/${id}`, { scroll: false });
-      // Sanft zum Termin-Bereich scrollen, sobald die Seite geladen ist
       setTimeout(() => {
         document.getElementById("termin-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
     }
-  }, [searchParams, id, router]);
+  }, [autoOpenAppt, id, router]);
 
   async function loadAll() {
-    const [jobRes, assignRes, apptRes, docRes, profRes, repRes] = await Promise.all([
+    const [jobRes, assignRes, apptRes, docRes, profRes, repRes, maintRes] = await Promise.all([
       supabase.from("jobs").select("*, customer:customers(id, name, address_street, address_zip, address_city, bexio_contact_id), location:locations(id, name, address_street, address_zip, address_city, customer:customers(id, name)), room:rooms(id, name, address_street, address_zip, address_city), project_lead:profiles!project_lead_id(full_name), cancelled_by_profile:profiles!cancelled_by(full_name)").eq("id", id).single(),
       supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
       supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
       supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
       supabase.from("service_reports").select("*, creator:profiles!created_by(full_name)").eq("job_id", id).order("created_at", { ascending: false }),
+      supabase.from("maintenance_tasks").select("id", { head: true, count: "exact" }).eq("job_id", id),
     ]);
+    setIsMaintenanceJob((maintRes.count ?? 0) > 0);
     if (jobRes.data) {
       setJob(jobRes.data as unknown as JobDetailWithRelations);
       // Notizen: alte JSON-Liste -> joined als Text. Plain-Text bleibt as-is.
@@ -122,11 +128,12 @@ export default function AuftragDetailPage() {
 
   async function updateStatus(newStatus: JobStatus) {
     if (newStatus === "abgeschlossen") {
-      // Status wird ERST in der Rapport-Page nach erfolgreichem Speichern auf
-      // 'abgeschlossen' gesetzt — sonst bleibt ein Auftrag fälschlich "geschlossen"
-      // wenn der User den Rapport-Flow abbricht.
-      toast.info("Bitte zuerst den Einsatzrapport ausfüllen");
-      router.push(`/rapporte/neu?job_id=${id}`);
+      // Modal oeffnet immer — auch vor Erreichen des End-Datums (User
+      // kann Rapport-Draft schon vorab pflegen). Final-Submit erst wenn
+      // canFinish && Termine-Check ok. Termine-Warnung erst beim
+      // tatsaechlichen Auftrag-Schliessen, nicht beim Modal-Open —
+      // sonst nervt's bei jedem Draft-Edit.
+      setShowRapportModal(true);
       return;
     }
 
@@ -153,104 +160,13 @@ export default function AuftragDetailPage() {
       .eq("id", id);
     setCancelSaving(false);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     setCancelPhase("closed");
     setCancelReason("");
     toast.success("Auftrag storniert");
     loadAll();
-  }
-
-  async function addAppointment(e: React.FormEvent) {
-    e.preventDefault();
-    const tzOffset = -new Date().getTimezoneOffset();
-    const tzSign = tzOffset >= 0 ? "+" : "-";
-    const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
-    const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, "0");
-    const tz = `${tzSign}${tzHours}:${tzMins}`;
-    const startTime = `${apptForm.date}T${apptForm.time || "00:00"}:00${tz}`;
-    const endTime = `${apptForm.date}T${apptForm.end_time || "17:00"}:00${tz}`;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const assignees = apptForm.assigned_to.length > 0 ? apptForm.assigned_to : [user?.id || ""];
-
-    const rows = assignees.map((personId) => ({
-      job_id: id,
-      title: apptForm.title,
-      start_time: startTime,
-      end_time: endTime,
-      assigned_to: personId,
-      description: apptForm.description || null,
-    }));
-    await supabase.from("job_appointments").insert(rows);
-
-    // E-Mail an zugewiesene Personen
-    const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", user?.id).single();
-    for (const personId of assignees) {
-      if (personId && personId !== user?.id) {
-        await fetch("/api/appointments/assign-notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            assignedTo: personId,
-            title: apptForm.title,
-            date: apptForm.date,
-            time: apptForm.time,
-            endTime: apptForm.end_time,
-            jobTitle: job?.title || null,
-            creatorName: creator?.full_name || "Unbekannt",
-          }),
-        });
-      }
-    }
-
-    setApptForm({ title: "", date: new Date().toISOString().split("T")[0], time: "09:00", end_time: "17:00", assigned_to: [], description: "" });
-    setShowApptForm(false);
-    loadAll();
-    toast.success(`Termin für ${assignees.length} Person${assignees.length > 1 ? "en" : ""} erstellt`);
-  }
-
-  async function toggleAppointment(apptId: string, isDone: boolean) {
-    await supabase.from("job_appointments").update({ is_done: !isDone }).eq("id", apptId);
-    loadAll();
-  }
-
-  async function deleteAppointment() {
-    if (deleteApptCode !== "5225" || !deleteApptTarget) {
-      toast.error("Falscher Code");
-      return;
-    }
-    await supabase.from("job_appointments").delete().eq("id", deleteApptTarget);
-    setDeleteApptTarget(null);
-    setDeleteApptCode("");
-    loadAll();
-    toast.success("Termin gelöscht");
-  }
-
-  async function notifyAppointment(apptId: string) {
-    const emails = [emailField1, emailField2].filter((e) => e.trim() && e.includes("@"));
-    if (emails.length === 0) { toast.error("Mindestens eine E-Mail eingeben"); return; }
-    toast.info("E-Mails werden gesendet...");
-    try {
-      const res = await fetch("/api/appointments/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: apptId, job_id: id, send_to_emails: emails }),
-      });
-      const result = await res.json();
-      if (result.sentTo?.length > 0) {
-        toast.success(`E-Mail gesendet an: ${result.sentTo.join(", ")}`);
-        setNotifiedAppts((prev) => new Set(prev).add(apptId));
-      } else {
-        toast.error("Keine E-Mails gesendet");
-      }
-    } catch {
-      toast.error("Fehler beim Senden");
-    }
-    setNotifyPopup(null);
-    setEmailField1("");
-    setEmailField2("");
   }
 
   // Mail-Anhaenge aus dem Vermietentwurf duerfen nicht geloescht werden — sie
@@ -270,9 +186,9 @@ export default function AuftragDetailPage() {
     });
     if (!ok) return;
     await supabase.storage.from("documents").remove([storagePath]);
-    const { error } = await supabase.from("documents").delete().eq("id", docId);
-    if (error) {
-      toast.error("Fehler beim Löschen: " + error.message);
+    const result = await deleteRow("documents", docId);
+    if (!result.ok) {
+      toast.error("Fehler beim Löschen: " + (result.error ?? "Unbekannt"));
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
@@ -282,6 +198,7 @@ export default function AuftragDetailPage() {
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    if (!validateFileList(files)) return;
     setUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
@@ -300,7 +217,7 @@ export default function AuftragDetailPage() {
           name: file.name, storage_path: path, file_size: file.size, mime_type: file.type,
           job_id: id as string, uploaded_by: user.id,
         });
-      } catch (err: any) { toast.error("Upload-Fehler: " + (err.message || "Netzwerkfehler")); continue; }
+      } catch (err) { toast.error("Upload-Fehler: " + (err instanceof Error ? err.message : "Netzwerkfehler")); continue; }
     }
     toast.success("Datei(en) hochgeladen");
     loadAll();
@@ -353,7 +270,7 @@ export default function AuftragDetailPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-muted transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <BackButton fallbackHref="/auftraege" />
         <div className="flex-1 min-w-0">
           <div className="space-y-1.5">
             <JobNumber number={job.job_number} size="md" />
@@ -383,13 +300,17 @@ export default function AuftragDetailPage() {
         </div>
       </div>
 
-      {/* Aktionen: Status-Uebergaenge + Bearbeiten + Stornieren — alles im Kasten-Stil */}
+      {/* Aktionen: Status-Uebergaenge + Bearbeiten + Stornieren — alles im Kasten-Stil.
+          "Abschliessen" oeffnet das Rapport-Modal — bleibt sichtbar fuer
+          zugewiesene Techniker auch ohne auftraege:edit (RLS hat eigene
+          Sonderregel fuer Job-Assignments). Stornieren / andere Status-
+          Wechsel / Bearbeiten brauchen explizit auftraege:edit. */}
       <div className="flex flex-wrap gap-2">
         {availableActions
           .filter((a) => a.to !== "storniert")
+          .filter((a) => a.to === "abgeschlossen" || can("auftraege:edit"))
           .map((a) => {
             const isFinish = a.to === "abgeschlossen";
-            const disabled = isFinish && !canFinish;
             const isPrimary = a.variant === "primary";
             const tone = isFinish ? "kasten-green" : isPrimary ? "kasten-red" : "kasten-muted";
             return (
@@ -397,8 +318,6 @@ export default function AuftragDetailPage() {
                 key={a.to}
                 type="button"
                 onClick={() => updateStatus(a.to)}
-                disabled={disabled}
-                title={disabled ? finishBlockReason : undefined}
                 className={`kasten ${tone}`}
               >
                 {a.icon}
@@ -410,7 +329,7 @@ export default function AuftragDetailPage() {
         {/* Bearbeiten — nur bei Entwuerfen. Violet wie der Entwurf-Status-Tag,
             damit die Farbsprache app-weit konsistent ist (Bearbeiten == Entwurf-
             Aktion). */}
-        {job.status === "entwurf" && (
+        {job.status === "entwurf" && can("auftraege:edit") && (
           <Link
             href={`/auftraege/${id}/bearbeiten`}
             className="kasten kasten-purple"
@@ -420,8 +339,8 @@ export default function AuftragDetailPage() {
           </Link>
         )}
 
-        {/* Stornieren als Letztes */}
-        {availableActions
+        {/* Stornieren als Letztes — auftraege:edit-only */}
+        {can("auftraege:edit") && availableActions
           .filter((a) => a.to === "storniert")
           .map((a) => (
             <button
@@ -434,37 +353,54 @@ export default function AuftragDetailPage() {
               {a.label}
             </button>
           ))}
+
+        {/* Stempel-Quick-Button — auch fuer Techniker ohne auftraege:edit
+            verfuegbar (Stempelung gehoert zur Arbeitszeit-Erfassung). */}
+        {(job.status === "offen" || job.status === "anfrage" || job.status === "entwurf") && (
+          <JobStempelButton jobId={id as string} jobNumber={job.job_number} />
+        )}
       </div>
+
+      {/* End-Date-Hint: erklaert dass Final-Submit erst ab End-Datum geht,
+          aber der Rapport schon jetzt vorbereitet werden kann (Auto-Save). */}
+      {!canFinish && job.status === "offen" && finishBlockReason && (
+        <p className="text-xs text-muted-foreground -mt-3 flex items-center gap-1.5">
+          <AlertCircle className="h-3 w-3" />
+          {finishBlockReason} — Rapport kann jedoch schon jetzt vorbereitet werden.
+        </p>
+      )}
 
       {/* Info */}
       <Card className="bg-card">
         <CardContent className="p-5 space-y-3">
-          {customer && (
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-medium">Kunde:</span>
-                  <span className="truncate">{customer.name}</span>
-                </div>
-                {customerAddress && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">{customerAddress}</span>
-                  </div>
-                )}
+          {/* Kunde IMMER anzeigen — auch bei Location-Auftraegen wo der
+              Customer der Verwaltungs-Kunde der Location ist. Falls weder
+              direkt noch via Location ein Customer auflösbar: "—". */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-0.5 text-sm">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="font-medium">Kunde:</span>
+                <span className="truncate">{customer?.name ?? "—"}</span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {/* BexioButton nur fuer echte job.customer-Verknuepfungen — der
-                    Verwaltungs-Fallback (job.location.customer) hat nur id+name,
-                    kein bexio_contact_id. Bexio-Sync findet auf der Customer-Seite statt. */}
-                {job.customer?.id && (
-                  <BexioButton
-                    customerId={job.customer.id}
-                    bexioContactId={job.customer.bexio_contact_id ?? null}
-                    onLinked={() => loadAll()}
-                  />
-                )}
+              {customerAddress && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{customerAddress}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* BexioButton nur fuer echte job.customer-Verknuepfungen — der
+                  Verwaltungs-Fallback (job.location.customer) hat nur id+name,
+                  kein bexio_contact_id. Bexio-Sync findet auf der Customer-Seite statt. */}
+              {job.customer?.id && (
+                <BexioButton
+                  customerId={job.customer.id}
+                  bexioContactId={job.customer.bexio_contact_id ?? null}
+                  onLinked={() => loadAll()}
+                />
+              )}
                 {!location && mapsUrl && (
                   <a
                     href={mapsUrl}
@@ -478,7 +414,6 @@ export default function AuftragDetailPage() {
                 )}
               </div>
             </div>
-          )}
           {location && (
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-0.5 text-sm">
@@ -544,6 +479,32 @@ export default function AuftragDetailPage() {
           )}
           {projectLead && <div className="flex items-center gap-2 text-sm"><UserCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Projektleiter:</span> {projectLead.full_name}</div>}
           {job.start_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span className="font-medium">Event-Datum:</span> {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })} {job.end_date && job.end_date !== job.start_date ? `– ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}</div>}
+          {/* Veranstalter-Kontakt — Person vor Ort, separat vom Customer.
+              Nur sichtbar wenn mind. ein Feld gesetzt ist; bei extern-Auftraegen
+              sind die Felder typisch null (Customer ist selber der Kontakt). */}
+          {(job.contact_person || job.contact_phone || job.contact_email) && (
+            <div className="pt-2 border-t space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Veranstalter-Kontakt</p>
+              {job.contact_person && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span>{job.contact_person}</span>
+                </div>
+              )}
+              {job.contact_phone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <a href={`tel:${job.contact_phone.replace(/\s+/g, "")}`} className="hover:underline tabular-nums">{job.contact_phone}</a>
+                </div>
+              )}
+              {job.contact_email && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <a href={`mailto:${job.contact_email}`} className="hover:underline truncate">{job.contact_email}</a>
+                </div>
+              )}
+            </div>
+          )}
           {job.description && <div className="pt-2 border-t"><p className="text-sm text-muted-foreground">{job.description}</p></div>}
         </CardContent>
       </Card>
@@ -591,151 +552,16 @@ export default function AuftragDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Termine */}
-      <Card id="termin-form" className="bg-card scroll-mt-4">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Calendar className="h-4 w-4" />Termine ({appointments.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}><Plus className="h-4 w-4 mr-1" />Termin</Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {showApptForm && (
-            <form onSubmit={addAppointment} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <Input placeholder="Termin-Titel *" value={apptForm.title} onChange={(e) => setApptForm({ ...apptForm, title: e.target.value })} required />
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs font-medium">Datum *</label><Input type="date" value={apptForm.date} onChange={(e) => setApptForm({ ...apptForm, date: e.target.value })} className="mt-1" required /></div>
-                <div><label className="text-xs font-medium">Von *</label><Input type="time" value={apptForm.time} onChange={(e) => setApptForm({ ...apptForm, time: e.target.value })} className="mt-1" required /></div>
-                <div><label className="text-xs font-medium">Bis *</label><Input type="time" value={apptForm.end_time} onChange={(e) => setApptForm({ ...apptForm, end_time: e.target.value })} className="mt-1" required /></div>
-              </div>
-              <div>
-                <label className="text-xs font-medium">Zuweisen an {apptForm.assigned_to.length > 0 && <span className="text-red-500">({apptForm.assigned_to.length})</span>}</label>
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  {profiles.map((p) => {
-                    const selected = apptForm.assigned_to.includes(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
-                        className={selected ? "kasten-active" : "kasten-toggle-off"}
-                      >
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
-                          {p.full_name.charAt(0)}
-                        </div>
-                        {p.full_name.split(" ")[0]}
-                      </button>
-                    );
-                  })}
-                </div>
-                {apptForm.assigned_to.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst</p>}
-              </div>
-              <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowApptForm(false)} className="kasten kasten-muted">Abbrechen</button>
-                <button type="submit" className="kasten kasten-red">Termin erstellen</button>
-              </div>
-            </form>
-          )}
-          {appointments.length === 0 && !showApptForm && (
-            !["abgeschlossen", "storniert"].includes(job.status) ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl border tinted-amber">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/20 shrink-0">
-                  <Calendar className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Kein Termin geplant</p>
-                  <p className="text-xs opacity-80 mt-0.5">
-                    {job.start_date ? (() => {
-                      const days = Math.ceil((new Date(job.start_date).getTime() - Date.now()) / 86400000);
-                      return days > 0 ? `Auftrag beginnt in ${days} Tag${days === 1 ? "" : "en"}` : days === 0 ? "Auftrag beginnt heute" : `Auftrag hat vor ${Math.abs(days)} Tag${Math.abs(days) === 1 ? "" : "en"} begonnen`;
-                    })() : "Kein Startdatum gesetzt"}
-                    {" · oben rechts \"Termin\" anlegen"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground py-2">Keine Termine.</p>
-            )
-          )}
-          {appointments.map((appt) => {
-            const assignee = appt.assignee;
-            return (
-              <div key={appt.id} className={`flex items-center justify-between p-3 rounded-xl border ${appt.is_done ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <button onClick={() => toggleAppointment(appt.id, appt.is_done)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${appt.is_done ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
-                    {appt.is_done && <Check className="h-4 w-4" />}
-                  </button>
-                  <div className="min-w-0">
-                    <span className={`font-medium text-sm ${appt.is_done ? "line-through text-muted-foreground" : ""}`}>{appt.title}</span>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(appt.start_time).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{appt.end_time ? ` – ${new Date(appt.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
-                      {assignee && <span className="flex items-center gap-1"><User className="h-3 w-3" />{assignee.full_name}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {!appt.is_done && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
-                        className={`kasten ${notifiedAppts.has(appt.id) ? "kasten-green" : "kasten-blue"}`}
-                      >
-                        {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                        {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
-                      </button>
-                      <Modal
-                        open={notifyPopup === appt.id}
-                        onClose={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }}
-                        title="Terminbestätigung senden"
-                        icon={<Send className="h-5 w-5 text-blue-500" />}
-                        size="md"
-                      >
-                        <div>
-                          <label className="text-sm font-medium">E-Mail 1 *</label>
-                          <Input
-                            type="email"
-                            value={emailField1}
-                            onChange={(e) => setEmailField1(e.target.value)}
-                            placeholder="empfaenger@beispiel.ch"
-                            className="mt-1.5"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">E-Mail 2 (optional)</label>
-                          <Input
-                            type="email"
-                            value={emailField2}
-                            onChange={(e) => setEmailField2(e.target.value)}
-                            placeholder="weitere@beispiel.ch"
-                            className="mt-1.5"
-                          />
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                          <button type="button" onClick={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }} className="kasten kasten-muted flex-1">
-                            Abbrechen
-                          </button>
-                          <button type="button" onClick={() => notifyAppointment(appt.id)} className="kasten kasten-blue flex-1">
-                            <Send className="h-3.5 w-3.5" />Senden
-                          </button>
-                        </div>
-                      </Modal>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDeleteApptTarget(appt.id)}
-                    className="kasten kasten-red"
-                    title="Termin löschen"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Löschen
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      <AppointmentsSection
+        jobId={id as string}
+        jobTitle={job?.title ?? null}
+        jobStatus={job.status}
+        jobStartDate={job.start_date ?? null}
+        appointments={appointments}
+        profiles={profiles}
+        onReload={loadAll}
+        defaultOpen={autoOpenAppt}
+      />
 
       {/* Einsatzrapporte */}
       <Card className="bg-card">
@@ -897,23 +723,41 @@ export default function AuftragDetailPage() {
         )}
       </Modal>
 
-      {/* Delete Appointment Modal */}
-      <Modal
-        open={!!deleteApptTarget}
-        onClose={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }}
-        title="Termin löschen"
-      >
-        <p className="text-sm text-muted-foreground">Der Termin wird unwiderruflich gelöscht.</p>
-        <div>
-          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
-          <Input value={deleteApptCode} onChange={(e) => setDeleteApptCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
-        </div>
-        <div className="flex gap-3">
-          <button type="button" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="kasten kasten-muted flex-1">Abbrechen</button>
-          <button type="button" onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="kasten kasten-red flex-1">Endgültig löschen</button>
-        </div>
-      </Modal>
       {ConfirmModalElement}
+
+      {/* Einsatzrapport-Modal — geoeffnet via "Abschliessen"-Button. Beim
+          Submit wird Rapport gespeichert + Auftrag-Status atomar auf
+          'abgeschlossen' gesetzt. onCompleted reloaded die Detail-Page. */}
+      <RapportFormModal
+        open={showRapportModal}
+        onClose={() => setShowRapportModal(false)}
+        job={{
+          id: id as string,
+          title: job.title,
+          job_number: job.job_number,
+          customer_name: customer?.name ?? null,
+          location_name: location?.name ?? room?.name ?? null,
+        }}
+        onCompleted={loadAll}
+        canFinish={canFinish}
+        finishBlockReason={finishBlockReason}
+        isMaintenance={isMaintenanceJob}
+        onBeforeFinalSubmit={async () => {
+          // Termine-Warnung erst beim tatsaechlichen Final-Submit, nicht
+          // beim Modal-Open — Draft-Pflege soll nicht durch Warnung
+          // unterbrochen werden.
+          const openTermine = appointments.filter((a) => !a.is_done).length;
+          if (openTermine > 0) {
+            return await confirm({
+              title: "Offene Termine",
+              message: `${openTermine} Termin${openTermine === 1 ? "" : "e"} ${openTermine === 1 ? "ist" : "sind"} noch nicht als erledigt markiert. Auftrag trotzdem abschliessen?`,
+              confirmLabel: "Trotzdem abschliessen",
+              variant: "red",
+            });
+          }
+          return true;
+        }}
+      />
     </div>
   );
 }

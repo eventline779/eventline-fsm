@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getContactById } from "@/lib/bexio";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 // POST — Backfill: holt fuer alle Kunden mit bexio_contact_id aber ohne bexio_nr
 // die menschenlesbare Kundennummer aus Bexio nach. Wird vom "Synchronisieren"-
@@ -10,7 +10,7 @@ import { requireUser } from "@/lib/api-auth";
 //
 // Response: { updated: number, skipped: number, failed: number }
 export async function POST() {
-  const auth = await requireUser();
+  const auth = await requirePermission("bexio:use");
   if (auth.error) return auth.error;
 
   const supabase = await createClient();

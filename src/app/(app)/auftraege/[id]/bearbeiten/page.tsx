@@ -10,11 +10,13 @@ import {
   type Location,
   type Room,
 } from "@/components/auftrag-form-fields";
-import { ArrowLeft, Save, CheckCircle } from "lucide-react";
+import { Save, CheckCircle } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
 import { JobNumber } from "@/components/job-number";
 import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
+import { JOB_FORM_FIELDS } from "@/lib/constants";
 
 function dateToISODate(d: string | null): string {
   if (!d) return "";
@@ -48,6 +50,9 @@ export default function AuftragBearbeitenPage() {
     start_date: "",
     end_date: "",
     urgent: false,
+    contact_person: "",
+    contact_phone: "",
+    contact_email: "",
   });
 
   useEffect(() => {
@@ -55,9 +60,7 @@ export default function AuftragBearbeitenPage() {
       const [jobRes, custRes, locRes, roomRes] = await Promise.all([
         supabase
           .from("jobs")
-          .select(
-            "id, job_number, job_type, title, description, status, priority, customer_id, location_id, room_id, external_address, start_date, end_date"
-          )
+          .select(JOB_FORM_FIELDS)
           .eq("id", jobId)
           .single(),
         supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
@@ -107,6 +110,9 @@ export default function AuftragBearbeitenPage() {
           start_date: dateToISODate(j.start_date),
           end_date: dateToISODate(j.end_date),
           urgent: j.priority === "dringend",
+          contact_person: j.contact_person ?? "",
+          contact_phone: j.contact_phone ?? "",
+          contact_email: j.contact_email ?? "",
         });
         router.replace(returnPath, { scroll: false });
       } else {
@@ -121,6 +127,9 @@ export default function AuftragBearbeitenPage() {
           start_date: dateToISODate(j.start_date),
           end_date: dateToISODate(j.end_date),
           urgent: j.priority === "dringend",
+          contact_person: j.contact_person ?? "",
+          contact_phone: j.contact_phone ?? "",
+          contact_email: j.contact_email ?? "",
         });
       }
       setLoadingJob(false);
@@ -147,6 +156,12 @@ export default function AuftragBearbeitenPage() {
     if (form.job_type === "extern") {
       if (!form.customer_id) return "Bitte einen Kunden auswählen";
       if (!form.external_address.trim()) return "Bitte einen Ort angeben";
+    }
+    // Veranstalter-Kontakt nur bei Location-Auftraegen — bei Firma/Privat
+    // ist der Customer der Kontakt.
+    if (form.job_type === "location") {
+      if (!form.contact_person.trim()) return "Bitte Ansprechperson angeben";
+      if (!form.contact_phone.trim()) return "Bitte Telefon der Ansprechperson angeben";
     }
     if (!form.start_date) return "Bitte Startdatum angeben";
     if (!form.end_date) return "Bitte Enddatum angeben";
@@ -178,6 +193,12 @@ export default function AuftragBearbeitenPage() {
       external_address: form.job_type === "extern" ? form.external_address.trim() || null : null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
+      // Kontakt-Felder bleiben im Form-State (UX-Recovery), werden aber
+      // bei extern-Auftraegen NICHT persistiert — der Customer ist dort
+      // selber der Kontakt.
+      contact_person: form.job_type === "location" ? (form.contact_person.trim() || null) : null,
+      contact_phone:  form.job_type === "location" ? (form.contact_phone.trim()  || null) : null,
+      contact_email:  form.job_type === "location" ? (form.contact_email.trim()  || null) : null,
     };
 
     const { data: updated, error } = await supabase
@@ -216,11 +237,7 @@ export default function AuftragBearbeitenPage() {
     <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <Link href="/auftraege">
-          <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        </Link>
+        <BackButton fallbackHref="/auftraege" size="sm" />
         <h1 className="text-xl font-bold tracking-tight">
           {isDraft ? "Entwurf bearbeiten" : "Auftrag bearbeiten"}
         </h1>

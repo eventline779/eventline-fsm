@@ -2,6 +2,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/api-auth";
 
+// Quick-Link-Shape — wird im Profile.settings JSON-Feld gespeichert.
+type QuickLink = { label: string; href: string; icon?: string };
+type ProfileSettings = { quick_links?: QuickLink[]; [key: string]: unknown };
+
+function parseSettings(raw: unknown): ProfileSettings {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) as ProfileSettings; } catch { return {}; }
+  }
+  return raw as ProfileSettings;
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
@@ -10,36 +22,22 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient();
   const { data } = await supabase.from("profiles").select("settings").eq("id", userId).single();
-
-  let quickLinks: any[] = [];
-  if (data?.settings) {
-    try {
-      const parsed = typeof data.settings === "string" ? JSON.parse(data.settings) : data.settings;
-      quickLinks = parsed.quick_links || [];
-    } catch {}
-  }
-
-  return NextResponse.json({ quick_links: quickLinks });
+  const settings = parseSettings(data?.settings);
+  return NextResponse.json({ quick_links: settings.quick_links ?? [] });
 }
 
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
-  const { userId, quick_links } = await request.json();
+  const { userId, quick_links } = await request.json() as { userId?: string; quick_links?: QuickLink[] };
   if (!userId) return NextResponse.json({ success: false }, { status: 400 });
 
   const supabase = createAdminClient();
 
-  // Load existing settings
+  // Load existing settings — andere Felder darin nicht ueberschreiben.
   const { data: existing } = await supabase.from("profiles").select("settings").eq("id", userId).single();
-  let settings: any = {};
-  if (existing?.settings) {
-    try {
-      settings = typeof existing.settings === "string" ? JSON.parse(existing.settings) : existing.settings;
-    } catch {}
-  }
-
-  settings.quick_links = quick_links;
+  const settings = parseSettings(existing?.settings);
+  settings.quick_links = quick_links ?? [];
 
   const { error } = await supabase.from("profiles").update({ settings }).eq("id", userId);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });

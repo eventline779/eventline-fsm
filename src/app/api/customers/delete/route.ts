@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 // POST { customerId }
 //
@@ -12,7 +12,7 @@ import { requireUser } from "@/lib/api-auth";
 // Code-Bestaetigung wurde entfernt — Schutz wird spaeter via User-Rollen
 // (RLS / Policy) gemacht.
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  const auth = await requirePermission("kunden:delete");
   if (auth.error) return auth.error;
 
   const { customerId } = await request.json();

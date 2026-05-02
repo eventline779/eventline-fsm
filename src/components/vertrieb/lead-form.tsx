@@ -88,7 +88,7 @@ export function LeadForm({
                 return <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border ${k.color}`}><Icon className="h-3 w-3" />{k.label}</span>;
               })()}
             </div>
-            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
+            <button type="button" onClick={onClose} className="icon-btn icon-btn-muted"><X className="h-4 w-4" /></button>
           </div>
 
           {/* Step-Progress nur beim Bearbeiten */}
@@ -279,10 +279,18 @@ export function LeadForm({
           {!editingId && (
             <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "neu" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
+                <button
+                  type="button"
+                  onClick={() => { setKundenMode("neu"); setSelectedCustomerId(""); setForm((f) => ({ ...f, firma: "", email: "", telefon: "", create_customer: true })); }}
+                  className={kundenMode === "neu" ? "kasten kasten-red flex-1" : "kasten-toggle-off flex-1"}
+                >
                   + Neuer Kunde
                 </button>
-                <button type="button" onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }} className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${kundenMode === "bestehend" ? "bg-red-600 text-white border-red-600" : "bg-card text-gray-600 border-gray-200"}`}>
+                <button
+                  type="button"
+                  onClick={() => { setKundenMode("bestehend"); setForm((f) => ({ ...f, create_customer: false })); }}
+                  className={kundenMode === "bestehend" ? "kasten kasten-red flex-1" : "kasten-toggle-off flex-1"}
+                >
                   Bestandskunde auswählen
                 </button>
               </div>

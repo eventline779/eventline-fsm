@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils";
 import { NAV_GROUPS, ADMIN_NAV_GROUP } from "@/lib/constants";
 import type { NavGroup } from "@/lib/constants";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
+import { isPathAllowed } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
+import { SidebarStempel } from "@/components/stempel/sidebar-stempel";
 import {
   LogOut,
   ChevronRight,
-  Eye,
-  EyeOff,
   Sun,
   Moon,
 } from "lucide-react";
@@ -20,21 +20,25 @@ import type { Profile } from "@/types";
 
 interface SidebarProps {
   profile: Profile;
+  /** Erlaubte Modul-Slugs aus der Rollen-Konfiguration. */
+  permissions: string[];
   onSignOut: () => void;
-  simplified: boolean;
-  onToggleSimplified: () => void;
 }
 
-export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: SidebarProps) {
+export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
 
 
-  const groups: NavGroup[] = profile.role === "admin"
-    ? [...NAV_GROUPS, ADMIN_NAV_GROUP]
-    : [...NAV_GROUPS];
+  // Wir filtern alle Nav-Items nach den Permissions der Rolle des Users.
+  // Admin-Group + Standard-Group werden zusammengelegt und dann gefiltert;
+  // leere Gruppen verschwinden automatisch (kein hardcoded role==="admin"
+  // mehr — die Rollen-Tabelle entscheidet was sichtbar ist).
+  const groups: NavGroup[] = [...NAV_GROUPS, ADMIN_NAV_GROUP]
+    .map((g) => ({ ...g, items: g.items.filter((i) => isPathAllowed(i.href, permissions, profile.role)) }))
+    .filter((g) => g.items.length > 0);
 
   function isActive(href: string, matchPrefixes?: string[]) {
     // Exact match for items with query params (e.g. /einstellungen?tab=zeiten)
@@ -46,7 +50,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
       return pathname === "/einstellungen" && !searchParams.get("tab");
     }
     // Top-level singletons: exact match only, so deeper paths don't bleed into the highlight.
-    if (href === "/heute" || href === "/kalender") return pathname === href;
+    if (href === "/dashboard" || href === "/kalender") return pathname === href;
     if (pathname.startsWith(href)) return true;
     // Zusatz-Prefixe (z.B. /standorte und /raeume gehoeren zu /locations)
     if (matchPrefixes?.some((p) => pathname.startsWith(p))) return true;
@@ -57,7 +61,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[260px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
       {/* Logo — Top auf 38px */}
       <div className="px-6 pt-[38px] pb-4 flex items-start justify-center">
-        <Link href="/heute" className="block">
+        <Link href="/dashboard" className="block">
           <Logo size="md" />
         </Link>
       </div>
@@ -65,9 +69,7 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
         {groups.map((group) => {
-          const items = simplified
-            ? group.items.filter((item) => item.simplified)
-            : group.items;
+          const items = group.items;
           if (items.length === 0) return null;
 
           return (
@@ -115,17 +117,13 @@ export function Sidebar({ profile, onSignOut, simplified, onToggleSimplified }: 
         })}
       </nav>
 
+      {/* Stempel — eingestempelt zeigt Live-Timer + Ausstempeln,
+          ausgestempelt zeigt "Einstempeln"-Button. Steht ueber dem
+          Theme-Toggle damit es als prominenter Action-Bereich endet. */}
+      <SidebarStempel />
+
       {/* Toggles */}
       <div className="px-3 mb-2 space-y-0.5">
-        {profile.role === "admin" && (
-          <button
-            onClick={onToggleSimplified}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
-          >
-            {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            {simplified ? "Alle Module anzeigen" : "Vereinfachte Ansicht"}
-          </button>
-        )}
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"

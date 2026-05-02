@@ -212,7 +212,7 @@ export function SearchableSelect({
                 className={`flex items-start gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
                   i === highlight
                     ? "bg-foreground/[0.08]"
-                    : "hover:bg-foreground/[0.05]"
+                    : "hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.12]"
                 } ${item.id === value ? "font-semibold" : ""}`}
               >
                 <div className="min-w-0 flex-1">
@@ -237,7 +237,7 @@ export function SearchableSelect({
                 className={`flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors border-t border-border/60 mt-1 pt-2 ${
                   highlight === filtered.length
                     ? "bg-foreground/[0.08]"
-                    : "hover:bg-foreground/[0.05]"
+                    : "hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.12]"
                 }`}
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

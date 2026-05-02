@@ -28,26 +28,13 @@ interface Body {
   documentPaths: string[];
 }
 
+import { appUrl } from "@/lib/app-url";
+
 // Public-facing URL fuer Customer-Confirm-Links. Muss auf einen Server
 // zeigen, der die Route /api/auftraege/vermietentwurf/confirm hat (also
-// redesign-Code). Production main hat die Route nicht.
-//
-// Reihenfolge:
-//   1. NEXT_PUBLIC_APP_URL — expliziter Override
-//   2. VERCEL_URL — auf Vercel-Deployments zeigt der Link auf das genau
-//      laufende Deployment (= redesign-Preview, der die Route hat).
-//   3. NEXT_PUBLIC_SITE_URL — lokal in .env.local gesetzt (typisch
-//      http://localhost:3000) — der Klick im Mail oeffnet dann den Dev-
-//      Server, der die redesign-Route bedient.
-//   4. Hardcoded Production-Fallback — main hat die Route nicht, also
-//      nur als allerletzte Reserve.
-function getAppUrl(): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  return "https://eventline-fsm-usyk.vercel.app";
-}
-const APP_URL = getAppUrl();
+// redesign-Code). Auf Vercel kommt das über NEXT_PUBLIC_VERCEL_URL =
+// das genau laufende Deployment, im Dev über localhost.
+const APP_URL = appUrl();
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "";

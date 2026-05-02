@@ -33,8 +33,8 @@ export function TerminModalBody({ terminForm, setTerminForm, onSave, onClose, sa
         <textarea value={terminForm.note} onChange={(e) => setTerminForm({ ...terminForm, note: e.target.value })} placeholder="Worum geht es?" className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={2} />
       </div>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-        <button onClick={onSave} disabled={saving} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+        <button onClick={onClose} className="kasten kasten-muted flex-1">Abbrechen</button>
+        <button onClick={onSave} disabled={saving} className="kasten kasten-red flex-1">
           {saving ? "Speichern..." : "Termin erstellen"}
         </button>
       </div>

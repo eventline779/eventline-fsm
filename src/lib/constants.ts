@@ -4,12 +4,22 @@
 // Anfrage konvertiert wird, wechselt der Status auf 'offen' (oder 'entwurf')
 // und request_step wird NULL. Ab dann normale Auftragslogik.
 export const JOB_STATUS = {
-  anfrage: { label: "Vermietentwurf", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
+  // Vermietentwurf + Auftrag-Entwurf: gleiche LILA Draft-Farbe, app-weit
+  // als "WIP" einheitlich. Status-Codes sind unterschiedlich (anfrage =
+  // Sales-Pipeline, entwurf = Ops-Side-Draft) damit Lifecycle-Logik greift.
+  anfrage: { label: "Vermietentwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Bevorstehend", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
   storniert: { label: "Storniert", color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
 } as const;
+
+// Zentral definierte Spalten-Listen fuer Job-Selects: vermeidet Drift bei
+// neuen Spalten-Zugaengen (z.B. contact_*-Felder aus Migration 042). Wer
+// Form-Daten laedt nutzt JOB_FORM_FIELDS, Listen mit Joins ergaenzen den
+// Join-Teil eigenstaendig.
+export const JOB_FORM_FIELDS =
+  "id, job_number, job_type, title, description, status, priority, customer_id, location_id, room_id, external_address, start_date, end_date, contact_person, contact_phone, contact_email";
 
 // === Mietanfrage-Pipeline ===
 // 4 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
@@ -80,8 +90,6 @@ export interface NavItem {
   href: string;
   label: string;
   icon: string;
-  /** Visible in techniker simplified view (mobile + sidebar). */
-  simplified?: boolean;
   /** Show as a primary tab in mobile bottom-nav. Max 4 across all items. */
   mobile?: boolean;
   /** Zusatz-Pfade die als "in diesem Bereich" gelten — fuer Routen die unter
@@ -96,51 +104,40 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// Sidebar: nur die 10 Top-Level-Bereiche. Alles andere (Rapporte, Belege,
+// Vorlagen, Zeiterfassung, Todos, Tickets, Schulungen, IT-Tickets, Team,
+// Stempelzeiten, Schichtplanung) ist via /hr erreichbar — das ist der Hub
+// fuer "alles was nicht direkt Operativ-Buchung ist".
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "",
     items: [
-      { href: "/heute", label: "Heute", icon: "LayoutDashboard", simplified: true, mobile: true },
-      { href: "/kalender", label: "Kalender", icon: "Calendar", simplified: true, mobile: true },
+      { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard", mobile: true },
+      { href: "/kalender", label: "Kalender", icon: "Calendar", mobile: true },
     ],
   },
   {
     label: "Buchungen",
     items: [
-      { href: "/auftraege", label: "Operations", icon: "ClipboardList", simplified: true, mobile: true },
+      { href: "/auftraege", label: "Operations", icon: "ClipboardList", mobile: true },
       { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
     ],
   },
   {
     label: "Räumlichkeiten",
     items: [
-      { href: "/belegungsplan", label: "Belegungsplan", icon: "CalendarClock", simplified: true },
       // Standorte (Verwaltungen, intern) und Räume (externe Reference) leben
       // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
-      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
+      // Belegungsplan ist seit dem Locations-Refactor unter der Schweizer
+      // Karte direkt eingebettet, eigener Nav-Eintrag entfaellt.
+      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume", "/belegungsplan"] },
     ],
   },
   {
     label: "Kontakte",
     items: [
       { href: "/kunden", label: "Kunden", icon: "Users" },
-      { href: "/partner", label: "Partner", icon: "Briefcase" },
-    ],
-  },
-  {
-    label: "Dokumente",
-    items: [
-      { href: "/rapporte", label: "Rapporte", icon: "FileText", simplified: true },
-      { href: "/belege", label: "Rechnungen & Belege", icon: "Receipt" },
-      { href: "/vorlagen", label: "E-Mail-Vorlagen", icon: "Send" },
-    ],
-  },
-  {
-    label: "Meine Arbeit",
-    items: [
-      { href: "/zeiterfassung", label: "Zeiterfassung", icon: "Clock", simplified: true, mobile: true },
-      { href: "/todos", label: "Todos", icon: "CheckSquare", simplified: true },
-      { href: "/tickets", label: "Tickets", icon: "Ticket" },
+      { href: "/partner", label: "Partner", icon: "Handshake" },
     ],
   },
 ];
@@ -148,9 +145,10 @@ export const NAV_GROUPS: NavGroup[] = [
 export const ADMIN_NAV_GROUP: NavGroup = {
   label: "Admin",
   items: [
-    { href: "/hr", label: "HR", icon: "Briefcase" },
-    { href: "/schulungen", label: "Schulungen", icon: "GraduationCap" },
-    { href: "/einstellungen?tab=admin", label: "Einstellungen", icon: "Settings" },
+    // HR ist Hub fuer Rapporte, Belege, Vorlagen, Zeiterfassung, Todos,
+    // Tickets, Schulungen, IT-Tickets, Team, Stempelzeiten, Schichtplanung.
+    { href: "/hr", label: "HR", icon: "Briefcase", matchPrefixes: ["/todos", "/schulungen"] },
+    { href: "/einstellungen", label: "Einstellungen", icon: "Settings" },
   ],
 };
 

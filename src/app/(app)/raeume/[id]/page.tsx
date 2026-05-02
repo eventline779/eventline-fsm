@@ -3,14 +3,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
+import { validateFileSize } from "@/lib/file-upload";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Room, RoomContact, RoomPrice } from "@/types";
 import {
-  ArrowLeft, Plus, UserPlus, Users, Phone, Mail, Trash2,
-  DoorOpen, StickyNote, X, Banknote, Wrench, FileText, Upload, Download, Pencil,
+  Plus, UserPlus, Users, Phone, Mail, Trash2,
+  DoorOpen, X, Banknote, Wrench, FileText, Upload, Download, Pencil,
 } from "lucide-react";
-import Link from "next/link";
+import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
 
 export default function RaumDetailPage() {
@@ -30,9 +32,6 @@ export default function RaumDetailPage() {
   const [priceForm, setPriceForm] = useState({ label: "", amount: "", notes: "" });
 
   // Notes
-  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string }[]>([]);
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [newNote, setNewNote] = useState("");
 
   // Docs
   const [docs, setDocs] = useState<{ name: string; path: string; uploaded_at: string }[]>([]);
@@ -60,11 +59,10 @@ export default function RaumDetailPage() {
     if (roomRes.data) {
       setRoom(roomRes.data as Room);
       setTechText(roomRes.data.technical_details || "");
-      // Load notes from notes field
+      // Docs werden im notes-JSON-Field gespeichert (legacy storage).
       if (roomRes.data.notes) {
         try {
           const parsed = JSON.parse(roomRes.data.notes);
-          if (parsed._notes) setNotesList(parsed._notes);
           if (parsed._docs) setDocs(parsed._docs);
         } catch {}
       }
@@ -73,10 +71,9 @@ export default function RaumDetailPage() {
     if (priceRes.data) setPrices(priceRes.data as RoomPrice[]);
   }
 
-  async function saveRoomData(notes: any[], documents: any[]) {
-    let data: any = {};
+  async function saveDocs(documents: { name: string; path: string; uploaded_at: string }[]) {
+    let data: { _docs?: unknown } = {};
     try { data = JSON.parse(room?.notes || "{}"); } catch { data = {}; }
-    data._notes = notes;
     data._docs = documents;
     await supabase.from("rooms").update({ notes: JSON.stringify(data) }).eq("id", id);
   }
@@ -99,7 +96,7 @@ export default function RaumDetailPage() {
   }
 
   async function deleteContact(contactId: string) {
-    await supabase.from("room_contacts").delete().eq("id", contactId);
+    await deleteRow("room_contacts", contactId);
     loadAll();
   }
 
@@ -114,33 +111,15 @@ export default function RaumDetailPage() {
   }
 
   async function deletePrice(priceId: string) {
-    await supabase.from("room_prices").delete().eq("id", priceId);
+    await deleteRow("room_prices", priceId);
     loadAll();
-  }
-
-  // Notes
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-    const updated = [{ id: crypto.randomUUID(), content: newNote, created_at: new Date().toISOString() }, ...notesList];
-    await saveRoomData(updated, docs);
-    setNotesList(updated);
-    setNewNote("");
-    setShowNoteForm(false);
-    toast.success("Notiz hinzugefügt");
-  }
-
-  async function deleteNote(noteId: string) {
-    const updated = notesList.filter((n) => n.id !== noteId);
-    await saveRoomData(updated, docs);
-    setNotesList(updated);
-    toast.success("Notiz gelöscht");
   }
 
   // Docs
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setUploadingDoc(true);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `raeume/${id}/${Date.now()}_${safeName}`;
@@ -153,7 +132,7 @@ export default function RaumDetailPage() {
       if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); setUploadingDoc(false); e.target.value = ""; return; }
     } catch { toast.error("Upload fehlgeschlagen"); setUploadingDoc(false); e.target.value = ""; return; }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    await saveRoomData(notesList, newDocs);
+    await saveDocs(newDocs);
     setDocs(newDocs);
     toast.success("Dokument hochgeladen");
     setUploadingDoc(false);
@@ -163,7 +142,7 @@ export default function RaumDetailPage() {
   async function deleteDoc(doc: { name: string; path: string }) {
     await supabase.storage.from("documents").remove([doc.path]);
     const newDocs = docs.filter((d) => d.path !== doc.path);
-    await saveRoomData(notesList, newDocs);
+    await saveDocs(newDocs);
     setDocs(newDocs);
     toast.success("Dokument gelöscht");
   }
@@ -202,7 +181,7 @@ export default function RaumDetailPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/raeume"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <BackButton fallbackHref="/raeume" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -270,7 +249,7 @@ export default function RaumDetailPage() {
                 </div>
                 {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
               </div>
-              <button onClick={() => deletePrice(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deletePrice(p.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -315,39 +294,7 @@ export default function RaumDetailPage() {
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Notizen */}
-      <Card className="bg-card">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <button type="button" onClick={() => setShowNoteForm(!showNoteForm)} className="kasten kasten-muted">
-            {showNoteForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-muted/40 border space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setShowNoteForm(false); setNewNote(""); }} className="kasten kasten-muted">Abbrechen</button>
-                <button type="submit" className="kasten kasten-red">Speichern</button>
-              </div>
-            </form>
-          )}
-          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
-          {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-muted/40 border">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm whitespace-pre-wrap">{n.content}</p>
-                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-              </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteContact(c.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -375,8 +322,8 @@ export default function RaumDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground/60 hover:text-blue-500 transition-colors"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="icon-btn icon-btn-blue"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
@@ -391,7 +338,7 @@ export default function RaumDetailPage() {
             <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-gray-700">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Raum löschen</h2>
-                <button onClick={() => setShowDelete(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X className="h-4 w-4 text-gray-500" /></button>
+                <button onClick={() => setShowDelete(false)} className="icon-btn icon-btn-muted"><X className="h-4 w-4" /></button>
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
@@ -404,8 +351,8 @@ export default function RaumDetailPage() {
                   {deleteError && <p className="text-xs text-red-600 mt-1">Falscher Code</p>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowDelete(false)} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-border text-gray-700 hover:bg-muted/40">Abbrechen</button>
-                  <button onClick={deleteRoom} disabled={!deleteCode || deleting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                  <button onClick={() => setShowDelete(false)} className="kasten kasten-muted flex-1">Abbrechen</button>
+                  <button onClick={deleteRoom} disabled={!deleteCode || deleting} className="kasten kasten-red flex-1">
                     <Trash2 className="h-4 w-4" />{deleting ? "Löschen..." : "Endgültig löschen"}
                   </button>
                 </div>

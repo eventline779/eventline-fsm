@@ -213,13 +213,13 @@ export function DonutChart({ segments, centerLabel, below, emptyMessage }: Donut
                                 {/* Vermietungs-Zahl direkt am Label, damit alle grauen
                                     Eltern-Zahlen rechts auf einer Achse fluchten. */}
                                 <span className="ml-2 tabular-nums" style={{ color: s.sub.color }}>
-                                  <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {subPct.toFixed(0)}%
+                                  <strong style={{ color: s.sub.color }}>{s.sub.count}</strong> · {String(Math.round(subPct)).padStart(2, "0")}%
                                 </span>
                               </>
                             )}
                           </span>
                           <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                            <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
+                            <strong className="text-foreground">{s.count}</strong> · {String(Math.round(pct)).padStart(2, "0")}%
                           </span>
                         </div>
                         <div className="h-[2px] rounded-full bg-foreground/[0.05] overflow-hidden mt-1.5 relative">

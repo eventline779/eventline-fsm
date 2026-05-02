@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 // POST { customerId }
 // Archiviert einen Kunden: setzt archived_at = NOW(). Standard-Listen filtern
 // auf archived_at IS NULL, der Kunde verschwindet also aus der Ansicht. Alle
 // FK-Beziehungen (Auftraege, Dokumente, Standorte) bleiben unveraendert.
+//
+// Permission: kunden:archive (separat von kunden:edit — Admin kann
+// Archive-Recht erteilen ohne Edit-Recht und umgekehrt).
 export async function POST(request: NextRequest) {
-  const auth = await requireUser();
+  const auth = await requirePermission("kunden:archive");
   if (auth.error) return auth.error;
 
   const { customerId } = await request.json();

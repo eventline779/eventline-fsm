@@ -20,9 +20,11 @@ import {
   Check,
   Send,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 
 const ARCHIVE_PAGE_SIZE = 100;
+const ACTIVE_PAGE_SIZE = 100;
 // Location wird mit dem Verwaltungs-Kunden gejoint, sodass Standort-Auftraege
 // (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
 // Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
@@ -34,6 +36,8 @@ import { DonutChart } from "@/components/donut-chart";
 import { SendStepModal } from "@/components/send-step-modal";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
+import { usePermissions } from "@/lib/use-permissions";
+import { TOAST } from "@/lib/messages";
 
 type DonutCounts = {
   anfrage: number;
@@ -54,11 +58,16 @@ const EMPTY_COUNTS: DonutCounts = {
 };
 
 export default function AuftraegePage() {
-  // Active = alle nicht-archivierten Jobs (status ≠ abgeschlossen|storniert).
-  // Bounded set, voll geladen für saubere client-seitige Suche/Filter.
+  const { can } = usePermissions();
+  // Active + Archive: beide cursor-paginiert. Active war frueher voll geladen
+  // mit limit(500) als Sicherung — bei Wachstum in Eventline-Skala braucht es
+  // echte Pagination, sonst werden initial 5MB+ geladen sobald die Liste
+  // dichter wird. Die Donut-Counts kommen unabhaengig aus auftraege_counts
+  // (View) — der angezeigte/geladene Subset bleibt also stets vergleichbar
+  // mit dem Total.
   const [activeJobs, setActiveJobs] = useState<JobWithRelations[]>([]);
-  // Archive = paginiert (kann über Jahre wachsen). Erste Seite eager,
-  // weitere via "Mehr laden".
+  const [activeHasMore, setActiveHasMore] = useState(false);
+  const [activeLoadingMore, setActiveLoadingMore] = useState(false);
   const [archiveJobs, setArchiveJobs] = useState<JobWithRelations[]>([]);
   const [archiveHasMore, setArchiveHasMore] = useState(false);
   const [archiveLoadingMore, setArchiveLoadingMore] = useState(false);
@@ -69,7 +78,7 @@ export default function AuftraegePage() {
   const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
-  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as any) || "all" : "all");
+  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as "all" | "scala" | "barakuba" | "bau3" | "sonstige" | null) || "all" : "all");
   const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
   const [loading, setLoading] = useState(true);
   // Inline-Step-Aktion: welche Anfrage-Karte hat aktuell das Mail-Modal offen?
@@ -121,7 +130,7 @@ export default function AuftraegePage() {
         .update({ status: "offen", request_step: null })
         .eq("id", jobId);
       if (error) {
-        toast.error("Fehler: " + error.message);
+        TOAST.supabaseError(error);
         return;
       }
       toast.success("Vermietentwurf in Auftrag umgewandelt");
@@ -133,7 +142,7 @@ export default function AuftraegePage() {
       .update({ request_step: nextStep })
       .eq("id", jobId);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     toast.success(REQUEST_STEPS[nextStep - 1].label);
@@ -159,7 +168,7 @@ export default function AuftraegePage() {
       .eq("id", convertJobId);
     setConvertSaving(false);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     const id = convertJobId;
@@ -172,47 +181,62 @@ export default function AuftraegePage() {
   // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
   // Damit ist der Donut entkoppelt vom geladenen State und auch bei paginierter
   // Archive-Liste korrekt — und skaliert auf beliebig viele Jobs in der DB.
-  // cancelled_as_anfrage darf nicht via .neq(true) gefiltert werden, da das auch
-  // NULL-Zeilen ausschliessen wuerde — daher .or(is.null OR eq.false).
+  // Counts kommen aus der DB-View `auftraege_counts` — ein einziger
+  // Round-Trip mit count(*) filter (...) statt 6 parallelen HEAD-Queries.
+  // Definition: supabase/migrations/040_auftraege_counts_view.sql.
   async function loadCounts(): Promise<DonutCounts> {
-    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
-    const [anfrage, offen, offenVerm, abg, sto, ent] = await Promise.all([
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "anfrage").neq("is_deleted", true).or(cancelledFilter),
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "offen").neq("is_deleted", true),
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "offen").eq("was_anfrage", true).neq("is_deleted", true),
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "abgeschlossen").neq("is_deleted", true),
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "storniert").neq("is_deleted", true).or(cancelledFilter),
-      supabase.from("jobs").select("*", { count: "exact", head: true }).eq("status", "entwurf").neq("is_deleted", true),
-    ]);
+    const { data } = await supabase.from("auftraege_counts").select("*").single();
     return {
-      anfrage: anfrage.count ?? 0,
-      offen: offen.count ?? 0,
-      offenVermietung: offenVerm.count ?? 0,
-      abgeschlossen: abg.count ?? 0,
-      storniert: sto.count ?? 0,
-      entwurf: ent.count ?? 0,
+      anfrage: data?.anfrage ?? 0,
+      offen: data?.offen ?? 0,
+      offenVermietung: data?.offen_vermietung ?? 0,
+      abgeschlossen: data?.abgeschlossen ?? 0,
+      storniert: data?.storniert ?? 0,
+      entwurf: data?.entwurf ?? 0,
     };
   }
 
-  async function loadActiveAndCounts() {
+  // Active-Query: cursor-basiert (created_at) wie das Archive. ACTIVE_PAGE_SIZE+1
+  // damit hasMore ueber den (n+1)-Trick erkannt wird ohne Extra-Count-Query.
+  const buildActiveQuery = useCallback((cursor: string | null) => {
     const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    let q = supabase
+      .from("jobs")
+      .select(JOBS_SELECT)
+      .neq("is_deleted", true)
+      .or(cancelledFilter)
+      .not("status", "in", '("abgeschlossen","storniert")');
+    if (cursor !== null) q = q.lt("created_at", cursor);
+    return q.order("created_at", { ascending: false }).limit(ACTIVE_PAGE_SIZE + 1);
+  }, [supabase]);
+
+  async function loadActiveAndCounts() {
     const [activeRes, profRes, freshCounts] = await Promise.all([
-      // Active: alle nicht-archivierten Jobs voll geladen (bounded set,
-      // typischerweise <200 — joins waeren bei Pagination + Sort-Logik teuer).
-      supabase
-        .from("jobs")
-        .select(JOBS_SELECT)
-        .neq("is_deleted", true)
-        .or(cancelledFilter)
-        .not("status", "in", '("abgeschlossen","storniert")')
-        .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+      buildActiveQuery(null),
+      supabase.rpc("get_assignable_users"),
       loadCounts(),
     ]);
-    if (activeRes.data) setActiveJobs(activeRes.data as unknown as JobWithRelations[]);
+    if (activeRes.data) {
+      const rows = activeRes.data as unknown as JobWithRelations[];
+      setActiveHasMore(rows.length > ACTIVE_PAGE_SIZE);
+      setActiveJobs(rows.slice(0, ACTIVE_PAGE_SIZE));
+    }
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     setCounts(freshCounts);
     setLoading(false);
+  }
+
+  async function loadActiveMore() {
+    if (activeLoadingMore || activeJobs.length === 0) return;
+    setActiveLoadingMore(true);
+    const cursor = activeJobs[activeJobs.length - 1].created_at;
+    const { data } = await buildActiveQuery(cursor);
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setActiveHasMore(rows.length > ACTIVE_PAGE_SIZE);
+      setActiveJobs((prev) => [...prev, ...rows.slice(0, ACTIVE_PAGE_SIZE)]);
+    }
+    setActiveLoadingMore(false);
   }
 
   // Archive-Query mit Filtern: status, title, exakte Nummer — alles server-seitig.
@@ -331,9 +355,9 @@ export default function AuftraegePage() {
           <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
             <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${counts.abgeschlossen + counts.storniert})`}
           </button>
-          {!showArchive && (
+          {!showArchive && can("auftraege:create") && (
             <>
-              <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-blue">
+              <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
                 <Plus className="h-3.5 w-3.5" />
                 Neuer Vermietentwurf
               </Link>
@@ -348,9 +372,10 @@ export default function AuftraegePage() {
 
       {/* Kreis-Diagramm — Counts kommen aus DB-Count-Queries (entkoppelt vom geladenen State) */}
       {(counts.anfrage + counts.offen + counts.abgeschlossen + counts.storniert + counts.entwurf) > 0 && (() => {
-        const entwurfCount = counts.entwurf;
+        // Drafts gemeinsam: Vermietentwuerfe (anfrage) + Auftrag-Entwuerfe (entwurf)
+        // gelten app-weit als WIP/lila und zaehlen als eigenes Donut-Segment.
+        const draftCount = counts.anfrage + counts.entwurf;
         const segments = [
-          { label: "Vermietentwürfe", count: counts.anfrage, color: "var(--status-blue)" },
           {
             label: "Bevorstehend",
             count: counts.offen,
@@ -363,26 +388,15 @@ export default function AuftraegePage() {
               color: "#38bdf8",
             },
           },
+          { label: "Entwürfe", count: draftCount, color: "var(--status-purple)" },
           { label: "Abgeschlossen", count: counts.abgeschlossen, color: "var(--status-green)" },
           { label: "Storniert", count: counts.storniert, color: "var(--status-red)" },
         ];
-        const entwurfPill = entwurfCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setFilterStatus("entwurf")}
-            className="inline-flex items-center gap-3 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 transition-colors"
-            title="Filter auf Entwürfe setzen"
-          >
-            <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400 shrink-0" />
-            {entwurfCount} {entwurfCount === 1 ? "Entwurf" : "Entwürfe"} · separat
-          </button>
-        );
         return (
           <DonutChart
             segments={segments}
             centerLabel="Aufträge"
-            below={entwurfPill}
-            emptyMessage={entwurfCount > 0 ? "Aktuell nur Entwürfe — noch keine freigegebenen Aufträge." : "Keine Aufträge vorhanden."}
+            emptyMessage="Keine Aufträge vorhanden."
           />
         );
       })()}
@@ -520,7 +534,7 @@ export default function AuftraegePage() {
                   </button>
                 ) : (
                   <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
-                    <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-blue">
+                    <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
                       <Plus className="h-3.5 w-3.5" />
                       Neuer Vermietentwurf
                     </Link>
@@ -565,7 +579,7 @@ export default function AuftraegePage() {
               if (isAnfrage) {
                 if (isMailStep) return (
                   <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAnfrageNext(job.id); }}
-                    className={`${padCls} rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors`} aria-label={stepInfo.label}>
+                    className={`${padCls} rounded-lg text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors`} aria-label={stepInfo.label}>
                     <Send className={iconCls} />
                   </button>
                 );
@@ -594,7 +608,7 @@ export default function AuftraegePage() {
 
             return (
             <Link key={job.id} href={detailHref} className="block group">
-              <Card className={`relative bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer ${
+              <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
                 {/* Zwei-spaltiges Layout, jede Spalte eigene 2 Zeilen.
@@ -607,7 +621,7 @@ export default function AuftraegePage() {
                     {/* LINKE SPALTE: Titel-Zeile + Meta-Zeile */}
                     <div className="min-w-0 flex-1 flex flex-col gap-0.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-medium text-sm truncate">{job.title}</span>
+                        <span className="auftrag-card-title font-medium text-sm truncate transition-colors">{job.title}</span>
                         {job.priority === "dringend" && isActive && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                             <AlertCircle className="h-2.5 w-2.5" />
@@ -624,14 +638,20 @@ export default function AuftraegePage() {
                           </span>
                         )}
                       </div>
+                      {/* Sub-Line: IMMER Kunde + Standort, dann optional Datum.
+                          Bei Location-Auftraegen sind beide oft deckungs-
+                          gleich (Kunde = Verwaltungs-Kunde der Location)
+                          — beide trotzdem zeigen damit's app-weit konsis-
+                          tent ist. */}
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-                        {displayCustomerName && <span className="truncate">{displayCustomerName}</span>}
-                        {displayCustomerName && (placeLabel || dateText) && <span className="opacity-50 shrink-0">·</span>}
-                        {placeLabel && <span className="truncate">{placeLabel}</span>}
-                        {placeLabel && dateText && <span className="opacity-50 shrink-0">·</span>}
-                        {dateText && <span className="whitespace-nowrap shrink-0">{dateText}</span>}
-                        {!displayCustomerName && !placeLabel && !dateText && (
-                          <span className="text-muted-foreground/40">—</span>
+                        <span className="truncate">{displayCustomerName ?? "—"}</span>
+                        <span className="opacity-50 shrink-0">|</span>
+                        <span className="truncate">{placeLabel ?? "—"}</span>
+                        {dateText && (
+                          <>
+                            <span className="opacity-50 shrink-0">|</span>
+                            <span className="whitespace-nowrap shrink-0">{dateText}</span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -640,12 +660,12 @@ export default function AuftraegePage() {
                     <div className="shrink-0 flex flex-col gap-0.5 items-end">
                       <div className="flex items-center gap-1.5">
                         {isAnfrage && isMailStep && (
-                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                          <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
                             {stepInfo.label}
                           </span>
                         )}
                         {isAnfrage && !isMailStep && (
-                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                          <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
                             Manuell in Details bestätigen
                           </span>
                         )}
@@ -674,8 +694,21 @@ export default function AuftraegePage() {
                 disabled={archiveLoadingMore}
                 className="kasten kasten-muted"
               >
-                <ChevronDown className="h-3.5 w-3.5" />
+                {archiveLoadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 {archiveLoadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
+          {!showArchive && activeHasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadActiveMore}
+                disabled={activeLoadingMore}
+                className="kasten kasten-muted"
+              >
+                {activeLoadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {activeLoadingMore ? "Lade…" : "Mehr aktive Aufträge laden"}
               </button>
             </div>
           )}

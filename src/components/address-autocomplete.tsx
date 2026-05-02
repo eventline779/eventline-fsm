@@ -424,7 +424,7 @@ export function AddressAutocomplete({
               className={`flex items-start gap-2.5 px-2.5 py-1.5 text-sm cursor-pointer rounded-lg transition-colors ${
                 i === highlight
                   ? "bg-foreground/[0.08]"
-                  : "hover:bg-foreground/[0.05]"
+                  : "hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.12]"
               }`}
             >
               {s.kind === "location" ? (

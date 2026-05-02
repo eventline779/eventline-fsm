@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { REQUEST_STEPS } from "@/lib/constants";
 import { FileText, Send, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { validateFileSize } from "@/lib/file-upload";
 
 export type SendStep = 1 | 3;
 
@@ -87,6 +88,7 @@ export function SendStepModal({
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setUploading(true);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");

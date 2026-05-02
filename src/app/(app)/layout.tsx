@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { StempelWidget } from "@/components/stempel/stempel-widget";
 import { Toaster } from "@/components/ui/sonner";
 import type { Profile } from "@/types";
 import { NAV_GROUPS, ADMIN_NAV_GROUP } from "@/lib/constants";
+import { isPathAllowed } from "@/lib/permissions";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -16,7 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Eye, EyeOff, Sun, Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { useTheme } from "next-themes";
@@ -25,14 +27,9 @@ import { useEnterAsTab } from "@/lib/use-enter-as-tab";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [simplified, setSimplified] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("eventline-simplified") === "true";
-    }
-    return false;
-  });
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -41,14 +38,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Globale Regel: Enter im Input/Select springt zum nächsten Feld, statt zu submitten.
   useEnterAsTab();
-
-  function toggleSimplified() {
-    setSimplified((prev) => {
-      const next = !prev;
-      localStorage.setItem("eventline-simplified", String(next));
-      return next;
-    });
-  }
 
   // Realtime statt Polling: globale Subscription auf jobs + customers — bei
   // jedem INSERT/UPDATE/DELETE feuern wir einen window-Event den alle Listen
@@ -70,35 +59,66 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (data) {
-        setProfile(data as Profile);
-        // Techniker bekommen automatisch vereinfachte Ansicht (ohne Umschaltmöglichkeit)
-        if (data.role === "techniker") {
-          setSimplified(true);
+        if (!user) {
+          router.push("/login");
+          return;
         }
+
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          setLoadError(`Profil-Laden fehlgeschlagen: ${error.message}`);
+          setLoading(false);
+          return;
+        }
+        if (!data) {
+          setLoadError("Profil nicht gefunden für diesen User.");
+          setLoading(false);
+          return;
+        }
+
+        setProfile(data as Profile);
+        // Permissions zur Rolle des Users laden. Falls die Rolle (warum
+        // auch immer) nicht existiert, fallen wir auf leere Permissions
+        // zurueck — admin-Rolle wird im Helper sowieso special-cased.
+        const { data: roleRow } = await supabase
+          .from("roles")
+          .select("permissions")
+          .eq("slug", (data as Profile).role)
+          .single();
+        const perms = Array.isArray(roleRow?.permissions) ? roleRow.permissions as string[] : [];
+        setPermissions(perms);
+        setLoading(false);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : "Unbekannter Fehler beim Laden");
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     loadProfile();
   }, []);
+
+  // Path-Guard: wenn der aktuelle Pfad fuer diese Rolle nicht erlaubt ist,
+  // zurueck aufs Dashboard. Greift wenn jemand eine URL direkt aufruft die
+  // nicht in seiner Sidebar steht.
+  useEffect(() => {
+    if (!profile) return;
+    if (!isPathAllowed(pathname, permissions, profile.role)) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, profile, permissions, router]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -121,19 +141,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!profile) return null;
+  if (loadError || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <div className="max-w-md w-full bg-card border rounded-2xl p-6 space-y-3">
+          <h2 className="text-lg font-semibold">Konnte nicht geladen werden</h2>
+          <p className="text-sm text-muted-foreground">{loadError ?? "Profil ist null."}</p>
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => location.reload()} className="kasten kasten-muted flex-1">Neu laden</button>
+            <button onClick={handleSignOut} className="kasten kasten-red flex-1">Abmelden</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const groups = profile.role === "admin"
-    ? [...NAV_GROUPS, ADMIN_NAV_GROUP]
-    : [...NAV_GROUPS];
+  // Sidebar + Mobile-Sheet zeigen dieselben gefilterten Gruppen.
+  // Filter laeuft pro Item via isPathAllowed (admin sieht alles).
+  const groups = [...NAV_GROUPS, ADMIN_NAV_GROUP]
+    .map((g) => ({ ...g, items: g.items.filter((i) => isPathAllowed(i.href, permissions, profile.role)) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
+        permissions={permissions}
         onSignOut={handleSignOut}
-        simplified={simplified}
-        onToggleSimplified={toggleSimplified}
       />
 
       {/* Margin-left = Sidebar-Breite (260px) ab md-Breakpoint, damit der
@@ -142,7 +176,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-3 sm:p-4 pt-[calc(env(safe-area-inset-top)+12px)] sm:pt-[calc(env(safe-area-inset-top)+16px)] md:p-8 md:pt-8 max-w-[1400px] w-full mx-auto min-w-0">{children}</main>
       </div>
 
-      <MobileNav onMenuOpen={() => setMobileMenuOpen(true)} />
+      <MobileNav onMenuOpen={() => setMobileMenuOpen(true)} permissions={permissions} role={profile.role} />
+      <StempelWidget />
 
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -154,9 +189,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SheetHeader>
           <nav className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]">
             {groups.map((group) => {
-              const items = simplified
-                ? group.items.filter((item) => item.simplified)
-                : group.items;
+              const items = group.items;
               if (items.length === 0) return null;
 
               return (
@@ -173,7 +206,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       ? fullUrl === item.href
                       : item.href === "/einstellungen"
                         ? pathname === "/einstellungen" && !searchParams.get("tab")
-                        : item.href === "/heute" || item.href === "/kalender"
+                        : item.href === "/dashboard" || item.href === "/kalender"
                           ? pathname === item.href
                           : pathname.startsWith(item.href);
                     return (
@@ -216,15 +249,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
-            {profile.role === "admin" && (
-              <button
-                onClick={toggleSimplified}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
-              >
-                {simplified ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                {simplified ? "Alle Module" : "Vereinfacht"}
-              </button>
-            )}
           </div>
 
           <div className="absolute bottom-3 left-3 right-3">

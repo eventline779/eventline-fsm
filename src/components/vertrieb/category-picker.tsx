@@ -16,7 +16,7 @@ export function CategoryPicker({ onPick, onClose }: Props) {
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Was für ein Lead?</h3>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="icon-btn icon-btn-muted"><X className="h-4 w-4" /></button>
         </div>
         <div className="grid gap-3">
           {KATEGORIE_OPTIONS.map((k) => {

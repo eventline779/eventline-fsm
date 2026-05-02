@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CustomerType } from "@/types";
-import { ArrowLeft, Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
+import { Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 
@@ -126,14 +127,7 @@ function NeuerKundeContent() {
     <div className="max-w-2xl space-y-6 mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={cancel}
-          className="p-2 rounded-lg hover:bg-card transition-colors"
-          aria-label="Zurück"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
+        <BackButton fallbackHref={returnPath || "/kunden"} />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Neuer Kunde</h1>
           <p className="text-sm text-muted-foreground mt-0.5">

@@ -50,7 +50,7 @@ export function AuftragModalBody({ auftragForm, setAuftragForm, locations, onCre
       </div>
       <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+        <button onClick={onClose} className="kasten kasten-muted flex-1">Abbrechen</button>
         <button onClick={onCreate} disabled={!auftragForm.title || creating} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
           <Check className="h-4 w-4" />{creating ? "Erstellen..." : "Auftrag erstellen"}
         </button>

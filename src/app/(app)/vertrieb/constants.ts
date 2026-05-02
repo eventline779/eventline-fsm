@@ -1,4 +1,4 @@
-import { Building2, PartyPopper } from "lucide-react";
+import { Building2, PartyPopper, type LucideIcon } from "lucide-react";
 import type { VertriebStatus, VertriebPriority, VertriebKategorie } from "@/types";
 
 export const STATUS_OPTIONS: { value: VertriebStatus; label: string; color: string }[] = [
@@ -15,7 +15,7 @@ export const PRIORITY_OPTIONS: { value: VertriebPriority; label: string; color: 
   { value: "mittel", label: "Mittel", color: "bg-gray-100 text-gray-600 border-gray-200" },
 ];
 
-export const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: any; color: string }[] = [
+export const KATEGORIE_OPTIONS: { value: VertriebKategorie; label: string; icon: LucideIcon; color: string }[] = [
   { value: "verwaltung", label: "Verwaltungs-Anfragen", icon: Building2, color: "bg-blue-100 text-blue-700 border-blue-200" },
   { value: "veranstaltung", label: "Veranstaltungen", icon: PartyPopper, color: "bg-purple-100 text-purple-700 border-purple-200" },
 ];

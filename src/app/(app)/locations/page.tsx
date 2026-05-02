@@ -13,12 +13,28 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 import type { Location, Room } from "@/types";
 import Link from "next/link";
 import {
   Plus, Search, MapPin, Users as UsersIcon, Building, DoorOpen, X,
 } from "lucide-react";
-import { LocationsSwitzerlandMap } from "@/components/locations-switzerland-map";
+import dynamic from "next/dynamic";
+import { usePermissions } from "@/lib/use-permissions";
+
+// Map ist Leaflet + GeoJSON + Plugins — ~250kb-Chunk. Lazy laden damit der
+// First-Paint nicht darauf wartet.
+const LocationsSwitzerlandMap = dynamic(
+  () => import("@/components/locations-switzerland-map").then((m) => m.LocationsSwitzerlandMap),
+  { ssr: false, loading: () => <div className="h-[280px] rounded-xl border bg-card animate-pulse" /> },
+);
+
+// Belegungsplan unter der Karte — gleicher Daten-Kontext (alle Standorte +
+// deren Buchungen) macht's hier nochmal direkt nutzbar fuer Akquise.
+const BelegungsplanView = dynamic(
+  () => import("@/components/belegungsplan-view").then((m) => m.BelegungsplanView),
+  { ssr: false, loading: () => <div className="h-96 rounded-xl border bg-card animate-pulse" /> },
+);
 
 type OrtType = "standort" | "raum";
 
@@ -36,6 +52,7 @@ type OrtItem = {
 type FormType = OrtType | null;
 
 export default function OrtePage() {
+  const { can } = usePermissions();
   const [items, setItems] = useState<OrtItem[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | OrtType>("all");
@@ -98,8 +115,23 @@ export default function OrtePage() {
       capacity: form.capacity ? parseInt(form.capacity) : null,
       technical_details: form.technical_details || null,
     };
-    const { error } = await supabase.from(table).insert(payload);
+    const { data: inserted, error } = await supabase
+      .from(table)
+      .insert(payload)
+      .select("id")
+      .single();
     if (!error) {
+      // Fire-and-forget: Geocode laeuft serverseitig via Nominatim, Coords
+      // landen in latitude/longitude. Der nachfolgende loadAll() zeigt die
+      // neue Zeile sofort, das Map-Refresh kommt mit dem naechsten Reload —
+      // reicht weil Insert ein One-Shot-Vorgang ist.
+      if (inserted?.id) {
+        fetch("/api/geocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ table, id: inserted.id }),
+        }).catch(() => {});
+      }
       setForm({ name: "", address_street: "", address_zip: "", address_city: "Basel", capacity: "", technical_details: "" });
       setShowForm(null);
       loadAll();
@@ -130,19 +162,27 @@ export default function OrtePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setShowForm(showForm === "standort" ? null : "standort")} className="kasten kasten-red">
-            <Plus className="h-3.5 w-3.5" />
-            Neue Verwaltung
-          </button>
-          <button type="button" onClick={() => setShowForm(showForm === "raum" ? null : "raum")} className="kasten kasten-blue">
-            <Plus className="h-3.5 w-3.5" />
-            Neuer Raum
-          </button>
+          {can("locations:create") && (
+            <>
+              <button type="button" onClick={() => setShowForm(showForm === "standort" ? null : "standort")} className="kasten kasten-red">
+                <Plus className="h-3.5 w-3.5" />
+                Neue Verwaltung
+              </button>
+              <button type="button" onClick={() => setShowForm(showForm === "raum" ? null : "raum")} className="kasten kasten-blue">
+                <Plus className="h-3.5 w-3.5" />
+                Neuer Raum
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Schweizer Karte mit Punkten fuer alle Verwaltungen + Raeume */}
       <LocationsSwitzerlandMap />
+
+      {/* Belegungsplan — gleiche Standorte als Matrix mit Buchungen,
+          fuer Akquise-Verfuegbarkeitscheck direkt auf der Locations-Page. */}
+      <BelegungsplanView />
 
       {/* Inline Form — gleiche Felder, nur Header und Submit-Label aendern sich.
           Standort = Verwaltung (intern, mit Customer-Verknuepfung in Details).
@@ -178,12 +218,20 @@ export default function OrtePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Strasse</label>
-                <Input
-                  placeholder="Strasse und Hausnummer"
-                  value={form.address_street}
-                  onChange={(e) => setForm({ ...form, address_street: e.target.value })}
-                  className="mt-1.5 bg-gray-50"
-                />
+                <div className="mt-1.5">
+                  <AddressAutocomplete
+                    value={form.address_street}
+                    onChange={(v) => setForm({ ...form, address_street: v })}
+                    onPlace={(p: ParsedAddress) => setForm((prev) => ({
+                      ...prev,
+                      address_street: p.street || prev.address_street,
+                      address_zip: p.postcode || prev.address_zip,
+                      address_city: p.city || prev.address_city,
+                    }))}
+                    localLocations={[]}
+                    placeholder="Tippe um aus Google-Vorschlägen zu wählen — füllt PLZ + Ort automatisch"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -308,7 +356,7 @@ export default function OrtePage() {
             const Icon = it.type === "standort" ? MapPin : DoorOpen;
             return (
               <Link key={`${it.type}-${it.id}`} href={detailHref}>
-                <Card className="bg-card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 group cursor-pointer h-full">
+                <Card className="card-hover bg-card cursor-pointer group h-full">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       {/* Icon-Pad — Hover-Rot in Dark gleich kraeftig wie in Light:
@@ -318,7 +366,7 @@ export default function OrtePage() {
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-foreground truncate">{it.name}</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-foreground truncate group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">{it.name}</h3>
                         {it.address_city && (
                           <p className="text-xs text-muted-foreground">
                             {it.address_zip} {it.address_city}

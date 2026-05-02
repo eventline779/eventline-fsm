@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireUser } from "@/lib/api-auth";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST(request: Request) {
   const auth = await requireUser();
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
             <p style="margin:0 0 16px;color:#666;font-size:14px">Erstellt von: <strong>${creatorName}</strong></p>
 
             <div style="text-align:center;margin:24px 0">
-              <a href="https://eventline-fsm-usyk.vercel.app/todos" style="display:inline-block;background:#dc2626;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
+              <a href="${appUrl("/todos")}" style="display:inline-block;background:#dc2626;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
                 Todo öffnen
               </a>
             </div>

@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Link2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { usePermissions } from "@/lib/use-permissions";
 
 interface MatchCandidate {
   id: number;
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
+  const { can, ready: permsReady } = usePermissions();
   const [bexioConnected, setBexioConnected] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [matches, setMatches] = useState<MatchCandidate[] | null>(null);
@@ -57,6 +59,10 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
   }, []);
 
   if (bexioConnected !== true) return null;
+  // Permission-Check: ohne bexio:use bleibt der Button verborgen.
+  // permsReady=false ist der initiale Lade-Zustand — wir rendern nichts
+  // bis die Permissions klar sind, damit der Button nicht kurz aufflackert.
+  if (!permsReady || !can("bexio:use")) return null;
 
   // Zustand 2: schon verknuepft -> Tab oeffnen
   if (linkedId) {

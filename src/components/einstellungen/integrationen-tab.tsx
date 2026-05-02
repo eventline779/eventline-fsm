@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, Plug, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Plug, X, Copy, Check } from "lucide-react";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 export function IntegrationenTab() {
@@ -12,7 +12,28 @@ export function IntegrationenTab() {
   const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [icalUrl, setIcalUrl] = useState("");
+  const [copied, setCopied] = useState(false);
   const { confirm, ConfirmModalElement } = useConfirm();
+
+  // iCal-URL erst client-seitig setzen — window.location.origin ist auf
+  // dem Server nicht verfuegbar.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIcalUrl(`${window.location.origin}/api/calendar.ics`);
+    }
+  }, []);
+
+  async function copyIcalUrl() {
+    try {
+      await navigator.clipboard.writeText(icalUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("URL kopiert");
+    } catch {
+      toast.error("Kopieren fehlgeschlagen");
+    }
+  }
 
   // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
   useEffect(() => {
@@ -58,9 +79,48 @@ export function IntegrationenTab() {
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
-          Verknüpfe Eventline mit externen Tools — z.B. Bexio für Kontaktverwaltung.
+          Verknüpfe Eventline mit externen Tools — z.B. Bexio für Kontaktverwaltung
+          oder Google Calendar für persönliche Terminübersicht.
         </p>
       </div>
+
+      {/* Google Calendar — iCal-Feed-URL. User kopiert die URL und fuegt
+          sie in Google Calendar via "Anderer Kalender → Per URL hinzufuegen"
+          ein. Google synced dann automatisch alle Auftraege + Termine. */}
+      <Card className="bg-card border-gray-100">
+        <CardContent className="p-5 space-y-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center text-white font-bold shrink-0">
+              G
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">Google Calendar</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Kopiere die URL und füge sie in Google Calendar via
+                <span className="font-medium"> &quot;Andere Kalender&quot; → &quot;Per URL hinzufügen&quot;</span> ein.
+                Aufträge + Termine werden automatisch synchronisiert.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-stretch gap-2">
+            <input
+              readOnly
+              value={icalUrl}
+              onClick={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/40 truncate focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            <button
+              type="button"
+              onClick={copyIcalUrl}
+              disabled={!icalUrl}
+              className={`kasten ${copied ? "kasten-green" : "kasten-blue"}`}
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Kopiert" : "Kopieren"}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-card border-gray-100">
         <CardContent className="p-5">

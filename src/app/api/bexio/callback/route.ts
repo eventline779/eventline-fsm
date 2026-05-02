@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForTokens, saveConnection } from "@/lib/bexio";
 import { createClient } from "@/lib/supabase/server";
+import { logError } from "@/lib/log";
 
 // OAuth-Callback. Bexio leitet den User mit ?code=...&state=... hierher zurueck.
 // Wir vergleichen state mit dem Cookie (CSRF-Schutz), tauschen den Code gegen
@@ -46,7 +47,9 @@ export async function GET(request: NextRequest) {
           Buffer.from(tokens.id_token.split(".")[1], "base64url").toString("utf8"),
         );
         bexioEmail = payload.email ?? null;
-      } catch {}
+      } catch (e) {
+        logError("bexio.callback.id_token_decode", e);
+      }
     }
 
     // Bexio-User-ID gleich mitfetchen — wird beim Kontakt-Anlegen als

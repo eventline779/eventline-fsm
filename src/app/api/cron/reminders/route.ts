@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { logError } from "@/lib/log";
 
 export async function GET(request: Request) {
   // Cron-Secret prüfen (Vercel Cron sendet diesen Header)
@@ -40,8 +41,11 @@ export async function GET(request: Request) {
   const sent: string[] = [];
   const failed: string[] = [];
 
-  for (const todo of todos) {
-    const assignee = (todo as any).assignee;
+  type TodoWithAssignee = typeof todos[number] & {
+    assignee: { full_name: string; email: string } | null;
+  };
+  for (const todo of todos as TodoWithAssignee[]) {
+    const assignee = todo.assignee;
     if (!assignee?.email) continue;
 
     const formattedDate = new Date(todo.due_date + "T12:00:00").toLocaleDateString("de-CH", {
@@ -76,7 +80,8 @@ export async function GET(request: Request) {
         `,
       });
       sent.push(`${assignee.full_name}: ${todo.title}`);
-    } catch {
+    } catch (e) {
+      logError("cron.reminders.mail", e, { recipient: assignee.email, todoId: todo.id });
       failed.push(assignee.email);
     }
   }

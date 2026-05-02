@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createContact, createContactAddress, bexioContactUrl, findMatchingContacts } from "@/lib/bexio";
+import { requirePermission } from "@/lib/api-auth";
 
 // Body: { customerId, force?: boolean, linkOnly?: boolean }
 //
@@ -23,6 +24,8 @@ const REQUIRED_FIELDS = [
 ] as const;
 
 export async function POST(request: NextRequest) {
+  const auth = await requirePermission("bexio:use");
+  if (auth.error) return auth.error;
   try {
     const { customerId, force } = await request.json();
     if (!customerId) {

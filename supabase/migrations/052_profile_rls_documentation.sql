@@ -1,0 +1,22 @@
+-- Dokumentation: Profile-RLS bleibt bewusst offen.
+--
+-- Status quo:
+--   - SELECT: using (true)  — jeder authenticated User sieht alle Profile.
+--   - UPDATE: admin-only.
+--   - DELETE/INSERT: keine Policies (gesperrt).
+--
+-- Warum nicht enger?
+--   Assignee-Dropdowns (Auftrags-Zuweisung, Todo-Zuweisung, Termine an
+--   Person) brauchen die Liste aller aktiven User. Wuerde man SELECT auf
+--   "eigenes Profil" einschraenken, koennten Nicht-Admins niemanden mehr
+--   zuweisen. Echte Privacy-Schutz wuerde Column-Level-Grants oder eine
+--   public_profiles-VIEW erfordern (Telefon/Email versteckt) — das ist
+--   ein groesserer Umbau und bei interner Team-App nicht prioritaer.
+--
+-- Konsequenz: Telefonnummern und E-Mails der Kollegen sind fuer alle
+-- eingeloggten User sichtbar. Wenn das nicht passt (z.B. Praktikanten
+-- mit Vollzugriff), spaeter VIEW-basierten Schutz nachziehen.
+--
+-- Diese Migration hat keinen Effekt — sie steht fuer den Audit-Trail
+-- damit klar ist dass das bewusst so bleibt.
+select 1;

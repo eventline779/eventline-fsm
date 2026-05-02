@@ -250,7 +250,7 @@ export default function PartnerPage() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => openEdit(p)}
-                      className="p-1.5 rounded text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                      className="icon-btn icon-btn-purple"
                       title="Bearbeiten"
                     >
                       <Pencil className="h-3.5 w-3.5" />

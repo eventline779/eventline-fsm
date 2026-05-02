@@ -3,15 +3,18 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Job } from "@/types";
 import { REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
 import {
-  ArrowLeft, MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
-  StickyNote, FileText, Send, Download, Trash2,
+  MapPin, Users, Calendar, ArrowRight, Check, X, XCircle,
+  StickyNote, FileText, Send, Download, Trash2, Pencil,
 } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { JobNumber } from "@/components/job-number";
 import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
@@ -116,9 +119,9 @@ export default function AnfrageDetailPage() {
     // Erst aus Storage, dann aus documents-Tabelle. Wenn Storage failt, ueberspringen
     // wir die DB-Loeschung nicht — die Verwaltung des Files muss schliesslich raus.
     await supabase.storage.from("documents").remove([storagePath]);
-    const { error } = await supabase.from("documents").delete().eq("id", docId);
-    if (error) {
-      toast.error("Fehler beim Löschen: " + error.message);
+    const result = await deleteRow("documents", docId);
+    if (!result.ok) {
+      toast.error("Fehler beim Löschen: " + (result.error ?? "Unbekannt"));
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
@@ -128,7 +131,9 @@ export default function AnfrageDetailPage() {
   async function loadJob() {
     const { data, error } = await supabase
       .from("jobs")
-      .select("*, customer:customers(name, email), location:locations(name, address_street, address_zip, address_city)")
+      // Adressen bewusst weggelassen — in den Vermietentwurf-Details werden
+      // nur Namen angezeigt, Adressen leaken sonst durch unbenutzte Joins.
+      .select("*, customer:customers(name, email), location:locations(name)")
       .eq("id", id)
       .single();
     if (error || !data) {
@@ -186,7 +191,7 @@ export default function AnfrageDetailPage() {
       .update({ request_step: nextStep })
       .eq("id", id);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     toast.success(REQUEST_STEPS[nextStep - 1].label);
@@ -202,7 +207,7 @@ export default function AnfrageDetailPage() {
       .update({ request_step: prevStep })
       .eq("id", id);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     toast.success(`Zurück zu Schritt ${prevStep}`);
@@ -230,7 +235,7 @@ export default function AnfrageDetailPage() {
       .eq("id", id);
     setCancelSaving(false);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     setCancelPhase("closed");
@@ -254,7 +259,7 @@ export default function AnfrageDetailPage() {
       .eq("id", id);
     setConvertSaving(false);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error);
       return;
     }
     toast.success("Vermietentwurf in Auftrag umgewandelt");
@@ -272,7 +277,7 @@ export default function AnfrageDetailPage() {
   }
 
   const customer = (job.customer as unknown as { name: string }) || null;
-  const location = (job.location as unknown as { name: string; address_street: string | null; address_zip: string | null; address_city: string | null }) || null;
+  const location = (job.location as unknown as { name: string }) || null;
   // Step zwischen 1 und REQUEST_STEPS.length clampen — defensiv gegen
   // Alt-Daten mit request_step ueber dem aktuellen Pipeline-Maximum.
   const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
@@ -283,12 +288,8 @@ export default function AnfrageDetailPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/auftraege">
-          <button className="p-2 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        </Link>
+      <div className="flex items-start gap-3">
+        <BackButton fallbackHref="/auftraege" />
         <div className="flex-1 min-w-0">
           <div className="space-y-1.5">
             <JobNumber number={job.job_number} size="md" />
@@ -298,6 +299,15 @@ export default function AnfrageDetailPage() {
             {isCancelled ? "Vermietentwurf · storniert" : "Vermietentwurf · noch nicht freigegeben"}
           </p>
         </div>
+        {!isCancelled && (
+          <Link
+            href={`/auftraege/vermietentwurf/${id}/bearbeiten`}
+            className="kasten kasten-purple shrink-0"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Bearbeiten
+          </Link>
+        )}
       </div>
 
       {/* Step-Tracker — nur wenn nicht abgelehnt */}
@@ -322,7 +332,7 @@ export default function AnfrageDetailPage() {
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="kasten kasten-blue"
+                  className="kasten kasten-purple"
                 >
                   {REQUEST_MAIL_STEPS.has(currentStep) ? (
                     <>
@@ -545,7 +555,7 @@ export default function AnfrageDetailPage() {
               setShowManualConfirm(false);
               await advanceStepRaw();
             }}
-            className="kasten kasten-blue flex-1"
+            className="kasten kasten-purple flex-1"
           >
             Ja, bestätigen
           </button>
@@ -571,7 +581,7 @@ export default function AnfrageDetailPage() {
               setShowBackConfirm(false);
               await previousStep();
             }}
-            className="kasten kasten-blue flex-1"
+            className="kasten kasten-purple flex-1"
           >
             Zurücksetzen
           </button>

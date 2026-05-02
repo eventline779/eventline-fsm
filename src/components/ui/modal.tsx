@@ -58,6 +58,22 @@ export function Modal({ open, onClose, title, icon, size = "sm", closable = true
     return () => window.removeEventListener("keydown", handler);
   }, [open, closable, onClose]);
 
+  // Body-Scroll lockt waehrend Modal offen ist — verhindert dass User
+  // den Hintergrund parallel zum Modal scrollt. Sowohl <body> als auch
+  // <html> werden gelockt, weil je nach Layout-Kette die Scroll-Quelle
+  // unterschiedlich sein kann (Body in Next.js, HTML in iOS-Safari etc).
+  useEffect(() => {
+    if (!open) return;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, [open]);
+
   if (!open) return null;
   if (typeof document === "undefined") return null;
 
@@ -67,11 +83,17 @@ export function Modal({ open, onClose, title, icon, size = "sm", closable = true
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={handleBackdrop} />
-      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-        <div className={`bg-card rounded-2xl shadow-2xl w-full ${SIZE_CLASS[size]} overflow-hidden border`}>
+      {/* z-Indices ueber Leaflet-Default-Stack (Map-Controls bei 1000):
+          sonst sitzt z.B. die Schweizer Karte ueber dem Modal-Backdrop
+          und wuerde nicht geblurrt werden. */}
+      <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur" onClick={handleBackdrop} />
+      <div className="fixed inset-0 z-[1110] flex items-center justify-center p-4">
+        {/* max-h-[90vh] + overflow-y-auto am Body damit lange Inhalte auf
+            kleinen Screens scrollbar bleiben statt unter dem Fold zu verschwinden.
+            Header bleibt sichtbar (sticky-ish per flex-shrink-0). */}
+        <div className={`bg-card rounded-2xl shadow-2xl w-full ${SIZE_CLASS[size]} overflow-hidden border max-h-[90vh] flex flex-col`}>
           {(title || icon) && (
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
               <div className="flex items-center gap-2">
                 {icon}
                 {title && <h2 className="font-semibold">{title}</h2>}
@@ -88,7 +110,7 @@ export function Modal({ open, onClose, title, icon, size = "sm", closable = true
               )}
             </div>
           )}
-          <div className="p-6 space-y-4">{children}</div>
+          <div className="p-6 space-y-4 overflow-y-auto">{children}</div>
         </div>
       </div>
     </>,

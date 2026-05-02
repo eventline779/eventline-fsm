@@ -9,6 +9,7 @@
 // hier die Token-Verwaltung serverseitig kapseln.
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logWarn } from "@/lib/log";
 
 // Bexio hat den IdP von idp.bexio.com auf auth.bexio.com migriert. Beim
 // Verbinden auf den alten Endpunkten gibt's 404 — auth.bexio.com ist der
@@ -317,7 +318,7 @@ export async function createContactAddress(
     // Loggen aber nicht throwen — Kontakt existiert bereits, Adresse manuell
     // ergaenzbar in Bexio.
     const text = await res.text();
-    console.warn(`[bexio] Adresse fuer Kontakt ${contactId} konnte nicht angelegt werden (${res.status}): ${text}`);
+    logWarn("bexio.address", `Adresse fuer Kontakt ${contactId} konnte nicht angelegt werden (${res.status}): ${text}`);
   }
 }
 

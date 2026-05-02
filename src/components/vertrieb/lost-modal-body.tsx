@@ -25,8 +25,8 @@ export function LostModalBody({ lostReason, setLostReason, onConfirm, onClose }:
         />
       </div>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
-        <button onClick={onConfirm} disabled={!lostReason.trim()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+        <button onClick={onClose} className="kasten kasten-muted flex-1">Abbrechen</button>
+        <button onClick={onConfirm} disabled={!lostReason.trim()} className="kasten kasten-red flex-1">
           <AlertTriangle className="h-4 w-4" />Als verloren markieren
         </button>
       </div>

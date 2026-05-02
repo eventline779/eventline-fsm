@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 // POST { customerId }
 // Reaktiviert einen archivierten Kunden — archived_at = NULL.
+// Gleiche Permission wie Archivieren: kunden:archive.
 export async function POST(request: NextRequest) {
-  const auth = await requireUser();
+  const auth = await requirePermission("kunden:archive");
   if (auth.error) return auth.error;
 
   const { customerId } = await request.json();

@@ -2,13 +2,17 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { GraduationCap } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 
 export default function SchulungenPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Schulungen</h1>
-        <p className="text-sm text-muted-foreground mt-1">Schulungen und Weiterbildungen</p>
+      <div className="flex items-center gap-4">
+        <BackButton fallbackHref="/hr" />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Schulungen</h1>
+          <p className="text-sm text-muted-foreground mt-1">Schulungen und Weiterbildungen</p>
+        </div>
       </div>
 
       <Card className="bg-card border-dashed">

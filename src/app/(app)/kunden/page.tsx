@@ -25,11 +25,18 @@ import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
 import Link from "next/link";
 import {
-  Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, RefreshCw, Archive, ArchiveRestore,
+  Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, Loader2, RefreshCw, Archive, ArchiveRestore,
 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/lib/use-permissions";
 import { Modal } from "@/components/ui/modal";
-import { CustomerWorldMap } from "@/components/customer-world-map";
+import dynamic from "next/dynamic";
+
+// flag-icons CSS ist ~80kb — lazy laden damit /kunden zuerst rendert.
+const CustomerWorldMap = dynamic(
+  () => import("@/components/customer-world-map").then((m) => m.CustomerWorldMap),
+  { ssr: false, loading: () => null },
+);
 
 const PAGE_SIZE = 50;
 
@@ -59,6 +66,7 @@ type ActionTarget =
   | { kind: "unarchive"; customer: CustomerRow };
 
 export default function KundenPage() {
+  const { can } = usePermissions();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -294,7 +302,7 @@ export default function KundenPage() {
             <Archive className="h-3.5 w-3.5" />
             {showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}
           </button>
-          {!showArchive && (
+          {!showArchive && can("kunden:create") && (
             <Link href="/kunden/neu" className="kasten kasten-red">
               <Plus className="h-3.5 w-3.5" />
               Neuer Kunde
@@ -438,9 +446,15 @@ export default function KundenPage() {
               const hoverColor = action.kind === "delete" ? "hover:!text-red-500"
                 : action.kind === "archive" ? "hover:!text-foreground"
                 : "hover:!text-green-500";
+              // Gating: delete = kunden:delete, archive/unarchive = kunden:archive
+              // (eigene Permission damit Admin "Archivieren" separat von "Bearbeiten"
+              // erteilen kann).
+              const actionAllowed = action.kind === "delete"
+                ? can("kunden:delete")
+                : can("kunden:archive");
               return (
                 <div key={c.id} className="group relative after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-px after:bg-foreground/10 dark:after:bg-foreground/15 last:after:hidden">
-                  <div className="hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-2.5 py-2 rounded-lg hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors">
+                  <div className="kunden-row hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-2.5 py-2 rounded-lg">
                     <span className="font-mono text-xs">
                       {c.bexio_nr ? (
                         // Bexio-Lime-Pill — gleicher tinted Stil wie kasten-bexio
@@ -454,9 +468,9 @@ export default function KundenPage() {
                         <span className="text-muted-foreground/40">—</span>
                       )}
                     </span>
-                    <Link href={`/kunden/${c.id}`} className="flex items-center gap-2 min-w-0 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                    <Link href={`/kunden/${c.id}`} className="flex items-center gap-2 min-w-0">
                       <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
-                      <span className="font-medium text-sm truncate">{c.name}</span>
+                      <span className="kunden-name font-medium text-sm truncate">{c.name}</span>
                     </Link>
                     {c.email ? (
                       <a href={`mailto:${c.email}`} className="text-sm text-muted-foreground hover:text-foreground truncate transition-colors">{c.email}</a>
@@ -467,16 +481,18 @@ export default function KundenPage() {
                     <span className="text-sm text-muted-foreground truncate">
                       {c.address_city || <span className="opacity-40">—</span>}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setActionTarget(action)}
-                      className={`p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 ${hoverColor} transition-all`}
-                      aria-label={`${c.name}: ${actionTitle}`}
-                    >
-                      <ActionIcon className="h-3.5 w-3.5" />
-                    </button>
+                    {actionAllowed ? (
+                      <button
+                        type="button"
+                        onClick={() => setActionTarget(action)}
+                        className={`p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 ${hoverColor} transition-all`}
+                        aria-label={`${c.name}: ${actionTitle}`}
+                      >
+                        <ActionIcon className="h-3.5 w-3.5" />
+                      </button>
+                    ) : <span />}
                   </div>
-                  <div className="md:hidden flex items-center gap-3 px-2.5 py-3 rounded-lg hover:bg-foreground/[0.04] transition-colors">
+                  <div className="kunden-row md:hidden flex items-center gap-3 px-2.5 py-3 rounded-lg">
                     <Link href={`/kunden/${c.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                       <span className="font-mono text-[10px] shrink-0">
                         {c.bexio_nr ? (
@@ -487,20 +503,22 @@ export default function KundenPage() {
                       </span>
                       <Icon className="h-4 w-4 text-muted-foreground shrink-0" aria-label={CUSTOMER_TYPES[c.type]} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="kunden-name text-sm font-medium truncate">{c.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
                           {[c.email, c.address_city].filter(Boolean).join(" · ") || "—"}
                         </p>
                       </div>
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => setActionTarget(action)}
-                      className="p-2 rounded-lg text-muted-foreground/40"
-                      aria-label={`${c.name}: ${actionTitle}`}
-                    >
-                      <ActionIcon className="h-4 w-4" />
-                    </button>
+                    {actionAllowed && (
+                      <button
+                        type="button"
+                        onClick={() => setActionTarget(action)}
+                        className="p-2 rounded-lg text-muted-foreground/40"
+                        aria-label={`${c.name}: ${actionTitle}`}
+                      >
+                        <ActionIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -514,7 +532,7 @@ export default function KundenPage() {
                 disabled={loadingMore}
                 className="kasten kasten-muted"
               >
-                <ChevronDown className="h-3.5 w-3.5" />
+                {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 {loadingMore ? "Lade…" : "Mehr laden"}
               </button>
             </div>

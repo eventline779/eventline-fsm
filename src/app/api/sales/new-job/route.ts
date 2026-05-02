@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireUser } from "@/lib/api-auth";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST(request: Request) {
   const auth = await requireUser();
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
             </table>
 
             <div style="text-align:center;margin:20px 0">
-              <a href="https://eventline-fsm-usyk.vercel.app/auftraege/${jobId}" style="display:inline-block;background:#1a1a1a;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+              <a href="${appUrl(`/auftraege/${jobId}`)}" style="display:inline-block;background:#1a1a1a;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
                 Auftrag öffnen & Schichtplan machen
               </a>
             </div>

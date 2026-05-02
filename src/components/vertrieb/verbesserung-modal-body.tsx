@@ -26,7 +26,7 @@ export function VerbesserungModalBody({ verbesserungText, setVerbesserungText, o
         />
       </div>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Abbrechen</button>
+        <button onClick={onClose} className="kasten kasten-muted flex-1">Abbrechen</button>
         <button onClick={onSend} disabled={!verbesserungText.trim() || sending} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
           <Mail className="h-4 w-4" />{sending ? "Senden..." : "Senden"}
         </button>

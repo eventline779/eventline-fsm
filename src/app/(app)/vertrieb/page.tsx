@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
+import { logError } from "@/lib/log";
+import { TOAST } from "@/lib/messages";
+import { validateFileSize } from "@/lib/file-upload";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -260,11 +264,11 @@ export default function VertriebPage() {
     };
     if (editingId) {
       const { error } = await supabase.from("vertrieb_contacts").update(payload).eq("id", editingId);
-      if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
+      if (error) { TOAST.supabaseError(error); setSaving(false); return; }
       toast.success("Eintrag aktualisiert");
     } else {
       const { error } = await supabase.from("vertrieb_contacts").insert(payload);
-      if (error) { toast.error("Fehler: " + error.message); setSaving(false); return; }
+      if (error) { TOAST.supabaseError(error); setSaving(false); return; }
       // Wenn gewünscht, auch als Kunde anlegen
       if (form.create_customer && form.firma) {
         const { data: existing } = await supabase.from("customers").select("id").eq("name", form.firma).maybeSingle();
@@ -383,6 +387,7 @@ export default function VertriebPage() {
   async function uploadOfferte(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !editingId) return;
+    if (!validateFileSize(file)) return;
     setUploadingOfferte(true);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `vertrieb/${editingId}/offerte_${Date.now()}_${safeName}`;
@@ -539,7 +544,7 @@ export default function VertriebPage() {
     const c = contacts.find((x) => x.id === editingId);
     if (!c) return;
     // Aus Kalender löschen
-    await supabase.from("job_appointments").delete().eq("id", terminId);
+    await deleteRow("job_appointments", terminId);
     // Aus Lead-Details entfernen
     let obj: any = {};
     try { obj = JSON.parse(c.notizen || "{}"); } catch {}
@@ -646,8 +651,8 @@ export default function VertriebPage() {
       });
       const json = await res.json();
       emailOk = json.success;
-      if (!emailOk) console.error("Email-Fehler:", json.error);
-    } catch (e) { console.error("Fetch-Fehler:", e); }
+      if (!emailOk) logError("vertrieb.send-email", json.error);
+    } catch (e) { logError("vertrieb.send-fetch", e); }
 
     if (emailOk) {
       toast.success(`Auftrag INT-${newJob.job_number} erstellt — Leo benachrichtigt`);
@@ -672,7 +677,11 @@ export default function VertriebPage() {
       variant: "red",
     });
     if (!ok) return;
-    await supabase.from("vertrieb_contacts").delete().eq("id", id);
+    const result = await deleteRow("vertrieb_contacts", id);
+    if (!result.ok) {
+      toast.error("Löschen fehlgeschlagen: " + (result.error ?? "Unbekannt"));
+      return;
+    }
     toast.success("Eintrag gelöscht");
     load();
   }

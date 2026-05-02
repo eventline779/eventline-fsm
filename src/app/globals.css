@@ -423,6 +423,80 @@ html, body, *, *::before, *::after {
   [data-slot="card"] {
     border: 2px solid color-mix(in oklab, var(--foreground) 10%, transparent);
   }
+
+  /* Hover-Animation für Auftrag-Cards — als CSS-Klasse statt Tailwind-Utilities
+     damit Cascade-Konflikte mit dem [data-slot="card"]-Border ausgeschlossen sind.
+     Tritt mit hoher Specificity (Klasse + :hover + !important auf border-color)
+     auf damit's auch gegen die Component-Layer-Border greift. */
+  .auftrag-card-hover {
+    transition: box-shadow 200ms ease, transform 200ms ease,
+                border-color 200ms ease, background-color 200ms ease;
+  }
+  .auftrag-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    border-color: color-mix(in oklab, var(--foreground) 50%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 3%, transparent);
+  }
+  .dark .auftrag-card-hover:hover {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    border-color: color-mix(in oklab, var(--foreground) 60%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+
+  /* Generische Card-Hover-Klasse fuer alle Listing-Pages
+     (Locations, Tickets, Rapporte, HR, Todos, Dashboard-Stat-Cards).
+     Identisch zu .auftrag-card-hover, ohne Title-Color-Aenderung.
+     Hover: Card hebt 2px an, weicher Schatten, kraeftigerer Border, dezenter
+     Hintergrund-Tint. Funktioniert in beiden Themes via color-mix. */
+  .card-hover {
+    transition: box-shadow 200ms ease, transform 200ms ease,
+                border-color 200ms ease, background-color 200ms ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    border-color: color-mix(in oklab, var(--foreground) 50%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 3%, transparent);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    border-color: color-mix(in oklab, var(--foreground) 60%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+}
+
+/* Kunden-Liste-Hover: bewusst AUSSERHALB @layer und mit !important damit
+   keine Tailwind-Utility und kein component-layer-Border-Override es
+   uebersteuern kann. .kunden-row markiert die Tabellen-Zeile, .kunden-name
+   die Verlinkung — Name wird rot wenn man die Zeile hovert. */
+.kunden-row {
+  transition: background-color 150ms ease !important;
+}
+.kunden-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent) !important;
+}
+.dark .kunden-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 10%, transparent) !important;
+}
+.kunden-row .kunden-name {
+  transition: color 150ms ease;
+}
+.kunden-row:hover .kunden-name {
+  color: rgb(220, 38, 38) !important;
+}
+
+/* Auftrag-Dropdown-Item (Neuer-Termin-Modal): bewusst AUSSERHALB @layer und mit
+   !important damit keine Tailwind-Utility es uebersteuern kann. Hover dezent —
+   Brand-roter Tint statt knall-rot, Text bleibt erhalten. */
+.auftrag-dropdown-item:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+.dark .auftrag-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+.dark .kunden-row:hover .kunden-name {
+  color: rgb(248, 113, 113) !important;
 }
 
 @layer components {
@@ -545,6 +619,65 @@ html, body, *, *::before, *::after {
   .dark .kasten-toggle-off:hover:not(:disabled) {
     background-color: color-mix(in oklab, var(--foreground) 16%, transparent);
   }
+
+  /* ============================================================
+     Icon-Buttons — kleine Aktion-Icons (Trash, Download, Edit, X).
+     Ersetzt die inkonsistenten inline-Tailwind-Patterns:
+       - hover:bg-red-50 ... hover:text-red-500
+       - hover:bg-blue-50 ... hover:text-blue-500
+       - hover:bg-gray-100
+     Die alten Patterns hatten keine Dark-Mode-Overrides — Hover war
+     im Dark unsichtbar. Hier wird immer Light + Dark gepflegt.
+
+     Nutzung: <button class="icon-btn icon-btn-red">…</button>
+     ============================================================ */
+  .icon-btn {
+    @apply inline-flex items-center justify-center p-1.5 rounded-lg transition-colors;
+    color: var(--muted-foreground);
+  }
+  .icon-btn:disabled { @apply opacity-50 pointer-events-none; }
+
+  .icon-btn-red:hover:not(:disabled) {
+    background-color: rgba(239, 68, 68, 0.10);
+    color: rgb(239, 68, 68);
+  }
+  .dark .icon-btn-red:hover:not(:disabled) {
+    background-color: rgba(239, 68, 68, 0.18);
+    color: rgb(248, 113, 113);
+  }
+
+  .icon-btn-blue:hover:not(:disabled) {
+    background-color: rgba(59, 130, 246, 0.10);
+    color: rgb(59, 130, 246);
+  }
+  .dark .icon-btn-blue:hover:not(:disabled) {
+    background-color: rgba(59, 130, 246, 0.18);
+    color: rgb(96, 165, 250);
+  }
+
+  .icon-btn-green:hover:not(:disabled) {
+    background-color: rgba(34, 197, 94, 0.10);
+    color: rgb(34, 197, 94);
+  }
+  .dark .icon-btn-green:hover:not(:disabled) {
+    background-color: rgba(34, 197, 94, 0.18);
+    color: rgb(74, 222, 128);
+  }
+
+  .icon-btn-purple:hover:not(:disabled) {
+    background-color: rgba(168, 85, 247, 0.10);
+    color: rgb(168, 85, 247);
+  }
+  .dark .icon-btn-purple:hover:not(:disabled) {
+    background-color: rgba(168, 85, 247, 0.18);
+    color: rgb(192, 132, 252);
+  }
+
+  /* Neutral — fuer Modal-Close-X und allgemeine Toolbar-Aktionen */
+  .icon-btn-muted:hover:not(:disabled) {
+    background-color: var(--muted);
+    color: var(--foreground);
+  }
 }
 
 @layer utilities {
@@ -567,4 +700,111 @@ html, body, *, *::before, *::after {
   .divide-y > :not([hidden]) ~ :not([hidden]):not([class*="divide-y-0"]) {
     border-top-width: 2px;
   }
+}
+
+/* ============================================================
+   Karten-Marker-System fuer locations-switzerland-map.
+   Cluster-Bubbles bekommen einen Hover-Scale, Spider-Marker poppen mit
+   einer cubic-bezier-Overshoot-Animation auf — staggered ueber animation-delay
+   das die divIcon-HTML inline setzt. Leaflet's eigene Position-Transform liegt
+   auf dem .leaflet-marker-icon Wrapper, unsere Transforms greifen auf das
+   Inner-div => kein Konflikt.
+   ============================================================ */
+/* Karten-Tooltip + Popup im App-Stil — Comfortaa, Card-Background, Border-
+   Radius wie der Rest der App, dezenter Shadow. Leaflet-Default-Pfeil
+   (::before) wird ausgeblendet damit es eine clean rectangle-Bubble bleibt. */
+.leaflet-tooltip.eventline-map-tooltip,
+.leaflet-popup.eventline-map-popup .leaflet-popup-content-wrapper {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.leaflet-tooltip.eventline-map-tooltip {
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+.leaflet-tooltip.eventline-map-tooltip:before {
+  display: none;
+}
+.leaflet-popup.eventline-map-popup .leaflet-popup-tip {
+  display: none;
+}
+.leaflet-popup.eventline-map-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 4px;
+  font-family: var(--font-heading);
+}
+.eventline-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+.eventline-tooltip-row + .eventline-tooltip-row {
+  margin-top: 2px;
+}
+.eventline-popup-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--card-foreground);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+  cursor: pointer;
+}
+.eventline-popup-link:hover {
+  background-color: var(--muted);
+}
+.eventline-popup-link + .eventline-popup-link {
+  margin-top: 1px;
+}
+
+.eventline-cluster-marker {
+  transition: transform 180ms ease;
+  transform-origin: center;
+  cursor: pointer;
+}
+.eventline-cluster-marker:hover {
+  transform: scale(1.08);
+}
+/* Inner-Kreis im uMap-Stil — Halo (outer) ist drumherum, Inner zentriert. */
+.eventline-cluster-inner {
+  transition: box-shadow 180ms ease;
+}
+.eventline-cluster-marker:hover .eventline-cluster-inner {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Leaflet-Zoom-Buttons im App-Stil — kein heller Standard-Border, sondern
+   Card-Background + Border-Token, damit sie im Dark-Mode nicht rausstechen. */
+.leaflet-control-zoom {
+  border: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+.leaflet-control-zoom a {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+  width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  font-size: 18px !important;
+  font-weight: 500 !important;
+}
+.leaflet-control-zoom a:hover {
+  background-color: var(--muted) !important;
+}
+.leaflet-control-zoom a.leaflet-disabled {
+  background-color: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.5;
 }

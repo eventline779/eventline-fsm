@@ -3,32 +3,41 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
+import { validateFileSize } from "@/lib/file-upload";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Location, LocationContact, MaintenanceTask, Customer } from "@/types";
 import {
-  ArrowLeft, Plus, UserPlus, Wrench, Check, StickyNote, MapPin,
+  Plus, UserPlus, Wrench, Check, MapPin,
   Users, Phone, Mail, Trash2, Camera, Image as ImageIcon, X,
   ClipboardList, Building2, FileText, Upload, Download,
 } from "lucide-react";
-import Link from "next/link";
+import { BackButton } from "@/components/ui/back-button";
+import { usePermissions } from "@/lib/use-permissions";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 interface MaintenanceTaskWithPhoto extends MaintenanceTask {
   photo_url?: string | null;
+  job_id?: string | null;
+  // Aus Postgres-FK-Join: maintenance_tasks.job_id → jobs.id
+  job?: { id: string; status: string } | null;
+}
+
+function effectiveTaskStatus(t: MaintenanceTaskWithPhoto): "offen" | "erledigt" {
+  if (t.job?.status === "abgeschlossen") return "erledigt";
+  return t.status;
 }
 
 export default function StandortDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { can } = usePermissions();
   const [location, setLocation] = useState<Location | null>(null);
   const [contacts, setContacts] = useState<LocationContact[]>([]);
   const [tasks, setTasks] = useState<MaintenanceTaskWithPhoto[]>([]);
-  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string }[]>([]);
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [newNote, setNewNote] = useState("");
 
   // Contact form
   const [showContactForm, setShowContactForm] = useState(false);
@@ -36,7 +45,7 @@ export default function StandortDetailPage() {
 
   // Task form
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", due_date: "" });
+  const [taskForm, setTaskForm] = useState({ title: "", description: "" });
   const [taskPhoto, setTaskPhoto] = useState<{ file: File; preview: string } | null>(null);
   const taskPhotoRef = useRef<HTMLInputElement>(null);
   const taskCameraRef = useRef<HTMLInputElement>(null);
@@ -57,7 +66,7 @@ export default function StandortDetailPage() {
     const [locRes, contRes, taskRes, custRes] = await Promise.all([
       supabase.from("locations").select("*").eq("id", id).single(),
       supabase.from("location_contacts").select("*").eq("location_id", id).order("name"),
-      supabase.from("maintenance_tasks").select("*").eq("location_id", id).order("created_at", { ascending: false }),
+      supabase.from("maintenance_tasks").select("*, job:jobs(id, status)").eq("location_id", id).order("created_at", { ascending: false }),
       supabase.from("customers").select("*").eq("is_active", true).order("name"),
     ]);
     if (locRes.data) {
@@ -75,13 +84,6 @@ export default function StandortDetailPage() {
     if (taskRes.data) setTasks(taskRes.data as MaintenanceTaskWithPhoto[]);
     if (custRes.data) setCustomers(custRes.data as Customer[]);
 
-    // Load notes via API
-    try {
-      const notesRes = await fetch(`/api/locations/${id}/notes`);
-      const notesJson = await notesRes.json();
-      if (notesJson.notes) setNotesList(notesJson.notes);
-    } catch {}
-
     // Load documents from technical_details
     if (locRes.data?.technical_details) {
       try {
@@ -97,47 +99,10 @@ export default function StandortDetailPage() {
     loadAll();
   }
 
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-    try {
-      const res = await fetch(`/api/locations/${id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newNote }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setNotesList(json.notes);
-        setNewNote("");
-        setShowNoteForm(false);
-        toast.success("Notiz hinzugefügt");
-      } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
-      }
-    } catch {
-      toast.error("Fehler beim Speichern");
-    }
-  }
-
-  async function deleteNote(noteId: string) {
-    try {
-      const res = await fetch(`/api/locations/${id}/notes`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteId }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setNotesList(json.notes);
-        toast.success("Notiz gelöscht");
-      }
-    } catch {}
-  }
-
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setUploadingDoc(true);
     const ext = file.name.split(".").pop() || "pdf";
     const path = `standorte/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -149,11 +114,6 @@ export default function StandortDetailPage() {
       return;
     }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    await fetch(`/api/locations/${id}/notes`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: location?.notes }),
-    });
     // Save docs list via admin API
     await fetch(`/api/locations/${id}/docs`, {
       method: "POST",
@@ -200,13 +160,14 @@ export default function StandortDetailPage() {
   }
 
   async function deleteContact(contactId: string) {
-    await supabase.from("location_contacts").delete().eq("id", contactId);
+    await deleteRow("location_contacts", contactId);
     loadAll();
   }
 
   function handleTaskPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setTaskPhoto({ file, preview: URL.createObjectURL(file) });
     e.target.value = "";
   }
@@ -223,29 +184,23 @@ export default function StandortDetailPage() {
       if (!error) photoUrl = path;
     }
 
-    await supabase.from("maintenance_tasks").insert({
+    const { error: insertErr } = await supabase.from("maintenance_tasks").insert({
       location_id: id,
       title: taskForm.title,
       description: taskForm.description || null,
-      due_date: taskForm.due_date || null,
       photo_url: photoUrl,
       created_by: user?.id,
     });
+    if (insertErr) {
+      toast.error("Erstellen fehlgeschlagen: " + insertErr.message);
+      return;
+    }
 
-    setTaskForm({ title: "", description: "", due_date: "" });
+    setTaskForm({ title: "", description: "" });
     if (taskPhoto) { URL.revokeObjectURL(taskPhoto.preview); setTaskPhoto(null); }
     setShowTaskForm(false);
     loadAll();
     toast.success("Instandhaltungsarbeit erstellt");
-  }
-
-  async function toggleTask(taskId: string, currentStatus: string) {
-    const newStatus = currentStatus === "offen" ? "erledigt" : "offen";
-    await supabase.from("maintenance_tasks").update({
-      status: newStatus,
-      completed_at: newStatus === "erledigt" ? new Date().toISOString() : null,
-    }).eq("id", taskId);
-    loadAll();
   }
 
   async function deleteTask(task: MaintenanceTaskWithPhoto) {
@@ -258,7 +213,7 @@ export default function StandortDetailPage() {
     if (task.photo_url) {
       await supabase.storage.from("documents").remove([task.photo_url]);
     }
-    await supabase.from("maintenance_tasks").delete().eq("id", task.id);
+    await deleteRow("maintenance_tasks", task.id);
     loadAll();
     toast.success("Arbeit gelöscht");
   }
@@ -269,6 +224,9 @@ export default function StandortDetailPage() {
     if (task.description) params.set("description", task.description);
     if (id) params.set("location_id", id as string);
     if (location?.customer_id) params.set("customer_id", location.customer_id);
+    // Verknuepft den neuen Auftrag bei Submit zurueck mit dieser Instandhaltung
+    // — sobald der Auftrag abgeschlossen ist, gilt die Arbeit als erledigt.
+    params.set("from_maintenance", task.id);
     router.push(`/auftraege/neu?${params.toString()}`);
   }
 
@@ -290,12 +248,12 @@ export default function StandortDetailPage() {
 
   if (!location) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  const filteredTasks = tasks.filter((t) => taskFilter === "all" || t.status === taskFilter);
+  const filteredTasks = tasks.filter((t) => taskFilter === "all" || effectiveTaskStatus(t) === taskFilter);
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href="/standorte"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <BackButton fallbackHref="/standorte" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{location.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -337,42 +295,6 @@ export default function StandortDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Notizen */}
-      <Card className="bg-card">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <button type="button" onClick={() => setShowNoteForm(!showNoteForm)} className="kasten kasten-muted">
-            {showNoteForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-muted/40 border space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setShowNoteForm(false); setNewNote(""); }} className="kasten kasten-muted">Abbrechen</button>
-                <button type="submit" className="kasten kasten-red">Speichern</button>
-              </div>
-            </form>
-          )}
-          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
-          {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-muted/40 border">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                  part.match(/^https?:\/\//) ? (
-                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
-                  ) : part
-                )}</p>
-                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-              </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
       {/* Dokumente */}
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
@@ -395,8 +317,8 @@ export default function StandortDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground/60 hover:text-blue-500 transition-colors" title="Öffnen"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors" title="Löschen"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="icon-btn icon-btn-blue" title="Öffnen"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" title="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
@@ -407,10 +329,12 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Kontaktpersonen ({contacts.length})</CardTitle>
-          <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
-            <UserPlus className="h-3.5 w-3.5" />
-            Hinzufügen
-          </button>
+          {can("locations:edit") && (
+            <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
+              <UserPlus className="h-3.5 w-3.5" />
+              Hinzufügen
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {showContactForm && (
@@ -442,7 +366,7 @@ export default function StandortDetailPage() {
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/60 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteContact(c.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
@@ -452,10 +376,24 @@ export default function StandortDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Instandhaltung ({tasks.length})</CardTitle>
-          <button type="button" onClick={() => setShowTaskForm(!showTaskForm)} className="kasten kasten-muted">
-            {showTaskForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {showTaskForm ? "Abbrechen" : "Neue Arbeit"}
-          </button>
+          {can("locations:edit") && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!showTaskForm) {
+                  setTaskForm({
+                    title: location ? `Instandhaltung ${location.name}` : "Instandhaltung",
+                    description: "",
+                  });
+                }
+                setShowTaskForm(!showTaskForm);
+              }}
+              className="kasten kasten-muted"
+            >
+              {showTaskForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              {showTaskForm ? "Abbrechen" : "Neue Arbeit"}
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filter */}
@@ -470,9 +408,8 @@ export default function StandortDetailPage() {
           {/* Neue Arbeit Formular */}
           {showTaskForm && (
             <form onSubmit={addTask} className="p-4 rounded-xl bg-muted/40 border space-y-3">
-              <Input placeholder="Titel der Arbeit *" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} required />
-              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none" rows={2} />
-              <Input type="date" value={taskForm.due_date} onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })} />
+              <Input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder="Titel *" required />
+              <textarea placeholder="Beschreibung *" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring" rows={2} required />
 
               {/* Foto */}
               {taskPhoto ? (
@@ -488,10 +425,10 @@ export default function StandortDetailPage() {
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-border text-xs font-medium text-muted-foreground/60 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="kasten kasten-muted flex-1 py-2.5">
                     <Camera className="h-4 w-4" />Foto aufnehmen
                   </button>
-                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-border text-xs font-medium text-muted-foreground/60 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="kasten kasten-muted flex-1 py-2.5">
                     <ImageIcon className="h-4 w-4" />Aus Galerie
                   </button>
                 </div>
@@ -509,21 +446,26 @@ export default function StandortDetailPage() {
 
           {filteredTasks.length === 0 && !showTaskForm && <p className="text-sm text-muted-foreground py-4 text-center">Keine Instandhaltungsarbeiten.</p>}
 
-          {filteredTasks.map((t) => (
-            <div key={t.id} className={`p-3 rounded-xl border ${t.status === "erledigt" ? "bg-green-50 border-green-100" : "bg-muted/40 border-border"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <button onClick={() => toggleTask(t.id, t.status)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all mt-0.5 shrink-0 ${t.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
-                    {t.status === "erledigt" && <Check className="h-4 w-4" />}
-                  </button>
+          {filteredTasks.map((t) => {
+            const status = effectiveTaskStatus(t);
+            const done = status === "erledigt";
+            return (
+              <div key={t.id} className={`p-3 rounded-xl border ${done ? "bg-green-50 border-green-100 dark:bg-green-500/10 dark:border-green-500/20" : "bg-muted/40 border-border"}`}>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <span className={`font-medium text-sm ${t.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium text-sm ${done ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                      {done && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-green-700 dark:text-green-300">
+                          <Check className="h-3 w-3" />Erledigt
+                        </span>
+                      )}
+                    </div>
                     {t.description && <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>}
                     <div className="flex items-center gap-2 mt-1">
-                      {t.due_date && <span className="text-xs text-muted-foreground">Fällig: {new Date(t.due_date).toLocaleDateString("de-CH")}</span>}
-                      {t.completed_at && <span className="text-xs text-green-600">Erledigt: {new Date(t.completed_at).toLocaleDateString("de-CH")}</span>}
+                      <span className="text-xs text-muted-foreground">Erstellt: {new Date(t.created_at).toLocaleDateString("de-CH")}</span>
+                      {t.job && <span className="text-xs text-muted-foreground">· Auftrag verknüpft</span>}
                     </div>
-                    {/* Foto anzeigen */}
                     {t.photo_url && photoUrls[t.id] && (
                       <div className="mt-2">
                         <img
@@ -535,32 +477,20 @@ export default function StandortDetailPage() {
                       </div>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Auftrag erstellen Button */}
-                  {t.status === "offen" && (
-                    <button
-                      onClick={() => createJobFromTask(t)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
-                      title="Auftrag aus Instandhaltung erstellen"
-                    >
-                      <ClipboardList className="h-3.5 w-3.5" />
-                      Auftrag
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!done && !t.job_id && (
+                      <button onClick={() => createJobFromTask(t)} className="kasten kasten-red">
+                        <ClipboardList className="h-3.5 w-3.5" />Zu Auftrag
+                      </button>
+                    )}
+                    <button onClick={() => deleteTask(t)} className="kasten kasten-muted">
+                      <Trash2 className="h-3.5 w-3.5" />Löschen
                     </button>
-                  )}
-                  {/* Löschen Button */}
-                  <button
-                    onClick={() => deleteTask(t)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
-                    title="Arbeit löschen"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Löschen
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
       {ConfirmModalElement}

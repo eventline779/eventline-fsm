@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, path });
-  } catch (e: any) {
-    return NextResponse.json({ success: false, error: e.message || "Upload fehlgeschlagen" }, { status: 500 });
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "Upload fehlgeschlagen" }, { status: 500 });
   }
 }

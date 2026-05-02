@@ -98,6 +98,11 @@ export interface Job {
   extended_services: string | null;
   // Bleibt TRUE auch nach Konvertierung/Stornierung — fuer Lifecycle-Auswertung der Mietanfragen
   was_anfrage: boolean;
+  // Veranstalter-Kontakt — pro-Auftrag (kann pro Event variieren auch bei
+  // gleichem Kunden). UI: Person + Phone Pflicht, Mail optional.
+  contact_person: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
   // Storno-Metadaten — gefuellt wenn status='storniert'
   cancelled_by: string | null;
   cancelled_at: string | null;
@@ -204,21 +209,6 @@ export interface JobAssignment {
   profile?: Profile;
 }
 
-export interface TimeEntry {
-  id: string;
-  profile_id: string;
-  job_id: string | null;
-  clock_in: string;
-  clock_out: string | null;
-  break_minutes: number;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  // Joined
-  profile?: Profile;
-  job?: Job;
-}
-
 export interface ServiceReport {
   id: string;
   job_id: string;
@@ -277,13 +267,27 @@ export interface LocationContact {
   created_at: string;
 }
 
+// Stempel-System: ein Eintrag pro Einstempel-Vorgang. clock_out=NULL
+// = Eintrag laeuft noch. job_id ODER description ist immer gefuellt
+// (DB-Constraint).
+export interface TimeEntry {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  clock_in: string;
+  clock_out: string | null;
+  description: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MaintenanceTask {
   id: string;
   location_id: string;
   title: string;
   description: string | null;
   status: "offen" | "erledigt";
-  due_date: string | null;
   completed_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -298,7 +302,6 @@ export interface Todo {
   priority: JobPriority;
   due_date: string | null;
   assigned_to: string | null;
-  job_id: string | null;
   created_by: string | null;
   completed_at: string | null;
   created_at: string;

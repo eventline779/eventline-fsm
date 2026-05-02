@@ -43,7 +43,7 @@ export function RequestStepTracker({ currentStep, size = "lg", className = "" }:
         const done = s.step < currentStep;
         const active = s.step === currentStep;
         const stateClasses = active
-          ? "bg-[var(--status-blue)] text-white border-[var(--status-blue)]"
+          ? "bg-[var(--status-purple)] text-white border-[var(--status-purple)]"
           : done
             ? "bg-[var(--status-green)] text-white border-[var(--status-green)]"
             : "bg-foreground/[0.04] text-muted-foreground border-foreground/10";

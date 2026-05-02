@@ -9,15 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CUSTOMER_TYPES, JOB_STATUS } from "@/lib/constants";
 import type { Customer, Job, CustomerType } from "@/types";
 import {
-  ArrowLeft, Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
+  Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
   ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote, ChevronDown,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 import { Modal } from "@/components/ui/modal";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
+import { usePermissions } from "@/lib/use-permissions";
 
 type ActionKind = "delete" | "archive" | "unarchive";
 
@@ -35,6 +38,7 @@ export default function KundenDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { can } = usePermissions();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   // Auftrags-Liste ist initial auf 2 Eintraege begrenzt; "Mehr anzeigen"
@@ -143,7 +147,7 @@ export default function KundenDetailPage() {
       address_country: form.address_country || "CH",
       notes: form.notes || null,
     }).eq("id", id);
-    if (error) { toast.error("Fehler: " + error.message); return; }
+    if (error) { TOAST.supabaseError(error); return; }
     toast.success("Kunde gespeichert");
     setEditing(false);
     loadData();
@@ -210,7 +214,7 @@ export default function KundenDetailPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href="/kunden"><button className="p-2 rounded-lg hover:bg-card transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <BackButton fallbackHref="/kunden" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight truncate">{customer.name}</h1>
@@ -241,31 +245,35 @@ export default function KundenDetailPage() {
               onLinked={() => loadData()}
             />
           )}
-          <button
-            type="button"
-            onClick={() => setEditing(!editing)}
-            className={`kasten ${editing ? "kasten-muted" : "kasten-purple"}`}
-          >
-            {editing ? "Abbrechen" : "Bearbeiten"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActionKind(primaryAction)}
-            className={
-              primaryAction === "delete" ? "kasten kasten-red"
-              : primaryAction === "archive" ? "kasten-archive"
-              : "kasten kasten-green"
-            }
-            aria-label={
-              primaryAction === "delete" ? "Löschen"
-              : primaryAction === "archive" ? "Archivieren"
-              : "Reaktivieren"
-            }
-          >
-            {primaryAction === "delete" ? <Trash2 className="h-3.5 w-3.5" />
-              : primaryAction === "archive" ? <Archive className="h-3.5 w-3.5" />
-              : <ArchiveRestore className="h-3.5 w-3.5" />}
-          </button>
+          {can("kunden:edit") && (
+            <button
+              type="button"
+              onClick={() => setEditing(!editing)}
+              className={`kasten ${editing ? "kasten-muted" : "kasten-purple"}`}
+            >
+              {editing ? "Abbrechen" : "Bearbeiten"}
+            </button>
+          )}
+          {(primaryAction === "delete" ? can("kunden:delete") : can("kunden:archive")) && (
+            <button
+              type="button"
+              onClick={() => setActionKind(primaryAction)}
+              className={
+                primaryAction === "delete" ? "kasten kasten-red"
+                : primaryAction === "archive" ? "kasten-archive"
+                : "kasten kasten-green"
+              }
+              aria-label={
+                primaryAction === "delete" ? "Löschen"
+                : primaryAction === "archive" ? "Archivieren"
+                : "Reaktivieren"
+              }
+            >
+              {primaryAction === "delete" ? <Trash2 className="h-3.5 w-3.5" />
+                : primaryAction === "archive" ? <Archive className="h-3.5 w-3.5" />
+                : <ArchiveRestore className="h-3.5 w-3.5" />}
+            </button>
+          )}
         </div>
       </div>
 

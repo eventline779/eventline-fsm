@@ -6,24 +6,27 @@ import { cn } from "@/lib/utils";
 import { Menu } from "lucide-react";
 import { NAV_GROUPS, ADMIN_NAV_GROUP, type NavItem } from "@/lib/constants";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
+import { isPathAllowed } from "@/lib/permissions";
 
 interface MobileNavProps {
   onMenuOpen: () => void;
+  permissions: string[];
+  role: string;
 }
 
-// Pulls items flagged `mobile: true` from NAV_GROUPS — single source of truth.
-// Includes admin items if present so a future admin-only mobile shortcut works.
-function getMobileItems(): NavItem[] {
+function getMobileItems(permissions: string[], role: string): NavItem[] {
   const all = [...NAV_GROUPS, ADMIN_NAV_GROUP].flatMap((g) => g.items);
-  return all.filter((item) => item.mobile).slice(0, 4);
+  return all
+    .filter((item) => item.mobile && isPathAllowed(item.href, permissions, role))
+    .slice(0, 4);
 }
 
-export function MobileNav({ onMenuOpen }: MobileNavProps) {
+export function MobileNav({ onMenuOpen, permissions, role }: MobileNavProps) {
   const pathname = usePathname();
-  const items = getMobileItems();
+  const items = getMobileItems(permissions, role);
 
   function isActive(href: string) {
-    if (href === "/heute") return pathname === "/heute";
+    if (href === "/dashboard") return pathname === "/dashboard";
     if (href === "/kalender") return pathname === "/kalender";
     return pathname.startsWith(href);
   }

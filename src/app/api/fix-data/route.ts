@@ -1,9 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/api-auth";
 
 export async function POST() {
-  const auth = await requireUser();
+  const auth = await requireAdmin();
   if (auth.error) return auth.error;
   const supabase = createAdminClient();
   let fixed = 0;

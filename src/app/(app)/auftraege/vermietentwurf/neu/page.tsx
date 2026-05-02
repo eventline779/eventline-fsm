@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
 import { EVENT_TYPES } from "@/lib/constants";
 import type { Customer, Location } from "@/types";
-import { ArrowLeft, Save } from "lucide-react";
+import { Save, Paperclip, X } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
+import { validateFileList } from "@/lib/file-upload";
+import { logError } from "@/lib/log";
 
 const RETURN_PATH = "/auftraege/vermietentwurf/neu";
 
@@ -43,6 +47,7 @@ function NeueAnfragePageContent() {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [locations, setLocations] = useState<Location[] | null>(null);
   const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const [form, setForm] = useState({
     customer_id: "",
@@ -113,11 +118,13 @@ function NeueAnfragePageContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title.trim()) { toast.error("Titel ist Pflicht"); return; }
-    if (!form.customer_id) { toast.error("Kunde ist Pflicht"); return; }
-    if (!form.location_id) { toast.error("Location ist Pflicht"); return; }
-    if (!form.event_type.trim()) { toast.error("Veranstaltungstyp ist Pflicht"); return; }
-    if (!form.guest_count.trim()) { toast.error("Personenanzahl ist Pflicht"); return; }
+    if (!form.title.trim()) { TOAST.requiredField("Titel"); return; }
+    if (!form.customer_id) { TOAST.requiredField("Kunde"); return; }
+    if (!form.location_id) { TOAST.requiredField("Location"); return; }
+    if (!form.event_type.trim()) { TOAST.requiredField("Veranstaltungstyp"); return; }
+    if (!form.guest_count.trim()) { TOAST.requiredField("Personenanzahl"); return; }
+    if (!form.start_date) { TOAST.requiredField("Startdatum"); return; }
+    if (!form.end_date) { TOAST.requiredField("Enddatum"); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: inserted, error } = await supabase
@@ -142,10 +149,52 @@ function NeueAnfragePageContent() {
       .select("id, job_number")
       .single();
     if (error || !inserted) {
-      toast.error("Fehler: " + (error?.message ?? "konnte nicht angelegt werden"));
+      TOAST.errorOr(error?.message, "konnte nicht angelegt werden");
       setSaving(false);
       return;
     }
+
+    // Stage-Files hochladen — Fehler werden gesammelt und dem User
+    // danach via Toast gemeldet.
+    const uploadFails: string[] = [];
+    if (pendingFiles.length > 0 && user) {
+      for (const file of pendingFiles) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `jobs/${inserted.id}/${Date.now()}_${safeName}`;
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("path", path);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const json = await res.json();
+          if (!json.success) {
+            logError("vermietentwurf.neu.upload", json.error, { fileName: file.name });
+            uploadFails.push(file.name);
+            continue;
+          }
+          await supabase.from("documents").insert({
+            name: file.name,
+            storage_path: path,
+            file_size: file.size,
+            mime_type: file.type,
+            job_id: inserted.id,
+            uploaded_by: user.id,
+          });
+        } catch (err) {
+          logError("vermietentwurf.neu.upload", err, { fileName: file.name });
+          uploadFails.push(file.name);
+        }
+      }
+    }
+    if (uploadFails.length > 0) {
+      const list = uploadFails.length <= 3
+        ? uploadFails.join(", ")
+        : `${uploadFails.slice(0, 3).join(", ")} +${uploadFails.length - 3} weitere`;
+      toast.error(`${uploadFails.length} Datei(en) konnten nicht hochgeladen werden: ${list}. Du kannst sie nachträglich auf der Detail-Seite hochladen.`, {
+        duration: 8000,
+      });
+    }
+
     toast.success(`Vermietentwurf INT-${inserted.job_number} angelegt`);
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push(`/auftraege/vermietentwurf/${inserted.id}`);
@@ -154,11 +203,7 @@ function NeueAnfragePageContent() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-4">
-        <Link href="/auftraege">
-          <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        </Link>
+        <BackButton fallbackHref="/auftraege" size="sm" />
         {nextJobNumber ? (
           <span className="font-mono font-semibold text-xl px-3 py-1 rounded inline-flex items-center bg-foreground/[0.08]">INT-{nextJobNumber}</span>
         ) : (
@@ -237,15 +282,15 @@ function NeueAnfragePageContent() {
 
         {/* Wann */}
         <div className="space-y-2">
-          <SectionLabel>Event-Datum (geplant)</SectionLabel>
+          <SectionLabel>Event-Datum *</SectionLabel>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Start</p>
-              <Input type="date" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} />
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
+              <Input type="date" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende</p>
-              <Input type="date" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} min={form.start_date || undefined} />
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
+              <Input type="date" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} min={form.start_date || undefined} required />
             </div>
           </div>
         </div>
@@ -266,7 +311,7 @@ function NeueAnfragePageContent() {
                   className={`px-3 py-2 rounded-xl border text-sm transition-all ${
                     active
                       ? "bg-foreground/[0.08] border-foreground/40 font-semibold"
-                      : "border-border text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                      : "border-border text-muted-foreground hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.10] hover:text-foreground"
                   }`}
                 >
                   {t}
@@ -279,7 +324,7 @@ function NeueAnfragePageContent() {
               className={`px-3 py-2 rounded-xl border text-sm transition-all ${
                 eventTypeCustom
                   ? "bg-foreground/[0.08] border-foreground/40 font-semibold"
-                  : "border-border text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                  : "border-border text-muted-foreground hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.10] hover:text-foreground"
               }`}
             >
               Sonstige…
@@ -320,6 +365,48 @@ function NeueAnfragePageContent() {
           />
         </div>
 
+        <hr className="border-border/50" />
+
+        {/* Dokumente — werden nach dem Speichern unter dem neuen Vermietentwurf
+            in Storage hochgeladen + als documents-Row registriert. */}
+        <div className="space-y-2">
+          <SectionLabel>Dokumente</SectionLabel>
+          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors cursor-pointer">
+            <Paperclip className="h-4 w-4" />
+            Dateien auswählen…
+            <input
+              type="file"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                const fs = e.target.files;
+                if (!fs || fs.length === 0) return;
+                const validated = validateFileList(fs);
+                if (validated) setPendingFiles((prev) => [...prev, ...validated]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {pendingFiles.length > 0 && (
+            <ul className="space-y-1">
+              {pendingFiles.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 text-sm bg-muted/20 px-3 py-1.5 rounded-lg">
+                  <span className="truncate flex-1">{f.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    aria-label="Entfernen"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <div className="flex gap-3 pt-2">
           <Link
             href="/auftraege"
@@ -330,7 +417,7 @@ function NeueAnfragePageContent() {
           <button
             type="submit"
             disabled={saving}
-            className="kasten kasten-blue flex-1"
+            className="kasten kasten-purple flex-1"
           >
             <Save className="h-3.5 w-3.5" />
             {saving ? "Anlegen…" : "Vermietung anlegen"}
