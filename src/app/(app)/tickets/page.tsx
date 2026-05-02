@@ -239,12 +239,18 @@ export default function TicketsPage() {
               <Link key={t.id} href={`/tickets/${t.id}`} className="block">
                 <Card className="card-hover bg-card">
                   <CardContent className="px-4 py-1.5 flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
-                      <Icon className="h-3.5 w-3.5" />
+                    {/* Icon + T-Nummer auf w-44 (sm) — matcht die Nummer-
+                        Suchspalte in der Filter-Bar oben. So sind alle
+                        nachfolgenden Spalten in Card und Filter-Bar
+                        exakt aligned. */}
+                    <div className="flex items-center gap-3 shrink-0 sm:w-44">
+                      <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
                         <span className="font-medium text-sm truncate">{t.title}</span>
                         {t.priority === "dringend" && (
                           <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
