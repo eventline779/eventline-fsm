@@ -311,7 +311,7 @@ function EntryCard({ userName, jobLabel, jobHref, description, clockIn, clockOut
     <Card className={`card-hover bg-card ${isRunning ? "border-green-300 dark:border-green-500/40" : ""}`}>
       <CardContent className="p-4 flex items-center gap-3 flex-wrap">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-          jobLabel ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
+          jobLabel ? "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400"
                    : "bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
         }`}>
           {jobLabel ? <Briefcase className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
