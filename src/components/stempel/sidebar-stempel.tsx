@@ -66,16 +66,16 @@ export function SidebarStempel() {
       <div className="px-3 mb-2">
         {active ? (
           <div
-            className="rounded-lg overflow-hidden"
+            className="rounded-xl overflow-hidden"
             style={{
               transform: pressed ? "scale(0.99)" : hovered ? "scale(1.015)" : "scale(1)",
               transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, border-color 180ms",
               border: stopHovered
-                ? "1px solid rgba(220,38,38,0.5)"
-                : `1px solid ${hovered ? "rgba(0,168,107,0.5)" : "rgba(0,168,107,0.32)"}`,
+                ? "2px solid var(--status-red, #dc2626)"
+                : "2px solid var(--status-green, #00a86b)",
               backgroundColor: stopHovered
-                ? "rgba(220,38,38,0.10)"
-                : (hovered ? "rgba(0,168,107,0.14)" : "rgba(0,168,107,0.08)"),
+                ? "rgba(220,38,38,0.18)"
+                : (hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)"),
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); setPressed(false); }}
@@ -137,13 +137,12 @@ export function SidebarStempel() {
             onMouseLeave={() => { setHovered(false); setPressed(false); }}
             onMouseDown={() => setPressed(true)}
             onMouseUp={() => setPressed(false)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium text-green-700 dark:text-green-300"
             style={{
               transform: pressed ? "scale(0.99)" : hovered ? "scale(1.015)" : "scale(1)",
-              transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, color 180ms, border-color 180ms",
-              backgroundColor: hovered ? "rgba(0,168,107,0.15)" : "rgba(0,168,107,0.08)",
-              color: hovered ? "rgb(21,128,61)" : "rgb(22,163,74)",
-              borderColor: hovered ? "rgba(0,168,107,0.6)" : "rgba(0,168,107,0.35)",
+              transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms",
+              border: "2px solid var(--status-green, #00a86b)",
+              backgroundColor: hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)",
             }}
           >
             <Clock className="h-4 w-4" />

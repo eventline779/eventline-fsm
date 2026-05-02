@@ -123,13 +123,12 @@ export function StempelWidget() {
               onMouseLeave={() => { setHovered(false); setPressed(false); }}
               onMouseDown={() => setPressed(true)}
               onMouseUp={() => setPressed(false)}
-              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full"
+              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full text-green-700 dark:text-green-300"
               style={{
                 transform: pressed ? "scale(0.95)" : hovered ? "scale(1.05) translateY(-2px)" : "scale(1) translateY(0)",
-                transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms, border-color 200ms",
-                backgroundColor: hovered ? "rgba(0,168,107,0.18)" : "rgba(0,168,107,0.10)",
-                border: `1px solid ${hovered ? "rgba(0,168,107,0.5)" : "rgba(0,168,107,0.32)"}`,
-                color: "rgb(21,128,61)",
+                transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms",
+                backgroundColor: hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)",
+                border: "2px solid var(--status-green, #00a86b)",
                 boxShadow: hovered ? "0 8px 20px -6px rgba(0,168,107,0.25)" : "0 3px 10px -3px rgba(0,168,107,0.15)",
               }}
               aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details oeffnen"}
