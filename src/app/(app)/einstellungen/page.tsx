@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Plug, Users, Shield } from "lucide-react";
@@ -19,25 +19,23 @@ type Tab = "integrationen" | "backup" | "team" | "rollen";
 
 export default function EinstellungenPage() {
   const supabase = createClient();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  // Tab wird DIREKT aus der URL abgeleitet — die URL ist die einzige
-  // Wahrheits-Quelle. Vorher hatten wir useState parallel zur URL,
-  // was zu Drift gefuehrt hat (URL zeigt X, Tab zeigt Y) wenn
-  // router.replace-Updates aus irgendeinem Grund nicht durchkamen.
-  const tab: Tab = urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab)
-    ? urlTab
-    : "integrationen";
+  const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab) ? urlTab : "integrationen");
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Tab-Wechsel ueber URL — re-render geht automatisch durch den
-  // useSearchParams-Hook. router.replace statt push damit kein
-  // History-Entry pro Tab-Klick entsteht.
+  // Tab-Wechsel: state = sofortige UI-Quelle, URL parallel updaten via
+  // History-API damit Hard-Reload den gleichen Tab zeigt. Wir umgehen
+  // den Next-Router (router.replace mit Query-Only-Update triggerte in
+  // Next 16 weder re-render noch URL-Update zuverlaessig). History.API
+  // ist garantiert synchron + ohne Navigation.
   function selectTab(t: Tab) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", t);
-    router.replace(`?${params.toString()}`, { scroll: false });
+    setTab(t);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", t);
+      window.history.replaceState({}, "", url.toString());
+    }
   }
 
   useEffect(() => {
