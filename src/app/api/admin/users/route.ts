@@ -31,18 +31,6 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Doppelt-Anlegen verhindern: wenn die Email schon einen Auth-User
-  // hat, klare Fehlermeldung statt 500. Tritt typischerweise auf wenn
-  // jemand schon angelegt + spaeter wieder versucht wurde.
-  const { data: existingAuth } = await admin.auth.admin.listUsers();
-  const exists = existingAuth?.users?.some((u) => u.email?.toLowerCase() === email);
-  if (exists) {
-    return NextResponse.json(
-      { success: false, error: `Es gibt bereits einen Benutzer mit Email ${email}` },
-      { status: 400 },
-    );
-  }
-
   // Rolle muss in der roles-Tabelle existieren — sonst kann der User
   // spaeter nicht aufgeloest werden.
   const { data: roleRow } = await admin.from("roles").select("slug").eq("slug", requestedRole).single();
@@ -63,8 +51,14 @@ export async function POST(request: Request) {
     user_metadata: { full_name, role },
   });
   if (createErr || !created.user) {
+    // Email schon registriert → klarere Meldung statt Supabase-Default-Text
+    const msg = createErr?.message ?? "User-Erstellung fehlgeschlagen";
+    const friendlier = /already (been )?registered|already exists|duplicate/i.test(msg)
+      ? `Es gibt bereits einen Benutzer mit Email ${email}`
+      : msg;
+    logError("admin.users.create.auth", createErr, { email });
     return NextResponse.json(
-      { success: false, error: createErr?.message ?? "User-Erstellung fehlgeschlagen" },
+      { success: false, error: friendlier },
       { status: 400 },
     );
   }
