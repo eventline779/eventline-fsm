@@ -92,8 +92,16 @@ export default function TicketsPage() {
 
     const term = search.trim();
     if (term.length > 0) {
-      const like = `%${term}%`;
-      q = q.or(`title.ilike.${like},description.ilike.${like}`);
+      // Wenn das Such-Feld wie eine Nummer aussieht (z.B. '1042' oder 'T-1042'),
+      // dann auf ticket_number filtern statt auf Titel/Beschreibung.
+      const numMatch = term.match(/^[Tt][-_]?(\d+)$|^(\d+)$/);
+      if (numMatch) {
+        const num = parseInt(numMatch[1] ?? numMatch[2] ?? "", 10);
+        if (Number.isFinite(num)) q = q.eq("ticket_number", num);
+      } else {
+        const like = `%${term}%`;
+        q = q.or(`title.ilike.${like},description.ilike.${like}`);
+      }
     }
 
     const { data } = await q;
@@ -142,7 +150,7 @@ export default function TicketsPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Titel oder Beschreibung…"
+            placeholder="Titel, Beschreibung oder T-Nummer…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 bg-card"
