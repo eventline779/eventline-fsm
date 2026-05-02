@@ -44,6 +44,25 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  // Pre-Check: existiert die Email schon? profiles.email hat einen
+  // UNIQUE-Index, der "Wahrheits-Quelle" fuer "User existiert" ist.
+  // Vorher ohne den Check gab der Auth-Trigger einen cryptic "Internal
+  // Server Error" weil der INSERT in profiles wegen email-unique scheiterte.
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id, email, is_active")
+    .eq("email", email)
+    .maybeSingle();
+  if (existing) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Es gibt bereits einen Benutzer mit Email ${email}${existing.is_active ? "" : " (deaktiviert)"}. Falls Passwort-Reset gewünscht, nutze den "Passwort zurücksetzen"-Knopf in der User-Liste.`,
+      },
+      { status: 400 },
+    );
+  }
+
   // Rolle muss in der roles-Tabelle existieren — sonst kann der User
   // spaeter nicht aufgeloest werden.
   const { data: roleRow } = await admin.from("roles").select("slug").eq("slug", requestedRole).single();
