@@ -190,8 +190,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <nav
             className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]"
             style={{
-              maskImage: "linear-gradient(to bottom, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)",
-              WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)",
+              maskImage: "linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 64px), transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 64px), transparent 100%)",
             }}
           >
             {groups.map((group) => {

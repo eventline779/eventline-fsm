@@ -69,8 +69,8 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
       <nav
         className="flex-1 px-3 py-4 overflow-y-auto space-y-4"
         style={{
-          maskImage: "linear-gradient(to bottom, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)",
+          maskImage: "linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 64px), transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 64px), transparent 100%)",
         }}
       >
         {groups.map((group) => {
