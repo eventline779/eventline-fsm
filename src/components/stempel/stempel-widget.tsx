@@ -117,18 +117,20 @@ export function StempelWidget() {
               onMouseLeave={() => { setHovered(false); setPressed(false); }}
               onMouseDown={() => setPressed(true)}
               onMouseUp={() => setPressed(false)}
-              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full bg-green-600 text-white shadow-lg shadow-green-500/30"
+              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full"
               style={{
-                transform: pressed ? "scale(0.95)" : hovered ? "scale(1.1) translateY(-4px)" : "scale(1) translateY(0)",
-                transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms cubic-bezier(0.4,0,0.2,1), background-color 200ms",
-                boxShadow: hovered ? "0 20px 40px -10px rgba(34,197,94,0.5)" : "0 10px 20px -5px rgba(34,197,94,0.3)",
-                backgroundColor: hovered ? "rgb(21,128,61)" : "rgb(22,163,74)",
+                transform: pressed ? "scale(0.95)" : hovered ? "scale(1.05) translateY(-2px)" : "scale(1) translateY(0)",
+                transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms, border-color 200ms",
+                backgroundColor: hovered ? "rgba(34,197,94,0.18)" : "rgba(34,197,94,0.10)",
+                border: `1px solid ${hovered ? "rgba(34,197,94,0.5)" : "rgba(34,197,94,0.32)"}`,
+                color: "rgb(21,128,61)",
+                boxShadow: hovered ? "0 8px 20px -6px rgba(34,197,94,0.25)" : "0 3px 10px -3px rgba(34,197,94,0.15)",
               }}
               aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details oeffnen"}
             >
               <span className="relative flex">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-500 opacity-50" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
               </span>
               <span className="font-mono text-sm font-semibold tabular-nums">
                 {formatStempelDuration(active.clock_in, now)}
