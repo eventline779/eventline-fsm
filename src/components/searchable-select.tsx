@@ -191,7 +191,7 @@ export function SearchableSelect({
           left: pos.left,
           width: pos.width,
         }}
-        className="z-[100] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
+        className="z-[1200] rounded-xl border bg-popover shadow-lg max-h-72 overflow-y-auto p-1"
       >
         {filtered.length === 0 && !showCreateOption ? (
           <li className="px-3 py-2 text-sm text-muted-foreground">
