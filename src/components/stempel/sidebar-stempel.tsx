@@ -72,10 +72,10 @@ export function SidebarStempel() {
               transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, border-color 180ms",
               border: stopHovered
                 ? "1px solid rgba(220,38,38,0.5)"
-                : `1px solid ${hovered ? "rgba(34,197,94,0.5)" : "rgba(34,197,94,0.32)"}`,
+                : `1px solid ${hovered ? "rgba(0,168,107,0.5)" : "rgba(0,168,107,0.32)"}`,
               backgroundColor: stopHovered
                 ? "rgba(220,38,38,0.10)"
-                : (hovered ? "rgba(34,197,94,0.14)" : "rgba(34,197,94,0.08)"),
+                : (hovered ? "rgba(0,168,107,0.14)" : "rgba(0,168,107,0.08)"),
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); setPressed(false); }}
@@ -93,11 +93,11 @@ export function SidebarStempel() {
               <span className="relative flex shrink-0">
                 <span
                   className="animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-50"
-                  style={{ backgroundColor: stopHovered ? "rgb(239,68,68)" : "rgb(34,197,94)" }}
+                  style={{ backgroundColor: stopHovered ? "rgb(239,68,68)" : "rgb(0,168,107)" }}
                 />
                 <span
                   className="relative inline-flex h-2 w-2 rounded-full"
-                  style={{ backgroundColor: stopHovered ? "rgb(239,68,68)" : "rgb(34,197,94)" }}
+                  style={{ backgroundColor: stopHovered ? "rgb(239,68,68)" : "rgb(0,168,107)" }}
                 />
               </span>
               <div className="flex-1 min-w-0">
@@ -120,8 +120,8 @@ export function SidebarStempel() {
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-medium"
               style={{
                 transition: "background-color 180ms, color 180ms, border-color 180ms",
-                borderTop: `1px solid ${stopHovered ? "rgba(220,38,38,0.35)" : "rgba(34,197,94,0.25)"}`,
-                backgroundColor: stopHovered ? "rgba(220,38,38,0.18)" : "rgba(34,197,94,0.06)",
+                borderTop: `1px solid ${stopHovered ? "rgba(220,38,38,0.35)" : "rgba(0,168,107,0.25)"}`,
+                backgroundColor: stopHovered ? "rgba(220,38,38,0.18)" : "rgba(0,168,107,0.06)",
                 color: stopHovered ? "rgb(185,28,28)" : "rgb(22,101,52)",
               }}
             >
@@ -141,9 +141,9 @@ export function SidebarStempel() {
             style={{
               transform: pressed ? "scale(0.99)" : hovered ? "scale(1.015)" : "scale(1)",
               transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, color 180ms, border-color 180ms",
-              backgroundColor: hovered ? "rgba(34,197,94,0.15)" : "rgba(34,197,94,0.08)",
+              backgroundColor: hovered ? "rgba(0,168,107,0.15)" : "rgba(0,168,107,0.08)",
               color: hovered ? "rgb(21,128,61)" : "rgb(22,163,74)",
-              borderColor: hovered ? "rgba(34,197,94,0.6)" : "rgba(34,197,94,0.35)",
+              borderColor: hovered ? "rgba(0,168,107,0.6)" : "rgba(0,168,107,0.35)",
             }}
           >
             <Clock className="h-4 w-4" />

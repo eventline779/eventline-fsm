@@ -74,9 +74,15 @@ export function StempelWidget() {
           <div className="flex flex-col items-end gap-2">
             {/* Expand-Card mit Details */}
             {expanded && (
-              <div className="bg-card border border-green-500/40 rounded-xl p-3 shadow-2xl min-w-[260px] max-w-[320px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div
+                className="bg-card rounded-xl p-3 shadow-2xl min-w-[260px] max-w-[320px] animate-in fade-in slide-in-from-bottom-2 duration-200"
+                style={{ border: "1px solid rgba(0,168,107,0.4)" }}
+              >
                 <div className="flex items-start gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-green-500/15 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: "rgba(0,168,107,0.15)", color: "rgb(0,168,107)" }}
+                  >
                     {active.job_id ? <Briefcase className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -121,16 +127,16 @@ export function StempelWidget() {
               style={{
                 transform: pressed ? "scale(0.95)" : hovered ? "scale(1.05) translateY(-2px)" : "scale(1) translateY(0)",
                 transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms, border-color 200ms",
-                backgroundColor: hovered ? "rgba(34,197,94,0.18)" : "rgba(34,197,94,0.10)",
-                border: `1px solid ${hovered ? "rgba(34,197,94,0.5)" : "rgba(34,197,94,0.32)"}`,
+                backgroundColor: hovered ? "rgba(0,168,107,0.18)" : "rgba(0,168,107,0.10)",
+                border: `1px solid ${hovered ? "rgba(0,168,107,0.5)" : "rgba(0,168,107,0.32)"}`,
                 color: "rgb(21,128,61)",
-                boxShadow: hovered ? "0 8px 20px -6px rgba(34,197,94,0.25)" : "0 3px 10px -3px rgba(34,197,94,0.15)",
+                boxShadow: hovered ? "0 8px 20px -6px rgba(0,168,107,0.25)" : "0 3px 10px -3px rgba(0,168,107,0.15)",
               }}
               aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details oeffnen"}
             >
               <span className="relative flex">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-500 opacity-50" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-50" style={{ backgroundColor: "rgb(0,168,107)" }} />
+                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: "rgb(0,168,107)" }} />
               </span>
               <span className="font-mono text-sm font-semibold tabular-nums">
                 {formatStempelDuration(active.clock_in, now)}
@@ -151,7 +157,7 @@ export function StempelWidget() {
               transform: pressed ? "scale(0.95)" : hovered ? "scale(1.1) translateY(-4px)" : "scale(1) translateY(0)",
               transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms cubic-bezier(0.4,0,0.2,1), border-color 200ms",
               boxShadow: hovered ? "0 20px 40px -10px rgba(0,0,0,0.25)" : "0 10px 20px -5px rgba(0,0,0,0.15)",
-              border: hovered ? "2px solid rgb(34,197,94)" : "2px solid var(--border)",
+              border: hovered ? "2px solid rgb(0,168,107)" : "2px solid var(--border)",
             }}
             aria-label="Einstempeln"
           >
