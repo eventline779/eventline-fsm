@@ -45,10 +45,6 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
     if (href.includes("?")) {
       return fullUrl === href;
     }
-    // For /einstellungen without params, only active if no tab param
-    if (href === "/einstellungen") {
-      return pathname === "/einstellungen" && !searchParams.get("tab");
-    }
     // Top-level singletons: exact match only, so deeper paths don't bleed into the highlight.
     if (href === "/dashboard" || href === "/kalender") return pathname === href;
     if (pathname.startsWith(href)) return true;

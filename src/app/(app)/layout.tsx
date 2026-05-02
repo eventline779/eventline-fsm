@@ -204,11 +204,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     const fullUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
                     const isActive = item.href.includes("?")
                       ? fullUrl === item.href
-                      : item.href === "/einstellungen"
-                        ? pathname === "/einstellungen" && !searchParams.get("tab")
-                        : item.href === "/dashboard" || item.href === "/kalender"
-                          ? pathname === item.href
-                          : pathname.startsWith(item.href);
+                      : item.href === "/dashboard" || item.href === "/kalender"
+                        ? pathname === item.href
+                        : pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.href}
