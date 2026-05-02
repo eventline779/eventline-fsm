@@ -143,8 +143,9 @@ export default function TicketsPage() {
         </div>
       </div>
 
-      {/* Filter-Bar */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      {/* Filter-Bar — px-4 matcht das Inner-Padding der Cards damit die
+          Spalten-Anfaenge in Filter-Bar und Cards exakt aligned sind. */}
+      <div className="flex flex-col sm:flex-row gap-2 px-4">
         {/* Suche Nummer */}
         <div className="relative w-full sm:w-44">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
@@ -238,7 +239,7 @@ export default function TicketsPage() {
             return (
               <Link key={t.id} href={`/tickets/${t.id}`} className="block">
                 <Card className="card-hover bg-card">
-                  <CardContent className="px-4 py-2 flex items-center gap-3 text-left">
+                  <CardContent className="px-4 py-2 flex items-center gap-2 text-left">
                     {/* Spalte 1 — Nummer (linksbuendig, matcht Filter-Bar Nummer-Suche) */}
                     <div className="shrink-0 sm:w-44 flex items-center gap-2">
                       <span className="font-mono text-xs font-semibold text-muted-foreground">T-{t.ticket_number}</span>
