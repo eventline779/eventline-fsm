@@ -21,8 +21,12 @@ export default function EinstellungenPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab) ? urlTab : "integrationen");
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Default = "team" weil das der erste sichtbare Tab fuer Admin ist
+  // (Reihenfolge: Team → Rollen → Integrationen → Backup). Fuer Non-Admin
+  // wird unten via useEffect auf "integrationen" umgeleitet sobald der
+  // Admin-Status geladen ist.
+  const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab) ? urlTab : "team");
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   // Tab-Wechsel: state = sofortige UI-Quelle, URL parallel updaten via
   // History-API damit Hard-Reload den gleichen Tab zeigt. Wir umgehen
@@ -41,11 +45,20 @@ export default function EinstellungenPage() {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      setIsAdmin(profile?.role === "admin");
+      const admin = profile?.role === "admin";
+      setIsAdmin(admin);
+      // Non-Admin auf einem Admin-only-Tab → auf integrationen umlenken,
+      // sonst sieht er einen leeren Tab.
+      if (!admin && (tab === "team" || tab === "rollen")) {
+        selectTab("integrationen");
+      }
     })();
-  }, [supabase]);
+  }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function exportTable(table: string, label: string) {
     const { data, error } = await supabase.from(table).select("*");
