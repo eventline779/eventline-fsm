@@ -1,12 +1,14 @@
 // POST /api/admin/users/[id]/reset-password — schickt einen Passwort-
-// Reset-Link an die Mail-Adresse des Users. Klickt der User darauf, landet
-// er auf /passwort-reset und kann sich selbst ein neues Passwort setzen.
+// Reset-Link an die Mail-Adresse des Users via Resend (zuverlaessiger
+// als Supabase's Default-Mailer). Klickt der User darauf, landet er auf
+// /passwort-reset und kann sich selbst ein neues Passwort setzen.
 // Admin sieht das Passwort nie.
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/api-auth";
-import { appUrl } from "@/lib/app-url";
+import { sendSetupMail } from "../../route";
+import { logError } from "@/lib/log";
 
 export async function POST(
   _request: Request,
@@ -15,12 +17,21 @@ export async function POST(
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    return NextResponse.json(
+      { success: false, error: "Server-Konfiguration unvollstaendig" },
+      { status: 500 },
+    );
+  }
+
   const { id } = await params;
   const admin = createAdminClient();
 
   const { data: profile, error: profErr } = await admin
     .from("profiles")
-    .select("email")
+    .select("email, full_name")
     .eq("id", id)
     .single();
 
@@ -28,11 +39,18 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Profil nicht gefunden" }, { status: 404 });
   }
 
-  const { error } = await admin.auth.resetPasswordForEmail(profile.email, {
-    redirectTo: appUrl("/passwort-reset"),
+  const result = await sendSetupMail({
+    supabaseUrl,
+    serviceKey,
+    email: profile.email,
+    fullName: profile.full_name ?? profile.email,
   });
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (!result.success) {
+    logError("admin.users.reset-password", { error: result.error }, { email: profile.email });
+    return NextResponse.json(
+      { success: false, error: result.error ?? "Reset-Mail konnte nicht versendet werden" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ success: true, email: profile.email });

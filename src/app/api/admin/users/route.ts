@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/api-auth";
 import { appUrl } from "@/lib/app-url";
@@ -133,24 +134,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: profileErr.message }, { status: 500 });
   }
 
-  // 3. Reset-Mail senden — User klickt drauf, landet auf /passwort-reset
-  //    und setzt sich sein eigenes Passwort. Auch hier direkt per fetch
-  //    (recover-Endpoint) — robuster als das SDK.
-  const recoverRes = await fetch(`${supabaseUrl}/auth/v1/recover`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify({ email, redirect_to: appUrl("/passwort-reset") }),
-  });
-  if (!recoverRes.ok) {
-    const errBody = await recoverRes.json().catch(() => ({}));
-    logError("admin.users.create.reset", errBody, { email });
-    // User ist angelegt — Admin kann nochmal "Passwort zuruecksetzen"
-    // klicken um die Mail erneut zu schicken. Nur loggen, nicht abbrechen.
-  }
+  // 3. Setup-Mail mit Reset-Link via Resend — Supabase's Default-Mailer
+  //    ist unzuverlaessig (Rate-Limit, Spam-Filter). Wir generieren den
+  //    Recovery-Link via Auth-Admin-API und schicken die Mail dann selbst
+  //    ueber Resend, das die App eh schon fuer Termin-Mails nutzt.
+  await sendSetupMail({ supabaseUrl, serviceKey, email, fullName: full_name });
 
   return NextResponse.json({ success: true, user_id: created.id });
   } catch (err) {
@@ -159,5 +147,85 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Anlegen";
     logError("admin.users.create.exception", err);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}
+
+// Generiert via Auth-Admin-API einen Recovery-Link und schickt eine
+// Setup-Mail via Resend (zuverlaessiger als Supabase's Default-Mailer).
+// Bei Fehler nur loggen — User ist im Auth-System schon angelegt, der
+// Admin kann den Reset bei Bedarf ueber den "Passwort zuruecksetzen"-
+// Button erneut ausloesen.
+export async function sendSetupMail(opts: {
+  supabaseUrl: string;
+  serviceKey: string;
+  email: string;
+  fullName: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const { supabaseUrl, serviceKey, email, fullName } = opts;
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    logError("admin.users.setupmail.no-resend-key", null, { email });
+    return { success: false, error: "RESEND_API_KEY fehlt" };
+  }
+
+  // Recovery-Link generieren via Auth-Admin-API (direkter fetch).
+  const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({
+      type: "recovery",
+      email,
+      options: { redirect_to: appUrl("/passwort-reset") },
+    }),
+  });
+  if (!linkRes.ok) {
+    const body = await linkRes.text().catch(() => "");
+    logError("admin.users.setupmail.link", { status: linkRes.status, body }, { email });
+    return { success: false, error: `Link-Generation fehlgeschlagen: ${body}` };
+  }
+  const linkData = await linkRes.json() as {
+    properties?: { action_link?: string };
+    action_link?: string;
+  };
+  const actionLink = linkData.properties?.action_link ?? linkData.action_link;
+  if (!actionLink) {
+    logError("admin.users.setupmail.no-link", linkData, { email });
+    return { success: false, error: "Kein action_link in der Antwort" };
+  }
+
+  // Mail ueber Resend schicken — gleiche Optik wie restliche App-Mails.
+  const resend = new Resend(resendKey);
+  try {
+    await resend.emails.send({
+      from: "EVENTLINE FSM <noreply@eventline-basel.com>",
+      to: email,
+      subject: "Willkommen bei EVENTLINE — Passwort setzen",
+      html: `
+        <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto">
+          <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+            <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
+          </div>
+          <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+            <p style="margin:0 0 12px">Hallo ${fullName},</p>
+            <p style="margin:0 0 16px">Ein Admin hat dich bei EVENTLINE FSM hinzugefügt. Klicke auf den Button um dein Passwort zu setzen und dich einzuloggen:</p>
+            <p style="margin:0 0 16px;text-align:center">
+              <a href="${actionLink}" style="display:inline-block;background:#dc2626;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600">Passwort setzen</a>
+            </p>
+            <p style="margin:0 0 8px;color:#999;font-size:13px">Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:</p>
+            <p style="margin:0 0 16px;color:#666;font-size:12px;word-break:break-all">${actionLink}</p>
+            <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+            <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
+          </div>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (err) {
+    logError("admin.users.setupmail.send", err, { email });
+    return { success: false, error: err instanceof Error ? err.message : "Resend-Fehler" };
   }
 }
