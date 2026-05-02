@@ -304,16 +304,16 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
               <button
                 type="button"
                 onClick={() => setUrgent((u) => !u)}
-                data-tooltip={urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
                 aria-pressed={urgent}
                 aria-label="Dringend markieren"
-                className={`inline-flex items-center justify-center h-7 w-7 rounded-md transition-all ${
+                className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[11px] font-medium transition-all ${
                   urgent
                     ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
                     : "text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10"
                 }`}
               >
-                <AlertCircle className="h-4 w-4" strokeWidth={urgent ? 2.5 : 2} />
+                <AlertCircle className="h-3.5 w-3.5" strokeWidth={urgent ? 2.5 : 2} />
+                Dringend
               </button>
             </div>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
