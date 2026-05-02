@@ -662,18 +662,21 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* Beschreibung — universal */}
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground/70 ml-1">
-              {type === "it" ? "Problem-Beschreibung *" : "Beschreibung / Notiz"}
-            </p>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
-            />
-          </div>
+          {/* Beschreibung / Notiz — universal, ausser bei Stempel-Aenderung
+              (dort gibt's schon das Pflicht-Feld 'Grund der Aenderung'). */}
+          {type !== "stempel_aenderung" && (
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">
+                {type === "it" ? "Problem-Beschreibung *" : "Beschreibung / Notiz"}
+              </p>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
+              />
+            </div>
+          )}
 
           {/* File-Upload — nur fuer nicht-Beleg-Types (Beleg hat ihn oben). */}
           {type !== "beleg" && fileUploadBlock}
