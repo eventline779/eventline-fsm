@@ -36,59 +36,84 @@ export async function POST(request: Request) {
   const { data: roleRow } = await admin.from("roles").select("slug").eq("slug", requestedRole).single();
   const role = roleRow?.slug ?? "techniker";
 
-  // 1. Auth-User anlegen. email_confirm:true ueberspringt die Email-
-  //    Bestaetigung. Random-Passwort weil's der User eh per Reset-Link
-  //    selbst setzt. WICHTIG: full_name UND role landen via user_metadata
-  //    in raw_user_meta_data — der Postgres-Trigger handle_new_user()
-  //    feuert auf jedem auth.users-Insert und legt dann eigenstaendig
-  //    eine profiles-Row mit diesen Werten an. Wuerden wir hier noch
-  //    eine zweite profiles.insert() machen, gaebe es einen PK-Konflikt.
+  // 1. Auth-User anlegen. Wir umgehen das supabase-js SDK und rufen die
+  //    Auth-Admin-API direkt per fetch — das SDK ist im Next.js-Server-
+  //    Runtime mit "AuthApiError: Internal Server Error" gescheitert,
+  //    obwohl derselbe Payload direkt per curl gegen Supabase funktioniert.
+  //    Direkter Fetch ist robuster, weniger Schichten dazwischen.
+  //    email_confirm:true → keine Bestaetigungsmail; Random-Passwort weil
+  //    der User's eh per Reset-Link selbst setzt.
+  //    WICHTIG: full_name + role landen via user_metadata in der
+  //    raw_user_meta_data — der Postgres-Trigger handle_new_user() liest
+  //    das aus und legt damit selbst die profiles-Row an.
   const tempPassword = crypto.randomUUID() + "-" + crypto.randomUUID();
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: { full_name, role },
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name, role },
+    }),
   });
-  if (createErr || !created.user) {
-    // Email schon registriert → klarere Meldung statt Supabase-Default-Text
-    const msg = createErr?.message ?? "User-Erstellung fehlgeschlagen";
-    const friendlier = /already (been )?registered|already exists|duplicate/i.test(msg)
+
+  if (!authRes.ok) {
+    const errBody = await authRes.json().catch(() => ({ msg: "Unbekannter Fehler" }));
+    const msg = (errBody as { msg?: string; message?: string }).msg
+            ?? (errBody as { msg?: string; message?: string }).message
+            ?? "User-Erstellung fehlgeschlagen";
+    const friendlier = /already (been )?registered|already exists|duplicate|email_exists/i.test(msg)
       ? `Es gibt bereits einen Benutzer mit Email ${email}`
       : msg;
-    logError("admin.users.create.auth", createErr, { email });
-    return NextResponse.json(
-      { success: false, error: friendlier },
-      { status: 400 },
-    );
+    logError("admin.users.create.auth", { status: authRes.status, body: errBody }, { email });
+    return NextResponse.json({ success: false, error: friendlier }, { status: 400 });
   }
 
+  const created = await authRes.json() as { id: string; email: string };
+
   // 2. Sicherheitshalber das Profil nachschaerfen — falls der Trigger
-  //    aus irgendeinem Grund die Rolle nicht uebernommen hat, oder der
-  //    Trigger irgendwann anders aussieht. Idempotent: setzt nur was
-  //    der Trigger bereits gesetzt hat oder noch fehlt.
+  //    die Rolle nicht uebernommen hat. Idempotent.
   const { error: profileErr } = await admin
     .from("profiles")
     .update({ role, full_name, is_active: true })
-    .eq("id", created.user.id);
+    .eq("id", created.id);
   if (profileErr) {
-    await admin.auth.admin.deleteUser(created.user.id);
+    // Cleanup falls Update fehlschlaegt — aber via direkten Auth-API-Call.
+    await fetch(`${supabaseUrl}/auth/v1/admin/users/${created.id}`, {
+      method: "DELETE",
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
     logError("admin.users.create.profile-update", profileErr, { email });
     return NextResponse.json({ success: false, error: profileErr.message }, { status: 500 });
   }
 
-  // 3. Reset-Mail senden — der User klickt darauf, landet auf /passwort-reset
-  //    und setzt sich sein eigenes Passwort.
-  const { error: resetErr } = await admin.auth.resetPasswordForEmail(email, {
-    redirectTo: appUrl("/passwort-reset"),
+  // 3. Reset-Mail senden — User klickt drauf, landet auf /passwort-reset
+  //    und setzt sich sein eigenes Passwort. Auch hier direkt per fetch
+  //    (recover-Endpoint) — robuster als das SDK.
+  const recoverRes = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({ email, redirect_to: appUrl("/passwort-reset") }),
   });
-  if (resetErr) {
-    // User ist trotzdem angelegt — Admin kann nochmal "Passwort zuruecksetzen"
+  if (!recoverRes.ok) {
+    const errBody = await recoverRes.json().catch(() => ({}));
+    logError("admin.users.create.reset", errBody, { email });
+    // User ist angelegt — Admin kann nochmal "Passwort zuruecksetzen"
     // klicken um die Mail erneut zu schicken. Nur loggen, nicht abbrechen.
-    logError("admin.users.create.reset", resetErr, { email });
   }
 
-  return NextResponse.json({ success: true, user_id: created.user.id });
+  return NextResponse.json({ success: true, user_id: created.id });
   } catch (err) {
     // Statt generic 500 → konkrete Meldung zurueck. Hilft beim Debugging
     // von Edge-Cases (Service-Role-Key falsch, Trigger-Konflikte, etc.)
