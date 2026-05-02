@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { GraduationCap, CheckSquare, Clock } from "lucide-react";
+import { GraduationCap, CheckSquare, Clock, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface HRSection {
@@ -21,6 +21,7 @@ interface HRSection {
 const sections: HRSection[] = [
   { href: "/todos", label: "Todos", description: "Persönliche Aufgaben verwalten", icon: CheckSquare, color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400" },
   { href: "/stempelzeiten", label: "Stempelzeiten", description: "Arbeitszeit-Erfassung pro Auftrag", icon: Clock, color: "bg-green-50 text-green-600 dark:bg-green-500/15 dark:text-green-400" },
+  { href: "/tickets", label: "Tickets", description: "IT, Belege, Stempel-Änderungen, Material", icon: Ticket, color: "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400" },
   { href: "/schulungen", label: "Schulungen", description: "Schulungen und Weiterbildungen", icon: GraduationCap, color: "bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400" },
 ];
 
