@@ -188,26 +188,23 @@ export default function TicketsPage() {
             return (
               <Link key={t.id} href={`/tickets/${t.id}`} className="block">
                 <Card className="card-hover bg-card">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${typeMeta.color}`}>
-                      <Icon className="h-4 w-4" />
+                  <CardContent className="px-4 py-1.5 flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+                      <Icon className="h-3.5 w-3.5" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span className="font-medium text-sm truncate">{t.title}</span>
                         <span className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
                           {STATUS_META[t.status].label}
                         </span>
-                        {t.priority !== "normal" && (
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            · {t.priority}
+                        {t.priority === "dringend" && (
+                          <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                            Dringend
                           </span>
                         )}
                       </div>
-                      {t.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{t.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1 flex-wrap">
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
                         <span>{typeMeta.label}</span>
                         <span>·</span>
                         <span>{t.creator?.full_name ?? "—"}</span>
