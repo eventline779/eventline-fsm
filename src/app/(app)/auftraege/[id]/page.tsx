@@ -30,6 +30,7 @@ import { BexioButton } from "@/components/bexio-button";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { AppointmentsSection } from "@/components/auftrag/appointments-section";
 import { RapportFormModal } from "@/components/auftrag/rapport-form-modal";
+import { HoursAuditCard } from "@/components/auftrag/hours-audit-card";
 import { JobStempelButton } from "@/components/stempel/job-stempel-button";
 import { usePermissions } from "@/lib/use-permissions";
 
@@ -46,6 +47,19 @@ export default function AuftragDetailPage() {
   const [documents, setDocuments] = useState<DocType[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<ReportWithCreator[]>([]);
+
+  // Stundenkontrolle (admin-only): pro Mitarbeiter Stempel- vs Rapport-
+  // Stunden und die Differenz. Geladen via SECURITY-DEFINER-RPC, das
+  // intern den is_admin()-Check macht. Bei Non-Admin bleibt audit leer.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [audit, setAudit] = useState<Array<{
+    user_id: string;
+    user_name: string;
+    stempel_minutes: number;
+    rapport_minutes: number;
+    diff_minutes: number;
+  }>>([]);
+
   const [uploading, setUploading] = useState(false);
   const [showRapportModal, setShowRapportModal] = useState(false);
   // Auftrag stammt aus einer Instandhaltung (FK maintenance_tasks.job_id).
@@ -113,6 +127,25 @@ export default function AuftragDetailPage() {
     if (docRes.data) setDocuments(docRes.data as DocType[]);
     if (profRes.data) setProfiles(profRes.data as Profile[]);
     if (repRes.data) setReports(repRes.data as unknown as ReportWithCreator[]);
+
+    // Admin-Status pruefen — bestimmt ob die Stundenkontrolle-Card angezeigt
+    // wird und ob der RPC-Call sinnvoll ist (Non-Admin bekaeme 403).
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      const admin = profileRow?.role === "admin";
+      setIsAdmin(admin);
+      if (admin) {
+        const { data: auditRows } = await supabase.rpc("get_job_hours_audit", {
+          p_job_id: id,
+        });
+        setAudit((auditRows as typeof audit) ?? []);
+      }
+    }
   }
 
   // Notizen autosave: 800ms nach letzter Aenderung in DB schreiben.
@@ -592,6 +625,10 @@ export default function AuftragDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Stundenkontrolle — Stempel- vs Rapport-Stunden pro Mitarbeiter.
+          Admin-only, wird via SECURITY-DEFINER-RPC geladen. */}
+      {isAdmin && audit.length > 0 && <HoursAuditCard rows={audit} />}
 
       {/* Dokumente / PDFs */}
       <Card className="bg-card">
