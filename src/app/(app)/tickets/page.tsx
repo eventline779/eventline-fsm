@@ -123,41 +123,21 @@ export default function TicketsPage() {
             IT-Probleme · Belege · Stempel-Änderungen · Material-Anfragen
           </p>
         </div>
-        <button type="button" onClick={() => setShowNew(true)} className="kasten kasten-red">
-          <Plus className="h-3.5 w-3.5" />Neues Ticket
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowArchive((v) => !v)}
+            className={showArchive ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Archiv
+          </button>
+          <button type="button" onClick={() => setShowNew(true)} className="kasten kasten-red">
+            <Plus className="h-3.5 w-3.5" />Neues Ticket
+          </button>
+        </div>
       </div>
 
       {/* Filter-Bar */}
-      <div className="flex flex-wrap gap-2">
-        {(["offen", "erledigt", "abgelehnt", "alle"] as FilterStatus[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setFilterStatus(s)}
-            className={filterStatus === s ? "kasten-active" : "kasten-toggle-off"}
-          >
-            {s === "alle" ? "Alle" : STATUS_META[s].label}
-          </button>
-        ))}
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setShowOnlyMine((v) => !v)}
-            className={showOnlyMine ? "kasten-active" : "kasten-toggle-off"}
-          >
-            Nur meine
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setShowArchive((v) => !v)}
-          className={showArchive ? "kasten-active" : "kasten-toggle-off"}
-        >
-          Archiv
-        </button>
-      </div>
-
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -168,7 +148,22 @@ export default function TicketsPage() {
             className="pl-10 bg-card"
           />
         </div>
-        <div className="w-full sm:w-48">
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterStatus}
+            onChange={(v) => setFilterStatus(v as FilterStatus)}
+            items={[
+              { id: "offen", label: "Offen" },
+              { id: "erledigt", label: "Erledigt" },
+              { id: "abgelehnt", label: "Abgelehnt" },
+              { id: "alle", label: "Alle Status" },
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterStatus !== "offen"}
+          />
+        </div>
+        <div className="w-full sm:w-44">
           <SearchableSelect
             value={filterType}
             onChange={(v) => setFilterType(v as FilterType)}
@@ -184,6 +179,15 @@ export default function TicketsPage() {
             active={filterType !== "alle"}
           />
         </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowOnlyMine((v) => !v)}
+            className={showOnlyMine ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Nur meine
+          </button>
+        )}
       </div>
 
       {/* Liste */}
