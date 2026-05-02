@@ -384,6 +384,26 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   const modalTitle = step === "pick" ? "Neues Ticket" : `${TYPES.find((t) => t.id === type)?.label}`;
   const typeMeta = type ? TYPES.find((t) => t.id === type) : null;
 
+  // datetime-local-Strings ('YYYY-MM-DDTHH:MM') in Datum + Uhrzeit
+  // splitten — fuer separate <input type=date> und <input type=time>.
+  // Vorteil ggue. type=datetime-local: Datum direkt tippbar (DD.MM.YYYY)
+  // oder via Calendar-Picker, Zeit ohne den klobigen kombinierten Picker.
+  const dtDate = (s: string) => (s ? s.split("T")[0] ?? "" : "");
+  const dtTime = (s: string) => (s ? (s.split("T")[1] ?? "").slice(0, 5) : "");
+  const combineDT = (date: string, time: string): string => {
+    if (!date) return "";
+    return `${date}T${time || "00:00"}`;
+  };
+  function setStempelDateTime(field: "neu_start" | "neu_end", part: "date" | "time", value: string) {
+    setStempel((prev) => {
+      const current = prev[field];
+      const next = part === "date"
+        ? combineDT(value, dtTime(current))
+        : combineDT(dtDate(current), value);
+      return { ...prev, [field]: next };
+    });
+  }
+
   // File-Upload-Block — wird fuer Beleg nach OBEN gerendert (nach Title)
   // damit die KI-Analyse die Felder vorausfuellen kann bevor der User
   // ueberhaupt was eintippen muss. Fuer alle anderen Types unten.
@@ -574,11 +594,17 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Start</p>
-                      <Input type="datetime-local" value={stempel.neu_start} onChange={(e) => setStempel({ ...stempel, neu_start: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
+                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-24" />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Ende</p>
-                      <Input type="datetime-local" value={stempel.neu_end} onChange={(e) => setStempel({ ...stempel, neu_end: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
+                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-24" />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -589,11 +615,17 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
-                      <Input type="datetime-local" value={stempel.neu_start} onChange={(e) => setStempel({ ...stempel, neu_start: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
+                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-24" />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
-                      <Input type="datetime-local" value={stempel.neu_end} onChange={(e) => setStempel({ ...stempel, neu_end: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
+                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-24" />
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-1">
