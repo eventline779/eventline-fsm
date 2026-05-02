@@ -403,6 +403,13 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       return { ...prev, [field]: next };
     });
   }
+  // Auto-Format fuer Zeit-Eingabe: User tippt "0830" → "08:30".
+  // Strippt non-digits, fuegt ':' nach 2 Ziffern ein, kappt bei 5 chars.
+  function formatTimeInput(raw: string): string {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  }
 
   // File-Upload-Block — wird fuer Beleg nach OBEN gerendert (nach Title)
   // damit die KI-Analyse die Felder vorausfuellen kann bevor der User
@@ -596,14 +603,14 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Start</p>
                       <div className="flex gap-2">
                         <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-24" />
+                        <Input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5} value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", formatTimeInput(e.target.value))} className="w-24 text-center font-mono" />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Ende</p>
                       <div className="flex gap-2">
                         <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-24" />
+                        <Input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5} value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", formatTimeInput(e.target.value))} className="w-24 text-center font-mono" />
                       </div>
                     </div>
                   </div>
@@ -617,14 +624,14 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
                       <div className="flex gap-2">
                         <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-24" />
+                        <Input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5} value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", formatTimeInput(e.target.value))} className="w-24 text-center font-mono" />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
                       <div className="flex gap-2">
                         <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-24" />
+                        <Input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5} value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", formatTimeInput(e.target.value))} className="w-24 text-center font-mono" />
                       </div>
                     </div>
                   </div>
