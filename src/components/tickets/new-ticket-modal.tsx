@@ -281,28 +281,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
     <Modal open={open} onClose={() => !saving && onClose()} title={modalTitle} size="lg" closable={!saving}>
       {step === "pick" && (
         <div className="grid grid-cols-2 gap-3">
-          {TYPES.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => pickType(t.id)}
-                className="text-left p-4 rounded-xl border-2 border-border hover:border-foreground/30 bg-card hover:bg-muted/30 transition-all"
-              >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
-                  t.tone === "purple" ? "bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400"
-                  : t.tone === "amber" ? "bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                  : t.tone === "blue"  ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                                       : "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400"
-                }`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <p className="font-semibold text-sm">{t.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
-              </button>
-            );
-          })}
+          {TYPES.map((t) => (
+            <TypePickerCard key={t.id} type={t} onPick={() => pickType(t.id)} />
+          ))}
         </div>
       )}
 
@@ -543,5 +524,50 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         </div>
       )}
     </Modal>
+  );
+}
+
+// ---- Sub: ein Typ-Picker-Card mit state-driven Hover/Press-Animation.
+// Tailwind-hover-Variants greifen in dem Projekt nicht zuverlaessig
+// (gleiche Story wie sidebar-stempel/stempel-widget) — daher inline-style.
+function TypePickerCard({
+  type,
+  onPick,
+}: {
+  type: { id: TicketType; label: string; description: string; icon: React.ComponentType<{ className?: string }>; tone: string };
+  onPick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const Icon = type.icon;
+  const iconBg = type.tone === "purple"
+    ? "bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400"
+    : type.tone === "amber"
+      ? "bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
+      : type.tone === "blue"
+        ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
+        : "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400";
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className="text-left p-4 rounded-xl bg-card"
+      style={{
+        transform: pressed ? "scale(0.98)" : hovered ? "scale(1.02)" : "scale(1)",
+        transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, border-color 180ms",
+        border: `2px solid ${hovered ? "color-mix(in oklab, var(--foreground) 35%, transparent)" : "color-mix(in oklab, var(--foreground) 12%, transparent)"}`,
+        backgroundColor: hovered ? "color-mix(in oklab, var(--foreground) 4%, transparent)" : "transparent",
+      }}
+    >
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${iconBg}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="font-semibold text-sm">{type.label}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{type.description}</p>
+    </button>
   );
 }
