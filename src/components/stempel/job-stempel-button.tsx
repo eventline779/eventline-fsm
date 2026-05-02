@@ -54,19 +54,19 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
     );
   }
 
-  // Style 1:1 vom Sidebar-Stempel uebernommen — getoenter Background mit
-  // Border in derselben Akzent-Farbe + Icon in der Vollfarbe. Aktiv (auf
+  // Style 1:1 wie kasten-green / kasten-red: 2px voller Akzent-Border,
+  // 12/22% Background-Tint, Text in Tailwind-Akzent-Klasse. Aktiv (auf
   // diesem Auftrag) = rot, sonst gruen wie das "Einstempeln" in der Sidebar.
   const tones = onSameJob
     ? {
-        bg: hovered ? "rgba(220,38,38,0.15)" : "rgba(220,38,38,0.08)",
-        border: hovered ? "rgba(220,38,38,0.6)" : "rgba(220,38,38,0.35)",
-        icon: hovered ? "rgb(185,28,28)" : "rgb(220,38,38)",
+        bg: hovered ? "rgba(220,38,38,0.22)" : "rgba(220,38,38,0.12)",
+        border: "2px solid var(--status-red, #dc2626)",
+        text: "text-red-700 dark:text-red-300",
       }
     : {
-        bg: hovered ? "rgba(34,197,94,0.15)" : "rgba(34,197,94,0.08)",
-        border: hovered ? "rgba(34,197,94,0.6)" : "rgba(34,197,94,0.35)",
-        icon: hovered ? "rgb(21,128,61)" : "rgb(22,163,74)",
+        bg: hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)",
+        border: "2px solid var(--status-green, #00a86b)",
+        text: "text-green-700 dark:text-green-300",
       };
 
   return (
@@ -79,13 +79,12 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
       onMouseUp={() => setPressed(false)}
       title={onSameJob ? "Ausstempeln" : "Auf diesen Auftrag stempeln"}
       aria-label={onSameJob ? "Ausstempeln" : "Auf diesen Auftrag stempeln"}
-      className="inline-flex items-center justify-center w-9 h-9 rounded-full border shrink-0"
+      className={`inline-flex items-center justify-center w-9 h-9 rounded-full shrink-0 ${tones.text}`}
       style={{
         backgroundColor: tones.bg,
-        borderColor: tones.border,
-        color: tones.icon,
+        border: tones.border,
         transform: pressed ? "scale(0.95)" : hovered ? "scale(1.05)" : "scale(1)",
-        transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms, border-color 180ms, color 180ms",
+        transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 180ms",
       }}
     >
       {onSameJob ? <Square className="h-4 w-4" fill="currentColor" /> : <Clock className="h-4 w-4" />}
