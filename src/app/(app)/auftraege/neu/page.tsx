@@ -345,7 +345,7 @@ function NeuerAuftragPageContent() {
             disabled={saving !== null || fromMaintenance}
             onClick={() => submit("draft")}
             className="kasten kasten-purple flex-1"
-            title={fromMaintenance ? "Instandhaltungs-Aufträge werden direkt erstellt, nicht als Entwurf gespeichert" : undefined}
+            data-tooltip={fromMaintenance ? "Instandhaltungs-Aufträge werden direkt erstellt, nicht als Entwurf gespeichert" : undefined}
           >
             <FileEdit className="h-3.5 w-3.5" />
             {saving === "draft" ? "Speichert…" : "Als Entwurf"}

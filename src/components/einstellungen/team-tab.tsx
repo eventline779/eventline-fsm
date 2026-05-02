@@ -213,7 +213,7 @@ export function TeamTab() {
                     onClick={() => resetPassword(p)}
                     disabled={busyId === p.id || !p.is_active}
                     className="kasten kasten-muted"
-                    title="Passwort zurücksetzen"
+                    data-tooltip="Passwort zurücksetzen"
                   >
                     <KeyRound className="h-3.5 w-3.5" />
                     Reset
@@ -222,7 +222,7 @@ export function TeamTab() {
                     type="button"
                     onClick={() => setEdit({ id: p.id, full_name: p.full_name, role: p.role })}
                     className="kasten kasten-muted"
-                    title="Bearbeiten"
+                    data-tooltip="Bearbeiten"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -231,7 +231,7 @@ export function TeamTab() {
                     onClick={() => toggleActive(p)}
                     disabled={busyId === p.id}
                     className={p.is_active ? "kasten kasten-muted" : "kasten kasten-green"}
-                    title={p.is_active ? "Deaktivieren" : "Reaktivieren"}
+                    data-tooltip={p.is_active ? "Deaktivieren" : "Reaktivieren"}
                   >
                     {p.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                   </button>
@@ -241,7 +241,7 @@ export function TeamTab() {
                       onClick={() => hardDelete(p)}
                       disabled={busyId === p.id}
                       className="kasten kasten-red"
-                      title="Endgültig löschen"
+                      data-tooltip="Endgültig löschen"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

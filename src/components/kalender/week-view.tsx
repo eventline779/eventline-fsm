@@ -160,7 +160,7 @@ export function WeekView({ weekDays, items, shifts }: Props) {
               href={s.href}
               style={{ gridColumn: `${s.startCol + 1} / ${s.endCol + 2}` }}
               className={`min-w-0 my-1 ${ml} ${mr} px-2.5 py-1.5 ${round} text-[11px] font-semibold border ${borderL} ${borderR} ${sty.bg} ${sty.text} truncate hover:shadow-sm transition-all`}
-              title={[s.title, s.customerName, s.locationName].filter(Boolean).join(" · ")}
+              data-tooltip={[s.title, s.customerName, s.locationName].filter(Boolean).join(" · ")}
             >
               <span className="truncate">{s.title}</span>
               {s.locationName && (
@@ -255,12 +255,12 @@ export function WeekView({ weekDays, items, shifts }: Props) {
                             key={s.id}
                             href={s.href}
                             className={`${baseClasses} ${hoverClasses}`}
-                            title={tipText}
+                            data-tooltip={tipText}
                           >
                             {inner}
                           </Link>
                         ) : (
-                          <div key={s.id} className={baseClasses} title={tipText}>
+                          <div key={s.id} className={baseClasses} data-tooltip={tipText}>
                             {inner}
                           </div>
                         );

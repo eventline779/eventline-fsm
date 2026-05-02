@@ -572,7 +572,7 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
                 <button
                   type="submit"
                   disabled={!form.work_description || saving !== null || !canFinish}
-                  title={!canFinish ? finishBlockReason : undefined}
+                  data-tooltip={!canFinish ? finishBlockReason : undefined}
                   className="kasten kasten-red flex-[2]"
                 >
                   <Save className="h-3.5 w-3.5" />

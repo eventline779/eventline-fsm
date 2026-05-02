@@ -482,7 +482,7 @@ export default function AnfrageDetailPage() {
                       type="button"
                       onClick={() => downloadDoc(doc.storage_path, doc.name)}
                       className="kasten kasten-muted"
-                      title="Herunterladen"
+                      data-tooltip="Herunterladen"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
@@ -490,7 +490,7 @@ export default function AnfrageDetailPage() {
                       type="button"
                       onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
                       className="kasten kasten-red"
-                      title="Löschen"
+                      data-tooltip="Löschen"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

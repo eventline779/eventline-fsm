@@ -323,7 +323,7 @@ export default function AuftragDetailPage() {
             {job.was_anfrage && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
-                title="Aus einem Vermietentwurf entstanden"
+                data-tooltip="Aus einem Vermietentwurf entstanden"
               >
                 <Inbox className="h-3 w-3" />
                 Vermietentwurf
@@ -670,7 +670,7 @@ export default function AuftragDetailPage() {
                         type="button"
                         onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
                         className={`kasten kasten-red ${fromMail ? "invisible pointer-events-none" : ""}`}
-                        title="Löschen"
+                        data-tooltip="Löschen"
                         aria-hidden={fromMail || undefined}
                         tabIndex={fromMail ? -1 : undefined}
                       >
@@ -688,7 +688,7 @@ export default function AuftragDetailPage() {
                           }
                         }}
                         className="kasten kasten-muted"
-                        title="Herunterladen"
+                        data-tooltip="Herunterladen"
                       >
                         <Download className="h-3.5 w-3.5" />
                       </button>

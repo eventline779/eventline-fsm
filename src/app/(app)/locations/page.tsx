@@ -312,7 +312,7 @@ export default function OrtePage() {
             type="button"
             onClick={() => { setSearch(""); setFilterType("all"); }}
             className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
-            title="Filter zurücksetzen"
+            data-tooltip="Filter zurücksetzen"
           >
             <X className="h-3.5 w-3.5" />
             Reset

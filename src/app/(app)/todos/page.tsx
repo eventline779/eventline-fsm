@@ -451,7 +451,7 @@ export default function TodosPage() {
             type="button"
             onClick={() => setSearch("")}
             className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
-            title="Suche zurücksetzen"
+            data-tooltip="Suche zurücksetzen"
           >
             <X className="h-3.5 w-3.5" />
             Reset
@@ -497,7 +497,7 @@ export default function TodosPage() {
                         </span>
                       )}
                       {attCount > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0" title={`${attCount} Anhang${attCount === 1 ? "" : "e"}`}>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0" data-tooltip={`${attCount} Anhang${attCount === 1 ? "" : "e"}`}>
                           <Paperclip className="h-3 w-3" />
                           {attCount}
                         </span>

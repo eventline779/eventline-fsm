@@ -306,7 +306,7 @@ export function AppointmentsSection({
                     type="button"
                     onClick={() => setDeleteApptTarget(appt.id)}
                     className="kasten kasten-red"
-                    title="Termin löschen"
+                    data-tooltip="Termin löschen"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Löschen

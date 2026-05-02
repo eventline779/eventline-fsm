@@ -144,7 +144,7 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
           <button
             onClick={onSignOut}
             className="p-2 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all duration-200"
-            title="Abmelden"
+            data-tooltip="Abmelden"
           >
             <LogOut className="h-4 w-4" />
           </button>

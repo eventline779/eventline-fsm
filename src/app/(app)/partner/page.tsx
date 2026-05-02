@@ -251,14 +251,14 @@ export default function PartnerPage() {
                     <button
                       onClick={() => openEdit(p)}
                       className="icon-btn icon-btn-purple"
-                      title="Bearbeiten"
+                      data-tooltip="Bearbeiten"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(p)}
                       className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                      title="Löschen"
+                      data-tooltip="Löschen"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

@@ -317,8 +317,8 @@ export default function StandortDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="icon-btn icon-btn-blue" title="Öffnen"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" title="Löschen"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="icon-btn icon-btn-blue" data-tooltip="Öffnen"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" data-tooltip="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}

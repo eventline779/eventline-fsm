@@ -59,7 +59,7 @@ export function LeadCard({ contact: c, onClick, onDelete }: Props) {
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
             className="icon-btn icon-btn-red opacity-0 group-hover:opacity-100"
-            title="Löschen"
+            data-tooltip="Löschen"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

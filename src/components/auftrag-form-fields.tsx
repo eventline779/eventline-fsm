@@ -166,7 +166,7 @@ export function AuftragFormFields({
           <button
             type="button"
             onClick={() => update("urgent", !form.urgent)}
-            title={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
+            data-tooltip={form.urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
             aria-pressed={form.urgent}
             aria-label="Dringend markieren"
             className={`inline-flex items-center justify-center h-7 w-7 rounded-md transition-all ${

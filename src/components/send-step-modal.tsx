@@ -287,7 +287,7 @@ export function SendStepModal({
                           type="button"
                           onClick={() => removeDoc(d)}
                           className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0"
-                          title="Entfernen"
+                          data-tooltip="Entfernen"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -310,7 +310,7 @@ export function SendStepModal({
                   type="button"
                   onClick={sendMail}
                   disabled={sending || !email.trim() || docs.length === 0}
-                  title={docs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
+                  data-tooltip={docs.length === 0 ? "Bitte zuerst ein Dokument hochladen" : undefined}
                   className="kasten kasten-blue flex-1"
                 >
                   <Send className="h-3.5 w-3.5" />

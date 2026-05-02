@@ -45,7 +45,7 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
       <button
         type="button"
         disabled
-        title="Du bist gerade auf einen anderen Auftrag eingestempelt"
+        data-tooltip="Du bist gerade auf einen anderen Auftrag eingestempelt"
         aria-label="Bereits auf anderen Auftrag eingestempelt"
         className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-muted text-muted-foreground/60 cursor-not-allowed"
       >
@@ -77,7 +77,7 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
       onMouseLeave={() => { setHovered(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
-      title={onSameJob ? "Ausstempeln" : "Auf diesen Auftrag stempeln"}
+      data-tooltip={onSameJob ? "Ausstempeln" : "Auf diesen Auftrag stempeln"}
       aria-label={onSameJob ? "Ausstempeln" : "Auf diesen Auftrag stempeln"}
       className={`inline-flex items-center justify-center w-9 h-9 rounded-full shrink-0 ${tones.text}`}
       style={{

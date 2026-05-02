@@ -381,7 +381,7 @@ export function MonthView({ year, month, items, shifts, selectedDay, onSelectDay
                         gridRow: b.lane + 2,
                       }}
                       className={`relative z-10 self-center h-5 px-2 text-[10px] font-semibold leading-[18px] truncate cursor-pointer text-left ${sty.bg} ${borderL} ${borderR} ${sty.text} ${round} ${ml} ${mr} ${sty.ring} transition-all`}
-                      title={[b.item.title, b.item.customerName, b.item.locationName].filter(Boolean).join(" · ")}
+                      data-tooltip={[b.item.title, b.item.customerName, b.item.locationName].filter(Boolean).join(" · ")}
                     >
                       {b.item.title}
                     </button>
@@ -411,7 +411,7 @@ export function MonthView({ year, month, items, shifts, selectedDay, onSelectDay
                       }}
                       style={{ gridColumn: p.col + 1, gridRow: p.lane + 2 }}
                       className={`relative z-10 self-center h-5 mx-1 px-1.5 text-[10px] font-medium leading-[18px] truncate rounded cursor-pointer text-left ${sty.bg} ${sty.text} transition-all`}
-                      title={[p.shift.title, p.shift.jobTitle, p.shift.assigneeName].filter(Boolean).join(" · ")}
+                      data-tooltip={[p.shift.title, p.shift.jobTitle, p.shift.assigneeName].filter(Boolean).join(" · ")}
                     >
                       {label}
                     </button>
