@@ -36,15 +36,18 @@ export async function POST(request: Request) {
   const role = roleRow?.slug ?? "techniker";
 
   // 1. Auth-User anlegen. email_confirm:true ueberspringt die Email-
-  //    Bestaetigung — der User soll direkt einloggen koennen, sobald er
-  //    sein Passwort gesetzt hat. Random-Passwort weil er's eh per Reset-
-  //    Link selbst setzt.
+  //    Bestaetigung. Random-Passwort weil's der User eh per Reset-Link
+  //    selbst setzt. WICHTIG: full_name UND role landen via user_metadata
+  //    in raw_user_meta_data — der Postgres-Trigger handle_new_user()
+  //    feuert auf jedem auth.users-Insert und legt dann eigenstaendig
+  //    eine profiles-Row mit diesen Werten an. Wuerden wir hier noch
+  //    eine zweite profiles.insert() machen, gaebe es einen PK-Konflikt.
   const tempPassword = crypto.randomUUID() + "-" + crypto.randomUUID();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
     email_confirm: true,
-    user_metadata: { full_name },
+    user_metadata: { full_name, role },
   });
   if (createErr || !created.user) {
     return NextResponse.json(
@@ -53,18 +56,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Profil anlegen (id == auth.users.id).
-  const { error: profileErr } = await admin.from("profiles").insert({
-    id: created.user.id,
-    email,
-    full_name,
-    role,
-    is_active: true,
-  });
+  // 2. Sicherheitshalber das Profil nachschaerfen — falls der Trigger
+  //    aus irgendeinem Grund die Rolle nicht uebernommen hat, oder der
+  //    Trigger irgendwann anders aussieht. Idempotent: setzt nur was
+  //    der Trigger bereits gesetzt hat oder noch fehlt.
+  const { error: profileErr } = await admin
+    .from("profiles")
+    .update({ role, full_name, is_active: true })
+    .eq("id", created.user.id);
   if (profileErr) {
-    // Rollback: Auth-User wieder loeschen damit's keinen Waisen-Eintrag gibt.
     await admin.auth.admin.deleteUser(created.user.id);
-    logError("admin.users.create.profile", profileErr, { email });
+    logError("admin.users.create.profile-update", profileErr, { email });
     return NextResponse.json({ success: false, error: profileErr.message }, { status: 500 });
   }
 
