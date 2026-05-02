@@ -360,6 +360,76 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   const modalTitle = step === "pick" ? "Neues Ticket" : `${TYPES.find((t) => t.id === type)?.label}`;
   const typeMeta = type ? TYPES.find((t) => t.id === type) : null;
 
+  // File-Upload-Block — wird fuer Beleg nach OBEN gerendert (nach Title)
+  // damit die KI-Analyse die Felder vorausfuellen kann bevor der User
+  // ueberhaupt was eintippen muss. Fuer alle anderen Types unten.
+  const fileUploadBlock = (
+    <div className="space-y-1">
+      <p className="text-[10px] text-muted-foreground/70 ml-1">
+        {type === "beleg"
+          ? "Beleg-Foto oder PDF *"
+          : type === "material"
+            ? "Anhänge (Foto / Quittung)"
+            : "Anhänge"}
+      </p>
+      <label className="kasten kasten-muted cursor-pointer w-full justify-center">
+        <Upload className="h-3.5 w-3.5" />
+        Datei wählen (Bild oder PDF)
+        <input
+          type="file"
+          multiple
+          accept="image/*,application/pdf"
+          onChange={handleFiles}
+          className="hidden"
+        />
+      </label>
+      {files.length > 0 && (
+        <div className="space-y-1.5 mt-2">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/40">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />
+              <span className="text-xs flex-1 truncate">{f.name}</span>
+              <span className="text-[10px] text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+              <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-600">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* KI-Analyse-Status fuer Beleg */}
+      {type === "beleg" && analyzing && (
+        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/[0.08] border border-blue-500/20 text-blue-700 dark:text-blue-300">
+          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+          <span className="text-xs">Beleg wird analysiert…</span>
+        </div>
+      )}
+      {type === "beleg" && !analyzing && analysisDone && analysisIssues.length === 0 && (
+        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/[0.08] border border-green-500/20 text-green-700 dark:text-green-300">
+          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-xs">Beleg ist klar lesbar — Felder vorausgefüllt, gerne anpassen.</span>
+        </div>
+      )}
+      {type === "beleg" && !analyzing && analysisIssues.length > 0 && (
+        <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/[0.08] border border-amber-500/30">
+          <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-0.5 flex-1">
+              <p className="font-medium">KI-Hinweis:</p>
+              {analysisIssues.map((iss, i) => (
+                <p key={i}>· {iss}</p>
+              ))}
+              <p className="text-[10px] opacity-75 mt-1">
+                Du kannst die Felder manuell ausfüllen oder ein besseres Foto hochladen.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <Modal open={open} onClose={() => !saving && onClose()} title={modalTitle} size="lg" closable={!saving}>
       {step === "pick" && (
@@ -401,6 +471,10 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
+          {/* Beleg: File-Upload zuerst, damit KI-Analyse die Felder
+              ausfuellen kann bevor der User selbst tippt. */}
+          {type === "beleg" && fileUploadBlock}
+
           {/* Typ-spezifische Felder */}
           {type === "it" && (
             <div className="space-y-1">
@@ -413,19 +487,28 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
-          {type === "beleg" && (
+          {type === "beleg" && files.length === 0 && (
+            <div className="px-4 py-4 rounded-xl border border-dashed bg-muted/20 text-center">
+              <Receipt className="h-6 w-6 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-sm font-medium">Beleg zuerst hochladen</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sobald der Beleg hochgeladen ist, werden Betrag, Datum und Lieferant<br />automatisch ausgefüllt.
+              </p>
+            </div>
+          )}
+          {type === "beleg" && files.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF) *</p>
-                <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} />
+                <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} disabled={analyzing} />
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Kaufdatum *</p>
-                <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} />
+                <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} disabled={analyzing} />
               </div>
               <div className="space-y-1 col-span-2">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Lieferant / Geschäft</p>
-                <Input value={beleg.lieferant} onChange={(e) => setBeleg({ ...beleg, lieferant: e.target.value })} placeholder="z.B. Conrad, Migros" />
+                <Input value={beleg.lieferant} onChange={(e) => setBeleg({ ...beleg, lieferant: e.target.value })} placeholder="z.B. Conrad, Migros" disabled={analyzing} />
               </div>
             </div>
           )}
@@ -568,71 +651,8 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             />
           </div>
 
-          {/* File-Upload */}
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground/70 ml-1">
-              {type === "beleg"
-                ? "Beleg-Foto oder PDF *"
-                : type === "material"
-                  ? "Anhänge (Foto / Quittung)"
-                  : "Anhänge"}
-            </p>
-            <label className="kasten kasten-muted cursor-pointer w-full justify-center">
-              <Upload className="h-3.5 w-3.5" />
-              Datei wählen (Bild oder PDF)
-              <input
-                type="file"
-                multiple
-                accept="image/*,application/pdf"
-                onChange={handleFiles}
-                className="hidden"
-              />
-            </label>
-            {files.length > 0 && (
-              <div className="space-y-1.5 mt-2">
-                {files.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/40">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />
-                    <span className="text-xs flex-1 truncate">{f.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
-                    <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-red-600">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* KI-Analyse-Status fuer Beleg */}
-            {type === "beleg" && analyzing && (
-              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/[0.08] border border-blue-500/20 text-blue-700 dark:text-blue-300">
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                <span className="text-xs">Beleg wird analysiert…</span>
-              </div>
-            )}
-            {type === "beleg" && !analyzing && analysisDone && analysisIssues.length === 0 && (
-              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/[0.08] border border-green-500/20 text-green-700 dark:text-green-300">
-                <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-xs">Beleg ist klar lesbar — Felder vorausgefüllt, gerne anpassen.</span>
-              </div>
-            )}
-            {type === "beleg" && !analyzing && analysisIssues.length > 0 && (
-              <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/[0.08] border border-amber-500/30">
-                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  <div className="text-xs space-y-0.5 flex-1">
-                    <p className="font-medium">KI-Hinweis:</p>
-                    {analysisIssues.map((iss, i) => (
-                      <p key={i}>· {iss}</p>
-                    ))}
-                    <p className="text-[10px] opacity-75 mt-1">
-                      Du kannst die Felder manuell ausfüllen oder ein besseres Foto hochladen.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* File-Upload — nur fuer nicht-Beleg-Types (Beleg hat ihn oben). */}
+          {type !== "beleg" && fileUploadBlock}
 
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={() => setStep("pick")} disabled={saving} className="kasten kasten-muted flex-1">
