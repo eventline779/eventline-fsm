@@ -157,6 +157,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   function validate(): string | null {
     if (!type) return "Typ fehlt";
     if (!title.trim()) return "Titel fehlt";
+    if (type === "it" && !description.trim()) return "Problem-Beschreibung fehlt";
     if (type === "beleg") {
       if (!beleg.betrag_chf || isNaN(parseFloat(beleg.betrag_chf))) return "Betrag fehlt";
       if (!beleg.kaufdatum) return "Kaufdatum fehlt";
@@ -316,7 +317,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                 Dringend
               </button>
             </div>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
           {/* Typ-spezifische Felder */}
@@ -335,11 +336,11 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF) *</p>
-                <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} required />
+                <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} />
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Kaufdatum *</p>
-                <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} required />
+                <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} />
               </div>
               <div className="space-y-1 col-span-2">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Lieferant / Geschäft</p>
@@ -400,11 +401,11 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
-                      <Input type="datetime-local" value={stempel.neu_start} onChange={(e) => setStempel({ ...stempel, neu_start: e.target.value })} required />
+                      <Input type="datetime-local" value={stempel.neu_start} onChange={(e) => setStempel({ ...stempel, neu_start: e.target.value })} />
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
-                      <Input type="datetime-local" value={stempel.neu_end} onChange={(e) => setStempel({ ...stempel, neu_end: e.target.value })} required />
+                      <Input type="datetime-local" value={stempel.neu_end} onChange={(e) => setStempel({ ...stempel, neu_end: e.target.value })} />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -434,7 +435,6 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                   rows={3}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
                   placeholder="warum gehört das angepasst…"
-                  required
                 />
               </div>
             </div>
@@ -445,11 +445,11 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2 space-y-1">
                   <p className="text-[10px] text-muted-foreground/70 ml-1">Artikel *</p>
-                  <Input value={material.artikel} onChange={(e) => setMaterial({ ...material, artikel: e.target.value })} placeholder="z.B. XLR-Kabel 5m" required />
+                  <Input value={material.artikel} onChange={(e) => setMaterial({ ...material, artikel: e.target.value })} placeholder="z.B. XLR-Kabel 5m" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] text-muted-foreground/70 ml-1">Menge *</p>
-                  <Input type="number" min="1" value={material.menge} onChange={(e) => setMaterial({ ...material, menge: e.target.value })} required />
+                  <Input type="number" min="1" value={material.menge} onChange={(e) => setMaterial({ ...material, menge: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -484,7 +484,6 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
-              required={type === "it"}
             />
           </div>
 
