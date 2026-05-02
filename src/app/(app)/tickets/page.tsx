@@ -143,9 +143,8 @@ export default function TicketsPage() {
         </div>
       </div>
 
-      {/* Filter-Bar — px-4 matcht das Inner-Padding der Cards damit die
-          Spalten-Anfaenge in Filter-Bar und Cards exakt aligned sind. */}
-      <div className="flex flex-col sm:flex-row gap-2 px-4">
+      {/* Filter-Bar */}
+      <div className="flex flex-col sm:flex-row gap-2">
         {/* Suche Nummer */}
         <div className="relative w-full sm:w-44">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
@@ -239,18 +238,17 @@ export default function TicketsPage() {
             return (
               <Link key={t.id} href={`/tickets/${t.id}`} className="block">
                 <Card className="card-hover bg-card">
-                  <CardContent className="px-4 py-2 flex items-center gap-2 text-left">
-                    {/* Spalte 1 — Nummer (linksbuendig, matcht Filter-Bar Nummer-Suche) */}
-                    <div className="shrink-0 sm:w-44 flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-muted-foreground">T-{t.ticket_number}</span>
-                      <span className={`sm:hidden inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full ${STATUS_META[t.status].classes}`}>
-                        {STATUS_META[t.status].label}
-                      </span>
+                  <CardContent className="px-4 py-1.5 flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+                      <Icon className="h-3.5 w-3.5" />
                     </div>
-                    {/* Spalte 2 — Titel + Meta (linksbuendig, matcht Titel-Suche) */}
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5 text-left">
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
                         <span className="font-medium text-sm truncate">{t.title}</span>
+                        <span className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
+                          {STATUS_META[t.status].label}
+                        </span>
                         {t.priority === "dringend" && (
                           <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                             Dringend
@@ -258,6 +256,8 @@ export default function TicketsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                        <span>{typeMeta.label}</span>
+                        <span>·</span>
                         <span>{t.creator?.full_name ?? "—"}</span>
                         <span>·</span>
                         <span>{formatDate(t.created_at)}</span>
@@ -268,19 +268,6 @@ export default function TicketsPage() {
                           </>
                         )}
                       </div>
-                    </div>
-                    {/* Spalte 3 — Status (Badge ganz links der Spalte) */}
-                    <div className="hidden sm:block w-44 shrink-0">
-                      <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${STATUS_META[t.status].classes}`}>
-                        {STATUS_META[t.status].label}
-                      </span>
-                    </div>
-                    {/* Spalte 4 — Typ (Icon + Label ganz links der Spalte) */}
-                    <div className="hidden sm:flex w-44 shrink-0 items-center gap-2">
-                      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
-                        <Icon className="h-3 w-3" />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground truncate">{typeMeta.label}</span>
                     </div>
                   </CardContent>
                 </Card>
