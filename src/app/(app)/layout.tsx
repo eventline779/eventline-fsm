@@ -187,7 +187,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Logo size="md" />
             </SheetTitle>
           </SheetHeader>
-          <nav className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+          <nav
+            className="px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)]"
+            style={{
+              maskImage: "linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)",
+            }}
+          >
             {groups.map((group) => {
               const items = group.items;
               if (items.length === 0) return null;

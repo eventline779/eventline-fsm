@@ -63,8 +63,16 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
         </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
+      {/* Navigation — mask-image fade an den Raendern damit Items nicht
+          hart abgeschnitten werden sondern weich in transparent uebergehen
+          beim Hoch-/Runter-Scrollen. */}
+      <nav
+        className="flex-1 px-3 py-4 overflow-y-auto space-y-4"
+        style={{
+          maskImage: "linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)",
+        }}
+      >
         {groups.map((group) => {
           const items = group.items;
           if (items.length === 0) return null;
