@@ -194,10 +194,16 @@ export async function sendSetupMail(opts: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
     },
+    // WICHTIG: redirect_to MUSS top-level sein. Wenn man's in `options`
+    // packt (wie supabase-js es kapselt), ignoriert die Auth-Admin-API
+    // das stillschweigend und faellt auf site_url zurueck (=localhost).
+    // Resultat waeren Reset-Links die auf localhost zeigen statt auf
+    // die Vercel-URL. Zusaetzlich muss die Ziel-URL in der uri_allow_list
+    // im Supabase-Auth-Config stehen.
     body: JSON.stringify({
       type: "recovery",
       email,
-      options: { redirect_to: appUrl("/passwort-reset") },
+      redirect_to: appUrl("/passwort-reset"),
     }),
   });
   if (!linkRes.ok) {

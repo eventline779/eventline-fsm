@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Plug, Users, Shield } from "lucide-react";
@@ -19,10 +19,22 @@ type Tab = "integrationen" | "backup" | "team" | "rollen";
 
 export default function EinstellungenPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
   const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab) ? urlTab : "integrationen");
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Tab-Wechsel in der URL spiegeln, damit ein Hard-Reload auf dem
+  // gleichen Tab landet. router.replace statt push damit kein History-
+  // Entry pro Tab-Klick entsteht.
+  function selectTab(t: Tab) {
+    setTab(t);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", t);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
 
   useEffect(() => {
     (async () => {
@@ -107,7 +119,7 @@ export default function EinstellungenPage() {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => selectTab(t.key)}
             className={tab === t.key ? "kasten-active" : "kasten-toggle-off"}
           >
             {t.icon}
