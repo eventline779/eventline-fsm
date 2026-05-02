@@ -11,6 +11,7 @@ import { appUrl } from "@/lib/app-url";
 import { logError } from "@/lib/log";
 
 export async function POST(request: Request) {
+  try {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
@@ -29,6 +30,18 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // Doppelt-Anlegen verhindern: wenn die Email schon einen Auth-User
+  // hat, klare Fehlermeldung statt 500. Tritt typischerweise auf wenn
+  // jemand schon angelegt + spaeter wieder versucht wurde.
+  const { data: existingAuth } = await admin.auth.admin.listUsers();
+  const exists = existingAuth?.users?.some((u) => u.email?.toLowerCase() === email);
+  if (exists) {
+    return NextResponse.json(
+      { success: false, error: `Es gibt bereits einen Benutzer mit Email ${email}` },
+      { status: 400 },
+    );
+  }
 
   // Rolle muss in der roles-Tabelle existieren — sonst kann der User
   // spaeter nicht aufgeloest werden.
@@ -82,4 +95,11 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ success: true, user_id: created.user.id });
+  } catch (err) {
+    // Statt generic 500 → konkrete Meldung zurueck. Hilft beim Debugging
+    // von Edge-Cases (Service-Role-Key falsch, Trigger-Konflikte, etc.)
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Anlegen";
+    logError("admin.users.create.exception", err);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
 }
