@@ -25,6 +25,17 @@ import type { TicketWithRelations, TicketType, TicketStatus } from "@/types";
 type FilterStatus = "alle" | TicketStatus;
 type FilterType = "alle" | TicketType;
 
+// Tickets gelten als 'archiviert' wenn sie erledigt/abgelehnt sind UND
+// das vor mehr als 14 Tagen passiert ist. Nur dann werden sie aus der
+// aktiven Liste ausgeblendet.
+const ARCHIVE_AFTER_DAYS = 14;
+function isArchived(t: { status: TicketStatus; resolved_at: string | null }): boolean {
+  if (t.status === "offen") return false;
+  if (!t.resolved_at) return false;
+  const ms = Date.now() - new Date(t.resolved_at).getTime();
+  return ms > ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+}
+
 const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
   beleg:            { label: "Beleg",              icon: Receipt, color: "text-amber-600  dark:text-amber-400  bg-amber-50  dark:bg-amber-500/15"  },
@@ -48,6 +59,7 @@ export default function TicketsPage() {
   const [showNew, setShowNew] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Admin-Check + eigene User-ID laden — bestimmt Filter-Optionen.
@@ -85,9 +97,13 @@ export default function TicketsPage() {
     }
 
     const { data } = await q;
-    setTickets((data as unknown as TicketWithRelations[]) ?? []);
+    const all = (data as unknown as TicketWithRelations[]) ?? [];
+    // Archiv-Toggle: zeige entweder NUR archivierte (älter als 14 Tage
+    // erledigt/abgelehnt) oder NUR die aktiven (alles andere).
+    const filtered = all.filter((t) => showArchive ? isArchived(t) : !isArchived(t));
+    setTickets(filtered);
     setLoading(false);
-  }, [supabase, filterStatus, filterType, showOnlyMine, currentUserId, search]);
+  }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, search]);
 
   useEffect(() => {
     const t = setTimeout(() => { load(); }, 200);
@@ -133,6 +149,13 @@ export default function TicketsPage() {
             Nur meine
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setShowArchive((v) => !v)}
+          className={showArchive ? "kasten-active" : "kasten-toggle-off"}
+        >
+          Archiv
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -194,6 +217,7 @@ export default function TicketsPage() {
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
                         <span className="font-medium text-sm truncate">{t.title}</span>
                         <span className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
                           {STATUS_META[t.status].label}

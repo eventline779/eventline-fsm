@@ -56,6 +56,14 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
 
   // Beleg-spezifisch.
   const [beleg, setBeleg] = useState({ betrag_chf: "", kaufdatum: "", lieferant: "" });
+  // Genehmigungs-Quelle fuer Belege: 'person' (User hat verbal/per Mail OK
+  // gegeben) oder 'ticket' (vorheriges Material-Ticket war approved).
+  const [belegApprovalSource, setBelegApprovalSource] = useState<"person" | "ticket">("person");
+  const [belegApprovalUserId, setBelegApprovalUserId] = useState("");
+  const [belegApprovalTicketId, setBelegApprovalTicketId] = useState("");
+  // Profile-Liste fuer Person-Picker, Material-Tickets fuer Ticket-Picker.
+  const [profilesForApproval, setProfilesForApproval] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
+  const [erledigteMaterialTickets, setErledigteMaterialTickets] = useState<Array<{ id: string; ticket_number: number; title: string }>>([]);
   // KI-Analyse-State fuer Beleg: laeuft beim ersten File-Pick.
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisIssues, setAnalysisIssues] = useState<string[]>([]);
@@ -91,6 +99,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       setDescription("");
       setUrgent(false);
       setBeleg({ betrag_chf: "", kaufdatum: "", lieferant: "" });
+      setBelegApprovalSource("person");
+      setBelegApprovalUserId("");
+      setBelegApprovalTicketId("");
       setAnalyzing(false);
       setAnalysisIssues([]);
       setAnalysisDone(false);
@@ -148,6 +159,29 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         }),
       );
     })();
+  }, [type, supabase]);
+
+  // Beleg: Profile-Liste + erledigte Material-Tickets fuer Genehmigung-Picker.
+  useEffect(() => {
+    if (type !== "beleg") return;
+    (async () => {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name, role")
+        .eq("is_active", true)
+        .order("full_name");
+      if (profs) setProfilesForApproval(profs as typeof profilesForApproval);
+
+      const { data: mats } = await supabase
+        .from("tickets")
+        .select("id, ticket_number, title")
+        .eq("type", "material")
+        .eq("status", "erledigt")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (mats) setErledigteMaterialTickets(mats as typeof erledigteMaterialTickets);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, supabase]);
 
   // Jobs fuer Stempel-/Material-Form laden.
@@ -303,6 +337,8 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       if (files.length === 0) return "Beleg-Foto oder PDF ist Pflicht — bitte Datei hochladen";
       if (!beleg.betrag_chf || isNaN(parseFloat(beleg.betrag_chf))) return "Betrag fehlt";
       if (!beleg.kaufdatum) return "Kaufdatum fehlt";
+      if (belegApprovalSource === "person" && !belegApprovalUserId) return "Wer hat den Kauf genehmigt? Bitte Person auswählen.";
+      if (belegApprovalSource === "ticket" && !belegApprovalTicketId) return "Bitte das Material-Ticket auswählen das den Kauf genehmigt hat.";
     }
     if (type === "stempel_aenderung") {
       if (!stempel.grund.trim()) return "Grund ist Pflicht";
@@ -336,6 +372,8 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
           betrag_chf: parseFloat(beleg.betrag_chf),
           kaufdatum: beleg.kaufdatum,
           lieferant: beleg.lieferant || undefined,
+          genehmigt_von_user_id: belegApprovalSource === "person" ? belegApprovalUserId : undefined,
+          genehmigt_via_ticket_id: belegApprovalSource === "ticket" ? belegApprovalTicketId : undefined,
         };
       } else if (type === "stempel_aenderung") {
         if (stempelMode === "korrektur") {
@@ -582,20 +620,70 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             </div>
           )}
           {type === "beleg" && files.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF) *</p>
-                <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} disabled={analyzing} />
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF) *</p>
+                  <Input type="number" step="0.05" value={beleg.betrag_chf} onChange={(e) => setBeleg({ ...beleg, betrag_chf: e.target.value })} disabled={analyzing} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Kaufdatum *</p>
+                  <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} disabled={analyzing} />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Lieferant / Geschäft</p>
+                  <Input value={beleg.lieferant} onChange={(e) => setBeleg({ ...beleg, lieferant: e.target.value })} placeholder="z.B. Conrad, Migros" disabled={analyzing} />
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Kaufdatum *</p>
-                <Input type="date" value={beleg.kaufdatum} onChange={(e) => setBeleg({ ...beleg, kaufdatum: e.target.value })} disabled={analyzing} />
+
+              {/* Genehmigung — Person ODER Material-Ticket. */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Genehmigung *</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBelegApprovalSource("person")}
+                    className={belegApprovalSource === "person" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                  >
+                    Person
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBelegApprovalSource("ticket")}
+                    className={belegApprovalSource === "ticket" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                  >
+                    Material-Ticket
+                  </button>
+                </div>
+                {belegApprovalSource === "person" && (
+                  <SearchableSelect
+                    value={belegApprovalUserId}
+                    onChange={setBelegApprovalUserId}
+                    items={profilesForApproval.map((p) => ({ id: p.id, label: p.full_name }))}
+                    placeholder="Wer hat den Kauf genehmigt?"
+                    clearable={false}
+                  />
+                )}
+                {belegApprovalSource === "ticket" && (
+                  erledigteMaterialTickets.length === 0 ? (
+                    <div className="px-3 py-2 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+                      Keine erledigten Material-Tickets vorhanden — wähle stattdessen eine Person.
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      value={belegApprovalTicketId}
+                      onChange={setBelegApprovalTicketId}
+                      items={erledigteMaterialTickets.map((t) => ({
+                        id: t.id,
+                        label: `T-${t.ticket_number} · ${t.title}`,
+                      }))}
+                      placeholder="Welches Material-Ticket?"
+                      clearable={false}
+                    />
+                  )
+                )}
               </div>
-              <div className="space-y-1 col-span-2">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Lieferant / Geschäft</p>
-                <Input value={beleg.lieferant} onChange={(e) => setBeleg({ ...beleg, lieferant: e.target.value })} placeholder="z.B. Conrad, Migros" disabled={analyzing} />
-              </div>
-            </div>
+            </>
           )}
 
           {type === "stempel_aenderung" && (

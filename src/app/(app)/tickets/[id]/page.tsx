@@ -47,6 +47,9 @@ export default function TicketDetailPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [resolutionNote, setResolutionNote] = useState("");
   const [busy, setBusy] = useState(false);
+  // Bei Beleg-Tickets: aufgeloester Genehmiger (Person-Name oder verlinktes
+  // Material-Ticket mit Nummer + Titel).
+  const [belegApproval, setBelegApproval] = useState<{ kind: "person" | "ticket"; label: string; href?: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -61,7 +64,41 @@ export default function TicketDetailPage() {
       `)
       .eq("id", id)
       .maybeSingle();
-    if (data) setTicket(data as unknown as TicketWithRelations);
+    if (data) {
+      const t = data as unknown as TicketWithRelations;
+      setTicket(t);
+
+      // Beleg-Genehmigung aufloesen — entweder Person-Name oder verlinktes
+      // Material-Ticket (mit Nummer + Titel als Klick-Link).
+      if (t.type === "beleg") {
+        const d = (t.data ?? {}) as { genehmigt_von_user_id?: string; genehmigt_via_ticket_id?: string };
+        if (d.genehmigt_von_user_id) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", d.genehmigt_von_user_id)
+            .maybeSingle();
+          setBelegApproval({ kind: "person", label: prof?.full_name ?? "—" });
+        } else if (d.genehmigt_via_ticket_id) {
+          const { data: tk } = await supabase
+            .from("tickets")
+            .select("ticket_number, title")
+            .eq("id", d.genehmigt_via_ticket_id)
+            .maybeSingle();
+          if (tk) {
+            setBelegApproval({
+              kind: "ticket",
+              label: `T-${tk.ticket_number} · ${tk.title}`,
+              href: `/tickets/${d.genehmigt_via_ticket_id}`,
+            });
+          }
+        } else {
+          setBelegApproval(null);
+        }
+      } else {
+        setBelegApproval(null);
+      }
+    }
     setLoading(false);
   }
 
@@ -163,11 +200,14 @@ export default function TicketDetailPage() {
         <BackButton fallbackHref="/tickets" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs font-semibold text-muted-foreground">T-{ticket.ticket_number}</span>
             <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${STATUS_META[ticket.status].classes}`}>
               {STATUS_META[ticket.status].label}
             </span>
-            {ticket.priority !== "normal" && (
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{ticket.priority}</span>
+            {ticket.priority === "dringend" && (
+              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                Dringend
+              </span>
             )}
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-1">{ticket.title}</h1>
@@ -214,6 +254,23 @@ export default function TicketDetailPage() {
           )}
 
           <TicketDataDisplay type={ticket.type} data={ticket.data as Record<string, unknown>} />
+
+          {/* Beleg-Genehmigung — aufgeloest aus genehmigt_von_user_id
+              oder genehmigt_via_ticket_id. */}
+          {ticket.type === "beleg" && belegApproval && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {belegApproval.kind === "person" ? "Genehmigt von" : "Genehmigt via Material-Ticket"}
+              </p>
+              {belegApproval.href ? (
+                <Link href={belegApproval.href} className="text-sm font-medium mt-0.5 text-blue-600 hover:underline inline-block">
+                  {belegApproval.label}
+                </Link>
+              ) : (
+                <p className="text-sm font-medium mt-0.5">{belegApproval.label}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

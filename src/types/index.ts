@@ -425,6 +425,11 @@ export interface TicketDataBeleg {
   kaufdatum: string;       // YYYY-MM-DD
   lieferant?: string;
   auftrag_id?: string;
+  // Genehmigung — entweder eine Person die's verbal/per Mail freigegeben hat
+  // (genehmigt_von_user_id) ODER ein vorheriges, bereits erledigtes Material-
+  // Ticket (genehmigt_via_ticket_id). Eines von beiden muss gesetzt sein.
+  genehmigt_von_user_id?: string;
+  genehmigt_via_ticket_id?: string;
 }
 
 export interface TicketDataStempelAenderung {
@@ -457,6 +462,7 @@ export type TicketData =
 
 export interface Ticket {
   id: string;
+  ticket_number: number;
   type: TicketType;
   status: TicketStatus;
   priority: TicketPriority;
@@ -468,6 +474,7 @@ export interface Ticket {
   resolved_at: string | null;
   resolved_by: string | null;
   resolution_note: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
