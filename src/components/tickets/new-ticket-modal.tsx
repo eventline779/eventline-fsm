@@ -181,15 +181,16 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
     setFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
 
-    // Beim Beleg-Typ: erste Datei automatisch via KI analysieren.
+    // Bei Beleg/Material: erste Datei automatisch via KI analysieren.
     // Wir analysieren NUR die erste Datei, weitere Dateien bleiben unangetastet.
-    if (type === "beleg" && newFiles.length > 0 && !analysisDone) {
+    if ((type === "beleg" || type === "material") && newFiles.length > 0 && !analysisDone) {
       const first = newFiles[0];
       if (!first.type.startsWith("image/")) {
-        // PDF-Belege analysieren wir nicht — User soll selbst eintragen.
+        // PDFs analysieren wir nicht — User soll selbst eintragen.
         return;
       }
-      analyzeReceipt(first);
+      if (type === "beleg") analyzeReceipt(first);
+      if (type === "material") analyzeMaterial(first);
     }
   }
 
@@ -219,6 +220,42 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         betrag_chf: prev.betrag_chf || (typeof ex.betrag_chf === "number" ? ex.betrag_chf.toFixed(2) : ""),
         kaufdatum: prev.kaufdatum || (typeof ex.kaufdatum === "string" ? ex.kaufdatum : ""),
         lieferant: prev.lieferant || (typeof ex.lieferant === "string" ? ex.lieferant : ""),
+      }));
+      setAnalysisIssues(Array.isArray(r.issues) ? r.issues : []);
+      setAnalysisDone(true);
+    } catch (err) {
+      setAnalysisIssues([err instanceof Error ? err.message : "Analyse fehlgeschlagen"]);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function analyzeMaterial(file: File) {
+    setAnalyzing(true);
+    setAnalysisIssues([]);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch("/api/tickets/analyze-material", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setAnalysisIssues([`Analyse fehlgeschlagen: ${json.error ?? "Unbekannt"}`]);
+        return;
+      }
+      const r = json.result as {
+        ok?: boolean;
+        issues?: string[];
+        extracted?: { artikel?: string | null; menge?: number | null; betrag_chf?: number | null };
+      };
+      const ex = r.extracted ?? {};
+      setMaterial((prev) => ({
+        artikel: prev.artikel || (typeof ex.artikel === "string" ? ex.artikel : ""),
+        menge: prev.menge && prev.menge !== "1" ? prev.menge : (typeof ex.menge === "number" ? String(ex.menge) : "1"),
+        betrag_chf: prev.betrag_chf || (typeof ex.betrag_chf === "number" ? ex.betrag_chf.toFixed(2) : ""),
+        auftrag_id: prev.auftrag_id,
       }));
       setAnalysisIssues(Array.isArray(r.issues) ? r.issues : []);
       setAnalysisDone(true);
@@ -273,12 +310,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
     }
     if (type === "material") {
+      if (files.length === 0) return "Warenkorb-Screenshot ist Pflicht — bitte Datei hochladen";
       if (!material.artikel.trim()) return "Artikel fehlt";
       if (!material.menge || parseInt(material.menge) < 1) return "Menge muss mindestens 1 sein";
-      // Mindestens eines: Betrag ODER File-Upload
-      const hasBetrag = !!material.betrag_chf && !isNaN(parseFloat(material.betrag_chf));
-      const hasFile = files.length > 0;
-      if (!hasBetrag && !hasFile) return "Entweder Betrag eingeben ODER Quittung/Foto hochladen";
     }
     return null;
   }
@@ -420,7 +454,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         {type === "beleg"
           ? "Beleg-Foto oder PDF *"
           : type === "material"
-            ? "Anhänge (Foto / Quittung)"
+            ? "Warenkorb-Screenshot *"
             : "Anhänge"}
       </p>
       <label className="kasten kasten-muted cursor-pointer w-full justify-center">
@@ -449,20 +483,20 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         </div>
       )}
 
-      {/* KI-Analyse-Status fuer Beleg */}
-      {type === "beleg" && analyzing && (
+      {/* KI-Analyse-Status fuer Beleg/Material */}
+      {(type === "beleg" || type === "material") && analyzing && (
         <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/[0.08] border border-blue-500/20 text-blue-700 dark:text-blue-300">
           <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-          <span className="text-xs">Beleg wird analysiert…</span>
+          <span className="text-xs">{type === "beleg" ? "Beleg" : "Warenkorb"} wird analysiert…</span>
         </div>
       )}
-      {type === "beleg" && !analyzing && analysisDone && analysisIssues.length === 0 && (
+      {(type === "beleg" || type === "material") && !analyzing && analysisDone && analysisIssues.length === 0 && (
         <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/[0.08] border border-green-500/20 text-green-700 dark:text-green-300">
           <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          <span className="text-xs">Beleg ist klar lesbar — Felder vorausgefüllt, gerne anpassen.</span>
+          <span className="text-xs">{type === "beleg" ? "Beleg" : "Warenkorb"} ist klar lesbar — Felder vorausgefüllt, gerne anpassen.</span>
         </div>
       )}
-      {type === "beleg" && !analyzing && analysisIssues.length > 0 && (
+      {(type === "beleg" || type === "material") && !analyzing && analysisIssues.length > 0 && (
         <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/[0.08] border border-amber-500/30">
           <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -522,9 +556,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
-          {/* Beleg: File-Upload zuerst, damit KI-Analyse die Felder
-              ausfuellen kann bevor der User selbst tippt. */}
-          {type === "beleg" && fileUploadBlock}
+          {/* Beleg/Material: File-Upload zuerst, damit KI-Analyse die
+              Felder ausfuellen kann bevor der User selbst tippt. */}
+          {(type === "beleg" || type === "material") && fileUploadBlock}
 
           {/* Typ-spezifische Felder */}
           {type === "it" && (
@@ -667,16 +701,26 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
-          {type === "material" && (
+          {type === "material" && files.length === 0 && (
+            <div className="px-4 py-4 rounded-xl border border-dashed bg-muted/20 text-center">
+              <Package className="h-6 w-6 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-sm font-medium">Screenshot vom Warenkorb zuerst hochladen</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                z.B. von digitec.ch oder galaxus.ch — sobald hochgeladen werden<br />
+                Artikel, Menge und Betrag automatisch ausgefüllt.
+              </p>
+            </div>
+          )}
+          {type === "material" && files.length > 0 && (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2 space-y-1">
                   <p className="text-[10px] text-muted-foreground/70 ml-1">Artikel *</p>
-                  <Input value={material.artikel} onChange={(e) => setMaterial({ ...material, artikel: e.target.value })} placeholder="z.B. XLR-Kabel 5m" />
+                  <Input value={material.artikel} onChange={(e) => setMaterial({ ...material, artikel: e.target.value })} placeholder="z.B. XLR-Kabel 5m" disabled={analyzing} />
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] text-muted-foreground/70 ml-1">Menge *</p>
-                  <Input type="number" min="1" value={material.menge} onChange={(e) => setMaterial({ ...material, menge: e.target.value })} />
+                  <Input type="number" min="1" value={material.menge} onChange={(e) => setMaterial({ ...material, menge: e.target.value })} disabled={analyzing} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -693,10 +737,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF)</p>
-                <Input type="number" step="0.05" value={material.betrag_chf} onChange={(e) => setMaterial({ ...material, betrag_chf: e.target.value })} placeholder="z.B. 24.50" />
-                <p className="text-[10px] text-muted-foreground/70 ml-1 mt-1">
-                  Genauer Betrag — entweder hier eintragen <strong>oder</strong> ein Bild/eine Datei hochladen wo er ersichtlich ist.
-                </p>
+                <Input type="number" step="0.05" value={material.betrag_chf} onChange={(e) => setMaterial({ ...material, betrag_chf: e.target.value })} placeholder="z.B. 24.50" disabled={analyzing} />
               </div>
             </div>
           )}
@@ -717,8 +758,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* File-Upload — nur fuer nicht-Beleg-Types (Beleg hat ihn oben). */}
-          {type !== "beleg" && fileUploadBlock}
+          {/* File-Upload — nur fuer Types wo er optional ist (IT/Stempel).
+              Beleg + Material rendern den Block schon weiter oben. */}
+          {type !== "beleg" && type !== "material" && fileUploadBlock}
 
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={() => setStep("pick")} disabled={saving} className="kasten kasten-muted flex-1">
