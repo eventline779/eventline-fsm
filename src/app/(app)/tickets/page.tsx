@@ -239,16 +239,15 @@ export default function TicketsPage() {
               <Link key={t.id} href={`/tickets/${t.id}`} className="block">
                 <Card className="card-hover bg-card">
                   <CardContent className="px-4 py-1.5 flex items-center gap-3">
-                    {/* Icon + T-Nummer auf w-44 (sm) — matcht die Nummer-
-                        Suchspalte in der Filter-Bar oben. So sind alle
-                        nachfolgenden Spalten in Card und Filter-Bar
-                        exakt aligned. */}
-                    <div className="flex items-center gap-3 shrink-0 sm:w-44">
-                      <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
+                    {/* Spalte 1 — Nummer (matcht Filter-Bar Nummer-Suche) */}
+                    <div className="flex items-center gap-2 shrink-0 sm:w-44">
+                      <span className="font-mono text-xs font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
+                      {/* Mobile: Status-Badge inline neben der Nummer */}
+                      <span className={`sm:hidden inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
+                        {STATUS_META[t.status].label}
+                      </span>
                     </div>
+                    {/* Spalte 2 — Titel + Meta (matcht Filter-Bar Titel-Suche) */}
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-medium text-sm truncate">{t.title}</span>
@@ -259,8 +258,6 @@ export default function TicketsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-                        <span>{typeMeta.label}</span>
-                        <span>·</span>
                         <span>{t.creator?.full_name ?? "—"}</span>
                         <span>·</span>
                         <span>{formatDate(t.created_at)}</span>
@@ -272,20 +269,19 @@ export default function TicketsPage() {
                         )}
                       </div>
                     </div>
-                    {/* Status-Badge an fixer Position — vertikal unter
-                        dem Status-Dropdown in der Filter-Bar. Nach dem
-                        Status kommt eine leere w-44-Spalte als Platzhalter
-                        fuer die Typ-Dropdown-Spalte rechts daneben. */}
-                    <div className="hidden sm:flex w-44 shrink-0 justify-start">
+                    {/* Spalte 3 — Status (matcht Filter-Bar Status-Dropdown) */}
+                    <div className="hidden sm:flex w-44 shrink-0 justify-start items-center">
                       <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${STATUS_META[t.status].classes}`}>
                         {STATUS_META[t.status].label}
                       </span>
                     </div>
-                    <div className="hidden sm:block w-44 shrink-0" aria-hidden="true" />
-                    {/* Mobile: Status-Badge bleibt inline neben dem Titel */}
-                    <span className={`sm:hidden inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
-                      {STATUS_META[t.status].label}
-                    </span>
+                    {/* Spalte 4 — Typ (matcht Filter-Bar Typ-Dropdown) */}
+                    <div className="hidden sm:flex w-44 shrink-0 justify-start items-center gap-2">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+                        <Icon className="h-3 w-3" />
+                      </div>
+                      <span className="text-[11px] text-muted-foreground truncate">{typeMeta.label}</span>
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
