@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Einstellungen-Page — Tabs: Integrationen, Backup, Team (admin-only).
+ * Einstellungen-Page — Tabs: Team, Rollen (admin-only), Integrationen, Backup.
  * Team-Tab ist neu: User anlegen + Passwort-Reset ohne externes Tool.
  */
 
@@ -83,11 +83,11 @@ export default function EinstellungenPage() {
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
     ...(isAdmin ? [
       { key: "team" as Tab, label: "Team", icon: <Users className="h-4 w-4" /> },
       { key: "rollen" as Tab, label: "Rollen", icon: <Shield className="h-4 w-4" /> },
     ] : []),
+    { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
     { key: "backup", label: "Backup", icon: <Download className="h-4 w-4" /> },
   ];
 
