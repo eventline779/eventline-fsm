@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Plug, Users, Shield } from "lucide-react";
@@ -20,20 +20,24 @@ type Tab = "integrationen" | "backup" | "team" | "rollen";
 export default function EinstellungenPage() {
   const supabase = createClient();
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab) ? urlTab : "integrationen");
+  // Tab wird DIREKT aus der URL abgeleitet — die URL ist die einzige
+  // Wahrheits-Quelle. Vorher hatten wir useState parallel zur URL,
+  // was zu Drift gefuehrt hat (URL zeigt X, Tab zeigt Y) wenn
+  // router.replace-Updates aus irgendeinem Grund nicht durchkamen.
+  const tab: Tab = urlTab && ["integrationen", "backup", "team", "rollen"].includes(urlTab)
+    ? urlTab
+    : "integrationen";
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Tab-Wechsel in der URL spiegeln, damit ein Hard-Reload auf dem
-  // gleichen Tab landet. router.replace statt push damit kein History-
-  // Entry pro Tab-Klick entsteht.
+  // Tab-Wechsel ueber URL — re-render geht automatisch durch den
+  // useSearchParams-Hook. router.replace statt push damit kein
+  // History-Entry pro Tab-Klick entsteht.
   function selectTab(t: Tab) {
-    setTab(t);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", t);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    router.replace(`?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
