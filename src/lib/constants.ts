@@ -140,6 +140,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/partner", label: "Partner", icon: "Handshake" },
     ],
   },
+  {
+    label: "Anliegen",
+    items: [
+      { href: "/tickets", label: "Tickets", icon: "Ticket" },
+    ],
+  },
 ];
 
 export const ADMIN_NAV_GROUP: NavGroup = {

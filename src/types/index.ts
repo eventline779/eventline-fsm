@@ -405,3 +405,103 @@ export interface CalendarEvent {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================
+// Tickets — IT-Probleme, Belege, Stempel-Aenderungen, Material-Anfragen.
+// Eine zentrale Tabelle mit type-Diskriminator + data-jsonb.
+// ============================================================
+
+export type TicketType = "it" | "beleg" | "stempel_aenderung" | "material";
+export type TicketStatus = "offen" | "erledigt" | "abgelehnt";
+export type TicketPriority = "niedrig" | "normal" | "hoch" | "dringend";
+
+// Typ-spezifische data-jsonb Inhalte. Discriminierung ueber Ticket["type"].
+export interface TicketDataIT {
+  device?: string;
+}
+
+export interface TicketDataBeleg {
+  betrag_chf: number;
+  kaufdatum: string;       // YYYY-MM-DD
+  lieferant?: string;
+  auftrag_id?: string;
+}
+
+export interface TicketDataStempelAenderung {
+  // Modus 1: Korrektur eines existierenden Stempels.
+  time_entry_id?: string;
+  // Modus 2: Vergessen einzustempeln — neuer Eintrag.
+  // Beide Modi nutzen neu_start + neu_end als Ziel-Werte.
+  neu_start?: string;      // ISO timestamptz
+  neu_end?: string;        // ISO timestamptz
+  job_id?: string;         // optional bei Modus 2
+  beschreibung?: string;
+  grund: string;           // Pflicht: warum die Aenderung
+}
+
+export interface TicketDataMaterial {
+  artikel: string;
+  menge: number;
+  // Genauer Betrag — entweder direkt eingegeben ODER aus dem Attachment
+  // ablesbar (Quittung / Foto). Eines der beiden ist Pflicht.
+  betrag_chf?: number;
+  auftrag_id?: string;
+}
+
+export type TicketData =
+  | TicketDataIT
+  | TicketDataBeleg
+  | TicketDataStempelAenderung
+  | TicketDataMaterial
+  | Record<string, unknown>;
+
+export interface Ticket {
+  id: string;
+  type: TicketType;
+  status: TicketStatus;
+  priority: TicketPriority;
+  title: string;
+  description: string | null;
+  data: TicketData;
+  created_by: string;
+  assigned_to: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketAttachment {
+  id: string;
+  ticket_id: string;
+  storage_path: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
+}
+
+// Mit eingebettetem Profile fuer Listen-Views (Supabase-Join).
+export type TicketWithRelations = Ticket & {
+  creator: { full_name: string } | null;
+  assignee: { full_name: string } | null;
+  resolver: { full_name: string } | null;
+  attachments: { id: string; filename: string; storage_path: string; mime_type: string | null }[];
+};
+
+// ============================================================
+// Notifications — in-app Benachrichtigungen, gerendert in der Glocke
+// oben in der Sidebar.
+// ============================================================
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}

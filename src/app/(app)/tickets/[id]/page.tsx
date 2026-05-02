@@ -1,0 +1,419 @@
+"use client";
+
+/**
+ * Ticket-Detail-Seite.
+ *
+ * Zeigt alle Details eines Tickets, Anhaenge mit Download-Link, und
+ * fuer Admins die Approve/Ablehnen-Buttons. Approve laeuft ueber RPC
+ * apply_ticket(), die bei stempel_aenderung atomisch auch das
+ * time_entries-Update macht.
+ */
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackButton } from "@/components/ui/back-button";
+import { useConfirm } from "@/components/ui/use-confirm";
+import {
+  Wrench, Receipt, Clock, Package, Calendar, User, FileText, Download,
+  CheckCircle2, XCircle, Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import type { TicketWithRelations, TicketType, TicketStatus, TicketDataBeleg, TicketDataMaterial, TicketDataStempelAenderung, TicketDataIT } from "@/types";
+
+const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
+  it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
+  beleg:            { label: "Beleg",              icon: Receipt, color: "text-amber-600  dark:text-amber-400  bg-amber-50  dark:bg-amber-500/15"  },
+  stempel_aenderung:{ label: "Stempel-Änderung",  icon: Clock,   color: "text-blue-600   dark:text-blue-400   bg-blue-50   dark:bg-blue-500/15"   },
+  material:         { label: "Material",          icon: Package, color: "text-red-600    dark:text-red-400    bg-red-50    dark:bg-red-500/15"    },
+};
+
+const STATUS_META: Record<TicketStatus, { label: string; classes: string }> = {
+  offen:     { label: "Offen",     classes: "bg-blue-100  text-blue-700  dark:bg-blue-500/20  dark:text-blue-300"  },
+  erledigt:  { label: "Erledigt",  classes: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
+  abgelehnt: { label: "Abgelehnt", classes: "bg-red-100   text-red-700   dark:bg-red-500/20   dark:text-red-300"   },
+};
+
+export default function TicketDetailPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
+
+  const [ticket, setTicket] = useState<TicketWithRelations | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("tickets")
+      .select(`
+        *,
+        creator:profiles!created_by(full_name),
+        assignee:profiles!assigned_to(full_name),
+        resolver:profiles!resolved_by(full_name),
+        attachments:ticket_attachments(id, filename, storage_path, mime_type)
+      `)
+      .eq("id", id)
+      .maybeSingle();
+    if (data) setTicket(data as unknown as TicketWithRelations);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      setIsAdmin(profile?.role === "admin");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  async function downloadAttachment(path: string, filename: string) {
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) {
+      toast.error("Download fehlgeschlagen");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = data.signedUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  async function applyStatus(newStatus: "erledigt" | "abgelehnt") {
+    if (!ticket) return;
+    const ok = await confirm({
+      title: newStatus === "erledigt" ? "Ticket als erledigt markieren?" : "Ticket ablehnen?",
+      message:
+        newStatus === "erledigt" && ticket.type === "stempel_aenderung"
+          ? "Die Stempelzeit wird automatisch entsprechend angepasst. Diese Aktion kann nicht rückgängig gemacht werden."
+          : `Status wird auf "${newStatus}" gesetzt. Notiz wird an den Ersteller mitgeschickt.`,
+      confirmLabel: newStatus === "erledigt" ? "Erledigt" : "Ablehnen",
+      variant: newStatus === "erledigt" ? "blue" : "red",
+    });
+    if (!ok) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("apply_ticket", {
+      p_ticket_id: id,
+      p_new_status: newStatus,
+      p_resolution_note: resolutionNote.trim() || null,
+    });
+    if (error) {
+      toast.error(`Fehler: ${error.message}`);
+      setBusy(false);
+      return;
+    }
+    // Notification an Ersteller.
+    fetch("/api/tickets/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_id: id, event: "status_changed", note: resolutionNote.trim() || null }),
+    }).catch(() => {});
+    toast.success(newStatus === "erledigt" ? "Erledigt" : "Abgelehnt");
+    setResolutionNote("");
+    setBusy(false);
+    await load();
+  }
+
+  async function deleteTicket() {
+    if (!ticket) return;
+    const ok = await confirm({
+      title: "Ticket löschen?",
+      message: "Das Ticket und alle Anhänge werden unwiderruflich entfernt.",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
+    setBusy(true);
+    // Storage-Files mit-löschen (best effort).
+    if (ticket.attachments.length > 0) {
+      await supabase.storage.from("documents").remove(ticket.attachments.map((a) => a.storage_path));
+    }
+    const { error } = await supabase.from("tickets").delete().eq("id", id);
+    if (error) {
+      toast.error(`Fehler: ${error.message}`);
+      setBusy(false);
+      return;
+    }
+    toast.success("Gelöscht");
+    router.push("/tickets");
+  }
+
+  if (loading) {
+    return <div className="space-y-3">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-6 h-24" /></Card>)}</div>;
+  }
+  if (!ticket) {
+    return <Card className="bg-card"><CardContent className="py-12 text-center text-muted-foreground">Ticket nicht gefunden.</CardContent></Card>;
+  }
+
+  const typeMeta = TYPE_META[ticket.type];
+  const Icon = typeMeta.icon;
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <div className="flex items-center gap-4">
+        <BackButton fallbackHref="/tickets" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${STATUS_META[ticket.status].classes}`}>
+              {STATUS_META[ticket.status].label}
+            </span>
+            {ticket.priority !== "normal" && (
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{ticket.priority}</span>
+            )}
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight mt-1">{ticket.title}</h1>
+        </div>
+      </div>
+
+      {/* Hauptinfos */}
+      <Card className="bg-card">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Typ</p>
+              <p className="text-sm font-medium">{typeMeta.label}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><User className="h-3 w-3" />Eingereicht von</p>
+              <p className="font-medium mt-0.5">{ticket.creator?.full_name ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Calendar className="h-3 w-3" />Eingereicht</p>
+              <p className="font-medium mt-0.5">
+                {new Date(ticket.created_at).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+            {ticket.assignee && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Zugewiesen an</p>
+                <p className="font-medium mt-0.5">{ticket.assignee.full_name}</p>
+              </div>
+            )}
+          </div>
+
+          {ticket.description && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Beschreibung</p>
+              <p className="text-sm whitespace-pre-wrap mt-1">{ticket.description}</p>
+            </div>
+          )}
+
+          <TicketDataDisplay type={ticket.type} data={ticket.data as Record<string, unknown>} />
+        </CardContent>
+      </Card>
+
+      {/* Anhänge */}
+      {ticket.attachments.length > 0 && (
+        <Card className="bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <FileText className="h-4 w-4" />Anhänge ({ticket.attachments.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {ticket.attachments.map((a) => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <p className="text-sm truncate">{a.filename}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadAttachment(a.storage_path, a.filename)}
+                    className="kasten kasten-muted shrink-0"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resolution falls erledigt/abgelehnt */}
+      {ticket.status !== "offen" && (
+        <Card className="bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {ticket.status === "erledigt" ? "Erledigt" : "Abgelehnt"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {ticket.resolved_at
+                ? new Date(ticket.resolved_at).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                : "—"}
+              {ticket.resolver?.full_name ? ` · von ${ticket.resolver.full_name}` : ""}
+            </p>
+            {ticket.resolution_note && (
+              <p className="text-sm whitespace-pre-wrap">{ticket.resolution_note}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Admin-Aktionen */}
+      {isAdmin && ticket.status === "offen" && (
+        <Card className="bg-card border-foreground/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Bearbeiten</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Notiz an Ersteller (optional)</p>
+              <textarea
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                rows={3}
+                disabled={busy}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
+                placeholder="z.B. Beleg ist erstattet · Reset gemacht · Material bestellt"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => applyStatus("erledigt")} disabled={busy} className="kasten kasten-green flex-1">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Erledigt
+              </button>
+              <button type="button" onClick={() => applyStatus("abgelehnt")} disabled={busy} className="kasten kasten-red flex-1">
+                <XCircle className="h-3.5 w-3.5" />
+                Ablehnen
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lösch-Aktion (Admin only, Ticket muss nicht offen sein) */}
+      {isAdmin && (
+        <div className="flex justify-end">
+          <button type="button" onClick={deleteTicket} disabled={busy} className="kasten kasten-red">
+            <Trash2 className="h-3.5 w-3.5" />Ticket löschen
+          </button>
+        </div>
+      )}
+
+      {ConfirmModalElement}
+    </div>
+  );
+}
+
+// ---- Sub: type-spezifische Daten anzeigen ----
+function TicketDataDisplay({ type, data }: { type: TicketType; data: Record<string, unknown> }) {
+  if (!data || Object.keys(data).length === 0) return null;
+
+  if (type === "it") {
+    const d = data as unknown as TicketDataIT;
+    if (!d.device) return null;
+    return (
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betroffenes Gerät</p>
+        <p className="text-sm font-medium mt-0.5">{d.device}</p>
+      </div>
+    );
+  }
+
+  if (type === "beleg") {
+    const d = data as unknown as TicketDataBeleg;
+    return (
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betrag</p>
+          <p className="text-sm font-mono font-semibold mt-0.5">CHF {d.betrag_chf?.toFixed(2)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Kaufdatum</p>
+          <p className="text-sm font-medium mt-0.5">{d.kaufdatum ? new Date(d.kaufdatum).toLocaleDateString("de-CH") : "—"}</p>
+        </div>
+        {d.lieferant && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lieferant</p>
+            <p className="text-sm font-medium mt-0.5">{d.lieferant}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === "stempel_aenderung") {
+    const d = data as unknown as TicketDataStempelAenderung;
+    const fmt = (iso?: string) => iso ? new Date(iso).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Modus</p>
+            <p className="text-sm font-medium mt-0.5">{d.time_entry_id ? "Korrektur eines Eintrags" : "Vergessen einzustempeln"}</p>
+          </div>
+          {d.time_entry_id && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stempel-ID</p>
+              <p className="text-xs font-mono mt-0.5 truncate">{d.time_entry_id}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Neue Start</p>
+            <p className="text-sm font-medium mt-0.5">{fmt(d.neu_start)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Neues Ende</p>
+            <p className="text-sm font-medium mt-0.5">{fmt(d.neu_end)}</p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Grund</p>
+          <p className="text-sm whitespace-pre-wrap mt-1">{d.grund}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "material") {
+    const d = data as unknown as TicketDataMaterial;
+    return (
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Artikel</p>
+          <p className="text-sm font-medium mt-0.5">{d.artikel}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Menge</p>
+          <p className="text-sm font-mono font-semibold mt-0.5">{d.menge}</p>
+        </div>
+        {typeof d.betrag_chf === "number" && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betrag</p>
+            <p className="text-sm font-mono font-semibold mt-0.5">CHF {d.betrag_chf.toFixed(2)}</p>
+          </div>
+        )}
+        {d.auftrag_id && (
+          <div className="col-span-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Auftrag</p>
+            <Link href={`/auftraege/${d.auftrag_id}`} className="text-sm font-medium mt-0.5 text-blue-600 hover:underline">
+              Auftrag öffnen
+            </Link>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}

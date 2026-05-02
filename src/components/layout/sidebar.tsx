@@ -9,6 +9,7 @@ import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { isPathAllowed } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
 import { SidebarStempel } from "@/components/stempel/sidebar-stempel";
+import { NotificationsBell } from "@/components/layout/notifications-bell";
 import {
   LogOut,
   ChevronRight,
@@ -55,11 +56,16 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
 
   return (
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[260px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
-      {/* Logo — Top auf 38px */}
-      <div className="px-6 pt-[38px] pb-4 flex items-start justify-center">
-        <Link href="/dashboard" className="block">
+      {/* Logo + Notifications-Glocke — Top auf 38px. Glocke steht
+          rechts vom Logo damit sie immer sichtbar ist und nicht mit
+          dem Nav-Scroll mitwandert. */}
+      <div className="px-4 pt-[38px] pb-4 flex items-start justify-between gap-2">
+        <Link href="/dashboard" className="block flex-1 min-w-0 flex items-start">
           <Logo size="md" />
         </Link>
+        <div className="shrink-0">
+          <NotificationsBell />
+        </div>
       </div>
 
       {/* Navigation */}

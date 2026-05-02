@@ -44,6 +44,7 @@ const ACTION_LABELS: Record<PermissionAction, string> = {
   edit: "Bearbeiten",
   archive: "Archivieren",
   delete: "Löschen",
+  manage: "Verwalten",
 };
 
 const ACTION_COLUMNS: PermissionAction[] = ["view", "create", "edit", "archive", "delete"];

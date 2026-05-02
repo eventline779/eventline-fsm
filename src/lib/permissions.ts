@@ -13,7 +13,7 @@
 // Module die keine Action-Granularitaet haben (Kalender, HR, Vertrieb,
 // Einstellungen): nur "view". Wer diese Module sieht, sieht alles drin.
 
-export type PermissionAction = "view" | "create" | "edit" | "archive" | "delete";
+export type PermissionAction = "view" | "create" | "edit" | "archive" | "delete" | "manage";
 
 export interface PermissionModule {
   slug: string;
@@ -32,6 +32,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { slug: "kunden",        label: "Kunden",        paths: ["/kunden"],                                           actions: ["view", "create", "edit", "archive", "delete"] },
   { slug: "partner",       label: "Partner",       paths: ["/partner"],                                          actions: ["view", "create", "edit", "delete"] },
   { slug: "hr",            label: "HR",            paths: ["/hr", "/todos", "/schulungen", "/stempelzeiten"],    actions: ["view"] },
+  { slug: "tickets",       label: "Tickets",       paths: ["/tickets"],                                          actions: ["view", "create", "manage"] },
   { slug: "einstellungen", label: "Einstellungen", paths: ["/einstellungen"],                                    actions: ["view"] },
 ];
 
