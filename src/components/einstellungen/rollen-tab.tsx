@@ -282,7 +282,7 @@ export function RollenTab() {
                 <button
                   type="button"
                   onClick={() => toggleExpanded(role.slug)}
-                  className="w-full flex items-center justify-between gap-2 p-4 hover:bg-foreground/[0.02] transition-colors text-left"
+                  className="w-full flex items-center justify-between gap-2 px-4 py-2 hover:bg-foreground/[0.02] transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
                     {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}

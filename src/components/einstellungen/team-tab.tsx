@@ -187,12 +187,12 @@ export function TeamTab() {
         <div className="space-y-2">
           {profiles.map((p) => (
             <Card key={p.id} className={`card-hover bg-card ${!p.is_active ? "opacity-60" : ""}`}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold shrink-0">
+              <CardContent className="px-4 py-1.5 flex items-center gap-3">
+                <div className="h-7 w-7 rounded-md bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
                   {p.full_name.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-sm truncate">{p.full_name}</span>
                     <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${p.role === "admin" ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" : "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300"}`}>
                       {roleLabel(p.role)}
@@ -203,8 +203,8 @@ export function TeamTab() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Mail className="h-3 w-3" />{p.email}
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                    <Mail className="h-2.5 w-2.5 shrink-0" />{p.email}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
