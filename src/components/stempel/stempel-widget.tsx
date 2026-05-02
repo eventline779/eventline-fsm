@@ -80,8 +80,11 @@ export function StempelWidget() {
               >
                 <div className="flex items-start gap-2">
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: "rgba(0,168,107,0.15)", color: "rgb(0,168,107)" }}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      active.job_id
+                        ? "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400"
+                        : "bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    }`}
                   >
                     {active.job_id ? <Briefcase className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                   </div>

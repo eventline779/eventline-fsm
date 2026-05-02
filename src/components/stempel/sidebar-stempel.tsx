@@ -110,7 +110,9 @@ export function SidebarStempel() {
                     : (active.description || "Andere Arbeit")}
                 </p>
               </div>
-              {active.job_id ? <Briefcase className="h-3.5 w-3.5 shrink-0 opacity-65" /> : <FileText className="h-3.5 w-3.5 shrink-0 opacity-65" />}
+              {active.job_id
+                ? <Briefcase className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                : <FileText className="h-3.5 w-3.5 shrink-0 opacity-65" />}
             </Link>
             <button
               type="button"
