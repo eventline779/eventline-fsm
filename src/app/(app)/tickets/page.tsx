@@ -53,7 +53,8 @@ export default function TicketsPage() {
   const supabase = createClient();
   const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchNumber, setSearchNumber] = useState("");
+  const [searchTitle, setSearchTitle] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("offen");
   const [filterType, setFilterType] = useState<FilterType>("alle");
   const [showNew, setShowNew] = useState(false);
@@ -90,18 +91,15 @@ export default function TicketsPage() {
     if (filterType !== "alle") q = q.eq("type", filterType);
     if (showOnlyMine && currentUserId) q = q.eq("created_by", currentUserId);
 
-    const term = search.trim();
-    if (term.length > 0) {
-      // Wenn das Such-Feld wie eine Nummer aussieht (z.B. '1042' oder 'T-1042'),
-      // dann auf ticket_number filtern statt auf Titel/Beschreibung.
-      const numMatch = term.match(/^[Tt][-_]?(\d+)$|^(\d+)$/);
-      if (numMatch) {
-        const num = parseInt(numMatch[1] ?? numMatch[2] ?? "", 10);
-        if (Number.isFinite(num)) q = q.eq("ticket_number", num);
-      } else {
-        const like = `%${term}%`;
-        q = q.or(`title.ilike.${like},description.ilike.${like}`);
-      }
+    const numQ = searchNumber.trim();
+    if (numQ) {
+      const n = parseInt(numQ, 10);
+      if (Number.isFinite(n)) q = q.eq("ticket_number", n);
+    }
+    const titleQ = searchTitle.trim();
+    if (titleQ) {
+      const like = `%${titleQ}%`;
+      q = q.or(`title.ilike.${like},description.ilike.${like}`);
     }
 
     const { data } = await q;
@@ -111,7 +109,7 @@ export default function TicketsPage() {
     const filtered = all.filter((t) => showArchive ? isArchived(t) : !isArchived(t));
     setTickets(filtered);
     setLoading(false);
-  }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, search]);
+  }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, searchNumber, searchTitle]);
 
   useEffect(() => {
     const t = setTimeout(() => { load(); }, 200);
@@ -146,14 +144,31 @@ export default function TicketsPage() {
       </div>
 
       {/* Filter-Bar */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Suche Nummer */}
+        <div className="relative w-full sm:w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+            T-
+          </span>
           <Input
-            placeholder="Titel, Beschreibung oder T-Nummer…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-card"
+            placeholder="0000"
+            value={searchNumber}
+            onChange={(e) => setSearchNumber(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="pl-[2.4rem] h-9 font-mono bg-card"
+            aria-label="Ticket-Nummer"
+          />
+        </div>
+        {/* Suche Titel */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Titel oder Beschreibung…"
+            value={searchTitle}
+            onChange={(e) => setSearchTitle(e.target.value)}
+            className="pl-9 h-9 bg-card"
+            aria-label="Titel"
           />
         </div>
         <div className="w-full sm:w-44">
@@ -209,7 +224,7 @@ export default function TicketsPage() {
             </div>
             <h3 className="font-semibold text-lg">Keine Tickets</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {search || filterType !== "alle" || filterStatus !== "alle"
+              {searchNumber || searchTitle || filterType !== "alle" || filterStatus !== "offen" || showArchive
                 ? "Mit den aktuellen Filtern wurde nichts gefunden."
                 : "Erstelle dein erstes Ticket über den Knopf oben."}
             </p>
