@@ -19,7 +19,14 @@ import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Notification } from "@/types";
 
-export function NotificationsBell() {
+interface Props {
+  /** Auf welcher Seite das Dropdown aufklappt. Default 'bottom' (unter
+   *  der Glocke). 'top' wenn die Glocke unten in der Sidebar steht und
+   *  das Dropdown nach OBEN aufklappen muss. */
+  side?: "top" | "bottom";
+}
+
+export function NotificationsBell({ side = "bottom" }: Props = {}) {
   const supabase = createClient();
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -110,7 +117,9 @@ export function NotificationsBell() {
         )}
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-[320px] max-h-[70vh] overflow-y-auto rounded-xl bg-card border border-border shadow-2xl z-50 text-foreground">
+        <div className={`absolute right-0 w-[320px] max-h-[70vh] overflow-y-auto rounded-xl bg-card border border-border shadow-2xl z-50 text-foreground ${
+          side === "top" ? "bottom-full mb-2" : "top-full mt-2"
+        }`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-card z-10">
             <p className="text-sm font-semibold">Benachrichtigungen</p>
             {unread > 0 && (

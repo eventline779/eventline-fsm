@@ -56,16 +56,11 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
 
   return (
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[260px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
-      {/* Logo + Notifications-Glocke — Top auf 38px. Glocke steht
-          rechts vom Logo damit sie immer sichtbar ist und nicht mit
-          dem Nav-Scroll mitwandert. */}
-      <div className="px-4 pt-[38px] pb-4 flex items-start justify-between gap-2">
-        <Link href="/dashboard" className="block flex-1 min-w-0 flex items-start">
+      {/* Logo — Top auf 38px */}
+      <div className="px-6 pt-[38px] pb-4 flex items-start justify-center">
+        <Link href="/dashboard" className="block">
           <Logo size="md" />
         </Link>
-        <div className="shrink-0">
-          <NotificationsBell />
-        </div>
       </div>
 
       {/* Navigation */}
@@ -124,15 +119,17 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
           Theme-Toggle damit es als prominenter Action-Bereich endet. */}
       <SidebarStempel />
 
-      {/* Toggles */}
-      <div className="px-3 mb-2 space-y-0.5">
+      {/* Theme-Toggle (Light/Dark) + Notifications-Glocke. Glocke rechts
+          ausgerichtet damit sie immer sichtbar ist neben dem Theme-Text. */}
+      <div className="px-3 mb-2 flex items-center gap-1">
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
         >
           {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </button>
+        <NotificationsBell side="top" />
       </div>
 
       {/* User */}
