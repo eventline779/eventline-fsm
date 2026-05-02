@@ -69,16 +69,52 @@ export async function POST(request: Request) {
   const { data: roleRow } = await admin.from("roles").select("slug").eq("slug", requestedRole).single();
   const role = roleRow?.slug ?? "techniker";
 
-  // 1. Auth-User anlegen. Wir umgehen das supabase-js SDK und rufen die
-  //    Auth-Admin-API direkt per fetch — das SDK ist im Next.js-Server-
-  //    Runtime mit "AuthApiError: Internal Server Error" gescheitert,
-  //    obwohl derselbe Payload direkt per curl gegen Supabase funktioniert.
-  //    Direkter Fetch ist robuster, weniger Schichten dazwischen.
-  //    email_confirm:true → keine Bestaetigungsmail; Random-Passwort weil
-  //    der User's eh per Reset-Link selbst setzt.
-  //    WICHTIG: full_name + role landen via user_metadata in der
-  //    raw_user_meta_data — der Postgres-Trigger handle_new_user() liest
-  //    das aus und legt damit selbst die profiles-Row an.
+  const created = await createAuthUser({ supabaseUrl, serviceKey, email, fullName: full_name, role });
+  if (!created.success) {
+    return NextResponse.json(
+      { success: false, error: created.error, debug: created.debug },
+      { status: 400 },
+    );
+  }
+
+  // Setup-Mail mit Reset-Link via Resend — Supabase's Default-Mailer
+  // ist unzuverlaessig (Rate-Limit, Spam-Filter). Wir generieren den
+  // Recovery-Link via Auth-Admin-API und schicken die Mail dann selbst
+  // ueber Resend, das die App eh schon fuer Termin-Mails nutzt.
+  await sendSetupMail({ supabaseUrl, serviceKey, email, fullName: full_name });
+
+  return NextResponse.json({ success: true, user_id: created.userId });
+  } catch (err) {
+    // Statt generic 500 → konkrete Meldung zurueck. Hilft beim Debugging
+    // von Edge-Cases (Service-Role-Key falsch, Trigger-Konflikte, etc.)
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Anlegen";
+    logError("admin.users.create.exception", err);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}
+
+// Legt einen Auth-User per direktem Fetch gegen die Supabase Auth-Admin-
+// API an. Wir umgehen das supabase-js SDK weil es im Next.js-Server-
+// Runtime mit "AuthApiError: Internal Server Error" gescheitert ist,
+// obwohl derselbe Payload direkt per curl funktioniert.
+//
+// email_confirm:true → keine Bestaetigungsmail; Random-Passwort weil
+// der User sich's eh per Reset-Link selbst setzt. full_name + role
+// landen via user_metadata in der raw_user_meta_data — der Postgres-
+// Trigger handle_new_user() liest das aus und legt damit selbst die
+// profiles-Row an. Anschliessend updaten wir das Profil idempotent
+// (Sicherheits-Netz falls der Trigger die Rolle nicht uebernommen hat).
+//
+// Bei Fehler im Profil-Update wird der Auth-User wieder geloescht
+// damit kein Zombie-Auth-User uebrigbleibt.
+export async function createAuthUser(opts: {
+  supabaseUrl: string;
+  serviceKey: string;
+  email: string;
+  fullName: string;
+  role: string;
+}): Promise<{ success: true; userId: string } | { success: false; error: string; debug?: unknown }> {
+  const { supabaseUrl, serviceKey, email, fullName, role } = opts;
   const tempPassword = randomUUID() + "-" + randomUUID();
   const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: "POST",
@@ -91,12 +127,11 @@ export async function POST(request: Request) {
       email,
       password: tempPassword,
       email_confirm: true,
-      user_metadata: { full_name, role },
+      user_metadata: { full_name: fullName, role },
     }),
   });
 
   if (!authRes.ok) {
-    // Body als Text holen damit auch Non-JSON-Antworten lesbar sind.
     const rawBody = await authRes.text().catch(() => "");
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(rawBody) as Record<string, unknown>; } catch {}
@@ -109,45 +144,28 @@ export async function POST(request: Request) {
       ? `Es gibt bereits einen Benutzer mit Email ${email}`
       : msg;
     logError("admin.users.create.auth", { status: authRes.status, body: rawBody }, { email });
-    // Debug-Info im Response damit wir sehen was Supabase sagt
-    return NextResponse.json(
-      { success: false, error: friendlier, debug: { status: authRes.status, supabase_body: parsed } },
-      { status: 400 },
-    );
+    return { success: false, error: friendlier, debug: { status: authRes.status, supabase_body: parsed } };
   }
 
   const created = await authRes.json() as { id: string; email: string };
 
-  // 2. Sicherheitshalber das Profil nachschaerfen — falls der Trigger
-  //    die Rolle nicht uebernommen hat. Idempotent.
+  // Profil idempotent nachschaerfen falls der Trigger die Rolle nicht
+  // uebernommen hat. Bei Fehler den Auth-User wieder loeschen.
+  const admin = createAdminClient();
   const { error: profileErr } = await admin
     .from("profiles")
-    .update({ role, full_name, is_active: true })
+    .update({ role, full_name: fullName, is_active: true })
     .eq("id", created.id);
   if (profileErr) {
-    // Cleanup falls Update fehlschlaegt — aber via direkten Auth-API-Call.
     await fetch(`${supabaseUrl}/auth/v1/admin/users/${created.id}`, {
       method: "DELETE",
       headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
     });
     logError("admin.users.create.profile-update", profileErr, { email });
-    return NextResponse.json({ success: false, error: profileErr.message }, { status: 500 });
+    return { success: false, error: profileErr.message };
   }
 
-  // 3. Setup-Mail mit Reset-Link via Resend — Supabase's Default-Mailer
-  //    ist unzuverlaessig (Rate-Limit, Spam-Filter). Wir generieren den
-  //    Recovery-Link via Auth-Admin-API und schicken die Mail dann selbst
-  //    ueber Resend, das die App eh schon fuer Termin-Mails nutzt.
-  await sendSetupMail({ supabaseUrl, serviceKey, email, fullName: full_name });
-
-  return NextResponse.json({ success: true, user_id: created.id });
-  } catch (err) {
-    // Statt generic 500 → konkrete Meldung zurueck. Hilft beim Debugging
-    // von Edge-Cases (Service-Role-Key falsch, Trigger-Konflikte, etc.)
-    const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Anlegen";
-    logError("admin.users.create.exception", err);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
-  }
+  return { success: true, userId: created.id };
 }
 
 // Generiert via Auth-Admin-API einen Recovery-Link und schickt eine

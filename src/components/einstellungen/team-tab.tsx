@@ -21,7 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
-import { Plus, KeyRound, Pencil, UserX, UserCheck, Mail } from "lucide-react";
+import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 type EditState = { id: string; full_name: string; role: string } | null;
@@ -122,6 +122,26 @@ export function TeamTab() {
     toast.success(`Reset-Mail an ${p.email} verschickt`);
   }
 
+  async function hardDelete(p: Profile) {
+    const ok = await confirm({
+      title: "Endgültig löschen?",
+      message: `${p.full_name} wird unwiderruflich aus dem System entfernt. Auf alten Aufträgen wird die Zuordnung entfernt (auf "—" gesetzt). Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: "Endgültig löschen",
+      variant: "red",
+    });
+    if (!ok) return;
+    setBusyId(p.id);
+    const res = await fetch(`/api/admin/users/${p.id}`, { method: "DELETE" });
+    const json = await res.json();
+    setBusyId(null);
+    if (!json.success) {
+      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      return;
+    }
+    toast.success(`${p.full_name} endgültig gelöscht`);
+    load();
+  }
+
   async function toggleActive(p: Profile) {
     const ok = await confirm({
       title: p.is_active ? "Benutzer deaktivieren?" : "Benutzer reaktivieren?",
@@ -215,6 +235,17 @@ export function TeamTab() {
                   >
                     {p.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                   </button>
+                  {!p.is_active && (
+                    <button
+                      type="button"
+                      onClick={() => hardDelete(p)}
+                      disabled={busyId === p.id}
+                      className="kasten kasten-red"
+                      title="Endgültig löschen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </CardContent>
             </Card>
