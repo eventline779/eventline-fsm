@@ -23,7 +23,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles } from "lucide-react";
 import type { TicketType } from "@/types";
 
 type Step = "pick" | "form";
@@ -56,6 +56,10 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
 
   // Beleg-spezifisch.
   const [beleg, setBeleg] = useState({ betrag_chf: "", kaufdatum: "", lieferant: "" });
+  // KI-Analyse-State fuer Beleg: laeuft beim ersten File-Pick.
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisIssues, setAnalysisIssues] = useState<string[]>([]);
+  const [analysisDone, setAnalysisDone] = useState(false);
 
   // Stempel-Aenderung-spezifisch.
   const [stempelMode, setStempelMode] = useState<StempelMode>("korrektur");
@@ -87,6 +91,9 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       setDescription("");
       setUrgent(false);
       setBeleg({ betrag_chf: "", kaufdatum: "", lieferant: "" });
+      setAnalyzing(false);
+      setAnalysisIssues([]);
+      setAnalysisDone(false);
       setStempelMode("korrektur");
       setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", beschreibung: "", grund: "" });
       setMaterial({ artikel: "", menge: "1", betrag_chf: "", auftrag_id: "" });
@@ -143,15 +150,88 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
     if (t === "material") setTitle("Material-Anfrage");
   }
 
-  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = e.target.files;
     if (!list) return;
-    setFiles((prev) => [...prev, ...Array.from(list)]);
+    const newFiles = Array.from(list);
+    setFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
+
+    // Beim Beleg-Typ: erste Datei automatisch via KI analysieren.
+    // Wir analysieren NUR die erste Datei, weitere Dateien bleiben unangetastet.
+    if (type === "beleg" && newFiles.length > 0 && !analysisDone) {
+      const first = newFiles[0];
+      if (!first.type.startsWith("image/")) {
+        // PDF-Belege analysieren wir nicht — User soll selbst eintragen.
+        return;
+      }
+      analyzeReceipt(first);
+    }
+  }
+
+  async function analyzeReceipt(file: File) {
+    setAnalyzing(true);
+    setAnalysisIssues([]);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch("/api/tickets/analyze-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setAnalysisIssues([`Analyse fehlgeschlagen: ${json.error ?? "Unbekannt"}`]);
+        return;
+      }
+      const r = json.result as {
+        ok?: boolean;
+        issues?: string[];
+        extracted?: { betrag_chf?: number | null; kaufdatum?: string | null; lieferant?: string | null };
+      };
+      // Felder vorausfuellen wenn KI was erkannt hat — User kann jederzeit ueberschreiben.
+      const ex = r.extracted ?? {};
+      setBeleg((prev) => ({
+        betrag_chf: prev.betrag_chf || (typeof ex.betrag_chf === "number" ? ex.betrag_chf.toFixed(2) : ""),
+        kaufdatum: prev.kaufdatum || (typeof ex.kaufdatum === "string" ? ex.kaufdatum : ""),
+        lieferant: prev.lieferant || (typeof ex.lieferant === "string" ? ex.lieferant : ""),
+      }));
+      setAnalysisIssues(Array.isArray(r.issues) ? r.issues : []);
+      setAnalysisDone(true);
+    } catch (err) {
+      setAnalysisIssues([err instanceof Error ? err.message : "Analyse fehlgeschlagen"]);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          reject(new Error("Konnte Bild nicht lesen"));
+          return;
+        }
+        const comma = result.indexOf(",");
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("FileReader-Fehler"));
+      reader.readAsDataURL(file);
+    });
   }
 
   function removeFile(idx: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      // Wenn alle Files weg, Analyse-State zuruecksetzen.
+      if (next.length === 0) {
+        setAnalysisIssues([]);
+        setAnalysisDone(false);
+      }
+      return next;
+    });
   }
 
   function validate(): string | null {
@@ -159,6 +239,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
     if (!title.trim()) return "Titel fehlt";
     if (type === "it" && !description.trim()) return "Problem-Beschreibung fehlt";
     if (type === "beleg") {
+      if (files.length === 0) return "Beleg-Foto oder PDF ist Pflicht — bitte Datei hochladen";
       if (!beleg.betrag_chf || isNaN(parseFloat(beleg.betrag_chf))) return "Betrag fehlt";
       if (!beleg.kaufdatum) return "Kaufdatum fehlt";
     }
@@ -490,7 +571,11 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
           {/* File-Upload */}
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">
-              Anhänge {type === "beleg" ? "(Quittung-Foto)" : type === "material" ? "(Foto / Quittung)" : ""}
+              {type === "beleg"
+                ? "Beleg-Foto oder PDF *"
+                : type === "material"
+                  ? "Anhänge (Foto / Quittung)"
+                  : "Anhänge"}
             </p>
             <label className="kasten kasten-muted cursor-pointer w-full justify-center">
               <Upload className="h-3.5 w-3.5" />
@@ -515,6 +600,36 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* KI-Analyse-Status fuer Beleg */}
+            {type === "beleg" && analyzing && (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/[0.08] border border-blue-500/20 text-blue-700 dark:text-blue-300">
+                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                <span className="text-xs">Beleg wird analysiert…</span>
+              </div>
+            )}
+            {type === "beleg" && !analyzing && analysisDone && analysisIssues.length === 0 && (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/[0.08] border border-green-500/20 text-green-700 dark:text-green-300">
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-xs">Beleg ist klar lesbar — Felder vorausgefüllt, gerne anpassen.</span>
+              </div>
+            )}
+            {type === "beleg" && !analyzing && analysisIssues.length > 0 && (
+              <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/[0.08] border border-amber-500/30">
+                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-0.5 flex-1">
+                    <p className="font-medium">KI-Hinweis:</p>
+                    {analysisIssues.map((iss, i) => (
+                      <p key={i}>· {iss}</p>
+                    ))}
+                    <p className="text-[10px] opacity-75 mt-1">
+                      Du kannst die Felder manuell ausfüllen oder ein besseres Foto hochladen.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
