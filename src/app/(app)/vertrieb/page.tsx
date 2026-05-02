@@ -31,6 +31,7 @@ import { LeadCard } from "@/components/vertrieb/lead-card";
 import { LeadForm } from "@/components/vertrieb/lead-form";
 import { CategoryPicker } from "@/components/vertrieb/category-picker";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { SearchableSelect } from "@/components/searchable-select";
 
 export default function VertriebPage() {
   const router = useRouter();
@@ -848,18 +849,45 @@ export default function VertriebPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Firma, Person oder Branche..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card" />
         </div>
-        <select value={filterKategorie} onChange={(e) => setFilterKategorie(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
-          <option value="all">Alle Kategorien</option>
-          {KATEGORIE_OPTIONS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-        </select>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
-          <option value="all">Alle Status</option>
-          {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label} ({statusCounts[s.value] || 0})</option>)}
-        </select>
-        <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value as any)} className="h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card">
-          <option value="all">Alle Prioritäten</option>
-          {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-        </select>
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterKategorie}
+            onChange={(v) => setFilterKategorie(v as VertriebKategorie | "all")}
+            items={[
+              { id: "all", label: "Alle Kategorien" },
+              ...KATEGORIE_OPTIONS.map((k) => ({ id: k.value, label: k.label })),
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterKategorie !== "all"}
+          />
+        </div>
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterStatus}
+            onChange={(v) => setFilterStatus(v as VertriebStatus | "all")}
+            items={[
+              { id: "all", label: "Alle Status" },
+              ...STATUS_OPTIONS.map((s) => ({ id: s.value, label: `${s.label} (${statusCounts[s.value] || 0})` })),
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterStatus !== "all"}
+          />
+        </div>
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterPriority}
+            onChange={(v) => setFilterPriority(v as VertriebPriority | "all")}
+            items={[
+              { id: "all", label: "Alle Prioritäten" },
+              ...PRIORITY_OPTIONS.map((p) => ({ id: p.value, label: p.label })),
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterPriority !== "all"}
+          />
+        </div>
       </div>
 
       {/* Form */}

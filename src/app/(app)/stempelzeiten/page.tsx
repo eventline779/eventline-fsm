@@ -18,6 +18,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { Briefcase, FileText, Clock, Calendar, User, Trash2 } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { SearchableSelect } from "@/components/searchable-select";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -215,16 +216,19 @@ export default function StempelzeitenPage() {
           <Input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className="h-9 w-40" />
         </div>
         {showAll && isAdmin && (
-          <select
-            value={filterUserId}
-            onChange={(e) => setFilterUserId(e.target.value)}
-            className="h-9 px-3 text-sm rounded-xl border border-border bg-card"
-          >
-            <option value="">Alle Mitarbeiter</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.full_name}</option>
-            ))}
-          </select>
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              value={filterUserId}
+              onChange={setFilterUserId}
+              items={[
+                { id: "", label: "Alle Mitarbeiter" },
+                ...users.map((u) => ({ id: u.id, label: u.full_name })),
+              ]}
+              searchable={false}
+              clearable={false}
+              active={!!filterUserId}
+            />
+          </div>
         )}
         {(filterFrom || filterTo || filterUserId) && (
           <button

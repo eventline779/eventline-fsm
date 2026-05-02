@@ -23,6 +23,7 @@ import {
 import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { SearchableSelect } from "@/components/searchable-select";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 interface TodoAttachment {
@@ -403,10 +404,17 @@ export default function TodosPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Zuweisen an</label>
-                  <select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-border bg-card">
-                    <option value="">Niemand</option>
-                    {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                  </select>
+                  <div className="mt-1">
+                    <SearchableSelect
+                      value={form.assigned_to}
+                      onChange={(v) => setForm({ ...form, assigned_to: v })}
+                      items={[
+                        { id: "", label: "Niemand" },
+                        ...profiles.map((p) => ({ id: p.id, label: p.full_name })),
+                      ]}
+                      clearable={false}
+                    />
+                  </div>
                 </div>
                 <div className="flex items-end">
                   <button
