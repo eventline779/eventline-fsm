@@ -5,6 +5,7 @@
 // ein Passwort setzt. Der Reset-Link landet auf /passwort-reset.
 
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/api-auth";
 import { appUrl } from "@/lib/app-url";
@@ -12,6 +13,18 @@ import { logError } from "@/lib/log";
 
 export async function POST(request: Request) {
   try {
+    // Env-Vars upfront pruefen damit ein fehlender Key sofort eine
+    // klare Meldung liefert statt einem cryptic Internal Server Error.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+      logError("admin.users.create.env", { hasUrl: !!supabaseUrl, hasKey: !!serviceKey });
+      return NextResponse.json(
+        { success: false, error: "Server-Konfiguration unvollstaendig (SUPABASE-ENV fehlt)" },
+        { status: 500 },
+      );
+    }
+
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
@@ -46,9 +59,7 @@ export async function POST(request: Request) {
   //    WICHTIG: full_name + role landen via user_metadata in der
   //    raw_user_meta_data — der Postgres-Trigger handle_new_user() liest
   //    das aus und legt damit selbst die profiles-Row an.
-  const tempPassword = crypto.randomUUID() + "-" + crypto.randomUUID();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const tempPassword = randomUUID() + "-" + randomUUID();
   const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
