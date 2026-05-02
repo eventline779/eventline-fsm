@@ -361,6 +361,35 @@ html, body, *, *::before, *::after {
   background: transparent !important;
 }
 
+/* Browser-Default-Spinner und Calendar/Clock-Icons app-weit unterdruecken
+   bei date/time/number-Inputs. Die nativen Widgets fuehlen sich klobig
+   an — Eventline-User wollen direkt tippen. Date-Picker bleibt durch
+   Klick auf Input-Feld weiter zugaenglich (Browser-Behavior), nur das
+   visuelle Icon rechts und die hoch/runter-Pfeile verschwinden. */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="time"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-outer-spin-button,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-outer-spin-button,
+input[type="datetime-local"]::-webkit-inner-spin-button,
+input[type="datetime-local"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* === Globale Linien-Staerke: alle Tailwind .border-* Utilities auf 2px ===
    In @layer utilities platziert — innerhalb dieses Layers gewinnt source-order,
    und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
