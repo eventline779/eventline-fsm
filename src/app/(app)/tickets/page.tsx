@@ -266,15 +266,16 @@ export default function TicketsPage() {
                         )}
                       </div>
                     </div>
-                    {/* Status-Badge an fixer Position rechts — vertikal
-                        unter dem Status-Dropdown in der Filter-Bar.
-                        w-44 matcht den Dropdown-Container, justify-start
-                        damit das Badge linksbuendig in der Spalte sitzt. */}
+                    {/* Status-Badge an fixer Position — vertikal unter
+                        dem Status-Dropdown in der Filter-Bar. Nach dem
+                        Status kommt eine leere w-44-Spalte als Platzhalter
+                        fuer die Typ-Dropdown-Spalte rechts daneben. */}
                     <div className="hidden sm:flex w-44 shrink-0 justify-start">
                       <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${STATUS_META[t.status].classes}`}>
                         {STATUS_META[t.status].label}
                       </span>
                     </div>
+                    <div className="hidden sm:block w-44 shrink-0" aria-hidden="true" />
                     {/* Mobile: Status-Badge bleibt inline neben dem Titel */}
                     <span className={`sm:hidden inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
                       {STATUS_META[t.status].label}
