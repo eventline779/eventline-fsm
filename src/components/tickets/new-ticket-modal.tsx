@@ -102,27 +102,51 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   }, [open]);
 
   // Stempel-Eintraege laden wenn Typ Stempel-Aenderung gewaehlt wird.
+  // Separate Queries fuer time_entries und jobs — der nested join
+  // (job:jobs(...)) hatte still failende Probleme bei manchen Usern.
   useEffect(() => {
     if (type !== "stempel_aenderung") return;
     (async () => {
-      const { data } = await supabase
+      const { data: entries, error: entriesErr } = await supabase
         .from("time_entries")
-        .select("id, clock_in, clock_out, description, job:jobs(job_number, title)")
+        .select("id, clock_in, clock_out, description, job_id")
         .order("clock_in", { ascending: false })
         .limit(30);
-      if (data) {
-        setTimeEntries(
-          (data as unknown as Array<{
-            id: string; clock_in: string; clock_out: string | null; description: string | null;
-            job: { job_number: number; title: string } | null;
-          }>).map((e) => ({
+      if (entriesErr) {
+        toast.error("Stempel-Eintraege konnten nicht geladen werden: " + entriesErr.message);
+        return;
+      }
+      if (!entries || entries.length === 0) {
+        setTimeEntries([]);
+        return;
+      }
+
+      // Job-Daten fuer die referenzierten Jobs nachladen.
+      const jobIds = Array.from(new Set(
+        entries.map((e) => e.job_id).filter((id): id is string => !!id),
+      ));
+      const jobsById = new Map<string, { job_number: number; title: string }>();
+      if (jobIds.length > 0) {
+        const { data: jobsData } = await supabase
+          .from("jobs")
+          .select("id, job_number, title")
+          .in("id", jobIds);
+        for (const j of jobsData ?? []) {
+          jobsById.set(j.id, { job_number: j.job_number, title: j.title });
+        }
+      }
+
+      setTimeEntries(
+        entries.map((e) => {
+          const job = e.job_id ? jobsById.get(e.job_id) : null;
+          return {
             id: e.id,
             clock_in: e.clock_in,
             clock_out: e.clock_out,
-            job_label: e.job ? `INT-${e.job.job_number}` : (e.description || "Andere Arbeit"),
-          })),
-        );
-      }
+            job_label: job ? `INT-${job.job_number}` : (e.description || "Andere Arbeit"),
+          };
+        }),
+      );
     })();
   }, [type, supabase]);
 
