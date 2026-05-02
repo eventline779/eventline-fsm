@@ -23,8 +23,8 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2 } from "lucide-react";
-import type { TicketType, TicketPriority } from "@/types";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle } from "lucide-react";
+import type { TicketType } from "@/types";
 
 type Step = "pick" | "form";
 type StempelMode = "korrektur" | "vergessen";
@@ -52,7 +52,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   // Gemeinsame Felder.
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TicketPriority>("normal");
+  const [urgent, setUrgent] = useState(false);
 
   // Beleg-spezifisch.
   const [beleg, setBeleg] = useState({ betrag_chf: "", kaufdatum: "", lieferant: "" });
@@ -85,7 +85,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       setFiles([]);
       setTitle("");
       setDescription("");
-      setPriority("normal");
+      setUrgent(false);
       setBeleg({ betrag_chf: "", kaufdatum: "", lieferant: "" });
       setStempelMode("korrektur");
       setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", beschreibung: "", grund: "" });
@@ -230,7 +230,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
           type,
           title: title.trim(),
           description: description.trim() || null,
-          priority,
+          priority: urgent ? "dringend" : "normal",
           data,
           created_by: user.id,
         })
@@ -297,9 +297,25 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
 
       {step === "form" && type && typeMeta && (
         <div className="space-y-4">
-          {/* Titel */}
+          {/* Titel + Dringend-Toggle (gleicher Stil wie Auftrag-Form). */}
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground/70 ml-1">Titel *</p>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Titel *</p>
+              <button
+                type="button"
+                onClick={() => setUrgent((u) => !u)}
+                data-tooltip={urgent ? "Dringend markiert (klicken zum entfernen)" : "Als dringend markieren"}
+                aria-pressed={urgent}
+                aria-label="Dringend markieren"
+                className={`inline-flex items-center justify-center h-7 w-7 rounded-md transition-all ${
+                  urgent
+                    ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
+                    : "text-muted-foreground/60 hover:text-red-500 hover:bg-red-500/10"
+                }`}
+              >
+                <AlertCircle className="h-4 w-4" strokeWidth={urgent ? 2.5 : 2} />
+              </button>
+            </div>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
           </div>
 
@@ -470,23 +486,6 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
               className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
               required={type === "it"}
             />
-          </div>
-
-          {/* Priorität */}
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground/70 ml-1">Priorität</p>
-            <div className="grid grid-cols-4 gap-2">
-              {(["niedrig", "normal", "hoch", "dringend"] as TicketPriority[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPriority(p)}
-                  className={priority === p ? "kasten-active" : "kasten-toggle-off"}
-                >
-                  {p === "niedrig" ? "Niedrig" : p === "normal" ? "Normal" : p === "hoch" ? "Hoch" : "Dringend"}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* File-Upload */}
