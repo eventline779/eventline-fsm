@@ -76,15 +76,24 @@ export async function POST(request: Request) {
   });
 
   if (!authRes.ok) {
-    const errBody = await authRes.json().catch(() => ({ msg: "Unbekannter Fehler" }));
-    const msg = (errBody as { msg?: string; message?: string }).msg
-            ?? (errBody as { msg?: string; message?: string }).message
+    // Body als Text holen damit auch Non-JSON-Antworten lesbar sind.
+    const rawBody = await authRes.text().catch(() => "");
+    let parsed: Record<string, unknown> = {};
+    try { parsed = JSON.parse(rawBody) as Record<string, unknown>; } catch {}
+    const msg = (parsed.msg as string | undefined)
+            ?? (parsed.message as string | undefined)
+            ?? (parsed.error_description as string | undefined)
+            ?? rawBody
             ?? "User-Erstellung fehlgeschlagen";
     const friendlier = /already (been )?registered|already exists|duplicate|email_exists/i.test(msg)
       ? `Es gibt bereits einen Benutzer mit Email ${email}`
       : msg;
-    logError("admin.users.create.auth", { status: authRes.status, body: errBody }, { email });
-    return NextResponse.json({ success: false, error: friendlier }, { status: 400 });
+    logError("admin.users.create.auth", { status: authRes.status, body: rawBody }, { email });
+    // Debug-Info im Response damit wir sehen was Supabase sagt
+    return NextResponse.json(
+      { success: false, error: friendlier, debug: { status: authRes.status, supabase_body: parsed } },
+      { status: 400 },
+    );
   }
 
   const created = await authRes.json() as { id: string; email: string };
