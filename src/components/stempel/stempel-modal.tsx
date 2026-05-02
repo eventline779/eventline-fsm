@@ -239,15 +239,6 @@ export function StempelModal({ open, onClose }: Props) {
               })
             )}
           </div>
-          <div>
-            <Label className="text-xs">Notiz (optional)</Label>
-            <Input
-              placeholder="Was machst du genau?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1"
-            />
-          </div>
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={() => setMode("choose")} className="kasten kasten-muted flex-1">Zurück</button>
             <button
