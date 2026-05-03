@@ -17,34 +17,33 @@ const SYSTEM_PROMPT = `Du bist ein Material-Anfrage-Assistent fuer Eventline FSM
 Analysiere das Bild eines Warenkorbs oder einer Produkt-Auflistung
 (typisch von digitec.ch, galaxus.ch, conrad.ch oder aehnlichen Shops).
 
-Extrahiere die folgenden Infos und antworte AUSSCHLIESSLICH mit einem
-validen JSON-Objekt in genau diesem Format, kein Markdown-Codeblock:
+Extrahiere die einzelnen Positionen und antworte AUSSCHLIESSLICH mit
+einem validen JSON-Objekt in genau diesem Format, kein Markdown-Codeblock:
 
 {
   "ok": boolean,
   "issues": ["..."],
   "extracted": {
-    "artikel": string | null,
-    "menge": number | null,
-    "betrag_chf": number | null
+    "items": [
+      { "artikel": "...", "menge": 1, "betrag_chf": 24.50 }
+    ]
   }
 }
 
 Regeln:
-- "ok": true nur wenn alle drei Infos klar erkennbar sind.
-- "issues" Array (auf Deutsch): kurze, konkrete Punkte was unklar/unscharf
+- "ok": true nur wenn fuer jedes Item Artikel + Menge erkennbar sind.
+- "issues" Array (auf Deutsch): kurze konkrete Punkte was unklar/unscharf
   ist. Leeres Array wenn alles ok. Beispiele: "Bild ist unscharf",
-  "Mehrere Artikel — nicht klar welcher Total-Betrag", "Kein Warenkorb-
-  Bildschirm".
-- "artikel": Bei einem Artikel: dessen voller Name (z.B. "Sennheiser
-  EW-DX EM 4 Dante MK2 Empfaenger"). Bei mehreren Artikeln: alle
-  Artikel-Namen kommasepariert (z.B. "XLR-Kabel 5m, HDMI-Kabel 2m,
-  Lautsprecher-Kabel 10m").
-- "menge": Gesamt-Stueckzahl. Wenn Warenkorb 3 verschiedene Items
-  zu je 1 Stueck zeigt → 3. Wenn 1 Item zu 5 Stueck → 5. null wenn
-  unklar.
-- "betrag_chf": Total-Betrag in CHF (mit Steuern wenn ersichtlich).
-  null wenn andere Waehrung oder Total nicht erkennbar.`;
+  "Preis bei Item 2 nicht erkennbar", "Kein Warenkorb-Bildschirm".
+- "items": EIN Eintrag pro Position. Wenn der Warenkorb 3 verschiedene
+  Artikel zeigt → 3 Items im Array. Wenn 1 Artikel zu 5 Stueck → 1 Item
+  mit menge=5. Felder pro Item:
+    * "artikel": voller Produktname inkl. Hersteller wenn ersichtlich
+    * "menge": Stueckzahl als Integer
+    * "betrag_chf": Stueck-Preis (nicht Total) in CHF wenn erkennbar,
+      sonst null. NUR CHF — bei anderer Waehrung null + ein issue dazu.
+- Mindestens ein Item muss im Array sein (auch bei null-Werten),
+  ausser "ok" ist false und das Bild ist gar kein Warenkorb.`;
 
 export async function POST(request: Request) {
   const auth = await requireUser();

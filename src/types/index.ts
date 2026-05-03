@@ -444,12 +444,17 @@ export interface TicketDataStempelAenderung {
   grund: string;           // Pflicht: warum die Aenderung
 }
 
-export interface TicketDataMaterial {
+export interface TicketDataMaterialItem {
   artikel: string;
   menge: number;
-  // Genauer Betrag — entweder direkt eingegeben ODER aus dem Attachment
-  // ablesbar (Quittung / Foto). Eines der beiden ist Pflicht.
   betrag_chf?: number;
+}
+
+export interface TicketDataMaterial {
+  // Pro Material-Anfrage koennen mehrere Positionen drin sein (z.B. wenn
+  // ein Warenkorb-Screenshot mehrere Items enthaelt). Mindestens 1 Item
+  // ist Pflicht.
+  items: TicketDataMaterialItem[];
   auftrag_id?: string;
 }
 

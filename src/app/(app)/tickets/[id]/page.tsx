@@ -444,26 +444,38 @@ function TicketDataDisplay({ type, data }: { type: TicketType; data: Record<stri
 
   if (type === "material") {
     const d = data as unknown as TicketDataMaterial;
+    const items = Array.isArray(d.items) ? d.items : [];
+    const total = items.reduce((sum, it) => sum + (it.betrag_chf ?? 0) * it.menge, 0);
     return (
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Artikel</p>
-          <p className="text-sm font-medium mt-0.5">{d.artikel}</p>
-        </div>
+      <div className="space-y-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Menge</p>
-          <p className="text-sm font-mono font-semibold mt-0.5">{d.menge}</p>
-        </div>
-        {typeof d.betrag_chf === "number" && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betrag</p>
-            <p className="text-sm font-mono font-semibold mt-0.5">CHF {d.betrag_chf.toFixed(2)}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Positionen</p>
+          <div className="mt-2 space-y-1.5">
+            {items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">—</p>
+            ) : (
+              items.map((it, i) => (
+                <div key={i} className="grid grid-cols-12 gap-3 items-center text-sm">
+                  <span className="col-span-7 font-medium truncate">{it.artikel}</span>
+                  <span className="col-span-2 text-right font-mono tabular-nums">{it.menge}×</span>
+                  <span className="col-span-3 text-right font-mono tabular-nums">
+                    {typeof it.betrag_chf === "number" ? `CHF ${it.betrag_chf.toFixed(2)}` : "—"}
+                  </span>
+                </div>
+              ))
+            )}
+            {items.length > 1 && total > 0 && (
+              <div className="grid grid-cols-12 gap-3 items-center text-sm pt-1.5 border-t-2 border-border">
+                <span className="col-span-9 font-semibold uppercase text-xs tracking-wider text-muted-foreground">Total</span>
+                <span className="col-span-3 text-right font-mono tabular-nums font-semibold">CHF {total.toFixed(2)}</span>
+              </div>
+            )}
           </div>
-        )}
+        </div>
         {d.auftrag_id && (
-          <div className="col-span-2">
+          <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Auftrag</p>
-            <Link href={`/auftraege/${d.auftrag_id}`} className="text-sm font-medium mt-0.5 text-blue-600 hover:underline">
+            <Link href={`/auftraege/${d.auftrag_id}`} className="text-sm font-medium mt-0.5 text-blue-600 hover:underline inline-block">
               Auftrag öffnen
             </Link>
           </div>

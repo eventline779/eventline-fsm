@@ -23,7 +23,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles } from "lucide-react";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus } from "lucide-react";
 import type { TicketType } from "@/types";
 
 type Step = "pick" | "form";
@@ -82,8 +82,13 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   });
   const [jobs, setJobs] = useState<{ id: string; job_number: number; title: string }[]>([]);
 
-  // Material-spezifisch.
-  const [material, setMaterial] = useState({ artikel: "", menge: "1", betrag_chf: "", auftrag_id: "" });
+  // Material-spezifisch — pro Anfrage koennen mehrere Positionen rein
+  // (Warenkorb mit mehreren Artikeln). Mindestens 1 leeres Item beim
+  // Start damit das Form sofort ausfuellbar ist.
+  const [materialItems, setMaterialItems] = useState<Array<{ artikel: string; menge: string; betrag_chf: string }>>(
+    [{ artikel: "", menge: "1", betrag_chf: "" }],
+  );
+  const [materialAuftrag, setMaterialAuftrag] = useState("");
 
   // IT-spezifisch.
   const [device, setDevice] = useState("");
@@ -107,7 +112,8 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       setAnalysisDone(false);
       setStempelMode("korrektur");
       setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", beschreibung: "", grund: "" });
-      setMaterial({ artikel: "", menge: "1", betrag_chf: "", auftrag_id: "" });
+      setMaterialItems([{ artikel: "", menge: "1", betrag_chf: "" }]);
+      setMaterialAuftrag("");
       setDevice("");
     }
   }, [open]);
@@ -282,15 +288,20 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       const r = json.result as {
         ok?: boolean;
         issues?: string[];
-        extracted?: { artikel?: string | null; menge?: number | null; betrag_chf?: number | null };
+        extracted?: {
+          items?: Array<{ artikel?: string | null; menge?: number | null; betrag_chf?: number | null }>;
+        };
       };
-      const ex = r.extracted ?? {};
-      setMaterial((prev) => ({
-        artikel: prev.artikel || (typeof ex.artikel === "string" ? ex.artikel : ""),
-        menge: prev.menge && prev.menge !== "1" ? prev.menge : (typeof ex.menge === "number" ? String(ex.menge) : "1"),
-        betrag_chf: prev.betrag_chf || (typeof ex.betrag_chf === "number" ? ex.betrag_chf.toFixed(2) : ""),
-        auftrag_id: prev.auftrag_id,
-      }));
+      const items = r.extracted?.items ?? [];
+      if (items.length > 0) {
+        setMaterialItems(
+          items.map((it) => ({
+            artikel: typeof it.artikel === "string" ? it.artikel : "",
+            menge: typeof it.menge === "number" ? String(it.menge) : "1",
+            betrag_chf: typeof it.betrag_chf === "number" ? it.betrag_chf.toFixed(2) : "",
+          })),
+        );
+      }
       setAnalysisIssues(Array.isArray(r.issues) ? r.issues : []);
       setAnalysisDone(true);
     } catch (err) {
@@ -347,8 +358,12 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
     }
     if (type === "material") {
       if (files.length === 0) return "Warenkorb-Screenshot ist Pflicht — bitte Datei hochladen";
-      if (!material.artikel.trim()) return "Artikel fehlt";
-      if (!material.menge || parseInt(material.menge) < 1) return "Menge muss mindestens 1 sein";
+      if (materialItems.length === 0) return "Mindestens eine Position eintragen";
+      for (let i = 0; i < materialItems.length; i++) {
+        const it = materialItems[i];
+        if (!it.artikel.trim()) return `Artikel ${i + 1}: Name fehlt`;
+        if (!it.menge || parseInt(it.menge) < 1) return `Artikel ${i + 1}: Menge muss mindestens 1 sein`;
+      }
     }
     return null;
   }
@@ -394,10 +409,12 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
         }
       } else if (type === "material") {
         data = {
-          artikel: material.artikel,
-          menge: parseInt(material.menge),
-          betrag_chf: material.betrag_chf ? parseFloat(material.betrag_chf) : undefined,
-          auftrag_id: material.auftrag_id || undefined,
+          items: materialItems.map((it) => ({
+            artikel: it.artikel.trim(),
+            menge: parseInt(it.menge),
+            betrag_chf: it.betrag_chf ? parseFloat(it.betrag_chf) : undefined,
+          })),
+          auftrag_id: materialAuftrag || undefined,
         };
       }
 
@@ -801,31 +818,84 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
           )}
           {type === "material" && files.length > 0 && (
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 space-y-1">
-                  <p className="text-[10px] text-muted-foreground/70 ml-1">Artikel *</p>
-                  <Input value={material.artikel} onChange={(e) => setMaterial({ ...material, artikel: e.target.value })} placeholder="z.B. XLR-Kabel 5m" disabled={analyzing} />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Positionen *</p>
+                  {materialItems.length > 1 && (
+                    <p className="text-[10px] text-muted-foreground/60">
+                      Total: CHF {materialItems
+                        .reduce((sum, it) => sum + (parseFloat(it.betrag_chf) || 0) * (parseInt(it.menge) || 0), 0)
+                        .toFixed(2)}
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground/70 ml-1">Menge *</p>
-                  <Input type="number" min="1" value={material.menge} onChange={(e) => setMaterial({ ...material, menge: e.target.value })} disabled={analyzing} />
-                </div>
+                {materialItems.map((it, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-6">
+                      <Input
+                        value={it.artikel}
+                        onChange={(e) => setMaterialItems((prev) => prev.map((x, idx) => idx === i ? { ...x, artikel: e.target.value } : x))}
+                        placeholder={`Artikel ${i + 1}`}
+                        disabled={analyzing}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={it.menge}
+                        onChange={(e) => setMaterialItems((prev) => prev.map((x, idx) => idx === i ? { ...x, menge: e.target.value } : x))}
+                        placeholder="Menge"
+                        disabled={analyzing}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        step="0.05"
+                        value={it.betrag_chf}
+                        onChange={(e) => setMaterialItems((prev) => prev.map((x, idx) => idx === i ? { ...x, betrag_chf: e.target.value } : x))}
+                        placeholder="Stk-Preis"
+                        disabled={analyzing}
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center h-9">
+                      {materialItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setMaterialItems((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="p-1.5 rounded text-muted-foreground/50 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          aria-label="Position entfernen"
+                          disabled={analyzing}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setMaterialItems((prev) => [...prev, { artikel: "", menge: "1", betrag_chf: "" }])}
+                  className="kasten kasten-muted w-full justify-center"
+                  disabled={analyzing}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Weitere Position
+                </button>
               </div>
+
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Auftrag (optional)</p>
                 <SearchableSelect
-                  value={material.auftrag_id}
-                  onChange={(v) => setMaterial({ ...material, auftrag_id: v })}
+                  value={materialAuftrag}
+                  onChange={setMaterialAuftrag}
                   items={[
                     { id: "", label: "Kein Auftrag" },
                     ...jobs.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` })),
                   ]}
                   clearable={false}
                 />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Betrag (CHF)</p>
-                <Input type="number" step="0.05" value={material.betrag_chf} onChange={(e) => setMaterial({ ...material, betrag_chf: e.target.value })} placeholder="z.B. 24.50" disabled={analyzing} />
               </div>
             </div>
           )}
