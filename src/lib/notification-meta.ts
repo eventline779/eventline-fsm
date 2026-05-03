@@ -10,7 +10,7 @@
 //   purple = "IT/Tech"
 //   gray   = "System/Neutral"
 
-import { Ticket, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Ticket, CheckCircle2, XCircle, Info, Briefcase, Calendar, CheckSquare, Clock } from "lucide-react";
 import type { NotificationType } from "@/types";
 
 export type NotificationAccent = "blue" | "green" | "red" | "amber" | "purple" | "gray";
@@ -22,10 +22,14 @@ interface NotificationTypeMeta {
 }
 
 export const NOTIFICATION_META: Record<NotificationType, NotificationTypeMeta> = {
-  ticket_new:      { icon: Ticket,        accent: "blue",  label: "Neues Ticket"      },
-  ticket_done:     { icon: CheckCircle2,  accent: "green", label: "Ticket erledigt"   },
-  ticket_rejected: { icon: XCircle,       accent: "red",   label: "Ticket abgelehnt"  },
-  system:          { icon: Info,          accent: "gray",  label: "System"            },
+  ticket_new:       { icon: Ticket,       accent: "blue",  label: "Neues Ticket"      },
+  ticket_done:      { icon: CheckCircle2, accent: "green", label: "Ticket erledigt"   },
+  ticket_rejected:  { icon: XCircle,      accent: "red",   label: "Ticket abgelehnt"  },
+  job_assigned:     { icon: Briefcase,    accent: "red",   label: "Auftrag zugewiesen" },
+  appointment_new:  { icon: Calendar,     accent: "blue",  label: "Neuer Termin"      },
+  todo_assigned:    { icon: CheckSquare,  accent: "amber", label: "Todo zugewiesen"   },
+  stempel_reminder: { icon: Clock,        accent: "green", label: "Stempel-Erinnerung" },
+  system:           { icon: Info,         accent: "gray",  label: "System"            },
 };
 
 // Tailwind-Klassen pro Akzent — Bubble-Style (rounded-md mit getoenter

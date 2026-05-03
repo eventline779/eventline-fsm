@@ -515,6 +515,10 @@ export type NotificationType =
   | "ticket_new"
   | "ticket_done"
   | "ticket_rejected"
+  | "job_assigned"
+  | "appointment_new"
+  | "todo_assigned"
+  | "stempel_reminder"
   | "system";
 
 export interface Notification {

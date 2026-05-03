@@ -205,6 +205,10 @@ export default function BenachrichtigungenPage() {
               { id: "ticket_new", label: NOTIFICATION_META.ticket_new.label },
               { id: "ticket_done", label: NOTIFICATION_META.ticket_done.label },
               { id: "ticket_rejected", label: NOTIFICATION_META.ticket_rejected.label },
+              { id: "job_assigned", label: NOTIFICATION_META.job_assigned.label },
+              { id: "appointment_new", label: NOTIFICATION_META.appointment_new.label },
+              { id: "todo_assigned", label: NOTIFICATION_META.todo_assigned.label },
+              { id: "stempel_reminder", label: NOTIFICATION_META.stempel_reminder.label },
               { id: "system", label: NOTIFICATION_META.system.label },
             ]}
             searchable={false}
