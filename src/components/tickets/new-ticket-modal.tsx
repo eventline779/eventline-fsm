@@ -355,6 +355,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       if (!stempel.grund.trim()) return "Grund ist Pflicht";
       if (stempelMode === "korrektur" && !stempel.time_entry_id) return "Stempel-Eintrag auswählen";
       if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
+      if (stempelMode === "vergessen" && !stempel.job_id) return "Auftrag oder 'Andere Arbeit' auswählen";
     }
     if (type === "material") {
       if (files.length === 0) return "Warenkorb-Screenshot ist Pflicht — bitte Datei hochladen";
@@ -399,10 +400,13 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
             grund: stempel.grund,
           };
         } else {
+          // 'ANDERE_ARBEIT' ist der UI-Sentinel fuer 'kein Auftrag' — in
+          // der DB landet job_id=undefined.
+          const jobId = stempel.job_id === "ANDERE_ARBEIT" ? undefined : stempel.job_id;
           data = {
             neu_start: new Date(stempel.neu_start).toISOString(),
             neu_end: new Date(stempel.neu_end).toISOString(),
-            job_id: stempel.job_id || undefined,
+            job_id: jobId,
             beschreibung: stempel.beschreibung || undefined,
             grund: stempel.grund,
           };
@@ -775,14 +779,15 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground/70 ml-1">Auftrag (optional)</p>
+                    <p className="text-[10px] text-muted-foreground/70 ml-1">Auftrag *</p>
                     <SearchableSelect
                       value={stempel.job_id}
                       onChange={(v) => setStempel({ ...stempel, job_id: v })}
                       items={[
-                        { id: "", label: "Kein Auftrag (Andere Arbeit)" },
                         ...jobs.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` })),
+                        { id: "ANDERE_ARBEIT", label: "Keinem Auftrag (Andere Arbeit)" },
                       ]}
+                      placeholder="Auftrag oder 'Andere Arbeit' auswählen…"
                       clearable={false}
                     />
                   </div>
