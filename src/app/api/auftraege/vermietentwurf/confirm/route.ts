@@ -1,27 +1,42 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // HINWEIS: Diese Route bleibt absichtlich auf dem deutschen Pfad
 // /api/auftraege/vermietentwurf/confirm — sie wird in Mails an Kunden
 // referenziert, die schon im Umlauf sind. Umbenennen wuerde Bestaetigungs-
-// Links aus alten Mails brechen. Neue Routes sind englisch (jobs/rental-draft).
+// Links aus alten Mails brechen.
 //
 // Customer-facing Confirm-Link aus der Mail. Kein Login.
-// Der Frontend-Flow rueckelt den Step schon beim "Mail senden" hoch (auf 2
-// bzw. 4 — den Warte-Stand). Der Kunden-Klick:
-//   type=konditionen -> request_step >= 3 (Naechste Aktion: Angebot senden)
-//   type=angebot     -> Vermietentwurf direkt -> Auftrag (status='offen',
-//                       request_step=null). Schritt 5 gibt's nicht mehr.
-// So sieht der Kunde beim ERSTEN Klick die "Wurde bestaetigt"-Page, nicht
-// die "schon bestaetigt"-Page (die zeigt sich erst beim 2. Klick).
 //
-// Idempotent: Klickt der Kunde mehrmals, bleibt der Step beim hoechsten erreichten Wert.
-// Sicherheit: Token-Check ueber base64(jobId + "-confirm"). Reicht fuer den Use-Case
-// (eindeutiger Link pro Anfrage), kein Schutz gegen interne Kompromittierung — diese
-// Route hat keine Loeschwirkung.
+// Sicherheit: Token = HMAC-SHA256(jobId+":"+type) mit CONFIRM_SECRET als
+// Server-Secret. Ohne das Secret kann niemand offline einen gueltigen Token
+// erzeugen, auch nicht wer die Job-UUID kennt. Vorher base64(jobId+"-confirm")
+// war reine Obfuskation — wer die UUID kannte, konnte den Token rechnen.
+//
+// Backwards-Compat: Alte base64-Tokens aus Mails die VOR diesem Deploy
+// verschickt wurden, bleiben uebergangsweise akzeptiert. Sobald Leo bestaetigt
+// dass keine alten Mails mehr im Umlauf sind, kann der Fallback raus.
 
-function expectedToken(jobId: string) {
+function hmacToken(jobId: string, type: string): string {
+  const secret = process.env.CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return createHmac("sha256", secret).update(`${jobId}:${type}`).digest("hex");
+}
+
+function legacyBase64Token(jobId: string): string {
   return Buffer.from(jobId + "-confirm").toString("base64");
+}
+
+function isTokenValid(jobId: string, type: string, token: string): boolean {
+  const expected = hmacToken(jobId, type);
+  if (token.length === expected.length) {
+    try {
+      if (timingSafeEqual(Buffer.from(token), Buffer.from(expected))) return true;
+    } catch { /* length mismatch fallthrough */ }
+  }
+  // Legacy: erst-deployte Tokens — entfernen wenn 60 Tage nach Deploy
+  // keine alten Mails mehr im Umlauf sein sollten.
+  return token === legacyBase64Token(jobId);
 }
 
 export async function GET(request: NextRequest) {
@@ -33,7 +48,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(errorPage("Ungueltiger Link"), { headers: { "Content-Type": "text/html" } });
   }
 
-  if (token !== expectedToken(id)) {
+  if (!isTokenValid(id, type, token)) {
     return new NextResponse(errorPage("Ungueltiger Best&auml;tigungslink"), { headers: { "Content-Type": "text/html" } });
   }
 
@@ -98,25 +113,29 @@ export async function GET(request: NextRequest) {
     await supabase.from("jobs").update({ request_step: targetStep }).eq("id", id);
   }
 
-  // Mitarbeiter benachrichtigen
+  // Mitarbeiter benachrichtigen — alle aktiven Admins, nicht eine
+  // hardcoded Email-Liste. So bekommen neue Admins automatisch die
+  // Notifications, ohne dass jemand die Code-Liste pflegen muss.
   const { data: admins } = await supabase
     .from("profiles")
     .select("id")
-    .in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com"]);
+    .eq("role", "admin")
+    .eq("is_active", true);
 
-  if (admins) {
+  if (admins && admins.length > 0) {
     const title = type === "angebot"
       ? `Angebot best&auml;tigt — Auftrag erstellt: ${customerName}`
       : `Konditionen best&auml;tigt: ${customerName}`;
     const link = type === "angebot" ? `/auftraege/${id}` : `/auftraege/vermietentwurf/${id}`;
-    for (const admin of admins) {
-      await supabase.from("notifications").insert({
-        user_id: admin.id,
+    // Bulk-Insert statt Schleife → ein Roundtrip statt N.
+    await supabase.from("notifications").insert(
+      admins.map((a) => ({
+        user_id: a.id,
         title,
         message: locationName,
         link,
-      });
-    }
+      })),
+    );
   }
 
   const successMsg = type === "angebot"

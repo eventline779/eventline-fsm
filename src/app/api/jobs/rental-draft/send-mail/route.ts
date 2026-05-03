@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createHmac } from "node:crypto";
 import { requireUser } from "@/lib/api-auth";
 
 export const maxDuration = 60;
@@ -44,8 +45,13 @@ function formatDate(d: string | null | undefined) {
   return date.toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
-function confirmToken(jobId: string) {
-  return Buffer.from(jobId + "-confirm").toString("base64");
+// HMAC-Token analog zur Verify-Seite — passt zum hmacToken() in
+// /api/auftraege/vermietentwurf/confirm/route.ts. Wenn jemand das Secret
+// nicht kennt, kann er offline keinen Token konstruieren auch wenn er die
+// Job-UUID kennt.
+function confirmToken(jobId: string, type: "konditionen" | "angebot"): string {
+  const secret = process.env.CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return createHmac("sha256", secret).update(`${jobId}:${type}`).digest("hex");
 }
 
 export async function POST(request: Request) {
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
   if (step === 1) {
     subject = `Mietkonditionen: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
     intro = "Vielen Dank f&uuml;r Ihre Anfrage. Anbei finden Sie unsere Mietkonditionen:";
-    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=konditionen`;
+    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId, "konditionen")}&type=konditionen`;
     cta = `
       <div style="text-align:center;margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#16a34a;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
@@ -108,7 +114,7 @@ export async function POST(request: Request) {
     // step === 3 (Angebot) — die einzige andere Variante; Step 5 gibt es nicht mehr.
     subject = `Angebot: ${loc}${dateStr ? ` – ${dateStr}` : ""}`;
     intro = "Vielen Dank f&uuml;r die Best&auml;tigung unserer Konditionen. Anbei erhalten Sie unser Angebot:";
-    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId)}&type=angebot`;
+    const url = `${APP_URL}/api/auftraege/vermietentwurf/confirm?id=${jobId}&token=${confirmToken(jobId, "angebot")}&type=angebot`;
     cta = `
       <div style="text-align:center;margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#16a34a;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">

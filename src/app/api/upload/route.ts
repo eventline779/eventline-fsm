@@ -1,8 +1,57 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/api-auth";
+import { logError } from "@/lib/log";
 
 export const maxDuration = 30;
+
+// Erlaubte Path-Prefixes — alle Upload-Sites in der App schreiben in einen
+// dieser Top-Level-Ordner. Path-Traversal (`..`, leading `/`, `//`) ist
+// gesperrt; ohne Prefix-Match kommt der Upload nicht durch. Das schliesst
+// Path-Hijacking (User schickt fremden Pfad und ueberschreibt fremde Files
+// ueber upsert:true).
+//
+// Quellen der Prefixes (aus 'const path = ...' in der App):
+//   - jobs/             → auftraege/neu, auftraege/[id], vermietentwurf/neu
+//   - raeume/           → raeume/[id]
+//   - standorte/        → standorte/[id]
+//   - maintenance/      → standorte/[id] (Wartungs-Aufgaben)
+//   - todos/            → todos/page
+//   - tickets/          → new-ticket-modal
+//   - vertrieb/         → vertrieb/page (Offerten-PDF)
+//   - vermietentwurf/   → send-step-modal
+//   - rapport-photos/   → rapport-form-modal
+//   - signatures/client + signatures/tech → rapport-form-modal
+const ALLOWED_PREFIXES = [
+  "jobs/",
+  "raeume/",
+  "standorte/",
+  "maintenance/",
+  "todos/",
+  "tickets/",
+  "vertrieb/",
+  "vermietentwurf/",
+  "rapport-photos/",
+  "signatures/",
+] as const;
+
+// MIME-Whitelist — verhindert Upload von ausfuehrbaren Skripten in den
+// public-Bucket. Eventline laedt nur Bilder, PDFs und Office-Docs hoch.
+const ALLOWED_MIME_PREFIXES = ["image/", "application/pdf", "application/vnd.", "application/msword", "text/plain"];
+
+function isPathSafe(path: string): boolean {
+  if (!path) return false;
+  if (path.startsWith("/") || path.startsWith("\\")) return false;
+  if (path.includes("..")) return false;
+  if (path.includes("//") || path.includes("\\\\")) return false;
+  if (path.length > 512) return false;
+  return ALLOWED_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function isMimeSafe(mime: string): boolean {
+  if (!mime) return false;
+  return ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,8 +65,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "File and path required" }, { status: 400 });
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ success: false, error: `Datei zu gross (${Math.round(file.size / 1024 / 1024)}MB). Max 10MB.` }, { status: 400 });
+    if (!isPathSafe(path)) {
+      logError("api.upload.path-rejected", null, { userId: auth.user.id, path });
+      return NextResponse.json({ success: false, error: "Ungültiger Upload-Pfad" }, { status: 400 });
+    }
+
+    if (!isMimeSafe(file.type)) {
+      logError("api.upload.mime-rejected", null, { userId: auth.user.id, mime: file.type });
+      return NextResponse.json({ success: false, error: `Dateityp nicht erlaubt: ${file.type || "unbekannt"}` }, { status: 400 });
+    }
+
+    // 25MB — passt zum Client-Limit in src/lib/file-upload.ts. Vorher 10MB
+    // serverseitig vs 25MB clientseitig hat fuer Bandbreiten-Verschwendung
+    // gesorgt (Client laesst durch, Server lehnt nach kompletten Upload ab).
+    if (file.size > 25 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: `Datei zu gross (${Math.round(file.size / 1024 / 1024)}MB). Max 25MB.` }, { status: 400 });
     }
 
     const supabase = createAdminClient();
@@ -30,11 +92,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      logError("api.upload.supabase", error, { userId: auth.user.id, path });
+      return NextResponse.json({ success: false, error: "Upload fehlgeschlagen" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, path });
   } catch (e) {
-    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "Upload fehlgeschlagen" }, { status: 500 });
+    logError("api.upload.exception", e);
+    return NextResponse.json({ success: false, error: "Upload fehlgeschlagen" }, { status: 500 });
   }
 }

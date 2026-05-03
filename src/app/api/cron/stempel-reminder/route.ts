@@ -24,8 +24,13 @@ import { logError } from "@/lib/log";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Cron-Secret HARD-PFLICHT — siehe reminders/route.ts. Wenn ENV fehlt,
+  // 503 statt durchlassen.
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET fehlt in der Server-Config" }, { status: 503 });
+  }
   const authHeader = request.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

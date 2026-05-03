@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
   const { userId, quick_links } = await request.json() as { userId?: string; quick_links?: QuickLink[] };
   if (!userId) return NextResponse.json({ success: false }, { status: 400 });
 
+  // Trust-Boundary: User darf NUR seine eigenen Settings ueberschreiben.
+  // Vorher: Body-userId wurde ungeprueft genommen — jeder konnte fremde
+  // quick_links plattmachen.
+  if (userId !== auth.user.id) {
+    return NextResponse.json({ success: false, error: "Nicht erlaubt" }, { status: 403 });
+  }
+
   const supabase = createAdminClient();
 
   // Load existing settings — andere Felder darin nicht ueberschreiben.
@@ -40,7 +47,7 @@ export async function POST(request: NextRequest) {
   settings.quick_links = quick_links ?? [];
 
   const { error } = await supabase.from("profiles").update({ settings }).eq("id", userId);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ success: false, error: "Speichern fehlgeschlagen" }, { status: 500 });
 
   return NextResponse.json({ success: true });
 }

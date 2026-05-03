@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getAuthorizeUrl } from "@/lib/bexio";
+import { requireAdmin } from "@/lib/api-auth";
 
 // Startet den OAuth-Flow: state generieren, in Cookie ablegen (httpOnly), dann
 // per 302 zur Bexio-Authorize-URL weiterleiten. Der Callback prueft das
 // state-Cookie und tauscht den Code gegen Tokens.
+//
+// requireAdmin: ohne Auth-Check koennte ein externer Angreifer den OAuth-Start
+// triggern und durch Account-Linking-Attack das Bexio-Konto eines Beliebigen
+// an die Eventline-Instanz binden. Bexio-Setup ist Admin-Vorbehalt.
 export async function GET(_request: NextRequest) {
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
+
   const state = randomBytes(32).toString("hex");
   const url = getAuthorizeUrl(state);
 

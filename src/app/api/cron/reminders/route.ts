@@ -4,13 +4,18 @@ import { Resend } from "resend";
 import { logError } from "@/lib/log";
 
 export async function GET(request: Request) {
-  // Cron-Secret prüfen (Vercel Cron sendet diesen Header)
+  // Cron-Secret HARD-PFLICHT — wenn die ENV-Var fehlt, ist der Endpoint
+  // sonst oeffentlich (jeder kann Reminders-Mails an alle Mitarbeiter
+  // triggern). Vercel-Cron schickt den Header automatisch; ohne Secret
+  // gibts auch lokal keinen Bypass mehr (vorher pruefte er auf
+  // VERCEL_URL.includes("localhost") was auf Vercel nie greift, also
+  // toter Code, und ohne CRON_SECRET liess er einfach durch).
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET fehlt in der Server-Config" }, { status: 503 });
+  }
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !process.env.VERCEL_URL?.includes("localhost")) {
-    // Erlaube auch ohne Secret falls keins gesetzt ist
-    if (process.env.CRON_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createAdminClient();

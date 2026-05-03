@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { jsPDF } from "jspdf";
 import LOGO_BASE64 from "@/lib/logo-base64";
@@ -316,10 +317,15 @@ export async function POST(
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const { id } = await params;
+  // User-Client (mit Session-Cookie) fuer den initialen RLS-Check —
+  // der User darf den Rapport nur invoicen wenn er ihn auch sehen darf.
+  // Fuer Storage-Operationen + Update auf service_reports brauchen wir
+  // anschliessend den Service-Role-Client.
+  const userClient = await createClient();
   const supabase = createAdminClient();
 
-  // Rapport mit Details laden
-  const { data: report } = await supabase
+  // Rapport mit Details laden — via User-Client damit RLS greift.
+  const { data: report } = await userClient
     .from("service_reports")
     .select("*, job:jobs(title, job_number, customer:customers(name, address_street, address_zip, address_city), location:locations(name))")
     .eq("id", id)

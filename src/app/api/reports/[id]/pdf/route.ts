@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { jsPDF } from "jspdf";
 import LOGO_BASE64 from "@/lib/logo-base64";
@@ -18,17 +19,27 @@ export async function GET(
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const { id } = await params;
-  const supabase = createAdminClient();
+  // User-Client (mit Session-Cookie) statt Service-Role — damit RLS auf
+  // service_reports greift und der User nur Reports sieht zu denen er
+  // berechtigt ist (created_by ODER admin). Vorher konnte jeder
+  // authentifizierte User per Direct-Object-Reference jeden Rapport
+  // als PDF runterladen.
+  const userClient = await createClient();
 
-  const { data: report } = await supabase
+  const { data: report } = await userClient
     .from("service_reports")
     .select("*, job:jobs(title, job_number, customer:customers(name, address_street, address_zip, address_city), location:locations(name))")
     .eq("id", id)
     .single();
 
   if (!report) {
-    return NextResponse.json({ error: "Rapport nicht gefunden" }, { status: 404 });
+    return NextResponse.json({ error: "Rapport nicht gefunden oder keine Berechtigung" }, { status: 404 });
   }
+
+  // Service-Role-Client wird weiter unten ggf. fuer Storage-Reads (Photos)
+  // benoetigt — Storage-RLS koennte sonst den Photo-Pull blockieren obwohl
+  // der User den zugehoerigen Report sehen darf.
+  const supabase = createAdminClient();
 
   const job = report.job as any;
   const customer = job?.customer;

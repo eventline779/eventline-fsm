@@ -30,6 +30,25 @@ export async function PATCH(
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
 
+  // Selbstschutz: Admin darf sich nicht selbst aussperren oder degradieren.
+  // Ohne diesen Check kann der einzige Admin sich auf is_active=false setzen
+  // (oder seine Rolle weg von 'admin' aendern) und die Firma hat keinen
+  // Admin-Zugang mehr.
+  if (auth.user.id === id) {
+    if (body.is_active === false) {
+      return NextResponse.json(
+        { success: false, error: "Du kannst dich nicht selbst deaktivieren" },
+        { status: 400 },
+      );
+    }
+    if (typeof body.role === "string" && body.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Du kannst dir nicht selbst die Admin-Rolle wegnehmen" },
+        { status: 400 },
+      );
+    }
+  }
+
   const admin = createAdminClient();
 
   const update: Record<string, unknown> = {};
@@ -54,7 +73,8 @@ export async function PATCH(
 
   const { error: profErr } = await admin.from("profiles").update(update).eq("id", id);
   if (profErr) {
-    return NextResponse.json({ success: false, error: profErr.message }, { status: 500 });
+    logError("admin.users.update.profile", profErr, { userId: id });
+    return NextResponse.json({ success: false, error: "Update fehlgeschlagen" }, { status: 500 });
   }
 
   // Wenn is_active=false: Auth-User bannen damit Login nicht mehr geht.
@@ -65,7 +85,8 @@ export async function PATCH(
     });
     if (banErr) {
       // Profil ist schon umgestellt — den Ban-Fehler nur zurueckmelden.
-      return NextResponse.json({ success: false, error: banErr.message }, { status: 500 });
+      logError("admin.users.update.ban", banErr, { userId: id });
+      return NextResponse.json({ success: false, error: "Login-Sperre konnte nicht gesetzt werden" }, { status: 500 });
     }
   }
 
