@@ -11,6 +11,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteRow } from "@/lib/db-mutations";
+import { usePermissions } from "@/lib/use-permissions";
 import { validateFileSize } from "@/lib/file-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,7 @@ export default function TodosPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+  const { can } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -378,7 +380,7 @@ export default function TodosPage() {
           <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
             <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}
           </button>
-          {!showArchive && (
+          {!showArchive && can("todos:create") && (
             <button
               type="button"
               onClick={() => setShowForm(!showForm)}

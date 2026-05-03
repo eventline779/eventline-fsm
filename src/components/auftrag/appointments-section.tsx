@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Calendar, Clock, User, Plus, Send, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/lib/use-permissions";
 import type { JobAppointment, Profile } from "@/types";
 
 interface Props {
@@ -43,6 +44,7 @@ export function AppointmentsSection({
   defaultOpen = false,
 }: Props) {
   const supabase = createClient();
+  const { can } = usePermissions();
   const [showApptForm, setShowApptForm] = useState(defaultOpen);
   const [apptForm, setApptForm] = useState({
     title: "",
@@ -174,9 +176,11 @@ export function AppointmentsSection({
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Calendar className="h-4 w-4" />Termine ({appointments.length})
           </CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}>
-            <Plus className="h-4 w-4 mr-1" />Termin
-          </Button>
+          {can("kalender:create") && (
+            <Button size="sm" variant="outline" onClick={() => setShowApptForm(!showApptForm)}>
+              <Plus className="h-4 w-4 mr-1" />Termin
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {showApptForm && (

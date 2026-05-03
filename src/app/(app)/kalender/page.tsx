@@ -35,6 +35,7 @@ import type { CalendarItem, CalendarShift, CalendarView, ItemType } from "@/comp
 import { MonthView } from "@/components/kalender/month-view";
 import { WeekView } from "@/components/kalender/week-view";
 import { NeuerTerminModal } from "@/components/kalender/neuer-termin-modal";
+import { usePermissions } from "@/lib/use-permissions";
 
 // Supabase-Joined-Shape — am API-Boundary getypt damit die Loader-Logik
 // nicht durchgehend mit any/unknown rumhantieren muss.
@@ -73,6 +74,7 @@ export default function KalenderPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNeuerTermin, setShowNeuerTermin] = useState(false);
+  const { can } = usePermissions();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -246,14 +248,16 @@ export default function KalenderPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowNeuerTermin(true)}
-            className="kasten kasten-red"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Neuer Termin
-          </button>
+          {can("kalender:create") && (
+            <button
+              type="button"
+              onClick={() => setShowNeuerTermin(true)}
+              className="kasten kasten-red"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Neuer Termin
+            </button>
+          )}
         </div>
       </div>
 

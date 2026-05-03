@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteRow } from "@/lib/db-mutations";
 import { logError } from "@/lib/log";
 import { TOAST } from "@/lib/messages";
+import { usePermissions } from "@/lib/use-permissions";
 import { validateFileSize } from "@/lib/file-upload";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -82,6 +83,7 @@ export default function VertriebPage() {
   const [kundenMode, setKundenMode] = useState<"neu" | "bestehend">("neu");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const supabase = createClient();
+  const { can } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
@@ -734,14 +736,16 @@ export default function VertriebPage() {
           <h1 className="text-2xl font-bold tracking-tight">Vertrieb</h1>
           <p className="text-sm text-muted-foreground mt-1">{contacts.length} Kontakte · {statusCounts.gewonnen || 0} gewonnen · {statusCounts.offen || 0} offen</p>
         </div>
-        <button
-          type="button"
-          onClick={openNew}
-          className="kasten kasten-red"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Lead
-        </button>
+        {can("vertrieb:create") && (
+          <button
+            type="button"
+            onClick={openNew}
+            className="kasten kasten-red"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Lead
+          </button>
+        )}
       </div>
 
       {/* Kreis-Diagramm */}
