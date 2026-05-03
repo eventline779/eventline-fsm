@@ -785,8 +785,11 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                       value={stempel.job_id}
                       onChange={(v) => setStempel({ ...stempel, job_id: v })}
                       items={[
-                        ...jobs.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` })),
+                        // Andere Arbeit zuerst — sonst wird's bei vielen
+                        // Auftraegen abgeschnitten (SearchableSelect zeigt
+                        // nur die ersten 8 Items wenn search leer).
                         { id: "ANDERE_ARBEIT", label: "Keinem Auftrag (Andere Arbeit)" },
+                        ...jobs.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` })),
                       ]}
                       placeholder="Auftrag oder 'Andere Arbeit' auswählen…"
                       clearable={false}
