@@ -10,7 +10,7 @@ import { CUSTOMER_TYPES, JOB_STATUS } from "@/lib/constants";
 import type { Customer, Job, CustomerType } from "@/types";
 import {
   Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
-  ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote, ChevronDown,
+  ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote, ChevronDown, Plus,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { JobNumber } from "@/components/job-number";
@@ -426,12 +426,28 @@ export default function KundenDetailPage() {
 
       {/* Aufträge */}
       <Card className="bg-card">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ClipboardList className="h-4 w-4" />Aufträge ({jobs.length})</CardTitle>
+          {/* Direkt-Pfad: Auftrag fuer DIESEN Kunden anlegen — vorher musste
+              der User zur globalen /auftraege/neu und Kunden manuell suchen. */}
+          {can("auftraege:create") && (
+            <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red">
+              <Plus className="h-3.5 w-3.5" />
+              Auftrag
+            </Link>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {sortedJobs.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Keine Aufträge für diesen Kunden.</p>
+            <div className="py-4 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Keine Aufträge für diesen Kunden.</p>
+              {can("auftraege:create") && (
+                <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red inline-flex">
+                  <Plus className="h-3.5 w-3.5" />
+                  Ersten Auftrag anlegen
+                </Link>
+              )}
+            </div>
           ) : (
             <>
               {(showAllJobs ? sortedJobs : sortedJobs.slice(0, 2)).map((j) => (

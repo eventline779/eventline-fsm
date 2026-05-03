@@ -68,22 +68,16 @@ export default function AnfrageDetailPage() {
     const handler = () => loadDocuments();
     window.addEventListener("documents:invalidate", handler);
 
-    // Supabase-Realtime: sobald jemand (z.B. der Kunde via Mail-Confirm) das
-    // job aktualisiert, hier die Detail-Seite frisch laden — kein manuelles
-    // Refresh noetig. Filter auf genau dieses id, damit wir nur unser Job
-    // mitkriegen, nicht alle.
-    const channel = supabase
-      .channel(`vermietentwurf-${id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${id}` },
-        () => { loadJob(); }
-      )
-      .subscribe();
+    // Realtime via globalen Layout-Channel — wenn der Kunde via Mail-Confirm
+    // den Job aktualisiert, fliesst das Event als "realtime:jobs" auch hier
+    // rein und wir laden neu. Vorher lief hier ein eigener WebSocket pro
+    // Detail-Page, was sich bei vielen offenen Tabs aufaddiert hat.
+    const jobsHandler = () => { loadJob(); };
+    window.addEventListener("realtime:jobs", jobsHandler);
 
     return () => {
       window.removeEventListener("documents:invalidate", handler);
-      supabase.removeChannel(channel);
+      window.removeEventListener("realtime:jobs", jobsHandler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

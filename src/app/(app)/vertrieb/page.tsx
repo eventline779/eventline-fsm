@@ -33,9 +33,70 @@ import { CategoryPicker } from "@/components/vertrieb/category-picker";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 
+// Vertrieb-Notes-Schema — was im notizen-JSON-Feld gespeichert wird.
+// Vorher hatten wir ueberall `: any` weil das Schema implicit war —
+// hier explizit getypt, dann sind alle Lese/Schreib-Operationen safe.
+type Termin = {
+  id: string;
+  date: string;        // ISO YYYY-MM-DD
+  time: string;        // HH:MM
+  end_time?: string;
+  type?: string;
+  notes?: string;
+};
+
+interface VertriebDetails {
+  event_start?: string;
+  event_end?: string;
+  // Verwaltung-spezifisch
+  infrastruktur?: string;
+  ort?: string;
+  zielgruppe?: string;
+  programm?: string;
+  bedarf_vor_ort?: string;
+  // Veranstaltung-spezifisch (key=Bedarf-Slug, value=Beschreibung)
+  bedarf?: Record<string, string>;
+  // Cross-cutting
+  termine?: Termin[];
+  // Offerten-PDF: Storage-Pfad + Original-Filename. Wenn keine PDF gesetzt ist
+  // ist das Feld einfach nicht vorhanden (und `null` aus alten Datensaetzen
+  // wird beim Lesen via fallback abgefangen).
+  offerte_pdf?: { name: string; path: string } | null;
+  // Wird gesetzt wenn ein Auftrag aus diesem Lead konvertiert wurde.
+  job_id?: string;
+  job_number?: number | null;
+  // Optional: vom Lead vorausgewaehlte Location (springt zur Auftrag-Erstellung).
+  location_id?: string;
+}
+
+interface VertriebNotes {
+  _text?: string;
+  _details?: VertriebDetails;
+}
+
+function parseVertriebNotes(raw: string | null | undefined): VertriebNotes {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as VertriebNotes;
+    }
+  } catch { /* nicht-JSON Plain-Text — als _text rueckgeben */ }
+  return { _text: raw };
+}
+
 export default function VertriebPage() {
   const router = useRouter();
   const [contacts, setContacts] = useState<VertriebContact[]>([]);
+  // Counts kommen server-seitig aus der View `vertrieb_counts` — vorher
+  // wurden sie aus dem contacts-State berechnet, was nur funktioniert
+  // solange ALLE Leads geladen sind. Sobald Pagination kommt oder die
+  // Liste >1k Eintraege wird, waeren die Donut-Counts falsch.
+  const [counts, setCounts] = useState<{
+    total: number; offen: number; kontaktiert: number; gespraech: number;
+    gewonnen: number; abgesagt: number;
+    step_1: number; step_2: number; step_3: number; step_4: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<VertriebStatus | "all">("all");
@@ -90,23 +151,27 @@ export default function VertriebPage() {
   // das war Sicherheits-Theater (DevTools → Source → Passwort sichtbar).
   useEffect(() => {
     load();
-    const channel = supabase
-      .channel("vertrieb-contacts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Realtime via globalen Layout-Channel (event "realtime:vertrieb_contacts")
+    // statt eigenem WebSocket — schont Connection-Limits.
+    const handler = () => load();
+    window.addEventListener("realtime:vertrieb_contacts", handler);
+    return () => window.removeEventListener("realtime:vertrieb_contacts", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {
-    const [{ data }, locRes, custRes] = await Promise.all([
-      supabase.from("vertrieb_contacts").select("*").order("nr"),
+    const [{ data }, locRes, custRes, countsRes] = await Promise.all([
+      // limit(2000) — Bound damit der State nicht ueber alle Grenzen waechst.
+      // Bei 2000 Leads wird's eh Zeit fuer Pagination, dann faengst du das ab.
+      supabase.from("vertrieb_contacts").select("*").order("nr").limit(2000),
       supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
       supabase.from("customers").select("id, name, email, phone").eq("is_active", true).order("name"),
+      supabase.from("vertrieb_counts").select("*").single(),
     ]);
     if (data) setContacts(data as VertriebContact[]);
     if (locRes.data) setLocations(locRes.data);
     if (custRes.data) setCustomers(custRes.data);
+    if (countsRes.data) setCounts(countsRes.data);
     setLoading(false);
   }
 
@@ -143,16 +208,10 @@ export default function VertriebPage() {
     setEditingId(c.id);
     setEditingStep(c.step || 1);
     setCategoryPicked(true);
-    // Details aus notizen parsen (wenn JSON)
-    let details: any = {};
-    let freieNotiz = c.notizen || "";
-    try {
-      const parsed = JSON.parse(c.notizen || "{}");
-      if (parsed && typeof parsed === "object" && parsed._details) {
-        details = parsed._details;
-        freieNotiz = parsed._text || "";
-      }
-    } catch {}
+    // Details aus notizen parsen (typed via VertriebNotes — vorher `: any`).
+    const parsed = parseVertriebNotes(c.notizen);
+    const details: VertriebDetails = parsed._details ?? {};
+    const freieNotiz = parsed._text ?? "";
     setForm({
       firma: c.firma, branche: c.branche || "", ansprechperson: c.ansprechperson || "",
       position: c.position || "", email: c.email || "", telefon: c.telefon || "",
@@ -170,7 +229,10 @@ export default function VertriebPage() {
     });
     // Sichtbare Bedarf-Bereiche initial auf Basis vorhandener Texte
     setVisibleBedarf(new Set(Object.keys(details.bedarf || {})));
-    setOffertePdf(details.offerte_pdf || null);
+    // Legacy-Datensaetze koennten offerte_pdf als String haben — defensiv:
+    // nur Object-Form akzeptieren, sonst null.
+    const pdf = details.offerte_pdf;
+    setOffertePdf(pdf && typeof pdf === "object" && "path" in pdf ? pdf : null);
     setShowForm(true);
   }
 
@@ -183,7 +245,7 @@ export default function VertriebPage() {
     setSaving(true);
 
     // Details als JSON in notizen speichern (_text = freie Notiz, _details = kategorienspezifisch)
-    const details: any = {};
+    const details: VertriebDetails = {};
     if (form.event_start) details.event_start = form.event_start;
     if (form.event_end) details.event_end = form.event_end;
     if (form.kategorie === "verwaltung") {
@@ -294,15 +356,11 @@ export default function VertriebPage() {
     load();
   }
 
-  function currentContactWithDetails() {
+  function currentContactWithDetails(): (VertriebContact & { details: VertriebDetails }) | null {
     if (!editingId) return null;
     const c = contacts.find((x) => x.id === editingId);
     if (!c) return null;
-    let details: any = {};
-    try {
-      const parsed = JSON.parse(c.notizen || "{}");
-      if (parsed && parsed._details) details = parsed._details;
-    } catch {}
+    const details = parseVertriebNotes(c.notizen)._details ?? {};
     return { ...c, details };
   }
 
@@ -355,8 +413,7 @@ export default function VertriebPage() {
       // In notizen speichern
       const c = contacts.find((c) => c.id === editingId);
       if (c) {
-        let obj: any = {};
-        try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+        const obj: VertriebNotes = parseVertriebNotes(c.notizen);
         if (!obj._details) obj._details = {};
         obj._details.offerte_pdf = { name: file.name, path };
         await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
@@ -410,7 +467,7 @@ export default function VertriebPage() {
       if (fileData) {
         const arrayBuffer = await fileData.arrayBuffer();
         pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
-        pdfName = c.details.offerte_pdf.name;
+        pdfName = c.details.offerte_pdf?.name ?? null;
       }
     }
     try {
@@ -464,18 +521,16 @@ export default function VertriebPage() {
 
     // Termin-ID im Lead speichern
     if (newAppt?.id) {
-      let obj: any = {};
-      try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+      const obj: VertriebNotes = parseVertriebNotes(c.notizen);
       if (!obj._details) obj._details = {};
       if (!obj._details.termine) obj._details.termine = [];
       obj._details.termine.push({
         id: newAppt.id,
         type: terminType,
-        title,
         date: terminForm.date,
         time: terminForm.time,
         end_time: terminForm.end_time,
-        note: terminForm.note || null,
+        notes: terminForm.note || undefined,
       });
       await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
       await load();
@@ -499,10 +554,9 @@ export default function VertriebPage() {
     // Aus Kalender löschen
     await deleteRow("job_appointments", terminId);
     // Aus Lead-Details entfernen
-    let obj: any = {};
-    try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+    const obj: VertriebNotes = parseVertriebNotes(c.notizen);
     if (obj._details?.termine) {
-      obj._details.termine = obj._details.termine.filter((t: any) => t.id !== terminId);
+      obj._details.termine = obj._details.termine.filter((t) => t.id !== terminId);
       await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
       await load();
     }
@@ -560,7 +614,9 @@ export default function VertriebPage() {
     if (details.programm) descriptionParts.push(`Programm: ${details.programm}`);
     if (details.bedarf_vor_ort) descriptionParts.push(`Bedarf vor Ort: ${details.bedarf_vor_ort}`);
     if (details.bedarf) {
-      Object.entries(details.bedarf).forEach(([k, v]: any) => { descriptionParts.push(`${BEDARF_LABELS[k] || k}: ${v}`); });
+      for (const [k, v] of Object.entries(details.bedarf)) {
+        descriptionParts.push(`${BEDARF_LABELS[k] || k}: ${v}`);
+      }
     }
 
     const { data: newJob, error } = await supabase.from("jobs").insert({
@@ -578,8 +634,7 @@ export default function VertriebPage() {
     if (error || !newJob) { TOAST.supabaseError(error, "Auftrag konnte nicht angelegt werden"); setCreatingAuftrag(false); return; }
 
     // Auftrag-ID im Vertrieb-Eintrag speichern + Status auf gewonnen
-    let obj: any = {};
-    try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+    const obj: VertriebNotes = parseVertriebNotes(c.notizen);
     if (!obj._details) obj._details = {};
     obj._details.job_id = newJob.id;
     obj._details.job_number = newJob.job_number;
@@ -649,8 +704,7 @@ export default function VertriebPage() {
     await supabase.storage.from("documents").remove([offertePdf.path]);
     const c = contacts.find((c) => c.id === editingId);
     if (c) {
-      let obj: any = {};
-      try { obj = JSON.parse(c.notizen || "{}"); } catch {}
+      const obj: VertriebNotes = parseVertriebNotes(c.notizen);
       if (obj._details) delete obj._details.offerte_pdf;
       await supabase.from("vertrieb_contacts").update({ notizen: JSON.stringify(obj) }).eq("id", editingId);
     }
@@ -674,17 +728,21 @@ export default function VertriebPage() {
       return !q || c.firma.toLowerCase().includes(q) || (c.ansprechperson || "").toLowerCase().includes(q) || (c.branche || "").toLowerCase().includes(q);
     });
 
-  const statusCounts = STATUS_OPTIONS.reduce((acc, s) => {
-    acc[s.value] = contacts.filter((c) => c.status === s.value).length;
-    return acc;
-  }, {} as Record<string, number>);
+  // Counts aus der DB-View — fallback auf 0 wenn noch nicht geladen.
+  const statusCounts: Record<string, number> = counts ? {
+    offen: counts.offen,
+    kontaktiert: counts.kontaktiert,
+    gespraech: counts.gespraech,
+    gewonnen: counts.gewonnen,
+    abgesagt: counts.abgesagt,
+  } : {};
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Vertrieb</h1>
-          <p className="text-sm text-muted-foreground mt-1">{contacts.length} Kontakte · {statusCounts.gewonnen || 0} gewonnen · {statusCounts.offen || 0} offen</p>
+          <p className="text-sm text-muted-foreground mt-1">{counts?.total ?? 0} Kontakte · {statusCounts.gewonnen || 0} gewonnen · {statusCounts.offen || 0} offen</p>
         </div>
         {can("vertrieb:create") && (
           <button
@@ -699,14 +757,14 @@ export default function VertriebPage() {
       </div>
 
       {/* Kreis-Diagramm */}
-      {contacts.length > 0 && (() => {
+      {counts && counts.total > 0 && (() => {
         const segments = [
-          { label: "Schritt 1: Offen", count: contacts.filter((c) => (c.step || 1) === 1 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-gray)" },
-          { label: "Schritt 2: Kontaktiert", count: contacts.filter((c) => (c.step || 1) === 2 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-blue)" },
-          { label: "Schritt 3: Finalisierung", count: contacts.filter((c) => (c.step || 1) === 3 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-orange)" },
-          { label: "Schritt 4: Operations", count: contacts.filter((c) => (c.step || 1) === 4 && c.status !== "gewonnen" && c.status !== "abgesagt").length, color: "var(--status-emerald)" },
-          { label: "Gewonnen", count: contacts.filter((c) => c.status === "gewonnen").length, color: "var(--status-green)" },
-          { label: "Verloren", count: contacts.filter((c) => c.status === "abgesagt").length, color: "var(--status-red)" },
+          { label: "Schritt 1: Offen", count: counts.step_1, color: "var(--status-gray)" },
+          { label: "Schritt 2: Kontaktiert", count: counts.step_2, color: "var(--status-blue)" },
+          { label: "Schritt 3: Finalisierung", count: counts.step_3, color: "var(--status-orange)" },
+          { label: "Schritt 4: Operations", count: counts.step_4, color: "var(--status-emerald)" },
+          { label: "Gewonnen", count: counts.gewonnen, color: "var(--status-green)" },
+          { label: "Verloren", count: counts.abgesagt, color: "var(--status-red)" },
         ].filter((s) => s.count > 0);
 
         const total = segments.reduce((sum, s) => sum + s.count, 0);

@@ -30,6 +30,11 @@ type FilterType = "alle" | TicketType;
 // aktiven Liste ausgeblendet.
 const ARCHIVE_AFTER_DAYS = 14;
 
+// Cursor-Pagination — 100 Rows pro Page, "Mehr laden"-Button am Ende.
+// Bei 100 Mitarbeitern × ~5 Tickets/Monat ueberschreitet die Liste die
+// 500-Bound aus Phase D nach knapp einem Jahr — hier dann sauber paginiert.
+const PAGE_SIZE = 100;
+
 const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
   beleg:            { label: "Beleg",              icon: Receipt, color: "text-amber-600  dark:text-amber-400  bg-amber-50  dark:bg-amber-500/15"  },
@@ -46,6 +51,8 @@ const STATUS_META: Record<TicketStatus, { label: string; classes: string }> = {
 export default function TicketsPage() {
   const supabase = createClient();
   const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchNumber, setSearchNumber] = useState("");
   const [searchTitle, setSearchTitle] = useState("");
@@ -68,8 +75,9 @@ export default function TicketsPage() {
     })();
   }, [supabase]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Query-Builder — beide Loader-Pfade (initial + load-more) bauen die
+  // gleiche Query mit unterschiedlichem Cursor.
+  const buildQuery = useCallback((cursor: string | null) => {
     let q = supabase
       .from("tickets")
       .select(`
@@ -80,28 +88,25 @@ export default function TicketsPage() {
         attachments:ticket_attachments(id, filename, storage_path, mime_type)
       `)
       .order("created_at", { ascending: false })
-      // Bound auf 500 Rows — vorher unbounded → bei 100 MA × 5 Tickets/Monat
-      // wuerden nach 1 Jahr 6k+ Rows pro Page-Load durch die Browser laufen.
-      // 500 reicht fuer alle Filter-Modi mit komfortablem Headroom; harte
-      // Pagination wenn das mal zu eng wird.
-      .limit(500);
+      // PAGE_SIZE+1: der "(n+1)-Trick" → wenn wir 101 zurueckkriegen,
+      // wissen wir es gibt mindestens eine weitere Page, ohne extra
+      // count-Query zu machen.
+      .limit(PAGE_SIZE + 1);
+
+    if (cursor !== null) q = q.lt("created_at", cursor);
 
     // Im Archiv-Modus den Status-Filter ignorieren — archivierte Tickets sind
-    // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen),
-    // sonst wuerde das Default "offen" das Archiv immer leer aussehen lassen.
+    // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen).
     if (!showArchive && filterStatus !== "alle") q = q.eq("status", filterStatus);
     if (filterType !== "alle") q = q.eq("type", filterType);
     if (showOnlyMine && currentUserId) q = q.eq("created_by", currentUserId);
 
     // Archive vs Active per Server-Side-Filter — vorher wurden ALLE Rows
-    // geladen und client-seitig via isArchived() gefiltert. Bei Archiv-
-    // Toggle hiess das: oft 80% der Tickets ueber die Leitung ziehen die
-    // dann eh weggefiltert werden.
+    // geladen und client-seitig gefiltert.
     const archiveCutoff = new Date(Date.now() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
     if (showArchive) {
       q = q.in("status", ["erledigt", "abgelehnt"]).lt("resolved_at", archiveCutoff);
     } else {
-      // Aktive Tickets: alles was nicht in den letzten 14d resolved war ist Archiv.
       q = q.or(`resolved_at.is.null,resolved_at.gte.${archiveCutoff}`);
     }
 
@@ -115,11 +120,28 @@ export default function TicketsPage() {
       const like = `%${titleQ}%`;
       q = q.or(`title.ilike.${like},description.ilike.${like}`);
     }
-
-    const { data } = await q;
-    setTickets((data as unknown as TicketWithRelations[]) ?? []);
-    setLoading(false);
+    return q;
   }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, searchNumber, searchTitle]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await buildQuery(null);
+    const rows = (data as unknown as TicketWithRelations[]) ?? [];
+    setHasMore(rows.length > PAGE_SIZE);
+    setTickets(rows.slice(0, PAGE_SIZE));
+    setLoading(false);
+  }, [buildQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || tickets.length === 0) return;
+    setLoadingMore(true);
+    const lastCursor = tickets[tickets.length - 1].created_at;
+    const { data } = await buildQuery(lastCursor);
+    const rows = (data as unknown as TicketWithRelations[]) ?? [];
+    setHasMore(rows.length > PAGE_SIZE);
+    setTickets((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    setLoadingMore(false);
+  }, [buildQuery, loadingMore, hasMore, tickets]);
 
   useEffect(() => {
     const t = setTimeout(() => { load(); }, 200);
@@ -286,6 +308,18 @@ export default function TicketsPage() {
               </Link>
             );
           })}
+          {hasMore && (
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="kasten kasten-muted"
+              >
+                {loadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

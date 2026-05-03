@@ -39,21 +39,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Globale Regel: Enter im Input/Select springt zum nächsten Feld, statt zu submitten.
   useEnterAsTab();
 
-  // Realtime statt Polling: globale Subscription auf jobs + customers — bei
-  // jedem INSERT/UPDATE/DELETE feuern wir einen window-Event den alle Listen
-  // abonnieren ("jobs:invalidate" / "customers:invalidate"). Damit aktualisieren
-  // sich Listen ohne 10-Sekunden-Polling, und Form-Eingaben werden nicht durch
-  // einen Re-Render zerschossen. Skaliert deutlich besser als das vorige
-  // setInterval(refresh, 10000) — eine WebSocket-Verbindung statt Dauer-Queries.
+  // Realtime — EIN globaler Channel fuer alle Tables; vorher hatte jeder
+  // Listener (use-stempel, notifications-bell, vertrieb-page, etc.) seine
+  // eigene WebSocket-Verbindung. Bei 100 Mitarbeitern × 3 Tabs × 4 Channels
+  // waren das 1200 concurrent Realtime-Connections gegen das Supabase-
+  // Plan-Limit.
+  //
+  // Jetzt: ein Channel mit Subscriptions fuer alle relevanten Tables. Auf
+  // Change wird ein window-Event mit Stable-Name `realtime:<table>` gefeuert.
+  // Konsumenten lauschen via window.addEventListener — keine eigenen
+  // Channels mehr noetig. Plus zwei Legacy-Events ("jobs:invalidate",
+  // "customers:invalidate") die schon im Code referenziert sind.
   useEffect(() => {
+    const dispatch = (table: string) => () => {
+      window.dispatchEvent(new Event(`realtime:${table}`));
+    };
     const channel = supabase
       .channel("global-invalidate")
       .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
         window.dispatchEvent(new Event("jobs:invalidate"));
+        window.dispatchEvent(new Event("realtime:jobs"));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => {
         window.dispatchEvent(new Event("customers:invalidate"));
+        window.dispatchEvent(new Event("realtime:customers"));
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, dispatch("notifications"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "time_entries" }, dispatch("time_entries"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, dispatch("vertrieb_contacts"))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

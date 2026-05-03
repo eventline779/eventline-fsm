@@ -11,7 +11,7 @@
 // koennte man hier in einen Context optimieren, aktuell aber bei <10
 // gleichzeitigen Aufrufen unkritisch.
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { TimeEntry } from "@/types";
 
@@ -46,40 +46,15 @@ export function useStempel() {
     refresh();
   }, [refresh]);
 
-  // Channel-Name pro Hook-Instanz eindeutig — verhindert
-  // "cannot add postgres_changes callbacks after subscribe()" wenn
-  // mehrere useStempel()-Aufrufe parallel laufen (Widget + JobButton +
-  // /stempelzeiten-Page). Mit dem Singleton-Client wuerden sie sonst
-  // denselben Channel teilen und sich gegenseitig bei `.on()` blocken.
-  const channelIdRef = useRef<string>(`stempel-self-${Math.random().toString(36).slice(2)}`);
-
-  // Realtime-Sub: wenn der eigene User-Row sich aendert (egal woher),
-  // refreshen. Damit ist der Hook konsistent ueber Tabs hinweg.
+  // Realtime-Sub: konsumiert das `realtime:time_entries`-Event vom globalen
+  // Channel im (app)/layout.tsx — kein eigener WebSocket mehr. Der globale
+  // Channel sendet alle Aenderungen; wir filtern hier per refresh() das den
+  // eigenen User aus DB nachfragt (wird sowieso schon aufgerufen).
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
-      channel = supabase
-        .channel(channelIdRef.current)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "time_entries",
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => { refresh(); },
-        )
-        .subscribe();
-    })();
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [supabase, refresh]);
+    const handler = () => { refresh(); };
+    window.addEventListener("realtime:time_entries", handler);
+    return () => window.removeEventListener("realtime:time_entries", handler);
+  }, [refresh]);
 
   async function clockIn(opts: ClockInOpts): Promise<{ success: boolean; error?: string }> {
     const { data: { user } } = await supabase.auth.getUser();

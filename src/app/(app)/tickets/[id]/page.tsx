@@ -46,8 +46,16 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState<TicketWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [busy, setBusy] = useState(false);
+  // Edit-Mode fuer den Ersteller: Title + Description anpassen solange
+  // das Ticket noch offen ist (nach Erledigt/Abgelehnt schliesst sich
+  // das Fenster). Vorher gabs keinen Edit-Pfad — Tippfehler war Sackgasse.
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   // Bei Beleg-Tickets: aufgeloester Genehmiger (Person-Name oder verlinktes
   // Material-Ticket mit Nummer + Titel).
   const [belegApproval, setBelegApproval] = useState<{ kind: "person" | "ticket"; label: string; href?: string } | null>(null);
@@ -108,6 +116,7 @@ export default function TicketDetailPage() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setCurrentUserId(user.id);
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
       setIsAdmin(profile?.role === "admin");
     })();
@@ -124,6 +133,37 @@ export default function TicketDetailPage() {
     a.href = data.signedUrl;
     a.download = filename;
     a.click();
+  }
+
+  function startEdit() {
+    if (!ticket) return;
+    setEditTitle(ticket.title);
+    setEditDescription(ticket.description ?? "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!ticket) return;
+    if (!editTitle.trim()) {
+      toast.error("Titel ist Pflicht");
+      return;
+    }
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from("tickets")
+      .update({
+        title: editTitle.trim(),
+        description: editDescription.trim() || null,
+      })
+      .eq("id", ticket.id);
+    setSavingEdit(false);
+    if (error) {
+      TOAST.supabaseError(error, "Speichern fehlgeschlagen");
+      return;
+    }
+    toast.success("Gespeichert");
+    setEditing(false);
+    await load();
   }
 
   async function applyStatus(newStatus: "erledigt" | "abgelehnt") {
@@ -213,7 +253,59 @@ export default function TicketDetailPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-1">{ticket.title}</h1>
         </div>
+        {/* Edit-Button fuer den Ersteller — nur solange das Ticket noch
+            offen ist. Nach erledigt/abgelehnt friert der Inhalt ein. */}
+        {ticket.status === "offen" && currentUserId === ticket.created_by && !editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="kasten kasten-purple shrink-0"
+            data-tooltip="Bearbeiten"
+          >
+            Bearbeiten
+          </button>
+        )}
       </div>
+
+      {/* Edit-Form — Title + Description anpassen. */}
+      {editing && (
+        <Card className="bg-card border-foreground/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Bearbeiten</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Titel *</p>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                disabled={savingEdit}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung</p>
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={4}
+                disabled={savingEdit}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setEditing(false)} disabled={savingEdit} className="kasten kasten-muted flex-1">
+                Abbrechen
+              </button>
+              <button type="button" onClick={saveEdit} disabled={savingEdit || !editTitle.trim()} className="kasten kasten-red flex-1">
+                {savingEdit ? "Speichert…" : "Speichern"}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hauptinfos */}
       <Card className="bg-card">

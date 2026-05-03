@@ -95,15 +95,11 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
 
   useEffect(() => {
     load();
-    const channel = supabase
-      .channel("notifications-bell")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
-        () => { load(); },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Reload bei Notification-Aenderung — Event kommt vom globalen Channel
+    // im (app)/layout.tsx, kein eigener WebSocket mehr noetig.
+    const handler = () => load();
+    window.addEventListener("realtime:notifications", handler);
+    return () => window.removeEventListener("realtime:notifications", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

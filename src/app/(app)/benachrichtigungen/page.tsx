@@ -58,14 +58,12 @@ export default function BenachrichtigungenPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Realtime — bei jeder DB-Aenderung neu laden.
+  // Realtime — Event vom globalen Layout-Channel statt eigenem WebSocket.
   useEffect(() => {
-    const channel = supabase
-      .channel("benachrichtigungen-page")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, load]);
+    const handler = () => load();
+    window.addEventListener("realtime:notifications", handler);
+    return () => window.removeEventListener("realtime:notifications", handler);
+  }, [load]);
 
   const grouped = useMemo(() => {
     const buckets: Record<string, Notification[]> = { heute: [], gestern: [], diese_woche: [], aelter: [] };
