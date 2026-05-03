@@ -29,12 +29,6 @@ type FilterType = "alle" | TicketType;
 // das vor mehr als 14 Tagen passiert ist. Nur dann werden sie aus der
 // aktiven Liste ausgeblendet.
 const ARCHIVE_AFTER_DAYS = 14;
-function isArchived(t: { status: TicketStatus; resolved_at: string | null }): boolean {
-  if (t.status === "offen") return false;
-  if (!t.resolved_at) return false;
-  const ms = Date.now() - new Date(t.resolved_at).getTime();
-  return ms > ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000;
-}
 
 const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
@@ -85,7 +79,12 @@ export default function TicketsPage() {
         resolver:profiles!resolved_by(full_name),
         attachments:ticket_attachments(id, filename, storage_path, mime_type)
       `)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      // Bound auf 500 Rows — vorher unbounded → bei 100 MA × 5 Tickets/Monat
+      // wuerden nach 1 Jahr 6k+ Rows pro Page-Load durch die Browser laufen.
+      // 500 reicht fuer alle Filter-Modi mit komfortablem Headroom; harte
+      // Pagination wenn das mal zu eng wird.
+      .limit(500);
 
     // Im Archiv-Modus den Status-Filter ignorieren — archivierte Tickets sind
     // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen),
@@ -93,6 +92,18 @@ export default function TicketsPage() {
     if (!showArchive && filterStatus !== "alle") q = q.eq("status", filterStatus);
     if (filterType !== "alle") q = q.eq("type", filterType);
     if (showOnlyMine && currentUserId) q = q.eq("created_by", currentUserId);
+
+    // Archive vs Active per Server-Side-Filter — vorher wurden ALLE Rows
+    // geladen und client-seitig via isArchived() gefiltert. Bei Archiv-
+    // Toggle hiess das: oft 80% der Tickets ueber die Leitung ziehen die
+    // dann eh weggefiltert werden.
+    const archiveCutoff = new Date(Date.now() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    if (showArchive) {
+      q = q.in("status", ["erledigt", "abgelehnt"]).lt("resolved_at", archiveCutoff);
+    } else {
+      // Aktive Tickets: alles was nicht in den letzten 14d resolved war ist Archiv.
+      q = q.or(`resolved_at.is.null,resolved_at.gte.${archiveCutoff}`);
+    }
 
     const numQ = searchNumber.trim();
     if (numQ) {
@@ -106,11 +117,7 @@ export default function TicketsPage() {
     }
 
     const { data } = await q;
-    const all = (data as unknown as TicketWithRelations[]) ?? [];
-    // Archiv-Toggle: zeige entweder NUR archivierte (älter als 14 Tage
-    // erledigt/abgelehnt) oder NUR die aktiven (alles andere).
-    const filtered = all.filter((t) => showArchive ? isArchived(t) : !isArchived(t));
-    setTickets(filtered);
+    setTickets((data as unknown as TicketWithRelations[]) ?? []);
     setLoading(false);
   }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, searchNumber, searchTitle]);
 

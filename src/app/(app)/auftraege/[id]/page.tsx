@@ -98,7 +98,10 @@ export default function AuftragDetailPage() {
       supabase.from("job_assignments").select("*, profile:profiles(full_name, role)").eq("job_id", id),
       supabase.from("job_appointments").select("*, assignee:profiles!assigned_to(full_name)").eq("job_id", id).order("start_time"),
       supabase.from("documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
+      // Nur die Felder die das Form/Dropdown wirklich braucht — Profil-Listen
+      // werden bei 100+ Mitarbeitern sonst pro Auftrags-Detail-View 100+ Rows
+      // schwer.
+      supabase.from("profiles").select("id, full_name, role, is_active").eq("is_active", true).order("full_name"),
       supabase.from("service_reports").select("*, creator:profiles!created_by(full_name)").eq("job_id", id).order("created_at", { ascending: false }),
       supabase.from("maintenance_tasks").select("id", { head: true, count: "exact" }).eq("job_id", id),
     ]);

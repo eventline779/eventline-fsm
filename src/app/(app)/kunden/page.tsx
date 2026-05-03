@@ -134,19 +134,10 @@ export default function KundenPage() {
     setLoading(false);
   }, [buildQuery]);
 
-  // Beim Mount: auto-archive laufen lassen, dann Liste + Counts laden.
-  // Auto-Archive ist idempotent — laeuft bei jedem Page-Visit, fasst aber nur
-  // Kunden an deren letzter Auftrag >365 Tage alt ist.
-  useEffect(() => {
-    fetch("/api/customers/auto-archive", { method: "POST" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.archived > 0) {
-          toast.info(`${j.archived} ${j.archived === 1 ? "Kunde" : "Kunden"} automatisch ins Archiv (>1 Jahr inaktiv)`);
-        }
-      })
-      .catch(() => { /* ignore — Liste laed trotzdem */ });
-  }, []);
+  // Auto-Archive laeuft jetzt als Daily-Cron (siehe vercel.json) — nicht
+  // mehr bei jedem Kunden-Mount. Der Mount-Trigger hat bei 100+ Mitarbeitern
+  // jedes Mal alle Customers + alle Jobs in JS-Memory gepullt → MB-Response
+  // pro Visit. Cron laeuft einmal taeglich serverseitig.
 
   // Initial + bei Filter-/Modus-Aenderung neu laden, mit 250ms Debounce auf Suche.
   useEffect(() => {

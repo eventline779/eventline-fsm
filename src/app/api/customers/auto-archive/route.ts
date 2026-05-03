@@ -9,11 +9,33 @@ import { requireUser } from "@/lib/api-auth";
 // auch ohne direkten Auftrag operativ aktiv (Eventline betreibt z.B. einen
 // Standort fuer sie ohne taeglich neue Auftraege zu schreiben).
 //
-// Wird vom /kunden-Page beim Laden ausgeloest (idempotent — fasst bereits
-// archivierte Kunden nicht an dank archived_at IS NULL Filter).
+// Aufruf-Modi:
+//   - GET  via Vercel-Cron (taeglich) → liest CRON_SECRET-Header
+//   - POST via Admin (manuell) → requireUser() + admin-only durch Permission
+//
+// Vorher lief der Endpoint bei jedem /kunden-Mount jedes Users — bei 100+
+// Mitarbeitern eine Megabytes-Response × Pages × Visits pro Tag.
+
+// GET = Cron-Trigger
+export async function GET(request: Request) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET fehlt in der Server-Config" }, { status: 503 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runAutoArchive();
+}
+
+// POST = manueller Trigger durch Admin (z.B. via Settings-Page)
 export async function POST() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
+  return runAutoArchive();
+}
+
+async function runAutoArchive() {
 
   const admin = createAdminClient();
 
