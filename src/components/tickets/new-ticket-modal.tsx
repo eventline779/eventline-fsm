@@ -356,6 +356,7 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
       if (stempelMode === "korrektur" && !stempel.time_entry_id) return "Stempel-Eintrag auswählen";
       if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
       if (stempelMode === "vergessen" && !stempel.job_id) return "Auftrag oder 'Andere Arbeit' auswählen";
+      if (stempelMode === "vergessen" && stempel.job_id === "ANDERE_ARBEIT" && !stempel.beschreibung.trim()) return "Beschreibung der Arbeit ist Pflicht bei 'Andere Arbeit'";
     }
     if (type === "material") {
       if (files.length === 0) return "Warenkorb-Screenshot ist Pflicht — bitte Datei hochladen";
@@ -791,10 +792,12 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
                       clearable={false}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit</p>
-                    <Input value={stempel.beschreibung} onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })} placeholder="kurz: was wurde gemacht" />
-                  </div>
+                  {stempel.job_id === "ANDERE_ARBEIT" && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit *</p>
+                      <Input value={stempel.beschreibung} onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })} placeholder="kurz: was wurde gemacht" />
+                    </div>
+                  )}
                 </>
               )}
 
