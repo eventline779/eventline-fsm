@@ -192,14 +192,11 @@ export default function KundenDetailPage() {
       }
       const verb = actionKind === "delete" ? "gelöscht" : actionKind === "archive" ? "archiviert" : "reaktiviert";
       toast.success(`Kunde ${verb}`);
-      // Bei delete/archive zurueck zur Liste, bei unarchive auf der Detail-Seite bleiben.
-      if (actionKind === "unarchive") {
-        setActionKind(null);
-        setActionRunning(false);
-        await loadData();
-      } else {
-        router.push("/kunden");
-      }
+      // Bei allen drei Aktionen zurueck zur Liste — auch beim Reaktivieren.
+      // Vorher blieb der User auf der Detail-Page; das war inkonsistent zu
+      // archive/delete und nicht hilfreich (er sieht den frisch reaktivierten
+      // Kunden in der Liste, das ist die natuerliche Bestaetigung).
+      router.push("/kunden");
     } catch (e) {
       toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
       setActionRunning(false);
