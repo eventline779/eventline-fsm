@@ -6,8 +6,10 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, CheckCircle2, Plug, X, Copy, Check } from "lucide-react";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { createClient } from "@/lib/supabase/client";
 
 export function IntegrationenTab() {
+  const supabase = createClient();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,13 +18,26 @@ export function IntegrationenTab() {
   const [copied, setCopied] = useState(false);
   const { confirm, ConfirmModalElement } = useConfirm();
 
-  // iCal-URL erst client-seitig setzen — window.location.origin ist auf
-  // dem Server nicht verfuegbar.
+  // iCal-URL ist pro User unterschiedlich — der calendar_feed_token aus
+  // dem profile kommt als ?token=... in der URL. Ohne Token kriegt der
+  // Endpoint einen 401. Token wird beim Anlegen des Profils per Default
+  // automatisch generiert (Migration 066).
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIcalUrl(`${window.location.origin}/api/calendar.ics`);
-    }
-  }, []);
+    if (typeof window === "undefined") return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("calendar_feed_token")
+        .eq("id", user.id)
+        .maybeSingle();
+      const token = profile?.calendar_feed_token;
+      if (token) {
+        setIcalUrl(`${window.location.origin}/api/calendar.ics?token=${token}`);
+      }
+    })();
+  }, [supabase]);
 
   async function copyIcalUrl() {
     try {
@@ -94,11 +109,15 @@ export function IntegrationenTab() {
               G
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">Google Calendar</h3>
+              <h3 className="font-semibold">Mein Kalender (iCal-Feed)</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Kopiere die URL und füge sie in Google Calendar via
-                <span className="font-medium"> &quot;Andere Kalender&quot; → &quot;Per URL hinzufügen&quot;</span> ein.
-                Aufträge + Termine werden automatisch synchronisiert.
+                Dein <strong>persönlicher</strong> Kalender-Feed. Enthält nur Aufträge + Termine die dir
+                zugewiesen sind (Admin sieht alle). Kopiere die URL und füge sie in Google Calendar / Apple
+                Calendar / Outlook über <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
+                <br />
+                <span className="text-amber-700 dark:text-amber-400">
+                  Diese URL enthält dein persönliches Token — nicht weitergeben.
+                </span>
               </p>
             </div>
           </div>
