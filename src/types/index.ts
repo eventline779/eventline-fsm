@@ -508,12 +508,24 @@ export type TicketWithRelations = Ticket & {
 // oben in der Sidebar.
 // ============================================================
 
+// Notification-Types — semantische Kategorien. Jede Type ist ueber
+// notification-meta.ts auf Icon + Akzent-Farbe gemappt damit man im
+// Bell-Dropdown sofort erkennt um was es geht.
+export type NotificationType =
+  | "ticket_new"
+  | "ticket_done"
+  | "ticket_rejected"
+  | "system";
+
 export interface Notification {
   id: string;
   user_id: string;
+  type: NotificationType;
   title: string;
   message: string | null;
   link: string | null;
+  resource_type: string | null;
+  resource_id: string | null;
   is_read: boolean;
   created_at: string;
 }

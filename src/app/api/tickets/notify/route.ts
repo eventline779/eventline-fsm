@@ -71,9 +71,12 @@ export async function POST(request: Request) {
 
     const rows = adminIds.map((userId) => ({
       user_id: userId,
+      type: "ticket_new",
       title: `Neues Ticket: ${TYPE_LABEL[t.type] ?? t.type}`,
       message: `${t.creator?.full_name ?? "Unbekannt"}: ${t.title}`,
       link: `/tickets/${t.id}`,
+      resource_type: "ticket",
+      resource_id: t.id,
     }));
 
     const { error } = await admin.from("notifications").insert(rows);
@@ -85,11 +88,15 @@ export async function POST(request: Request) {
 
   if (body.event === "status_changed") {
     // An den Ersteller — der will wissen ob's erledigt oder abgelehnt wurde.
+    const notifType = t.status === "abgelehnt" ? "ticket_rejected" : "ticket_done";
     const { error } = await admin.from("notifications").insert({
       user_id: t.created_by,
+      type: notifType,
       title: `Ticket ${STATUS_LABEL[t.status] ?? t.status}: ${t.title}`,
       message: typeof body.note === "string" && body.note.trim() ? body.note : null,
       link: `/tickets/${t.id}`,
+      resource_type: "ticket",
+      resource_id: t.id,
     });
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
