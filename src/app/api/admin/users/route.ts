@@ -115,7 +115,11 @@ export async function createAuthUser(opts: {
   role: string;
 }): Promise<{ success: true; userId: string } | { success: false; error: string; debug?: unknown }> {
   const { supabaseUrl, serviceKey, email, fullName, role } = opts;
-  const tempPassword = randomUUID() + "-" + randomUUID();
+  // bcrypt cap't bei 72 Bytes — laenger schickt Supabase Auth direkt mit
+  // "Internal Server Error" zurueck. Eine UUID hat 36 Zeichen, das reicht
+  // (~122 bits Entropie) und der User setzt sich's eh ueber den Recovery-
+  // Link selber neu, dieses Passwort wird nie genutzt.
+  const tempPassword = randomUUID();
   const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
