@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
+import { usePermissions } from "@/lib/use-permissions";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 const PARTNER_TYPES = {
@@ -67,6 +68,7 @@ export default function PartnerPage() {
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const { confirm, ConfirmModalElement } = useConfirm();
+  const { can } = usePermissions();
 
   useEffect(() => {
     load();
@@ -187,14 +189,16 @@ export default function PartnerPage() {
               damit die Action-Buttons rechts auf gleicher Linie sitzen. */}
           <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
-        <button
-          type="button"
-          onClick={openNew}
-          className="kasten kasten-red"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Neuer Partner
-        </button>
+        {can("partner:create") && (
+          <button
+            type="button"
+            onClick={openNew}
+            className="kasten kasten-red"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Neuer Partner
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -222,7 +226,7 @@ export default function PartnerPage() {
               ? "Noch keine Partner angelegt."
               : "Keine Partner für diese Filter gefunden."}
           </p>
-          {partners.length === 0 && (
+          {partners.length === 0 && can("partner:create") && (
             <button
               type="button"
               onClick={openNew}
@@ -249,20 +253,24 @@ export default function PartnerPage() {
                     </span>
                   </div>
                   <div className="flex gap-1">
-                    <button
-                      onClick={() => openEdit(p)}
-                      className="icon-btn icon-btn-purple"
-                      data-tooltip="Bearbeiten"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p)}
-                      className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                      data-tooltip="Löschen"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {can("partner:edit") && (
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="icon-btn icon-btn-purple"
+                        data-tooltip="Bearbeiten"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {can("partner:delete") && (
+                      <button
+                        onClick={() => handleDelete(p)}
+                        className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                        data-tooltip="Löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

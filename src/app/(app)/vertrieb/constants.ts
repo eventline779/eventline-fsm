@@ -62,5 +62,3 @@ export const emptyForm = {
 };
 
 export type VertriebFormState = typeof emptyForm;
-
-export const VERTRIEB_PASSWORD = "788596";

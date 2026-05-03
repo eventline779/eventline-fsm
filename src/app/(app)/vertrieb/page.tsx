@@ -21,7 +21,6 @@ import {
   STEPS,
   BEDARF_LABELS,
   emptyForm,
-  VERTRIEB_PASSWORD,
 } from "./constants";
 import { TerminModalBody } from "@/components/vertrieb/termin-modal-body";
 import { AuftragModalBody } from "@/components/vertrieb/auftrag-modal-body";
@@ -36,9 +35,6 @@ import { SearchableSelect } from "@/components/searchable-select";
 
 export default function VertriebPage() {
   const router = useRouter();
-  const [unlocked, setUnlocked] = useState(false);
-  const [pwInput, setPwInput] = useState("");
-  const [pwError, setPwError] = useState(false);
   const [contacts, setContacts] = useState<VertriebContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -86,67 +82,21 @@ export default function VertriebPage() {
   const { can } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
 
+  // Permission-Gate statt Plain-Text-Passwort:
+  //   - Layout-Guard prueft eh schon `vertrieb:view` und blockt sonst die
+  //     Page ganz.
+  //   - Realtime-Subscription startet sofort, kein "Unlock"-State mehr.
+  // Frueher gab's hier ein hardcoded VERTRIEB_PASSWORD im Client-Bundle,
+  // das war Sicherheits-Theater (DevTools → Source → Passwort sichtbar).
   useEffect(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem("vertrieb-unlocked") === "1") {
-      setUnlocked(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!unlocked) return;
     load();
-    // Realtime statt Polling: nur reload wenn sich an den Vertrieb-Contacts
-    // wirklich was aendert. Vorher: 10-Sekunden-Polling auch wenn nichts passiert.
     const channel = supabase
       .channel("vertrieb-contacts")
       .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unlocked]);
-
-  function tryUnlock(e: React.FormEvent) {
-    e.preventDefault();
-    if (pwInput === VERTRIEB_PASSWORD) {
-      setUnlocked(true);
-      sessionStorage.setItem("vertrieb-unlocked", "1");
-      setPwInput("");
-      setPwError(false);
-    } else {
-      setPwError(true);
-    }
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Card className="bg-card w-full max-w-sm">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 text-red-500 mx-auto">
-              <TrendingUp className="h-7 w-7" />
-            </div>
-            <div className="text-center">
-              <h2 className="font-semibold text-lg">Vertrieb</h2>
-              <p className="text-sm text-muted-foreground mt-1">Dieser Bereich ist passwortgeschützt.</p>
-            </div>
-            <form onSubmit={tryUnlock} className="space-y-3">
-              <input
-                type="password"
-                inputMode="numeric"
-                placeholder="Passwort"
-                value={pwInput}
-                onChange={(e) => { setPwInput(e.target.value); setPwError(false); }}
-                className={`w-full h-11 px-4 text-lg tracking-widest text-center rounded-lg border bg-gray-50 outline-none focus:ring-2 ${pwError ? "border-red-500 focus:ring-red-500" : "border-gray-200 focus:ring-red-500 focus:border-red-500"}`}
-                autoFocus
-              />
-              {pwError && <p className="text-xs text-red-600 text-center">Falsches Passwort</p>}
-              <button type="submit" disabled={!pwInput} className="kasten kasten-red w-full">Zugang</button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  }, []);
 
   async function load() {
     const [{ data }, locRes, custRes] = await Promise.all([

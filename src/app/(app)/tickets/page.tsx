@@ -87,7 +87,10 @@ export default function TicketsPage() {
       `)
       .order("created_at", { ascending: false });
 
-    if (filterStatus !== "alle") q = q.eq("status", filterStatus);
+    // Im Archiv-Modus den Status-Filter ignorieren — archivierte Tickets sind
+    // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen),
+    // sonst wuerde das Default "offen" das Archiv immer leer aussehen lassen.
+    if (!showArchive && filterStatus !== "alle") q = q.eq("status", filterStatus);
     if (filterType !== "alle") q = q.eq("type", filterType);
     if (showOnlyMine && currentUserId) q = q.eq("created_by", currentUserId);
 

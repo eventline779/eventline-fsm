@@ -49,7 +49,6 @@ export default function AnfrageDetailPage() {
   const [cancelSaving, setCancelSaving] = useState(false);
 
   // Convert-Modal
-  const [showConvert, setShowConvert] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
 
   // Mail-Modal: gemeinsame Komponente, nur Open-Flag hier.
@@ -661,33 +660,6 @@ export default function AnfrageDetailPage() {
         onAdvance={advanceStepRaw}
       />
 
-      {/* Convert-Modal */}
-      <Modal
-        open={showConvert}
-        onClose={() => setShowConvert(false)}
-        title="Vermietentwurf in Auftrag umwandeln?"
-        size="md"
-        closable={!convertSaving}
-      >
-        <p className="text-sm text-muted-foreground">
-          Der Vermietentwurf wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
-        </p>
-        <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
-          <Check className="h-4 w-4 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-medium">Akquise abgeschlossen</p>
-            <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setShowConvert(false)} disabled={convertSaving} className="kasten kasten-muted flex-1">
-            Abbrechen
-          </button>
-          <button type="button" onClick={convertToAuftrag} disabled={convertSaving} className="kasten kasten-red flex-1">
-            {convertSaving ? "Wandle um…" : "Umwandeln"}
-          </button>
-        </div>
-      </Modal>
       {ConfirmModalElement}
     </div>
   );

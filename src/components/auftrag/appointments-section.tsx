@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Calendar, Clock, User, Plus, Send, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/use-permissions";
@@ -58,8 +59,7 @@ export function AppointmentsSection({
   const [notifyPopup, setNotifyPopup] = useState<string | null>(null);
   const [emailField1, setEmailField1] = useState("");
   const [emailField2, setEmailField2] = useState("");
-  const [deleteApptTarget, setDeleteApptTarget] = useState<string | null>(null);
-  const [deleteApptCode, setDeleteApptCode] = useState("");
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   async function addAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -126,14 +126,21 @@ export function AppointmentsSection({
     onReload();
   }
 
-  async function deleteAppointment() {
-    if (deleteApptCode !== "5225" || !deleteApptTarget) {
-      toast.error("Falscher Code");
+  // useConfirm-Pattern statt vorherigem hardcoded Code "5225"-Modal —
+  // konsistent mit allen anderen Loesch-Flows app-weit.
+  async function deleteAppointment(apptId: string) {
+    const ok = await confirm({
+      title: "Termin löschen?",
+      message: "Der Termin wird unwiderruflich gelöscht. Die Mitarbeiter-Zuweisung verschwindet ebenfalls.",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
+    const result = await deleteRow("job_appointments", apptId);
+    if (!result.ok) {
+      toast.error(result.error ?? "Termin konnte nicht gelöscht werden");
       return;
     }
-    await deleteRow("job_appointments", deleteApptTarget);
-    setDeleteApptTarget(null);
-    setDeleteApptCode("");
     onReload();
     toast.success("Termin gelöscht");
   }
@@ -308,7 +315,7 @@ export function AppointmentsSection({
                   )}
                   <button
                     type="button"
-                    onClick={() => setDeleteApptTarget(appt.id)}
+                    onClick={() => deleteAppointment(appt.id)}
                     className="kasten kasten-red"
                     data-tooltip="Termin löschen"
                   >
@@ -322,23 +329,7 @@ export function AppointmentsSection({
         </CardContent>
       </Card>
 
-      {/* Delete-Confirm-Modal mit Code-Eingabe — paranoid weil Termine
-          versehentlich geloescht harte Folgen haben (Mitarbeiter-Schichten weg). */}
-      <Modal
-        open={!!deleteApptTarget}
-        onClose={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }}
-        title="Termin löschen"
-      >
-        <p className="text-sm text-muted-foreground">Der Termin wird unwiderruflich gelöscht.</p>
-        <div>
-          <label className="text-sm font-medium">Bestätigungscode eingeben</label>
-          <Input value={deleteApptCode} onChange={(e) => setDeleteApptCode(e.target.value)} placeholder="Code eingeben..." className="mt-1.5 text-center text-lg tracking-widest font-mono" maxLength={4} />
-        </div>
-        <div className="flex gap-3">
-          <button type="button" onClick={() => { setDeleteApptTarget(null); setDeleteApptCode(""); }} className="kasten kasten-muted flex-1">Abbrechen</button>
-          <button type="button" onClick={deleteAppointment} disabled={deleteApptCode.length < 4} className="kasten kasten-red flex-1">Endgültig löschen</button>
-        </div>
-      </Modal>
+      {ConfirmModalElement}
     </>
   );
 }

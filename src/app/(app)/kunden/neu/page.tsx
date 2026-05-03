@@ -74,6 +74,16 @@ function NeuerKundeContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Adresse-Strasse via AddressAutocomplete — der Pflichtfeld-Stern im
+    // Label muss hier explizit validiert werden weil das Custom-Component
+    // kein required-Attribut hat. Die anderen Pflicht-Inputs nutzen das
+    // native required.
+    if (!form.address_street?.trim()) {
+      toast.error("Strasse ist Pflicht");
+      return;
+    }
+
     setSaving(true);
 
     const { data: inserted, error } = await supabase
@@ -201,6 +211,7 @@ function NeuerKundeContent() {
                   value={form.email}
                   onChange={(e) => update("email", e.target.value)}
                   className="mt-1.5 bg-gray-50 border-gray-200"
+                  required
                 />
               </div>
               <div>
@@ -211,6 +222,7 @@ function NeuerKundeContent() {
                   value={form.phone}
                   onChange={(e) => update("phone", e.target.value)}
                   className="mt-1.5 bg-gray-50 border-gray-200"
+                  required
                 />
               </div>
             </div>
@@ -245,6 +257,7 @@ function NeuerKundeContent() {
                   value={form.address_zip}
                   onChange={(e) => update("address_zip", e.target.value)}
                   className="mt-1.5 bg-gray-50 border-gray-200"
+                  required
                 />
               </div>
               <div className="col-span-2">
@@ -255,6 +268,7 @@ function NeuerKundeContent() {
                   value={form.address_city}
                   onChange={(e) => update("address_city", e.target.value)}
                   className="mt-1.5 bg-gray-50 border-gray-200"
+                  required
                 />
               </div>
             </div>

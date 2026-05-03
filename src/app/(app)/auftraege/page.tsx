@@ -34,7 +34,6 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
 import { DonutChart } from "@/components/donut-chart";
 import { SendStepModal } from "@/components/send-step-modal";
-import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/use-permissions";
 import { TOAST } from "@/lib/messages";
@@ -83,9 +82,6 @@ export default function AuftraegePage() {
   const [loading, setLoading] = useState(true);
   // Inline-Step-Aktion: welche Anfrage-Karte hat aktuell das Mail-Modal offen?
   const [activeStepJobId, setActiveStepJobId] = useState<string | null>(null);
-  // Convert-Modal: Mietentwurf -> Auftrag
-  const [convertJobId, setConvertJobId] = useState<string | null>(null);
-  const [convertSaving, setConvertSaving] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -157,25 +153,6 @@ export default function AuftraegePage() {
       return;
     }
     await advanceAnfrageStep(jobId);
-  }
-
-  async function confirmConvert() {
-    if (!convertJobId) return;
-    setConvertSaving(true);
-    const { error } = await supabase
-      .from("jobs")
-      .update({ status: "entwurf", request_step: null })
-      .eq("id", convertJobId);
-    setConvertSaving(false);
-    if (error) {
-      TOAST.supabaseError(error);
-      return;
-    }
-    const id = convertJobId;
-    setConvertJobId(null);
-    toast.success("In Auftrag umgewandelt — bitte vor Freigabe prüfen");
-    window.dispatchEvent(new Event("jobs:invalidate"));
-    router.push(`/auftraege/${id}/bearbeiten`);
   }
 
   // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
@@ -740,33 +717,6 @@ export default function AuftraegePage() {
         );
       })()}
 
-      {/* Convert-Modal: Mietentwurf -> Auftrag */}
-      <Modal
-        open={!!convertJobId}
-        onClose={() => setConvertJobId(null)}
-        title="Vermietentwurf in Auftrag umwandeln?"
-        size="md"
-        closable={!convertSaving}
-      >
-        <p className="text-sm text-muted-foreground">
-          Die Anfrage wird zum Entwurf-Auftrag — du landest auf der Bearbeiten-Seite, kannst Details ergänzen und dann freigeben.
-        </p>
-        <div className="flex items-start gap-2 p-3 rounded-xl border tinted-blue text-xs">
-          <Check className="h-4 w-4 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-medium">Akquise abgeschlossen</p>
-            <p className="opacity-80 mt-0.5">Alle 5 Schritte sind durchlaufen. Aus dem Vermietentwurf wird jetzt ein echter Auftrag.</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setConvertJobId(null)} disabled={convertSaving} className="kasten kasten-muted flex-1">
-            Abbrechen
-          </button>
-          <button type="button" onClick={confirmConvert} disabled={convertSaving} className="kasten kasten-red flex-1">
-            {convertSaving ? "Wandle um…" : "Umwandeln"}
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }
