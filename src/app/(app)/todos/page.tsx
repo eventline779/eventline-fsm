@@ -282,7 +282,7 @@ export default function TodosPage() {
             <div className="flex items-center gap-2">
               <h1 className={`text-2xl font-bold tracking-tight ${selectedTodo.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{selectedTodo.title}</h1>
               {selectedTodo.priority === "dringend" && selectedTodo.status === "offen" && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                   <AlertCircle className="h-3 w-3" />Dringend
                 </span>
               )}

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { REQUEST_STEPS } from "@/lib/constants";
 import { FileText, Send, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { validateFileSize } from "@/lib/file-upload";
 
 export type SendStep = 1 | 3;
@@ -116,7 +117,7 @@ export function SendStepModal({
         .select("id, name, storage_path")
         .single();
       if (error || !inserted) {
-        toast.error("Fehler: " + (error?.message ?? "Speichern fehlgeschlagen"));
+        TOAST.supabaseError(error, "Dokument konnte nicht gespeichert werden");
         return;
       }
       setDocs((prev) => [inserted as UploadedDoc, ...prev]);

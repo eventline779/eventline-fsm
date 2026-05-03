@@ -136,7 +136,7 @@ export default function VermietentwurfBearbeitenPage() {
       .eq("id", jobId);
     setSaving(false);
     if (error) {
-      toast.error("Fehler: " + error.message);
+      TOAST.supabaseError(error, "Speichern fehlgeschlagen");
       return;
     }
     toast.success("Änderungen gespeichert");

@@ -20,6 +20,7 @@ import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import Link from "next/link";
 
 interface AdminEntry {
@@ -111,7 +112,7 @@ export default function StempelzeitenPage() {
         filter_from: filterFrom ? new Date(filterFrom + "T00:00:00").toISOString() : null,
         filter_to: filterTo ? new Date(filterTo + "T23:59:59").toISOString() : null,
       });
-      if (error) toast.error(error.message);
+      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
       setAdminEntries((data as AdminEntry[]) ?? []);
     } else {
       let q = supabase
@@ -138,7 +139,7 @@ export default function StempelzeitenPage() {
     if (!ok) return;
     const { error } = await supabase.from("time_entries").delete().eq("id", id);
     if (error) {
-      toast.error(error.message);
+      TOAST.supabaseError(error, "Eintrag konnte nicht gelöscht werden");
       return;
     }
     toast.success("Eintrag gelöscht");

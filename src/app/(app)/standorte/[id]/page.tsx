@@ -16,6 +16,7 @@ import {
 import { BackButton } from "@/components/ui/back-button";
 import { usePermissions } from "@/lib/use-permissions";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 interface MaintenanceTaskWithPhoto extends MaintenanceTask {
@@ -108,7 +109,7 @@ export default function StandortDetailPage() {
     const path = `standorte/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) {
-      toast.error("Upload fehlgeschlagen: " + error.message);
+      TOAST.supabaseError(error, "Upload fehlgeschlagen");
       setUploadingDoc(false);
       e.target.value = "";
       return;

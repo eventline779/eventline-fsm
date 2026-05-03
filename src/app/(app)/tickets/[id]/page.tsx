@@ -21,6 +21,7 @@ import {
   CheckCircle2, XCircle, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import type { TicketWithRelations, TicketType, TicketStatus, TicketDataBeleg, TicketDataMaterial, TicketDataStempelAenderung, TicketDataIT } from "@/types";
 
 const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
@@ -144,7 +145,7 @@ export default function TicketDetailPage() {
       p_resolution_note: resolutionNote.trim() || null,
     });
     if (error) {
-      toast.error(`Fehler: ${error.message}`);
+      TOAST.supabaseError(error, "Status konnte nicht geändert werden");
       setBusy(false);
       return;
     }
@@ -176,7 +177,7 @@ export default function TicketDetailPage() {
     }
     const { error } = await supabase.from("tickets").delete().eq("id", id);
     if (error) {
-      toast.error(`Fehler: ${error.message}`);
+      TOAST.supabaseError(error, "Ticket konnte nicht gelöscht werden");
       setBusy(false);
       return;
     }

@@ -575,7 +575,7 @@ export default function VertriebPage() {
       created_by: user?.id,
     }).select("id, job_number, title").single();
 
-    if (error || !newJob) { toast.error("Auftrag-Fehler: " + (error?.message || "Unbekannt")); setCreatingAuftrag(false); return; }
+    if (error || !newJob) { TOAST.supabaseError(error, "Auftrag konnte nicht angelegt werden"); setCreatingAuftrag(false); return; }
 
     // Auftrag-ID im Vertrieb-Eintrag speichern + Status auf gewonnen
     let obj: any = {};

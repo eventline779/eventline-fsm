@@ -221,7 +221,7 @@ export function TeamTab() {
                   <button
                     type="button"
                     onClick={() => setEdit({ id: p.id, full_name: p.full_name, role: p.role })}
-                    className="kasten kasten-muted"
+                    className="kasten kasten-purple"
                     data-tooltip="Bearbeiten"
                   >
                     <Pencil className="h-3.5 w-3.5" />

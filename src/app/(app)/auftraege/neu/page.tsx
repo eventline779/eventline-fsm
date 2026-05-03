@@ -16,6 +16,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { scrollToError } from "@/lib/scroll-to-error";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { JobNumber } from "@/components/job-number";
 import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
 import { validateFileList } from "@/lib/file-upload";
@@ -179,7 +180,7 @@ function NeuerAuftragPageContent() {
       .single();
 
     if (error || !inserted) {
-      toast.error("Fehler: " + (error?.message ?? "unbekannt"));
+      TOAST.supabaseError(error, "Auftrag konnte nicht angelegt werden");
       setSaving(null);
       return;
     }

@@ -407,14 +407,14 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
     if (reportId) {
       const { error } = await supabase.from("service_reports").update(finalPayload).eq("id", reportId);
       if (error) {
-        toast.error("Fehler: " + error.message);
+        TOAST.supabaseError(error, "Rapport konnte nicht gespeichert werden");
         setSaving(null);
         return;
       }
     } else {
       const { data, error } = await supabase.from("service_reports").insert(finalPayload).select("id").single();
       if (error || !data) {
-        toast.error("Fehler: " + (error?.message ?? "konnte nicht gespeichert werden"));
+        TOAST.supabaseError(error, "Rapport konnte nicht erstellt werden");
         setSaving(null);
         return;
       }

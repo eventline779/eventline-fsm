@@ -14,6 +14,7 @@ import { Save, CheckCircle } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { JobNumber } from "@/components/job-number";
 import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
 import { JOB_FORM_FIELDS } from "@/lib/constants";
@@ -208,7 +209,7 @@ export default function AuftragBearbeitenPage() {
       .select("id");
 
     if (error || !updated || updated.length === 0) {
-      toast.error("Fehler: " + (error?.message ?? "konnte nicht gespeichert werden"));
+      TOAST.supabaseError(error, "Auftrag konnte nicht gespeichert werden");
       setSaving(null);
       return;
     }

@@ -120,7 +120,9 @@ export default function TicketsPage() {
   }, [load]);
 
   function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    // timeZone explizit Europe/Zurich — sonst rendern Mitarbeiter in
+    // anderen TZ den falschen Tag (created_at ist UTC im DB).
+    return new Date(iso).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", year: "2-digit" });
   }
 
   return (

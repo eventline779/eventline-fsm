@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/searchable-select";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { CheckSquare, Square, Trash2, Bell as BellIcon } from "lucide-react";
 import {
   NOTIFICATION_META,
@@ -133,7 +134,7 @@ export default function BenachrichtigungenPage() {
       .delete({ count: "exact" })
       .lt("created_at", cutoff);
     if (error) {
-      toast.error(error.message);
+      TOAST.supabaseError(error, "Aufräumen fehlgeschlagen");
       return;
     }
     toast.success(`${count ?? 0} alte Einträge entfernt`);
