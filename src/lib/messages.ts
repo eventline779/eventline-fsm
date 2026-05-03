@@ -30,16 +30,29 @@ export const TOAST = {
   networkError: (label: string) =>
     toast.error(`${label} fehlgeschlagen`),
 
-  /** Postgres/RLS-Errors aus Supabase einheitlich uebersetzen. PGRST201 ist
-   *  Permission-Denied (RLS lehnt ab); 23505 ist Duplicate-Key etc. */
-  supabaseError: (err: { code?: string; message?: string } | null | undefined, fallback = "Aktion fehlgeschlagen") => {
+  /** Postgres/RLS-Errors aus Supabase einheitlich uebersetzen. PGRST201 +
+   *  42501 = Permission-Denied (RLS lehnt ab); 23505 = Duplicate-Key.
+   *
+   *  Akzeptiert was auch immer im catch landet — Postgres-Error-Objekt,
+   *  String aus einer API-Response, oder unknown aus catch(e). RLS wird
+   *  zusaetzlich an der Message erkannt damit auch Fehler die nur als
+   *  String durchgeschleift werden (z.B. via /api/db/delete) als
+   *  "Keine Berechtigung" rauskommen statt mit "row-level security policy". */
+  supabaseError: (err: unknown, fallback = "Aktion fehlgeschlagen") => {
     if (!err) return toast.error(fallback);
-    if (err.code === "PGRST201" || err.code === "42501") {
+    const obj = (typeof err === "object" && err !== null) ? err as { code?: string; message?: string } : null;
+    const code = obj?.code;
+    const message = typeof err === "string" ? err : obj?.message;
+
+    if (code === "PGRST201" || code === "42501") {
       return toast.error("Keine Berechtigung für diese Aktion");
     }
-    if (err.code === "23505") {
+    if (message && /row-level security|permission denied|insufficient[_ ]privilege/i.test(message)) {
+      return toast.error("Keine Berechtigung für diese Aktion");
+    }
+    if (code === "23505") {
       return toast.error("Eintrag existiert bereits");
     }
-    return toast.error(err.message || fallback);
+    return toast.error(message || fallback);
   },
 };

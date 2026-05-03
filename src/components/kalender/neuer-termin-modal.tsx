@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import type { Profile } from "@/types";
 import type { CalendarItem } from "./types";
 
@@ -139,7 +140,7 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
       onClose();
     } catch (e) {
       logError("kalender.neuer-termin.submit", e);
-      toast.error("Termin konnte nicht erstellt werden");
+      TOAST.supabaseError(e, "Termin konnte nicht erstellt werden");
     } finally {
       setSubmitting(false);
     }

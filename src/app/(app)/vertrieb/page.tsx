@@ -583,14 +583,19 @@ export default function VertriebPage() {
     if (existingCust) {
       customerId = existingCust.id;
     } else {
-      const { data: newCust } = await supabase.from("customers").insert({
+      const { data: newCust, error: custError } = await supabase.from("customers").insert({
         name: c.firma,
         type: "company",
         email: c.email || null,
         phone: c.telefon || null,
         notes: c.ansprechperson ? `Ansprechperson: ${c.ansprechperson}${c.position ? ` (${c.position})` : ""}` : null,
       }).select("id").single();
-      customerId = newCust?.id || null;
+      if (custError || !newCust) {
+        TOAST.supabaseError(custError, "Kunde konnte nicht erstellt werden");
+        setCreatingAuftrag(false);
+        return;
+      }
+      customerId = newCust.id;
     }
 
     if (!customerId) { toast.error("Kunde konnte nicht erstellt werden"); setCreatingAuftrag(false); return; }

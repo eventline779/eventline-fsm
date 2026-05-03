@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { scrollToError } from "@/lib/scroll-to-error";
 import { logError } from "@/lib/log";
 import { TimeRangesSection } from "./rapport/time-ranges-section";
@@ -217,7 +218,7 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
       status: "entwurf" as const,
     }).select("id").single();
     if (error || !data) {
-      toast.error("Draft konnte nicht erstellt werden: " + (error?.message ?? ""));
+      TOAST.supabaseError(error, "Draft konnte nicht erstellt werden");
       return null;
     }
     setDraftId(data.id);

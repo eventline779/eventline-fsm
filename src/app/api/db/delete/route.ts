@@ -48,7 +48,17 @@ export async function POST(req: NextRequest) {
   const supa = await createClient();
   const { error } = await supa.from(table).delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    // RLS-Denial einheitlich uebersetzen statt der Postgres-Rohmeldung
+    // ("new row violates row-level security policy"). Codes 42501 +
+    // PGRST201 sowie Substring-Match decken alle Wege ab.
+    const isPermission =
+      error.code === "42501" ||
+      error.code === "PGRST201" ||
+      /row-level security|permission denied|insufficient[_ ]privilege/i.test(error.message || "");
+    return NextResponse.json(
+      { ok: false, error: isPermission ? "Keine Berechtigung für diese Aktion" : error.message },
+      { status: isPermission ? 403 : 500 },
+    );
   }
   return NextResponse.json({ ok: true });
 }

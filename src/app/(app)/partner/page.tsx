@@ -17,6 +17,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { useConfirm } from "@/components/ui/use-confirm";
 
 const PARTNER_TYPES = {
@@ -125,7 +126,7 @@ export default function PartnerPage() {
         .update(payload)
         .eq("id", editing.id);
       if (error) {
-        toast.error("Fehler beim Speichern");
+        TOAST.supabaseError(error, "Speichern fehlgeschlagen");
         setSaving(false);
         return;
       }
@@ -133,7 +134,7 @@ export default function PartnerPage() {
     } else {
       const { error } = await supabase.from("partners").insert(payload);
       if (error) {
-        toast.error("Fehler beim Speichern");
+        TOAST.supabaseError(error, "Speichern fehlgeschlagen");
         setSaving(false);
         return;
       }
@@ -157,7 +158,7 @@ export default function PartnerPage() {
       .update({ is_active: false })
       .eq("id", p.id);
     if (error) {
-      toast.error("Fehler beim Löschen");
+      TOAST.supabaseError(error, "Löschen fehlgeschlagen");
       return;
     }
     toast.success("Gelöscht");

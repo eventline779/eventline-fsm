@@ -10,6 +10,7 @@ import type { CustomerType } from "@/types";
 import { Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 
 // Land-Optionen — mehr als die Nachbarn macht aktuell keinen Sinn,
@@ -92,7 +93,7 @@ function NeuerKundeContent() {
       .single();
 
     if (error || !inserted) {
-      toast.error("Fehler beim Speichern: " + (error?.message ?? "unbekannt"));
+      TOAST.supabaseError(error, "Speichern fehlgeschlagen");
       setSaving(false);
       return;
     }
