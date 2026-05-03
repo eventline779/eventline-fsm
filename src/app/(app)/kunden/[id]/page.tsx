@@ -444,7 +444,7 @@ export default function KundenDetailPage() {
                       <div className="flex items-center gap-2">
                         <JobNumber number={j.job_number} />
                         <span className="font-medium text-sm">{j.title}</span>
-                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${JOB_STATUS[j.status].color}`}>{JOB_STATUS[j.status].label}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${JOB_STATUS[j.status].color}`}>{JOB_STATUS[j.status].label}</span>
                       </div>
                       {(j.location as unknown as { name: string })?.name && <p className="text-xs text-muted-foreground mt-0.5">{(j.location as unknown as { name: string }).name}</p>}
                     </div>

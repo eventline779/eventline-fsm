@@ -312,10 +312,10 @@ export default function AuftragDetailPage() {
           <div className="flex items-center gap-2 mt-1.5">
             {/* Konsistent zur Liste: 'offen' = Default, kein Badge */}
             {job.status !== "offen" && (
-              <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>{JOB_STATUS[job.status].label}</span>
+              <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${JOB_STATUS[job.status].color}`}>{JOB_STATUS[job.status].label}</span>
             )}
             {isDringend && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                 <AlertCircle className="h-3 w-3" />
                 Dringend
               </span>
