@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
@@ -41,7 +42,45 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<"alle" | "ungelesen">("alle");
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  // Position des Dropdowns berechnen — fixed zum Viewport, sodass es
+  // aus der Sidebar (overflow:hidden + nur 260px breit) herausragen
+  // kann nach rechts.
+  useEffect(() => {
+    if (!open) return;
+    function update() {
+      if (!buttonRef.current) return;
+      const r = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 360;
+      const margin = 8;
+      // Standardposition: rechts vom Button (Sidebar-Glocke unten links).
+      // Wenn das Dropdown so ueber den Viewport-Rand ginge: clamp.
+      let left = r.right + margin;
+      if (left + dropdownWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - dropdownWidth - 16);
+      }
+      // Vertikal: bottom-aligned mit dem Button (Dropdown-Bottom = Button-Bottom).
+      // 'top' Variante: dropdown-bottom = button-bottom; sonst von oben.
+      const top = side === "top"
+        ? r.bottom - 8 // bottom = bei button-bottom; top wird via maxHeight bestimmt
+        : r.bottom + margin;
+      setPos({ top, left });
+    }
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, side]);
 
   const unread = notifications.filter((n) => !n.is_read).length;
 
@@ -71,9 +110,10 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inButton = containerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inButton && !inDropdown) setOpen(false);
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
@@ -123,27 +163,19 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
 
   const totalShown = grouped.reduce((sum, g) => sum + g.items.length, 0);
 
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
-        data-tooltip="Benachrichtigungen"
-        aria-label="Benachrichtigungen"
-      >
-        <Bell className="h-5 w-5" />
-        {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className={`absolute right-0 w-[360px] max-h-[70vh] overflow-y-auto rounded-xl bg-card border border-border shadow-2xl z-50 text-foreground ${
-          side === "top" ? "bottom-full mb-2" : "top-full mt-2"
-        }`}>
+  const dropdown = open && pos ? (
+    <div
+      ref={dropdownRef}
+      style={{
+        position: "fixed",
+        top: side === "top" ? undefined : pos.top,
+        bottom: side === "top" ? window.innerHeight - pos.top : undefined,
+        left: pos.left,
+        width: 360,
+        maxHeight: "70vh",
+      }}
+      className="overflow-y-auto rounded-xl bg-card border border-border shadow-2xl z-[1200] text-foreground"
+    >
           {/* Header — Tabs + Aktionen, sticky damit beim Scrollen sichtbar bleibt */}
           <div className="sticky top-0 bg-card border-b border-border z-10">
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -241,8 +273,27 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
               Alle Benachrichtigungen ansehen →
             </Link>
           </div>
-        </div>
-      )}
+    </div>
+  ) : null;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="relative p-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
+        data-tooltip="Benachrichtigungen"
+        aria-label="Benachrichtigungen"
+      >
+        <Bell className="h-5 w-5" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+      {mounted && dropdown && createPortal(dropdown, document.body)}
     </div>
   );
 }
