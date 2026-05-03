@@ -83,6 +83,16 @@ export function SearchableSelect({
     setSearch(selectedItem?.label ?? "");
   }, [selectedItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Beim Oeffnen Suche leeren damit ALLE Items im Dropdown sichtbar sind.
+  // Sonst filtert der Match-Algorithmus gegen das Label des aktuellen Werts
+  // und zeigt nur Items die mit dem gleichen Wort beginnen → man sieht
+  // dann nur den schon ausgewaehlten Eintrag selbst. Bei Schliessen ohne
+  // Auswahl setzt onDocClick die Anzeige zurueck auf selectedItem.label.
+  useEffect(() => {
+    if (open && searchable) setSearch("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   useEffect(() => setMounted(true), []);
 
   // Position des Dropdowns
