@@ -33,6 +33,11 @@ interface Props {
   initialDate?: Date | null;
 }
 
+// Sentinel-Wert fuer "Nicht Auftrag bezogen" — Auftrag-Auswahl ist Pflicht,
+// aber der User kann explizit waehlen dass der Termin keinem Job zugeordnet
+// ist (Schulung, internes Meeting). In der DB landet dann job_id=null.
+const NO_JOB = "none" as const;
+
 // YYYY-MM-DD im LOKALEN Timezone — Date.toISOString() konvertiert in UTC was
 // in CET/CEST oft den Tag zurueckrolllt (z.B. lokal 00:00 am 17. = 22:00 UTC
 // am 16.). Date-Inputs erwarten lokales Datum, also lokal bauen.
@@ -49,6 +54,9 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Auftrag-Auswahl ist Pflicht, mit NO_JOB ("none") als expliziter Opt-Out-Wahl
+  // ("Nicht Auftrag bezogen" — z.B. fuer Buero-/Schulungs-Termine die nicht
+  // an einen Job haengen). null = nichts gewaehlt → Submit blockiert.
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobSearch, setJobSearch] = useState("");
   const [title, setTitle] = useState("");
@@ -102,12 +110,17 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
     return items.filter((it) => it.title.toLowerCase().includes(q) || (it.customerName?.toLowerCase().includes(q) ?? false)).slice(0, 30);
   }, [items, jobSearch]);
 
-  const selectedJob = jobId ? items.find((it) => it.id === jobId) ?? null : null;
+  const selectedJob = jobId && jobId !== NO_JOB ? items.find((it) => it.id === jobId) ?? null : null;
+  const isNoJobSelected = jobId === NO_JOB;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
       toast.error("Titel fehlt");
+      return;
+    }
+    if (jobId === null) {
+      toast.error("Bitte Auftrag wählen oder „Nicht Auftrag bezogen“");
       return;
     }
     setSubmitting(true);
@@ -123,8 +136,10 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
       const { data: { user } } = await supabase.auth.getUser();
       const assignees = assignedTo.length > 0 ? assignedTo : [user?.id || ""];
 
+      // NO_JOB → null in der DB; sonst echte Job-UUID.
+      const dbJobId = jobId === NO_JOB ? null : jobId;
       const rows = assignees.map((personId) => ({
-        job_id: jobId,
+        job_id: dbJobId,
         title: title.trim(),
         start_time: startISO,
         end_time: endISO,
@@ -155,12 +170,20 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
       closable={!submitting}
     >
       <form onSubmit={submit} className="space-y-4">
-        {/* Auftrag-Picker — optional. Suchfeld + Trefferliste. */}
+        {/* Auftrag-Picker — Pflichtfeld. Entweder echter Auftrag oder
+            explizit "Nicht Auftrag bezogen" (NO_JOB-Sentinel). */}
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Auftrag (optional)</label>
+          <label className="text-xs font-medium text-muted-foreground">Auftrag *</label>
           {selectedJob ? (
             <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-muted/30">
               <span className="text-sm font-medium truncate">{selectedJob.title}</span>
+              <button type="button" onClick={() => { setJobId(null); setJobSearch(""); }} className="text-xs text-muted-foreground hover:text-foreground">
+                Entfernen
+              </button>
+            </div>
+          ) : isNoJobSelected ? (
+            <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-muted/30">
+              <span className="text-sm font-medium italic text-muted-foreground">Nicht Auftrag bezogen</span>
               <button type="button" onClick={() => { setJobId(null); setJobSearch(""); }} className="text-xs text-muted-foreground hover:text-foreground">
                 Entfernen
               </button>
@@ -178,27 +201,35 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
                   className="pl-9"
                 />
               </div>
-              {jobSearch.trim() && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto rounded-lg border bg-card shadow-xl z-50 p-1 space-y-0.5">
-                  {filteredJobs.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-muted-foreground">Keine Treffer</p>
-                  ) : (
-                    filteredJobs.map((it) => (
-                      <button
-                        key={it.id}
-                        type="button"
-                        onClick={() => { setJobId(it.id); setJobSearch(""); }}
-                        className="auftrag-dropdown-item block w-full text-left px-3 py-2 text-sm rounded-md cursor-pointer transition-all duration-150 ease-out"
-                      >
-                        <span className="font-semibold truncate block">{it.title}</span>
-                        {it.customerName && (
-                          <span className="text-xs opacity-70">{it.customerName}</span>
-                        )}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+              <div className="absolute left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto rounded-lg border bg-card shadow-xl z-50 p-1 space-y-0.5">
+                {/* "Nicht Auftrag bezogen"-Option ist immer sichtbar — auch
+                    ohne Such-Eingabe, damit der User die Opt-Out-Wahl ohne
+                    Tipperei findet. */}
+                <button
+                  type="button"
+                  onClick={() => { setJobId(NO_JOB); setJobSearch(""); }}
+                  className="auftrag-dropdown-item block w-full text-left px-3 py-2 text-sm rounded-md cursor-pointer transition-all duration-150 ease-out italic text-muted-foreground"
+                >
+                  Nicht Auftrag bezogen
+                </button>
+                {jobSearch.trim() && filteredJobs.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">Keine Treffer</p>
+                ) : (
+                  filteredJobs.map((it) => (
+                    <button
+                      key={it.id}
+                      type="button"
+                      onClick={() => { setJobId(it.id); setJobSearch(""); }}
+                      className="auftrag-dropdown-item block w-full text-left px-3 py-2 text-sm rounded-md cursor-pointer transition-all duration-150 ease-out"
+                    >
+                      <span className="font-semibold truncate block">{it.title}</span>
+                      {it.customerName && (
+                        <span className="text-xs opacity-70">{it.customerName}</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

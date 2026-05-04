@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, CheckSquare, Ticket, Clock, ArrowRight } from "lucide-react";
+import { Calendar, CheckSquare, Ticket, ArrowRight } from "lucide-react";
 
 function greetingForHour(h: number): string {
   if (h < 12) return "Guten Morgen";
@@ -266,18 +266,6 @@ export default function HeutePage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Quick-Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Link href="/stempel" className="kasten kasten-green">
-          <Clock className="h-3.5 w-3.5" />
-          Stempeln
-        </Link>
-        <Link href="/kalender" className="kasten kasten-blue">
-          <Calendar className="h-3.5 w-3.5" />
-          Kalender
-        </Link>
       </div>
     </div>
   );
