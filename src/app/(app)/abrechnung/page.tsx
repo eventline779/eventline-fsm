@@ -492,39 +492,45 @@ function TrendChart({ data }: { data: TrendMonth[] }) {
           </div>
         </div>
 
-        {/* Bar-Chart: jeder Monat = flex-1 Spalte mit Wert oben + Bar +
-            Label unten. Bars in Teal (= Stempel-Farbe app-weit). Aktueller
-            Monat etwas heller damit "noch nicht abgeschlossen" visuell
-            klar ist. */}
-        <div className="flex items-end gap-3 h-32">
+        {/* Bar-Chart: feste Hoehe BAR_AREA_PX fuer den Bar-Bereich.
+            Hoehen werden in Pixel gerechnet (nicht %) — vermeidet das
+            "flex-1-im-content-height-Parent"-Problem wo Prozente gegen 0
+            resolven. Aktueller Monat heller (noch nicht abgeschlossen). */}
+        <div className="flex items-end gap-3 mb-1.5" style={{ height: 110 }}>
           {data.map((m) => {
-            const heightPct = (m.hours / maxHours) * 100;
-            // Min-Hoehe 4% damit auch Monate mit wenig Stunden sichtbar sind
-            // (sonst nur eine 0-pixel-Linie). 0h = gar keine Bar (klare visuelle Aussage).
-            const renderHeight = m.hours > 0 ? Math.max(heightPct, 4) : 0;
+            const BAR_AREA_PX = 88; // verfuegbare Hoehe fuer den Bar (110 - Wert-Label 22)
+            const heightPx = m.hours > 0 ? Math.max((m.hours / maxHours) * BAR_AREA_PX, 4) : 0;
             return (
-              <div key={m.key} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-                <div className="w-full text-center text-[10px] tabular-nums text-muted-foreground h-3">
-                  {m.hours > 0 ? `${Math.round(m.hours)}h` : ""}
-                </div>
-                <div className="w-full flex-1 flex items-end">
-                  <div
-                    className="w-full rounded-t transition-all"
-                    style={{
-                      height: `${renderHeight}%`,
-                      background: m.isCurrent
-                        ? "linear-gradient(to top, rgba(20,184,166,0.5), rgba(20,184,166,0.25))"
-                        : "linear-gradient(to top, rgb(20,184,166), rgba(20,184,166,0.55))",
-                      borderTop: m.hours > 0 ? "2px solid rgb(20,184,166)" : "none",
-                    }}
-                  />
-                </div>
-                <div className={`text-[11px] text-center tabular-nums ${m.isCurrent ? "font-semibold" : "text-muted-foreground"}`}>
-                  {m.label}
-                </div>
+              <div key={m.key} className="flex-1 flex flex-col items-center justify-end min-w-0">
+                {m.hours > 0 && (
+                  <div className="text-[10px] tabular-nums text-muted-foreground mb-1 leading-none">
+                    {Math.round(m.hours)}h
+                  </div>
+                )}
+                <div
+                  className="w-full rounded-t transition-all"
+                  style={{
+                    height: `${heightPx}px`,
+                    background: m.isCurrent
+                      ? "linear-gradient(to top, rgba(20,184,166,0.5), rgba(20,184,166,0.25))"
+                      : "linear-gradient(to top, rgb(20,184,166), rgba(20,184,166,0.55))",
+                    borderTop: m.hours > 0 ? "2px solid rgb(20,184,166)" : "none",
+                  }}
+                />
               </div>
             );
           })}
+        </div>
+        {/* X-Achsen-Labels separat, ueber alle Monate identische Position */}
+        <div className="flex gap-3">
+          {data.map((m) => (
+            <div
+              key={m.key}
+              className={`flex-1 text-[11px] text-center tabular-nums ${m.isCurrent ? "font-semibold" : "text-muted-foreground"}`}
+            >
+              {m.label}
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
