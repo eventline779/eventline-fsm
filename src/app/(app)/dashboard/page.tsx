@@ -53,7 +53,7 @@ interface OpenTicket {
 }
 
 interface PersonalStats {
-  hoursToday: number;
+  hoursTotal: number;       // all-time
   hoursWeek: number;
   hoursWeekByDay: number[]; // [Mo, Di, Mi, Do, Fr, Sa, So]
   activeJobs: number;
@@ -103,7 +103,7 @@ export default function HeutePage() {
       const monOffset = (startOfWeek.getDay() + 6) % 7;
       startOfWeek.setDate(startOfWeek.getDate() - monOffset);
 
-      const [apptRes, todoRes, ticketRes, entriesRes, assignedJobsRes, leadJobsRes, doneTodosRes] = await Promise.all([
+      const [apptRes, todoRes, ticketRes, entriesRes, totalEntriesRes, assignedJobsRes, leadJobsRes, doneTodosRes] = await Promise.all([
         supabase
           .from("job_appointments")
           .select("id, title, start_time, end_time, job:jobs(id, job_number, title)")
@@ -133,6 +133,14 @@ export default function HeutePage() {
           .eq("user_id", user.id)
           .not("clock_out", "is", null)
           .gte("clock_in", startOfWeek.toISOString()),
+        // Total-Stunden seit Eventline-Start (alle eigenen abgeschlossenen
+        // Stempel-Eintraege). Bei langjaehrigen Mitarbeitern viele Rows —
+        // bei Performance-Problemen spaeter via SQL-RPC mit SUM ersetzen.
+        supabase
+          .from("time_entries")
+          .select("clock_in, clock_out")
+          .eq("user_id", user.id)
+          .not("clock_out", "is", null),
         // Aktive Auftraege via job_assignments
         supabase
           .from("job_assignments")
@@ -162,8 +170,7 @@ export default function HeutePage() {
       setTodos((todoRes.data ?? []) as OpenTodo[]);
       setTickets((ticketRes.data ?? []) as OpenTicket[]);
 
-      // Stunden-Aggregation
-      let hoursToday = 0;
+      // Stunden-Aggregation: laufende Woche (mit Per-Tag-Verteilung)
       let hoursWeek = 0;
       const hoursByDay = [0, 0, 0, 0, 0, 0, 0]; // Mo..So
       type EntryRow = { clock_in: string; clock_out: string | null };
@@ -172,9 +179,15 @@ export default function HeutePage() {
         const start = new Date(e.clock_in);
         const dur = (new Date(e.clock_out).getTime() - start.getTime()) / 3600000;
         hoursWeek += dur;
-        if (start >= startOfDay) hoursToday += dur;
         const dayIdx = (start.getDay() + 6) % 7;
         hoursByDay[dayIdx] += dur;
+      }
+
+      // Total seit Eventline-Start
+      let hoursTotal = 0;
+      for (const e of (totalEntriesRes.data ?? []) as EntryRow[]) {
+        if (!e.clock_out) continue;
+        hoursTotal += (new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 3600000;
       }
 
       // Aktive Auftraege = assigned + lead, Status nicht abgeschlossen/storniert,
@@ -195,7 +208,7 @@ export default function HeutePage() {
       }
 
       setStats({
-        hoursToday,
+        hoursTotal,
         hoursWeek,
         hoursWeekByDay: hoursByDay,
         activeJobs: activeJobIds.size,
@@ -237,10 +250,11 @@ export default function HeutePage() {
           Verteilung nach Wochentag. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Heute"
-          value={loading ? "—" : formatHoursShort(stats?.hoursToday ?? 0)}
+          label="Total gestempelt"
+          value={loading ? "—" : formatHoursShort(stats?.hoursTotal ?? 0)}
           icon={Clock}
           accent="teal"
+          sub="seit Beginn"
         />
         <StatCard
           label="Diese Woche"
