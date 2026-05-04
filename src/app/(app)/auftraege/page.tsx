@@ -608,9 +608,11 @@ export default function AuftraegePage() {
                   // Container-Breite und denselben Template-String haben —
                   // CSS Grid resolved die Spalten daher in jeder Card identisch.
                   //
-                  // Min-Summe: 80+140+0+90+100+100+80+0+110 = 700px + 8*12 (gap) = 796
-                  // -> fits ab Card-Inner-Breite ~800px (Browser ~1100px).
-                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 220px) minmax(0, 1fr) minmax(90px, 130px) minmax(100px, 150px) minmax(100px, 130px) minmax(80px, 110px) minmax(0, 1fr) minmax(110px, 160px)" }}
+                  // Ort/Standort-Spalte raus (Leo: "vollgestopft" — Datum
+                  // + Kunde reicht, Standort steht eh im Detail-View).
+                  // Min-Summe: 80+140+0+100+110+90+0+120 = 640px + 7*12 (gap) = 724
+                  // -> fits locker ab Card-Inner-Breite ~750px (Browser ~1050px).
+                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
                 >
                   {/* LINKS — Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
@@ -626,17 +628,12 @@ export default function AuftraegePage() {
                     {displayCustomerName ?? "—"}
                   </span>
 
-                  {/* MITTE — Col 5: Standort */}
-                  <span className="text-xs text-muted-foreground truncate">
-                    {placeLabel ?? "—"}
-                  </span>
-
-                  {/* MITTE — Col 6: Datum */}
+                  {/* MITTE — Col 5: Datum */}
                   <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
                     {dateText ?? "—"}
                   </span>
 
-                  {/* MITTE — Col 7: Status-Tags (Vermietung, Status, Dringend) */}
+                  {/* MITTE — Col 6: Status-Tags (Vermietung, Status, Dringend) */}
                   <div className="flex items-center gap-1 min-w-0 flex-wrap">
                     {job.priority === "dringend" && isActive && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
