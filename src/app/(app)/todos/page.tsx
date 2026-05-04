@@ -157,7 +157,11 @@ export default function TodosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userIds: [form.assigned_to],
-          title: priority === "dringend" ? `🚨 Dringendes Todo: ${form.title}` : `Neues Todo: ${form.title}`,
+          // Dringend-Marker steht in der priority-Spalte; Title bleibt
+          // emoji-frei damit Notification-Daten clean sind und in
+          // anderen UIs (Mail-Templates, Sidebar-Bell) nicht doppelt
+          // mit Icons + Emojis konfligieren.
+          title: priority === "dringend" ? `Dringendes Todo: ${form.title}` : `Neues Todo: ${form.title}`,
           message: `Von ${creator?.full_name || "Unbekannt"}${form.due_date ? ` · Fällig: ${(() => { const [y,m,d] = form.due_date.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH"); })()}` : ""}`,
           link: "/todos",
         }),

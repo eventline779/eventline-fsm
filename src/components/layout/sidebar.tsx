@@ -73,6 +73,16 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
           WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 64px, black calc(100% - 64px), transparent 100%)",
         }}
       >
+        {/* Empty-State: User mit leerer Permissions-Liste sieht sonst gar
+            nichts und glaubt die App ist kaputt. Der Hinweis macht klar
+            dass es ein Permission-Problem ist und an wen er sich wenden
+            soll. */}
+        {groups.length === 0 && (
+          <div className="px-3 py-4 rounded-lg bg-sidebar-accent/50 text-sidebar-foreground/70 text-[12px] leading-relaxed">
+            <p className="font-medium mb-1 text-sidebar-foreground">Noch keine Berechtigungen</p>
+            <p>Deine Rolle hat keine Module freigeschaltet. Bitte sprich mit deinem Admin.</p>
+          </div>
+        )}
         {groups.map((group) => {
           const items = group.items;
           if (items.length === 0) return null;

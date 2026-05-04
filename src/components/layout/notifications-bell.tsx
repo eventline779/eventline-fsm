@@ -82,15 +82,25 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
     };
   }, [open, side]);
 
-  const unread = notifications.filter((n) => !n.is_read).length;
+  // Unread-Counter aus separater count-Query — vorher wurde aus den
+  // 12 Preview-Items gezaehlt, was bei 13+ Ungelesenen immer "9+"
+  // ergab und nach dem Lesen einzelner Items inkonsistent wurde.
+  const [unread, setUnread] = useState(0);
 
   async function load() {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(PREVIEW_LIMIT);
+    const [{ data }, { count }] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(PREVIEW_LIMIT),
+      supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("is_read", false),
+    ]);
     if (data) setNotifications(data as Notification[]);
+    setUnread(count ?? 0);
   }
 
   useEffect(() => {

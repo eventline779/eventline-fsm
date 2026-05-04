@@ -508,7 +508,9 @@ export default function VertriebPage() {
     const tzH = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
     const tzM = String(Math.abs(tzOffset) % 60).padStart(2, "0");
     const tz = `${tzSign}${tzH}:${tzM}`;
-    const title = `${terminType === "telefon" ? "📞 Telefon-Termin" : "👥 Kunden-Termin"}: ${c.firma}${c.ansprechperson ? ` (${c.ansprechperson})` : ""}`;
+    // Title ohne Emoji-Prefix — die Termin-Art steht in der Vertrieb-
+    // Notes-Struktur. Hier nur sauberer Text fuer Calendar-App-Anzeige.
+    const title = `${terminType === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}: ${c.firma}${c.ansprechperson ? ` (${c.ansprechperson})` : ""}`;
     const description = [terminForm.note, c.telefon ? `Tel: ${c.telefon}` : "", c.email ? `E-Mail: ${c.email}` : ""].filter(Boolean).join("\n");
     const { data: newAppt } = await supabase.from("job_appointments").insert({
       job_id: null,
