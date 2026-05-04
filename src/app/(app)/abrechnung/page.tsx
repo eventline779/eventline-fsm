@@ -89,6 +89,19 @@ const BELEGE_SELECT = `
 `.replace(/\s+/g, " ").trim();
 
 // =====================================================================
+// Umsatz-Trend (Stunden pro Monat, gruppiert nach invoiced_at)
+// =====================================================================
+
+interface TrendMonth {
+  key: string;     // "2026-05" — fuer State-Keys
+  label: string;   // "Mai" — fuer X-Achse
+  hours: number;
+  isCurrent: boolean;
+}
+
+const MONTH_LABELS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+
+// =====================================================================
 // Helpers
 // =====================================================================
 
@@ -137,6 +150,7 @@ export default function AbrechnungPage() {
   const { confirm, ConfirmModalElement } = useConfirm();
   const [jobs, setJobs] = useState<UnbilledJob[]>([]);
   const [belege, setBelege] = useState<UnfiledBeleg[]>([]);
+  const [trend, setTrend] = useState<TrendMonth[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
   const [reference, setReference] = useState("");
@@ -144,7 +158,13 @@ export default function AbrechnungPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [jobsRes, belegeRes] = await Promise.all([
+
+    // Sechs-Monats-Fenster (aktueller + 5 vorhergehende). 1. des Monats
+    // damit wir den ganzen Start-Monat einfangen.
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
+
+    const [jobsRes, belegeRes, trendRes] = await Promise.all([
       supabase
         .from("jobs")
         .select(JOBS_SELECT)
@@ -161,11 +181,48 @@ export default function AbrechnungPage() {
         .neq("status", "abgelehnt")
         .order("created_at", { ascending: false })
         .limit(100),
+      // Trend: nur Jobs die in den letzten 6 Monaten ABGERECHNET wurden
+      // (= invoiced_at gefuellt). Stunden-Berechnung aus den verknuepften
+      // time_entries. Wenn ein Job spaet abgerechnet wird (Stunden lange
+      // davor gestempelt), zaehlt die Rechnung im Abrechnungs-Monat —
+      // genau das was Buchhaltung sehen will (Umsatz-Realisierung).
+      supabase
+        .from("jobs")
+        .select("invoiced_at, time_entries(clock_in, clock_out)")
+        .not("invoiced_at", "is", null)
+        .gte("invoiced_at", sixMonthsAgo.toISOString())
+        .neq("is_deleted", true),
     ]);
     if (jobsRes.error) TOAST.supabaseError(jobsRes.error, "Aufträge konnten nicht geladen werden");
     if (belegeRes.error) TOAST.supabaseError(belegeRes.error, "Belege konnten nicht geladen werden");
     setJobs((jobsRes.data as unknown as UnbilledJob[]) ?? []);
     setBelege((belegeRes.data as unknown as UnfiledBeleg[]) ?? []);
+
+    // Trend aggregieren
+    const minutesByMonth = new Map<string, number>();
+    type TrendJobRow = { invoiced_at: string | null; time_entries: { clock_in: string; clock_out: string | null }[] | null };
+    for (const job of (trendRes.data as TrendJobRow[] | null) ?? []) {
+      if (!job.invoiced_at) continue;
+      const monthKey = job.invoiced_at.slice(0, 7); // "2026-05"
+      const minutes = (job.time_entries ?? []).reduce((sum, te) => {
+        if (!te.clock_out) return sum;
+        return sum + (new Date(te.clock_out).getTime() - new Date(te.clock_in).getTime()) / 60000;
+      }, 0);
+      minutesByMonth.set(monthKey, (minutesByMonth.get(monthKey) ?? 0) + minutes);
+    }
+    const trendData: TrendMonth[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      trendData.push({
+        key,
+        label: MONTH_LABELS_DE[d.getMonth()],
+        hours: (minutesByMonth.get(key) ?? 0) / 60,
+        isCurrent: i === 0,
+      });
+    }
+    setTrend(trendData);
+
     setLoading(false);
   }, [supabase]);
 
@@ -271,6 +328,8 @@ export default function AbrechnungPage() {
           Aufträge mit gestellter Rechnung und Belege als abgelegt markieren.
         </p>
       </div>
+
+      {!loading && <TrendChart data={trend} />}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Lade…</p>
@@ -382,6 +441,93 @@ export default function AbrechnungPage() {
       </Modal>
       {ConfirmModalElement}
     </div>
+  );
+}
+
+// =====================================================================
+// TrendChart — Stunden pro Monat, letzte 6 Monate
+// =====================================================================
+
+function TrendChart({ data }: { data: TrendMonth[] }) {
+  const totalHours = data.reduce((sum, d) => sum + d.hours, 0);
+  // maxHours dient nur der Skalierung — minimum 1 damit nicht durch 0 geteilt wird.
+  const maxHours = Math.max(...data.map((d) => d.hours), 1);
+  // Vergleich: Vorhergehender Monat vs aktueller. Praktisch fuer "Trend-
+  // Pfeil"-Anzeige (geht's hoch oder runter?).
+  const current = data[data.length - 1]?.hours ?? 0;
+  const previous = data[data.length - 2]?.hours ?? 0;
+  const delta = previous > 0 ? ((current - previous) / previous) * 100 : null;
+  const trendUp = delta !== null && delta > 5;
+  const trendDown = delta !== null && delta < -5;
+
+  return (
+    <Card className="bg-card">
+      <CardContent className="p-5">
+        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-teal-500" />
+              Abgerechnete Stunden — Trend
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Letzte 6 Monate, gruppiert nach Monat der Rechnungsstellung.
+            </p>
+          </div>
+          <div className="flex items-baseline gap-3">
+            {delta !== null && (
+              <span
+                className={`text-xs font-medium tabular-nums ${
+                  trendUp ? "text-green-600 dark:text-green-400"
+                    : trendDown ? "text-red-600 dark:text-red-400"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {trendUp ? "↑" : trendDown ? "↓" : "→"} {Math.abs(Math.round(delta))}% ggü. Vormonat
+              </span>
+            )}
+            <div className="text-right">
+              <div className="text-2xl font-bold tabular-nums">{Math.round(totalHours)}h</div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gesamt</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bar-Chart: jeder Monat = flex-1 Spalte mit Wert oben + Bar +
+            Label unten. Bars in Teal (= Stempel-Farbe app-weit). Aktueller
+            Monat etwas heller damit "noch nicht abgeschlossen" visuell
+            klar ist. */}
+        <div className="flex items-end gap-3 h-32">
+          {data.map((m) => {
+            const heightPct = (m.hours / maxHours) * 100;
+            // Min-Hoehe 4% damit auch Monate mit wenig Stunden sichtbar sind
+            // (sonst nur eine 0-pixel-Linie). 0h = gar keine Bar (klare visuelle Aussage).
+            const renderHeight = m.hours > 0 ? Math.max(heightPct, 4) : 0;
+            return (
+              <div key={m.key} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                <div className="w-full text-center text-[10px] tabular-nums text-muted-foreground h-3">
+                  {m.hours > 0 ? `${Math.round(m.hours)}h` : ""}
+                </div>
+                <div className="w-full flex-1 flex items-end">
+                  <div
+                    className="w-full rounded-t transition-all"
+                    style={{
+                      height: `${renderHeight}%`,
+                      background: m.isCurrent
+                        ? "linear-gradient(to top, rgba(20,184,166,0.5), rgba(20,184,166,0.25))"
+                        : "linear-gradient(to top, rgb(20,184,166), rgba(20,184,166,0.55))",
+                      borderTop: m.hours > 0 ? "2px solid rgb(20,184,166)" : "none",
+                    }}
+                  />
+                </div>
+                <div className={`text-[11px] text-center tabular-nums ${m.isCurrent ? "font-semibold" : "text-muted-foreground"}`}>
+                  {m.label}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
