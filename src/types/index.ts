@@ -486,6 +486,12 @@ export interface Ticket {
   resolved_by: string | null;
   resolution_note: string | null;
   archived_at: string | null;
+  // Beleg-Ablage — gefuellt wenn die Buchhaltung den Beleg abgelegt hat
+  // (Bexio, Ordner, etc.). filed_reference ist die externe Referenz.
+  // /abrechnung filtert auf type='beleg' AND filed_at IS NULL.
+  filed_at: string | null;
+  filed_reference: string | null;
+  filed_by: string | null;
   created_at: string;
   updated_at: string;
 }

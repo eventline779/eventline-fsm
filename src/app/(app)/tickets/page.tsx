@@ -305,6 +305,14 @@ export default function TicketsPage() {
                             Dringend
                           </span>
                         )}
+                        {t.filed_at && (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 shrink-0"
+                            data-tooltip={t.filed_reference ?? "Abgelegt"}
+                          >
+                            Abgelegt
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
                         <span>{typeMeta.label}</span>
