@@ -30,6 +30,9 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { slug: "kalender",      label: "Kalender",      paths: ["/kalender"],                                         actions: ["view", "create", "edit", "delete"] },
   // Operationen → Aufträge (Begriff aus der Sidebar, statt "Operations").
   { slug: "auftraege",     label: "Aufträge",      paths: ["/auftraege"],                                        actions: ["view", "create", "edit", "delete"] },
+  // Abrechnung — abgeschlossene Auftraege als "Rechnung gestellt" markieren.
+  // view = /abrechnung-Seite sehen; edit = "Rechnung gestellt"-Button druecken.
+  { slug: "abrechnung",    label: "Abrechnung",    paths: ["/abrechnung"],                                       actions: ["view", "edit"] },
   // Vertrieb — Lead-Pipeline. CRUD pro Lead.
   { slug: "vertrieb",      label: "Vertrieb",      paths: ["/vertrieb"],                                         actions: ["view", "create", "edit", "delete"] },
   { slug: "locations",     label: "Locations",     paths: ["/locations", "/standorte", "/raeume"], actions: ["view", "create", "edit", "delete"] },

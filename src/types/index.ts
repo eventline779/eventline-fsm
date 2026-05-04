@@ -109,6 +109,12 @@ export interface Job {
   cancellation_reason: string | null;
   // TRUE wenn die Stornierung in der Anfrage-Phase passierte — solche Jobs gehoeren nicht ins Auftrags-Archiv.
   cancelled_as_anfrage: boolean;
+  // Abrechnung — gefuellt wenn der Auftrag als "Rechnung gestellt" markiert wurde.
+  // /abrechnung filtert auf status='abgeschlossen' AND invoiced_at IS NULL.
+  // /auftraege-Archiv zeigt invoiced_at IS NOT NULL als "Abgerechnet"-Tag.
+  invoiced_at: string | null;
+  invoice_number: string | null;
+  invoiced_by: string | null;
   // Joined data
   customer?: Customer;
   location?: Location;
