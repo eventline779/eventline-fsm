@@ -18,13 +18,11 @@ export async function POST() {
   if (auth.error) return auth.error;
 
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("gen_random_uuid");
-  // Fallback: random_uuid via Postgres direkt
-  let newToken = data as string | null;
-  if (!newToken || error) {
-    // Wenn das RPC nicht existiert, generieren wir client-seitig.
-    newToken = crypto.randomUUID();
-  }
+  // Token wird im Node-Runtime via crypto.randomUUID generiert — der
+  // vorherige rpc("gen_random_uuid")-Aufruf war toter Code (gen_random_uuid
+  // ist eine SQL-Funktion, keine RPC; der Aufruf gab konstant null/error
+  // zurueck und der Fallback wurde immer benutzt).
+  const newToken = crypto.randomUUID();
 
   const { error: updateErr } = await admin
     .from("profiles")

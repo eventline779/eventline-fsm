@@ -126,13 +126,20 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
   }, [open]);
 
   async function markAsRead(id: string) {
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    // Optimistic Update — Counter SOFORT runter, sonst zeigt die rote
+    // Bubble noch Sekunden nach dem Click die alte Zahl bis Realtime
+    // reinkommt. Bei Fehler: load() korrigiert.
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    setUnread((prev) => Math.max(0, prev - 1));
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    if (error) load();
   }
 
   async function markAllAsRead() {
-    await supabase.from("notifications").update({ is_read: true }).eq("is_read", false);
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setUnread(0);
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("is_read", false);
+    if (error) load();
   }
 
   async function clickNotification(n: Notification) {

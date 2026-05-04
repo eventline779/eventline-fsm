@@ -71,6 +71,11 @@ export function IcalFeedBlock({ title, description }: Props) {
       variant: "red",
     });
     if (!ok) return;
+    // Race-Schutz: alten Link sofort entwerten BEVOR wir den neuen holen.
+    // Vorher konnte der User in der kurzen Zeit zwischen Click und Server-
+    // Antwort den noch sichtbaren alten Link kopieren — und damit eine
+    // bereits invalidierte URL in seiner Calendar-App speichern.
+    setIcalUrl("");
     setRotating(true);
     try {
       const res = await fetch("/api/profile/rotate-calendar-token", { method: "POST" });
