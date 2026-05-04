@@ -589,25 +589,42 @@ export default function AuftraegePage() {
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Tabellen-aehnliche Spalten-Ausrichtung wie Bexio:
-                    Nr | Title | Tags | Kunde | Standort | Datum | Aktionen
-                    Tags-Spalte (176px = w-44) ist mit dem Status-Dropdown in
-                    der Filter-Bar oben in derselben vertikalen Flucht. Kunde/
-                    Standort/Datum etwas schmaler als vorher (160/180/160 statt
-                    180/200/180), sodass das Title-Feld trotz neuer Tags-Spalte
-                    nicht zu eng wird und die Daten-Spalten "ein wenig nach
-                    links" rutschen. */}
+                {/* Drei-Zonen-Layout (wie Leo's Skizze):
+                    LINKS  : Nr + Title eng zusammen
+                    MITTE  : Kunde Ort Datum Status, gruppiert
+                    RECHTS : Rechnungs-Pille / Aktion
+                    Die zwei 1fr-Spalten dazwischen sind die Luecken. Title
+                    hat fixe Breite (220px) damit das Mittel-Feld ueber alle
+                    Cards hinweg in derselben Flucht startet. */}
                 <div
                   className="px-4 py-2 grid items-center gap-x-3"
-                  style={{ gridTemplateColumns: "auto minmax(0, 1fr) 176px 160px 180px 160px auto" }}
+                  style={{ gridTemplateColumns: "auto 220px minmax(0,1fr) 140px 160px 140px 130px minmax(0,1fr) auto" }}
                 >
-                  {/* Col 1: Nr-Badge */}
+                  {/* LINKS — Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
 
-                  {/* Col 2: Titel (Tags wandern in eigene Spalte) */}
+                  {/* LINKS — Col 2: Titel (fixed width, truncate) */}
                   <span className="auftrag-card-title font-medium text-sm truncate transition-colors min-w-0">{job.title}</span>
 
-                  {/* Col 3: Tags — vertikal unter dem Status-Dropdown der Filter-Bar */}
+                  {/* Col 3: Spacer (1fr) — leer */}
+                  <div />
+
+                  {/* MITTE — Col 4: Kunde */}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {displayCustomerName ?? "—"}
+                  </span>
+
+                  {/* MITTE — Col 5: Standort */}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {placeLabel ?? "—"}
+                  </span>
+
+                  {/* MITTE — Col 6: Datum */}
+                  <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
+                    {dateText ?? "—"}
+                  </span>
+
+                  {/* MITTE — Col 7: Status-Tags (Vermietung, Status, Dringend) */}
                   <div className="flex items-center gap-1 min-w-0 flex-wrap">
                     {job.priority === "dringend" && isActive && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
@@ -626,22 +643,10 @@ export default function AuftraegePage() {
                     )}
                   </div>
 
-                  {/* Col 4: Kunde */}
-                  <span className="text-xs text-muted-foreground truncate">
-                    {displayCustomerName ?? "—"}
-                  </span>
+                  {/* Col 8: Spacer (1fr) — leer */}
+                  <div />
 
-                  {/* Col 5: Standort */}
-                  <span className="text-xs text-muted-foreground truncate">
-                    {placeLabel ?? "—"}
-                  </span>
-
-                  {/* Col 6: Datum */}
-                  <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
-                    {dateText ?? "—"}
-                  </span>
-
-                  {/* Col 7: Aktionen / Rechnungs-Pille / Hints */}
+                  {/* RECHTS — Col 9: Rechnungs-Pille / Hint / Aktion-Icon */}
                   <div className="flex items-center gap-1.5 shrink-0 justify-end">
                     {job.invoiced_at && job.invoice_number && (
                       <button
