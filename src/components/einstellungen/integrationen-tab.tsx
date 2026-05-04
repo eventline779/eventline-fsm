@@ -85,17 +85,19 @@ export function IntegrationenTab() {
         </p>
       </div>
 
-      {/* iCal-Feed nur fuer Admins: ihr Token resolved im Endpoint zur
-          Komplett-Sicht (alle Auftraege + Termine der Firma). Normale User
-          sehen den Block hier nicht — sie haben den persoenlichen Feed
-          jetzt direkt auf der /kalender-Page. */}
+      {/* iCal-Feed Firma — dedizierter Token in app_settings, nicht an
+          eine Person gebunden. Vorher war das der persoenliche Admin-Token,
+          was strukturell falsch war (Token-Leak = Firma-Sicht-Leak,
+          Admin-Deaktivierung = Firma-Feed-Tod). Block nur fuer Admins —
+          RLS erlaubt nur ihnen das Lesen des Tokens. */}
       {isAdmin && (
         <IcalFeedBlock
+          source="company"
           title="Kalender der Firma (iCal-Feed)"
           description={
             <>
-              Als Admin enthält dein Feed <strong>alle Aufträge + Termine</strong> der Firma. Kopiere die URL
-              und füge sie in Google Calendar / Apple Calendar / Outlook über{" "}
+              Dieser Feed enthält <strong>alle Aufträge + Termine</strong> der Firma — unabhängig von einzelnen Mitarbeitern.
+              Kopiere die URL und füge sie in Google Calendar / Apple Calendar / Outlook über{" "}
               <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
             </>
           }

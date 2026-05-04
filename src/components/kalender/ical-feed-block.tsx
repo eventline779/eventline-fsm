@@ -23,9 +23,13 @@ interface Props {
   title: string;
   /** Erklaer-Text unter der Headline. */
   description: React.ReactNode;
+  /** "user" = persoenlicher Feed (profiles.calendar_feed_token);
+   *  "company" = firmenweiter Feed (app_settings.company_calendar_token).
+   *  Default "user" damit die /kalender-Seite nichts anpassen muss. */
+  source?: "user" | "company";
 }
 
-export function IcalFeedBlock({ title, description }: Props) {
+export function IcalFeedBlock({ title, description, source = "user" }: Props) {
   const supabase = createClient();
   const [icalUrl, setIcalUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -34,14 +38,26 @@ export function IcalFeedBlock({ title, description }: Props) {
 
   async function loadToken() {
     if (typeof window === "undefined") return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("calendar_feed_token")
-      .eq("id", user.id)
-      .maybeSingle();
-    const token = profile?.calendar_feed_token;
+    let token: string | null = null;
+    if (source === "company") {
+      // app_settings ist Singleton. RLS laesst nur Admins lesen — Block
+      // wird im IntegrationenTab ausserdem nur fuer Admins gerendert.
+      const { data } = await supabase
+        .from("app_settings")
+        .select("company_calendar_token")
+        .eq("id", 1)
+        .maybeSingle();
+      token = data?.company_calendar_token ?? null;
+    } else {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("calendar_feed_token")
+        .eq("id", user.id)
+        .maybeSingle();
+      token = profile?.calendar_feed_token ?? null;
+    }
     if (token) {
       setIcalUrl(`${window.location.origin}/api/calendar.ics?token=${token}`);
     }
@@ -50,7 +66,7 @@ export function IcalFeedBlock({ title, description }: Props) {
   useEffect(() => {
     loadToken();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase]);
+  }, [supabase, source]);
 
   async function copy() {
     try {
@@ -66,7 +82,9 @@ export function IcalFeedBlock({ title, description }: Props) {
   async function rotate() {
     const ok = await confirm({
       title: "Token rotieren?",
-      message: "Der alte Link wird sofort ungültig. Du musst die URL neu in deine Calendar-Apps kopieren (Google/Apple/Outlook). Alle anderen Geräte verlieren den Zugang.",
+      message: source === "company"
+        ? "Der alte Firma-Link wird sofort ungültig. Alle Geräte/Personen die diesen Kalender abonniert haben (Geschäftsleitung, Sekretariat, etc.) müssen die neue URL eintragen."
+        : "Der alte Link wird sofort ungültig. Du musst die URL neu in deine Calendar-Apps kopieren (Google/Apple/Outlook). Alle anderen Geräte verlieren den Zugang.",
       confirmLabel: "Rotieren",
       variant: "red",
     });
@@ -78,7 +96,10 @@ export function IcalFeedBlock({ title, description }: Props) {
     setIcalUrl("");
     setRotating(true);
     try {
-      const res = await fetch("/api/profile/rotate-calendar-token", { method: "POST" });
+      const endpoint = source === "company"
+        ? "/api/company/rotate-calendar-token"
+        : "/api/profile/rotate-calendar-token";
+      const res = await fetch(endpoint, { method: "POST" });
       const json = await res.json();
       if (!json.success) {
         toast.error(json.error ?? "Rotation fehlgeschlagen");

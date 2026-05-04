@@ -3,16 +3,21 @@
  * Google Calendar / Apple Calendar / Outlook etc koennen via "Add by URL"
  * den Eventline-Kalender abonnieren und automatisch synchronisieren.
  *
- * Token-basierter Zugang: jeder User hat seinen persoenlichen
- * profiles.calendar_feed_token (uuid). Dieser kommt als ?token=... in
- * der URL — der Endpoint mappt zurueck auf den User und zeigt nur was
- * der User auch in der App sehen darf:
- *   - Aufträge in denen er Project-Lead oder via job_assignments dabei ist
- *   - Termine bei denen er als assigned_to gelistet ist ODER auf einem
- *     Auftrag wo er drauf ist
+ * Zwei Token-Typen, beide ueber dieselbe URL `?token=...`:
  *
- * Admins sehen auch hier alles. Normale Mitarbeiter sehen nur ihre
- * eigenen Auftraege/Termine.
+ *  1. Firma-Token (app_settings.company_calendar_token) — gibt die
+ *     Komplett-Sicht: ALLE Auftraege + Termine der Firma. Eingerichtet
+ *     in Einstellungen → Integrationen, rotierbar via
+ *     /api/company/rotate-calendar-token. Nicht an einen User gebunden.
+ *
+ *  2. User-Token (profiles.calendar_feed_token) — persoenlicher Feed.
+ *     Mappt zurueck auf den User und zeigt nur was er auch in der App
+ *     sieht: Auftraege in denen er Project-Lead oder via job_assignments
+ *     dabei ist, plus Termine bei denen er assigned_to ist ODER auf
+ *     einem Auftrag wo er drauf ist. Admins als User sehen alles.
+ *
+ * Lookup-Reihenfolge: erst Firma-Token (eine Row, schneller Hit/Miss),
+ * dann User-Token. Kein 401 leakt welcher Typ einen Treffer haette.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -50,20 +55,38 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient();
 
-  // Token → User. Nur aktive Profile akzeptieren — deaktivierte User
-  // sollen keinen Feed mehr bekommen.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, is_active, full_name")
-    .eq("calendar_feed_token", token)
+  // 1) Firma-Token? Singleton-Row in app_settings. Wenn match, gibt's
+  //    Komplett-Sicht ohne User-Filter (isAdmin=true, userId=null).
+  const { data: companyRow } = await supabase
+    .from("app_settings")
+    .select("company_calendar_token")
+    .eq("id", 1)
     .maybeSingle();
 
-  if (!profile || !profile.is_active) {
-    return new NextResponse("Token ungueltig", { status: 401 });
-  }
+  let userId: string | null = null;
+  let isAdmin = false;
+  let calendarName = "Eventline";
 
-  const userId = profile.id;
-  const isAdmin = profile.role === "admin";
+  if (companyRow?.company_calendar_token === token) {
+    isAdmin = true;
+    calendarName = "Eventline — Firma";
+  } else {
+    // 2) User-Token? Nur aktive Profile akzeptieren — deaktivierte User
+    //    sollen keinen Feed mehr bekommen.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role, is_active, full_name")
+      .eq("calendar_feed_token", token)
+      .maybeSingle();
+
+    if (!profile || !profile.is_active) {
+      return new NextResponse("Token ungueltig", { status: 401 });
+    }
+
+    userId = profile.id;
+    isAdmin = profile.role === "admin";
+    calendarName = `Eventline — ${profile.full_name ?? "Mein Kalender"}`;
+  }
 
   // Welche Job-IDs darf der User sehen?
   // - Admin: alle nicht-geloeschten, nicht-stornierten
@@ -111,7 +134,7 @@ export async function GET(request: NextRequest) {
     "PRODID:-//Eventline FSM//DE",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:Eventline — ${escapeICS(profile.full_name ?? "Mein Kalender")}`,
+    `X-WR-CALNAME:${escapeICS(calendarName)}`,
     "X-WR-TIMEZONE:Europe/Zurich",
   ];
 
