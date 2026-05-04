@@ -34,20 +34,14 @@ export function CustomerWorldMap() {
   useEffect(() => {
     const supabase = createClient();
     async function load() {
-      // Zaehlt aktive UND archivierte Kunden — die geographische Verteilung
-      // ist eine historische Sicht und soll zeigen wo wir je Kunden hatten,
-      // nicht nur wo wir aktuell aktive Kunden haben.
+      // Server-seitig aggregiert via View customer_country_counts (075).
+      // Vorher zog die Komponente ALLE customers nur fuer address_country —
+      // bei 5-10k Kunden MB-Bereich pro /kunden-Mount.
       const { data: rows } = await supabase
-        .from("customers")
-        .select("address_country");
-      const counts = new Map<string, number>();
-      for (const r of (rows ?? []) as { address_country: string | null }[]) {
-        if (!r.address_country) continue;
-        const code = r.address_country.toUpperCase();
-        counts.set(code, (counts.get(code) ?? 0) + 1);
-      }
-      const sorted: CountryDatum[] = Array.from(counts.entries())
-        .map(([country, count]) => ({ country, count }))
+        .from("customer_country_counts")
+        .select("country, count");
+      const sorted: CountryDatum[] = ((rows ?? []) as { country: string; count: number }[])
+        .map((r) => ({ country: r.country.toUpperCase(), count: r.count }))
         .sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
       setData(sorted);
       setLoading(false);

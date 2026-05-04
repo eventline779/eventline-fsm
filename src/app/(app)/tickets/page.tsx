@@ -76,7 +76,10 @@ export default function TicketsPage() {
 
   // Query-Builder — beide Loader-Pfade (initial + load-more) bauen die
   // gleiche Query mit unterschiedlichem Cursor.
-  const buildQuery = useCallback((cursor: string | null) => {
+  // Cursor ist Composite (created_at, id) damit Tickets mit identischem
+  // created_at (Bulk-Imports, KI-Analyse-Massenanlagen) deterministisch
+  // sortiert werden und nichts in der naechsten Page durchrutscht.
+  const buildQuery = useCallback((cursor: { ts: string; id: string } | null) => {
     let q = supabase
       .from("tickets")
       .select(`
@@ -87,12 +90,16 @@ export default function TicketsPage() {
         attachments:ticket_attachments(id, filename, storage_path, mime_type)
       `)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       // PAGE_SIZE+1: der "(n+1)-Trick" → wenn wir 101 zurueckkriegen,
       // wissen wir es gibt mindestens eine weitere Page, ohne extra
       // count-Query zu machen.
       .limit(PAGE_SIZE + 1);
 
-    if (cursor !== null) q = q.lt("created_at", cursor);
+    if (cursor !== null) {
+      // Composite-Cursor: lt(created_at) ODER (eq(created_at) AND lt(id))
+      q = q.or(`created_at.lt.${cursor.ts},and(created_at.eq.${cursor.ts},id.lt.${cursor.id})`);
+    }
 
     // Im Archiv-Modus den Status-Filter ignorieren — archivierte Tickets sind
     // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen).
@@ -134,8 +141,8 @@ export default function TicketsPage() {
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || tickets.length === 0) return;
     setLoadingMore(true);
-    const lastCursor = tickets[tickets.length - 1].created_at;
-    const { data } = await buildQuery(lastCursor);
+    const last = tickets[tickets.length - 1];
+    const { data } = await buildQuery({ ts: last.created_at, id: last.id });
     const rows = (data as unknown as TicketWithRelations[]) ?? [];
     setHasMore(rows.length > PAGE_SIZE);
     setTickets((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);

@@ -19,9 +19,23 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // Notifications-Cleanup: alles aelter als 90 Tage wird geloescht damit
+  // die Tabelle bei mehrjaehriger Nutzung nicht ungebremst waechst (vor
+  // allem die Stempel-Reminder-Notifications die alle 30min entstehen).
+  const cleanupCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const { count: deletedNotifications } = await supabase
+    .from("notifications")
+    .delete({ count: "exact" })
+    .lt("created_at", cleanupCutoff);
+
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    return NextResponse.json({ error: "Kein RESEND_API_KEY" });
+    return NextResponse.json({
+      success: true,
+      message: "Kein RESEND_API_KEY — nur Cleanup gemacht",
+      cleanup: deletedNotifications ?? 0,
+    });
   }
 
   const resend = new Resend(resendKey);
@@ -40,7 +54,7 @@ export async function GET(request: Request) {
     .not("assigned_to", "is", null);
 
   if (!todos || todos.length === 0) {
-    return NextResponse.json({ success: true, message: "Keine Erinnerungen zu senden", count: 0 });
+    return NextResponse.json({ success: true, message: "Keine Erinnerungen zu senden", count: 0, cleanup: deletedNotifications ?? 0 });
   }
 
   const sent: string[] = [];
@@ -96,5 +110,6 @@ export async function GET(request: Request) {
     count: sent.length,
     sent,
     failed,
+    cleanup: deletedNotifications ?? 0,
   });
 }

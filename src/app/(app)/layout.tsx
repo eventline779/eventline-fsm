@@ -55,21 +55,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const dispatch = (table: string) => () => {
       window.dispatchEvent(new Event(`realtime:${table}`));
     };
-    const channel = supabase
-      .channel("global-invalidate")
-      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
-        window.dispatchEvent(new Event("jobs:invalidate"));
-        window.dispatchEvent(new Event("realtime:jobs"));
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => {
-        window.dispatchEvent(new Event("customers:invalidate"));
-        window.dispatchEvent(new Event("realtime:customers"));
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, dispatch("notifications"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "time_entries" }, dispatch("time_entries"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, dispatch("vertrieb_contacts"))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // notifications + time_entries pro User filtern — Bandwidth-Schnitt:
+      // vorher kriegte jeder Tab den Fan-out fuer ALLE Inserts in diesen
+      // Tables und filterte clientseitig (RLS sorgte zwar fuer Row-Sicht-
+      // barkeit, aber das Event-Volumen war voll). Filter macht Realtime
+      // server-seitig: nur User-relevante Events kommen rueber.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      channel = supabase
+        .channel("global-invalidate")
+        .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+          window.dispatchEvent(new Event("jobs:invalidate"));
+          window.dispatchEvent(new Event("realtime:jobs"));
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => {
+          window.dispatchEvent(new Event("customers:invalidate"));
+          window.dispatchEvent(new Event("realtime:customers"));
+        })
+        .on("postgres_changes", {
+          event: "*", schema: "public", table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        }, dispatch("notifications"))
+        .on("postgres_changes", {
+          event: "*", schema: "public", table: "time_entries",
+          filter: `user_id=eq.${user.id}`,
+        }, dispatch("time_entries"))
+        .on("postgres_changes", { event: "*", schema: "public", table: "vertrieb_contacts" }, dispatch("vertrieb_contacts"))
+        .subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
