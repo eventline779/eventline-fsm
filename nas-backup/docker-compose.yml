@@ -1,0 +1,89 @@
+# Eventline-FSM Nightly Backup auf Ugreen NAS.
+#
+# Was passiert:
+#   - Container startet, installiert pg_dump + rclone (Alpine-Pakete)
+#   - Schreibt eine rclone-Config aus den .env-Variablen
+#   - Connectivity-Test gegen Postgres + S3 beim Start (siehst du im Log)
+#   - Sleep-Loop bis $BACKUP_HOUR (default 3 = 03:00 Europe/Zurich)
+#   - Triggert backup.sh, schlaeft 24h, repeat
+#
+# Bei Container-Restart laueft alles neu auf — keine externen State-Files
+# noetig. Backups landen in /volume1/Backups/eventline/<datum>/ auf der NAS.
+#
+# Setup-Schritte fuer die Ugreen:
+#   1. Ordner /volume1/Backups/eventline/ via Datei-Manager anlegen
+#   2. Ordner /volume1/docker/eventline-backup/ anlegen
+#   3. Diese Datei + backup.sh + .env (von .env.example kopiert) dort
+#      reinkopieren
+#   4. Docker-App oeffnen → Compose → Neuer Stack → Pfad waehlen → Start
+#   5. Logs anschauen: muss "[Init] Postgres OK" + "[Init] S3-Storage OK"
+#      sagen. Erster Run um 03:00.
+
+services:
+  eventline-backup:
+    image: alpine:3.21
+    container_name: eventline-backup
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Zurich
+    volumes:
+      # Ziel-Verzeichnis fuer die Backups auf der NAS — Volume-1 ist
+      # Standard bei Ugreen. Falls du einen anderen Pool/Volume hast,
+      # hier den Pfad anpassen (z.B. /volume2/Backups/eventline).
+      - /volume1/Backups/eventline:/backups
+      # Backup-Script aus dem gleichen Ordner. :ro = read-only damit der
+      # Container das Script nicht versehentlich aendert.
+      - ./backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "[Init] Installiere pg_dump + rclone..."
+        apk add --no-cache postgresql17-client rclone tzdata >/dev/null
+
+        echo "[Init] Schreibe rclone-Config..."
+        cat > /tmp/rclone.conf <<RCLONE
+        [s3]
+        type = s3
+        provider = Other
+        access_key_id = $$S3_ACCESS_KEY_ID
+        secret_access_key = $$S3_SECRET_ACCESS_KEY
+        endpoint = $$S3_ENDPOINT
+        region = $$S3_REGION
+        force_path_style = true
+        RCLONE
+
+        chmod +x /usr/local/bin/backup.sh
+
+        echo "[Init] Connectivity-Tests..."
+        if PGPASSWORD="$$PG_PASSWORD" pg_isready -h "$$PG_HOST" -p "$$PG_PORT" -U "$$PG_USER" -d "$$PG_DATABASE" >/dev/null 2>&1; then
+          echo "[Init] Postgres OK"
+        else
+          echo "[Init] [FEHLER] Postgres nicht erreichbar — pruefe PG_HOST/PG_USER/PG_PASSWORD im .env"
+        fi
+        if rclone --config /tmp/rclone.conf lsd s3: >/dev/null 2>&1; then
+          echo "[Init] S3-Storage OK"
+        else
+          echo "[Init] [FEHLER] S3 nicht erreichbar — pruefe S3_*-Variablen im .env"
+        fi
+
+        echo "[Init] Bereit. Sleep-Loop bis $$BACKUP_HOUR:00 Europe/Zurich..."
+
+        while true; do
+          NOW_H=$$(date +%H)
+          NOW_M=$$(date +%M)
+          NOW_S=$$(date +%S)
+          NOW_SEC=$$(( 10#$$NOW_H * 3600 + 10#$$NOW_M * 60 + 10#$$NOW_S ))
+          TGT_SEC=$$(( BACKUP_HOUR * 3600 ))
+          if [ "$$NOW_SEC" -ge "$$TGT_SEC" ]; then
+            SLEEP=$$(( 86400 - NOW_SEC + TGT_SEC ))
+          else
+            SLEEP=$$(( TGT_SEC - NOW_SEC ))
+          fi
+          HRS=$$(( SLEEP / 3600 ))
+          MIN=$$(( (SLEEP % 3600) / 60 ))
+          echo "[Loop] Sleep $${HRS}h $${MIN}m bis naechstem Run..."
+          sleep "$$SLEEP"
+          /usr/local/bin/backup.sh || echo "[Loop] [FEHLER] Backup-Run abgebrochen, schlafe weiter"
+        done
