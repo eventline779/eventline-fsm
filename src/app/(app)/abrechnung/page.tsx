@@ -568,14 +568,12 @@ function TrendChart({ data }: { data: TrendMonth[] }) {
                   </div>
                 )}
                 <div
-                  className="w-full rounded-t transition-all"
-                  style={{
-                    height: `${heightPx}px`,
-                    background: m.isCurrent
-                      ? "linear-gradient(to top, rgba(20,184,166,0.5), rgba(20,184,166,0.25))"
-                      : "linear-gradient(to top, rgb(20,184,166), rgba(20,184,166,0.55))",
-                    borderTop: m.hours > 0 ? "2px solid rgb(20,184,166)" : "none",
-                  }}
+                  className={`w-full rounded-t transition-all bg-[rgba(20,184,166,0.12)] dark:bg-[rgba(20,184,166,0.18)] ${
+                    m.hours > 0
+                      ? `border-2 ${m.isCurrent ? "border-dashed" : "border-solid"} border-[rgb(20,184,166)]`
+                      : ""
+                  }`}
+                  style={{ height: `${heightPx}px` }}
                 />
               </div>
             );
