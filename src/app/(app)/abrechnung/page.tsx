@@ -275,9 +275,10 @@ export default function AbrechnungPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Lade…</p>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Linke Spalte — Auftraege */}
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-y-6 lg:gap-y-0">
+          {/* Linke Spalte — Auftraege. lg:border-r + Padding macht den
+              Trennstrich in der Mitte; auf Mobile (stacked) kein Border. */}
+          <div className="space-y-3 lg:pr-6 lg:border-r lg:border-border">
             <div className="flex items-baseline justify-between">
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Aufträge
@@ -300,7 +301,7 @@ export default function AbrechnungPage() {
           </div>
 
           {/* Rechte Spalte — Belege */}
-          <div className="space-y-3">
+          <div className="space-y-3 lg:pl-6">
             <div className="flex items-baseline justify-between">
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Belege
