@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackButton } from "@/components/ui/back-button";
 import { useConfirm } from "@/components/ui/use-confirm";
@@ -45,7 +46,7 @@ export default function TicketDetailPage() {
 
   const [ticket, setTicket] = useState<TicketWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -117,8 +118,6 @@ export default function TicketDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUserId(user.id);
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-      setIsAdmin(profile?.role === "admin");
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -419,8 +418,10 @@ export default function TicketDetailPage() {
         </Card>
       )}
 
-      {/* Admin-Aktionen */}
-      {isAdmin && ticket.status === "offen" && (
+      {/* Manage-Aktionen — vorher hardcoded auf isAdmin, jetzt ueber
+          tickets:manage-Permission. So kann eine Custom-Rolle wie
+          "Buchhaltung" Tickets verwalten ohne Admin sein zu muessen. */}
+      {can("tickets:manage") && ticket.status === "offen" && (
         <Card className="bg-card border-foreground/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Bearbeiten</CardTitle>
@@ -451,8 +452,8 @@ export default function TicketDetailPage() {
         </Card>
       )}
 
-      {/* Lösch-Aktion (Admin only, Ticket muss nicht offen sein) */}
-      {isAdmin && (
+      {/* Lösch-Aktion via tickets:manage. */}
+      {can("tickets:manage") && (
         <div className="flex justify-end">
           <button type="button" onClick={deleteTicket} disabled={busy} className="kasten kasten-red">
             <Trash2 className="h-3.5 w-3.5" />Ticket löschen

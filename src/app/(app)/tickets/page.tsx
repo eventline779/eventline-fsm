@@ -13,6 +13,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -59,19 +60,17 @@ export default function TicketsPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("offen");
   const [filterType, setFilterType] = useState<FilterType>("alle");
   const [showNew, setShowNew] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { can } = usePermissions();
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Admin-Check + eigene User-ID laden — bestimmt Filter-Optionen.
+  // Eigene User-ID laden — wird fuer den "Nur meine"-Filter gebraucht.
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUserId(user.id);
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-      setIsAdmin(profile?.role === "admin");
     })();
   }, [supabase]);
 
@@ -171,9 +170,11 @@ export default function TicketsPage() {
           >
             Archiv
           </button>
-          <button type="button" onClick={() => setShowNew(true)} className="kasten kasten-red">
-            <Plus className="h-3.5 w-3.5" />Neues Ticket
-          </button>
+          {can("tickets:create") && (
+            <button type="button" onClick={() => setShowNew(true)} className="kasten kasten-red">
+              <Plus className="h-3.5 w-3.5" />Neues Ticket
+            </button>
+          )}
         </div>
       </div>
 
@@ -236,7 +237,10 @@ export default function TicketsPage() {
             active={filterType !== "alle"}
           />
         </div>
-        {isAdmin && (
+        {/* "Nur meine"-Toggle nur fuer User die normalerweise alle Tickets sehen
+            (tickets:manage). Andere sehen via RLS eh nur eigene — der Filter
+            waere redundant. */}
+        {can("tickets:manage") && (
           <button
             type="button"
             onClick={() => setShowOnlyMine((v) => !v)}

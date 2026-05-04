@@ -9,9 +9,11 @@ interface Props {
   contact: VertriebContact;
   onClick: (contact: VertriebContact) => void;
   onDelete: (id: string) => void;
+  /** Wenn false: Delete-Button im Hover wird nicht gerendert. */
+  canDelete?: boolean;
 }
 
-export function LeadCard({ contact: c, onClick, onDelete }: Props) {
+export function LeadCard({ contact: c, onClick, onDelete, canDelete = true }: Props) {
   const statusConf = STATUS_OPTIONS.find((s) => s.value === c.status)!;
   const prioConf = PRIORITY_OPTIONS.find((p) => p.value === c.prioritaet)!;
   const katConf = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
@@ -56,13 +58,15 @@ export function LeadCard({ contact: c, onClick, onDelete }: Props) {
             <h3 className="font-semibold text-[15px] leading-tight truncate">{c.firma}</h3>
             {c.branche && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.branche}</p>}
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
-            className="icon-btn icon-btn-red opacity-0 group-hover:opacity-100"
-            data-tooltip="Löschen"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {canDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
+              className="icon-btn icon-btn-red opacity-0 group-hover:opacity-100"
+              data-tooltip="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Contact info */}

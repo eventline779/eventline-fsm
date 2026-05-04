@@ -116,8 +116,36 @@ export function RollenTab() {
   function togglePermission(slug: string, perm: string) {
     setEdits((prev) => {
       const current = prev[slug] ?? [];
-      const next = current.includes(perm) ? current.filter((s) => s !== perm) : [...current, perm];
+      const adding = !current.includes(perm);
+      let next = adding ? [...current, perm] : current.filter((s) => s !== perm);
+
+      // Auto-Aktivierung der module:view-Permission wenn create/edit/delete/
+      // archive aktiviert wird. Ein User kann z.B. kunden:edit nicht
+      // sinnvoll nutzen wenn er die Kunden-Liste gar nicht sehen darf —
+      // ohne diesen Auto-Toggle muesste der Admin daran denken view extra
+      // anzuhaken.
+      if (adding && perm.includes(":")) {
+        const [mod, action] = perm.split(":");
+        if (action !== "view" && !next.includes(`${mod}:view`)) {
+          next = [...next, `${mod}:view`];
+        }
+      }
+
       return { ...prev, [slug]: next };
+    });
+  }
+
+  // "Alle ankreuzen" pro Modul-Zeile — schnellerer Custom-Rollen-Build.
+  function setAllForModule(roleSlug: string, modSlug: string, actions: PermissionAction[]) {
+    setEdits((prev) => {
+      const current = prev[roleSlug] ?? [];
+      const modPerms = actions.map((a) => `${modSlug}:${a}`);
+      const allSet = modPerms.every((p) => current.includes(p));
+      // Wenn alle schon da: alle entfernen. Sonst alle hinzufuegen.
+      const next = allSet
+        ? current.filter((p) => !modPerms.includes(p))
+        : [...new Set([...current, ...modPerms])];
+      return { ...prev, [roleSlug]: next };
     });
   }
 
@@ -195,9 +223,31 @@ export function RollenTab() {
             </tr>
           </thead>
           <tbody>
-            {PERMISSION_MODULES.map((mod) => (
+            {PERMISSION_MODULES.map((mod) => {
+              // Tooltip-Hinweise pro Modul wo es Sub-Pfade gibt die nicht
+              // offensichtlich sind. Wird auf den Bereich-Namen gelegt.
+              const moduleTooltip = mod.slug === "kalender"
+                ? "Steuert auch Termine auf Auftrag-Detail-Seiten."
+                : mod.slug === "stempelzeiten"
+                ? "Eigene Stempelzeiten bleiben sichtbar; diese Permission steuert die /stempelzeiten-Seite."
+                : undefined;
+              return (
               <tr key={`${roleSlug}-${mod.slug}`} className="bg-foreground/[0.02] dark:bg-foreground/[0.04]">
-                <td className="py-1 px-3 rounded-l-lg text-xs font-medium">{mod.label}</td>
+                <td className="py-1 px-3 rounded-l-lg text-xs font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span data-tooltip={moduleTooltip}>{mod.label}</span>
+                    {!locked && mod.actions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setAllForModule(roleSlug, mod.slug, mod.actions)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                        data-tooltip={`Alle ${ACTION_COLUMNS.filter(a => mod.actions.includes(a)).length} Aktionen toggeln`}
+                      >
+                        Alle
+                      </button>
+                    )}
+                  </div>
+                </td>
                 {ACTION_COLUMNS.map((a) => {
                   const supported = mod.actions.includes(a);
                   const perm = `${mod.slug}:${a}`;
@@ -219,7 +269,8 @@ export function RollenTab() {
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

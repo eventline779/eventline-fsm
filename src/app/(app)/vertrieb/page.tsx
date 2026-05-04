@@ -1054,7 +1054,7 @@ export default function VertriebPage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
-            <LeadCard key={c.id} contact={c} onClick={openEdit} onDelete={deleteContact} />
+            <LeadCard key={c.id} contact={c} onClick={openEdit} onDelete={deleteContact} canDelete={can("vertrieb:delete")} />
           ))}
         </div>
       )}

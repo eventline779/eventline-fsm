@@ -26,18 +26,25 @@ export interface PermissionModule {
 
 export const PERMISSION_MODULES: PermissionModule[] = [
   // Kalender — view = Kalender sehen, create/edit/delete = Termine verwalten.
+  // Ist auch fuer Termine im Auftrag-Detail relevant (gleiche Permission).
   { slug: "kalender",      label: "Kalender",      paths: ["/kalender"],                                         actions: ["view", "create", "edit", "delete"] },
-  { slug: "auftraege",     label: "Operations",    paths: ["/auftraege"],                                        actions: ["view", "create", "edit", "delete"] },
+  // Operationen → Aufträge (Begriff aus der Sidebar, statt "Operations").
+  { slug: "auftraege",     label: "Aufträge",      paths: ["/auftraege"],                                        actions: ["view", "create", "edit", "delete"] },
   // Vertrieb — Lead-Pipeline. CRUD pro Lead.
   { slug: "vertrieb",      label: "Vertrieb",      paths: ["/vertrieb"],                                         actions: ["view", "create", "edit", "delete"] },
   { slug: "locations",     label: "Locations",     paths: ["/locations", "/standorte", "/raeume", "/belegungsplan"], actions: ["view", "create", "edit", "delete"] },
   { slug: "kunden",        label: "Kunden",        paths: ["/kunden"],                                           actions: ["view", "create", "edit", "archive", "delete"] },
   { slug: "partner",       label: "Partner",       paths: ["/partner"],                                          actions: ["view", "create", "edit", "delete"] },
-  // Todos — eigenes Modul (frueher unter dem hr-Umbrella). CRUD pro Todo.
-  { slug: "todos",         label: "Todos",         paths: ["/todos"],                                            actions: ["view", "create", "edit", "delete"] },
-  // HR-Hub — die Sammelseite + Schulungen/Stempelzeiten (own data). Granulare
-  // Sub-Module (Todos, Tickets) sind separat — `hr:view` = nur Hub sehen.
-  { slug: "hr",            label: "HR-Hub",        paths: ["/hr", "/schulungen", "/stempelzeiten"],              actions: ["view"] },
+  // Todos sind personal (RLS ueber created_by/assigned_to). Permissions
+  // gaten nur den UI-Pfad: view = Sidebar+Page, create = Anlegen-Button.
+  // Edit/Delete eigener Todos ist immer erlaubt (RLS-Owner) — daher nicht
+  // in der Matrix als Toggle, sonst missverstaendlich.
+  { slug: "todos",         label: "Todos",         paths: ["/todos"],                                            actions: ["view", "create"] },
+  // HR-Hub-Sammelseite (zeigt nur Karten — Sub-Pfade haben eigene Module).
+  { slug: "hr",            label: "HR-Hub",        paths: ["/hr"],                                               actions: ["view"] },
+  // Stempelzeiten als eigenes Modul — User mit hr:view aber nicht
+  // stempelzeiten:view kann den HR-Hub sehen, aber nicht die Stempel-Liste.
+  { slug: "stempelzeiten", label: "Stempelzeiten", paths: ["/stempelzeiten"],                                    actions: ["view"] },
   { slug: "tickets",       label: "Tickets",       paths: ["/tickets"],                                          actions: ["view", "create", "manage"] },
   { slug: "einstellungen", label: "Einstellungen", paths: ["/einstellungen"],                                    actions: ["view"] },
 ];
