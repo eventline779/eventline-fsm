@@ -14,6 +14,7 @@ import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
 import { TeamTab } from "@/components/einstellungen/team-tab";
 import { RollenTab } from "@/components/einstellungen/rollen-tab";
 import { AktivitaetTab } from "@/components/einstellungen/aktivitaet-tab";
+import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
 
 type Tab = "integrationen" | "team" | "rollen" | "aktivitaet";
 
@@ -72,10 +73,14 @@ export default function EinstellungenPage() {
   return (
     <div className="space-y-6">
       {/* Header — gleiche Struktur wie /auftraege etc. (h1 + Subtitle-Spacer
-          fuer konsistente Hoehe app-weit). */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Einstellungen</h1>
-        <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
+          fuer konsistente Hoehe app-weit). Rechts oben das Build-Info-
+          Fun-Fact-Widget (Version, LOC, Wort-Count). */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Einstellungen</h1>
+          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
+        </div>
+        <BuildInfoBadge />
       </div>
 
       {/* Tab-Bar im selben kasten-Toggle-Stil wie Filter-Buttons in /auftraege,
