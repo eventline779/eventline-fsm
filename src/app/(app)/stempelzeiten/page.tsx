@@ -12,6 +12,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BackButton } from "@/components/ui/back-button";
@@ -71,6 +72,7 @@ export default function StempelzeitenPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showStempelTicket, setShowStempelTicket] = useState(false);
+  const { can } = usePermissions();
   const [ownEntries, setOwnEntries] = useState<OwnEntry[]>([]);
   const [adminEntries, setAdminEntries] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,16 +178,20 @@ export default function StempelzeitenPage() {
         <div className="flex items-center gap-2">
           {/* Direktlink zum Stempel-Aenderungs-Ticket — vorher musste der
               User zu /tickets, "+ Neues Ticket", "Stempel-Aenderung"-Karte
-              waehlen. Jetzt ein Klick. */}
-          <button
-            type="button"
-            onClick={() => setShowStempelTicket(true)}
-            className="kasten kasten-blue"
-            data-tooltip="Stempel-Aenderung anfragen"
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Stempel-Änderung
-          </button>
+              waehlen. Jetzt ein Klick. Permission-gegated: User ohne
+              tickets:create sieht den Button nicht (sonst Modal-Open mit
+              spaeterer RLS-Denial). */}
+          {can("tickets:create") && (
+            <button
+              type="button"
+              onClick={() => setShowStempelTicket(true)}
+              className="kasten kasten-green"
+              data-tooltip="Stempel-Aenderung anfragen"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Stempel-Änderung
+            </button>
+          )}
           {isAdmin && (
             <button
               type="button"

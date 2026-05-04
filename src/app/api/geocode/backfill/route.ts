@@ -9,6 +9,11 @@ import { requireAdmin } from "@/lib/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { geocodeAddress } from "@/lib/geocode";
 
+// 5 Minuten — Nominatim ist 1.1s/Request, also reichts fuer ~270 Adressen
+// pro Lauf. Vercel-Default sind 10s, das hat den Backfill mittendrin
+// gekilled.
+export const maxDuration = 300;
+
 const NOMINATIM_THROTTLE_MS = 1100;
 
 function sleep(ms: number) {

@@ -18,12 +18,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Cache fuer 10 Minuten — Google Calendar pollt alle paar Stunden, das
-// reicht. So muss nicht jeder Poll die DB neu durchforsten. Aber:
-// pro User unterschiedlicher Inhalt → Cache muss vom Token abhaengen.
-// Cache-Control auf 'private' damit kein Shared-CDN das eine User-
-// Antwort an einen anderen ausliefert.
-export const revalidate = 600;
+// pro User unterschiedlicher Inhalt → kein CDN-Cache. force-dynamic
+// disabled Next.js-side Page-Caching. Cache-Control 'private, max-age=600'
+// wird im Response-Header gesetzt (Browser-/Calendar-App-Cache OK).
 export const dynamic = "force-dynamic";
 
 function escapeICS(text: string): string {

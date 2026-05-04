@@ -68,8 +68,19 @@ export async function POST(request: Request) {
   const sentTo: string[] = [];
   const failed: string[] = [];
 
-  // Wenn send_to_emails gesetzt ist, sende NUR an diese Adressen
+  // Wenn send_to_emails gesetzt ist, sende NUR an diese Adressen.
+  // Limit + Format-Validation gegen Spam-Missbrauch — vorher konnte ein
+  // authentifizierter User beliebig viele externe Mails ueber unsere
+  // Domain triggern (Resend-Quota + Reputation-Risiko).
   if (send_to_emails && Array.isArray(send_to_emails) && send_to_emails.length > 0) {
+    if (send_to_emails.length > 5) {
+      return NextResponse.json({ success: false, error: "Maximal 5 Empfaenger pro Aufruf" }, { status: 400 });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = send_to_emails.filter((e: unknown) => typeof e !== "string" || !emailRegex.test(e));
+    if (invalid.length > 0) {
+      return NextResponse.json({ success: false, error: "Ungueltige Email-Adresse(n)" }, { status: 400 });
+    }
     for (const email of send_to_emails) {
       try {
         await resend.emails.send({

@@ -1,10 +1,9 @@
 "use client";
 
 /**
- * Belegungsplan-View — wiederverwendbare Komponente. Wird von
- * /belegungsplan/page.tsx genutzt (mit Page-Header) und von /locations
- * unter der Schweizer Karte (ohne Page-Header — die Card ist alles was
- * dort angezeigt wird).
+ * Belegungsplan-View — direkt von /locations unter der Schweizer Karte
+ * eingebettet (ohne Page-Header — die Card ist alles was dort angezeigt
+ * wird). Eigene /belegungsplan-Route gibt es nicht mehr.
  *
  * Architektur: CSS-Grid mit (1 Standort-Spalte + N Tag-Spalten) ×
  * (Header + M Location-Reihen). Buchungen werden zu "Runs" zusammen-

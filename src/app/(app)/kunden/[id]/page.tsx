@@ -184,7 +184,7 @@ export default function KundenDetailPage() {
         if (json.reason === "has-references") {
           toast.error("Kunde hat noch Verknüpfungen — bitte archivieren statt löschen.");
         } else {
-          toast.error("Fehler: " + (json.error || "Unbekannt"));
+          TOAST.errorOr(json.error);
         }
         setActionRunning(false);
         setActionKind(null);
@@ -198,7 +198,7 @@ export default function KundenDetailPage() {
       // Kunden in der Liste, das ist die natuerliche Bestaetigung).
       router.push("/kunden");
     } catch (e) {
-      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+      TOAST.supabaseError(e);
       setActionRunning(false);
       setActionKind(null);
     }

@@ -14,8 +14,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface Props {
   /** Card-Headline. */
@@ -28,22 +29,27 @@ export function IcalFeedBlock({ title, description }: Props) {
   const supabase = createClient();
   const [icalUrl, setIcalUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const { confirm, ConfirmModalElement } = useConfirm();
+
+  async function loadToken() {
+    if (typeof window === "undefined") return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("calendar_feed_token")
+      .eq("id", user.id)
+      .maybeSingle();
+    const token = profile?.calendar_feed_token;
+    if (token) {
+      setIcalUrl(`${window.location.origin}/api/calendar.ics?token=${token}`);
+    }
+  }
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("calendar_feed_token")
-        .eq("id", user.id)
-        .maybeSingle();
-      const token = profile?.calendar_feed_token;
-      if (token) {
-        setIcalUrl(`${window.location.origin}/api/calendar.ics?token=${token}`);
-      }
-    })();
+    loadToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   async function copy() {
@@ -54,6 +60,31 @@ export function IcalFeedBlock({ title, description }: Props) {
       toast.success("URL kopiert");
     } catch {
       toast.error("Kopieren fehlgeschlagen");
+    }
+  }
+
+  async function rotate() {
+    const ok = await confirm({
+      title: "Token rotieren?",
+      message: "Der alte Link wird sofort ungültig. Du musst die URL neu in deine Calendar-Apps kopieren (Google/Apple/Outlook). Alle anderen Geräte verlieren den Zugang.",
+      confirmLabel: "Rotieren",
+      variant: "red",
+    });
+    if (!ok) return;
+    setRotating(true);
+    try {
+      const res = await fetch("/api/profile/rotate-calendar-token", { method: "POST" });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.error ?? "Rotation fehlgeschlagen");
+        return;
+      }
+      await loadToken();
+      toast.success("Token rotiert — bitte neu kopieren");
+    } catch {
+      toast.error("Rotation fehlgeschlagen");
+    } finally {
+      setRotating(false);
     }
   }
 
@@ -91,7 +122,17 @@ export function IcalFeedBlock({ title, description }: Props) {
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? "Kopiert" : "Kopieren"}
           </button>
+          <button
+            type="button"
+            onClick={rotate}
+            disabled={!icalUrl || rotating}
+            className="kasten kasten-muted"
+            data-tooltip="Token rotieren — alter Link wird ungueltig"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${rotating ? "animate-spin" : ""}`} />
+          </button>
         </div>
+        {ConfirmModalElement}
       </CardContent>
     </Card>
   );

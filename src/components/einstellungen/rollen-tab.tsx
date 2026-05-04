@@ -30,6 +30,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { PERMISSION_MODULES, PERMISSION_FEATURES, type PermissionAction } from "@/lib/permissions";
 import { Plus, Trash2, Lock, Save, X, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 
 interface Role {
   slug: string;
@@ -165,7 +166,7 @@ export function RollenTab() {
     const json = await res.json();
     setSavingSlug(null);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success("Berechtigungen gespeichert");
@@ -183,7 +184,7 @@ export function RollenTab() {
     const res = await fetch(`/api/admin/roles/${role.slug}`, { method: "DELETE" });
     const json = await res.json();
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success("Rolle gelöscht");
@@ -201,7 +202,7 @@ export function RollenTab() {
     const json = await res.json();
     setCreating(false);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success("Rolle angelegt");

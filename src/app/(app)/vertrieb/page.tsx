@@ -387,7 +387,7 @@ export default function VertriebPage() {
         setShowBuchhaltung(false);
         setBuchhaltungMessage("");
       } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
+        TOAST.errorOr(json.error);
       }
     } catch {
       toast.error("Fehler beim Senden");
@@ -447,7 +447,7 @@ export default function VertriebPage() {
         toast.success("Verbesserungs-Vorschlag gesendet");
         setShowVerbesserung(false);
         setVerbesserungText("");
-      } else toast.error("Fehler: " + (json.error || "Unbekannt"));
+      } else TOAST.errorOr(json.error);
     } catch { toast.error("Fehler beim Senden"); }
     setSendingVerbesserung(false);
   }
@@ -486,7 +486,7 @@ export default function VertriebPage() {
       const json = await res.json();
       if (json.success) {
         toast.success("Offerten-Bestätigung gesendet");
-      } else toast.error("Fehler: " + (json.error || "Unbekannt"));
+      } else TOAST.errorOr(json.error);
     } catch { toast.error("Fehler beim Senden"); }
     setSendingBestaetigung(false);
   }

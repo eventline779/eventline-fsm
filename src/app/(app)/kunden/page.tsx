@@ -28,6 +28,7 @@ import {
   Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, Loader2, RefreshCw, Archive, ArchiveRestore,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
 import { Modal } from "@/components/ui/modal";
 import dynamic from "next/dynamic";
@@ -230,7 +231,7 @@ export default function KundenPage() {
         if (json.reason === "has-references") {
           toast.error(`${customer.name} hat noch Verknüpfungen — bitte archivieren statt löschen.`);
         } else {
-          toast.error("Fehler: " + (json.error || "Unbekannt"));
+          TOAST.errorOr(json.error);
         }
         return;
       }
@@ -243,7 +244,7 @@ export default function KundenPage() {
       refreshArchiveCount();
       checkUnsynced();
     } catch (e) {
-      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+      TOAST.supabaseError(e);
     } finally {
       setActionRunning(false);
       setActionTarget(null);

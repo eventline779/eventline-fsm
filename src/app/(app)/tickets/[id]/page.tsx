@@ -28,7 +28,7 @@ import type { TicketWithRelations, TicketType, TicketStatus, TicketDataBeleg, Ti
 const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
   beleg:            { label: "Beleg",              icon: Receipt, color: "text-amber-600  dark:text-amber-400  bg-amber-50  dark:bg-amber-500/15"  },
-  stempel_aenderung:{ label: "Stempel-Änderung",  icon: Clock,   color: "text-blue-600   dark:text-blue-400   bg-blue-50   dark:bg-blue-500/15"   },
+  stempel_aenderung:{ label: "Stempel-Änderung",  icon: Clock,   color: "text-green-600  dark:text-green-400  bg-green-50  dark:bg-green-500/15"  },
   material:         { label: "Material",          icon: Package, color: "text-red-600    dark:text-red-400    bg-red-50    dark:bg-red-500/15"    },
 };
 

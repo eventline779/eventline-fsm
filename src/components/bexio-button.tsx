@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, Link2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { Modal } from "@/components/ui/modal";
 import { usePermissions } from "@/lib/use-permissions";
 
@@ -100,7 +101,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
         return;
       }
       if (!json.success) {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
+        TOAST.errorOr(json.error);
         return;
       }
       if (json.alreadyLinked) {
@@ -116,7 +117,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
       window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Netzwerkfehler";
-      toast.error("Fehler: " + msg);
+      TOAST.errorOr(msg);
     } finally {
       setBusy(false);
     }
@@ -132,7 +133,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
       });
       const json = await res.json();
       if (!json.success) {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
+        TOAST.errorOr(json.error);
         return;
       }
       const idStr = String(bexioId);
@@ -143,7 +144,7 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
       window.open(json.bexioContactUrl, "_blank", "noopener,noreferrer");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Netzwerkfehler";
-      toast.error("Fehler: " + msg);
+      TOAST.errorOr(msg);
     } finally {
       setBusy(false);
     }

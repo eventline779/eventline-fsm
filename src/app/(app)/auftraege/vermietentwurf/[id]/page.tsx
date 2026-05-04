@@ -20,6 +20,7 @@ import { RequestStepTracker } from "@/components/request-step-tracker";
 import { SendStepModal } from "@/components/send-step-modal";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { usePermissions } from "@/lib/use-permissions";
 
 export default function AnfrageDetailPage() {
   const { id } = useParams();
@@ -50,6 +51,7 @@ export default function AnfrageDetailPage() {
 
   // Convert-Modal
   const [convertSaving, setConvertSaving] = useState(false);
+  const { can } = usePermissions();
 
   // Mail-Modal: gemeinsame Komponente, nur Open-Flag hier.
   const [sendOpen, setSendOpen] = useState(false);
@@ -313,7 +315,10 @@ export default function AnfrageDetailPage() {
                 <p className="text-base font-semibold mt-0.5">{currentStep}. {stepInfo.label}</p>
               </div>
               <div className="flex items-center gap-2">
-                {currentStep > 1 && (
+                {/* Step-Aktionen nur fuer User mit auftraege:edit — alle
+                    Schritte mutieren den Vermietentwurf. Vorher waren die
+                    Buttons fuer alle sichtbar, RLS hat dann still abgelehnt. */}
+                {can("auftraege:edit") && currentStep > 1 && (
                   <button
                     type="button"
                     onClick={() => setShowBackConfirm(true)}
@@ -322,6 +327,7 @@ export default function AnfrageDetailPage() {
                     Zurück
                   </button>
                 )}
+                {can("auftraege:edit") && (
                 <button
                   type="button"
                   onClick={handleNextStep}
@@ -349,6 +355,7 @@ export default function AnfrageDetailPage() {
                     </>
                   )}
                 </button>
+                )}
               </div>
             </div>
             <div className="overflow-x-auto">

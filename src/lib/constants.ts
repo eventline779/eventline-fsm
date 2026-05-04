@@ -130,7 +130,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
       // Belegungsplan ist seit dem Locations-Refactor unter der Schweizer
       // Karte direkt eingebettet, eigener Nav-Eintrag entfaellt.
-      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume", "/belegungsplan"] },
+      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
     ],
   },
   {
@@ -147,7 +147,7 @@ export const ADMIN_NAV_GROUP: NavGroup = {
   items: [
     // HR ist Hub fuer Rapporte, Belege, Vorlagen, Zeiterfassung, Todos,
     // Tickets, Schulungen, IT-Tickets, Team, Stempelzeiten, Schichtplanung.
-    { href: "/hr", label: "HR", icon: "Briefcase", matchPrefixes: ["/todos", "/schulungen"] },
+    { href: "/hr", label: "HR", icon: "Briefcase", matchPrefixes: ["/todos"] },
     { href: "/einstellungen", label: "Einstellungen", icon: "Settings" },
   ],
 };

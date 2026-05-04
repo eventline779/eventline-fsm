@@ -32,7 +32,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { slug: "auftraege",     label: "Aufträge",      paths: ["/auftraege"],                                        actions: ["view", "create", "edit", "delete"] },
   // Vertrieb — Lead-Pipeline. CRUD pro Lead.
   { slug: "vertrieb",      label: "Vertrieb",      paths: ["/vertrieb"],                                         actions: ["view", "create", "edit", "delete"] },
-  { slug: "locations",     label: "Locations",     paths: ["/locations", "/standorte", "/raeume", "/belegungsplan"], actions: ["view", "create", "edit", "delete"] },
+  { slug: "locations",     label: "Locations",     paths: ["/locations", "/standorte", "/raeume"], actions: ["view", "create", "edit", "delete"] },
   { slug: "kunden",        label: "Kunden",        paths: ["/kunden"],                                           actions: ["view", "create", "edit", "archive", "delete"] },
   { slug: "partner",       label: "Partner",       paths: ["/partner"],                                          actions: ["view", "create", "edit", "delete"] },
   // Todos sind personal (RLS ueber created_by/assigned_to). Permissions

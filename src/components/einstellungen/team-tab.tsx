@@ -23,6 +23,7 @@ import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 
 type EditState = { id: string; full_name: string; role: string } | null;
 interface RoleOption { slug: string; label: string }
@@ -74,7 +75,7 @@ export function TeamTab() {
     const json = await res.json();
     setCreating(false);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success("Benutzer angelegt — Einladungs-Mail verschickt");
@@ -95,7 +96,7 @@ export function TeamTab() {
     const json = await res.json();
     setSavingEdit(false);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success("Gespeichert");
@@ -116,7 +117,7 @@ export function TeamTab() {
     const json = await res.json();
     setBusyId(null);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success(`Reset-Mail an ${p.email} verschickt`);
@@ -135,7 +136,7 @@ export function TeamTab() {
     const json = await res.json();
     setBusyId(null);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success(`${p.full_name} endgültig gelöscht`);
@@ -161,7 +162,7 @@ export function TeamTab() {
     const json = await res.json();
     setBusyId(null);
     if (!json.success) {
-      toast.error("Fehler: " + (json.error ?? "Unbekannt"));
+      TOAST.errorOr(json.error);
       return;
     }
     toast.success(p.is_active ? "Deaktiviert" : "Reaktiviert");
