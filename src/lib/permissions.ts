@@ -50,6 +50,9 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { slug: "stempelzeiten", label: "Stempelzeiten", paths: ["/stempelzeiten"],                                    actions: ["view"] },
   { slug: "tickets",       label: "Tickets",       paths: ["/tickets"],                                          actions: ["view", "create", "manage"] },
   { slug: "einstellungen", label: "Einstellungen", paths: ["/einstellungen"],                                    actions: ["view"] },
+  // Admin-only: User-Aktivitaets-Log einsehen (wann welcher Mitarbeiter
+  // in der App war). Hat keinen eigenen Pfad — Tab im /einstellungen.
+  // Wird via has_permission('admin:activity') gegated, Admin durch.
 ];
 
 /** Pfade die fuer alle eingeloggten User erreichbar sind, unabhaengig von der Rolle. */

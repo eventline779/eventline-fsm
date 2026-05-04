@@ -123,10 +123,69 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   }, [pathname, profile, permissions, router]);
 
   async function handleSignOut() {
+    // Server-Side Session-Tracking schliessen bevor Auth-Token weg ist
+    // — sonst wuerde die Session als "stale" eingestuft beim naechsten
+    // Heartbeat eines anderen Users (technisch unwahrscheinlich, aber
+    // sauber).
+    try {
+      await fetch("/api/sessions/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "logout" }),
+      });
+    } catch { /* best-effort */ }
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
   }
+
+  // Heartbeat — alle 5 min ein POST an /api/sessions/heartbeat damit
+  // die Session als "aktiv" markiert bleibt + last_seen_at aktualisiert
+  // wird. Erster Heartbeat beim Mount sobald wir wissen dass der User
+  // eingeloggt ist (profile geladen).
+  useEffect(() => {
+    if (!profile) return;
+    const ping = () => fetch("/api/sessions/heartbeat", { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [profile]);
+
+  // Inaktivitaets-Logout — nur fuer Non-Admins. 30 min ohne Maus-/
+  // Tastatur-/Scroll-/Touch-Interaktion -> auto-Logout mit Hinweis auf
+  // der Login-Seite. Admins sind ausgenommen damit Backoffice-Tabs
+  // nicht alle 30 min ausloggen.
+  useEffect(() => {
+    if (!profile || profile.role === "admin") return;
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const expire = async () => {
+      try {
+        await fetch("/api/sessions/end", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "inactive" }),
+        });
+      } catch { /* best-effort */ }
+      await supabase.auth.signOut();
+      router.push("/login?reason=inactive");
+      router.refresh();
+    };
+
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(expire, TIMEOUT_MS);
+    };
+    reset();
+
+    const events: Array<keyof DocumentEventMap> = ["mousedown", "keydown", "scroll", "touchstart"];
+    for (const e of events) document.addEventListener(e, reset, { passive: true });
+    return () => {
+      if (timer) clearTimeout(timer);
+      for (const e of events) document.removeEventListener(e, reset);
+    };
+  }, [profile, supabase, router]);
 
   if (loading) {
     return (
