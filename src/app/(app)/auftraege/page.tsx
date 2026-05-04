@@ -614,14 +614,6 @@ export default function AuftraegePage() {
                             {JOB_STATUS[job.status].label}
                           </span>
                         )}
-                        {job.invoiced_at && (
-                          <span
-                            className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-                            data-tooltip={job.invoice_number ?? "Abgerechnet"}
-                          >
-                            Abgerechnet
-                          </span>
-                        )}
                       </div>
                       {/* Sub-Line: IMMER Kunde + Standort, dann optional Datum.
                           Bei Location-Auftraegen sind beide oft deckungs-
@@ -644,6 +636,11 @@ export default function AuftraegePage() {
                         von Hint+Action (oben) und Tracker (unten). */}
                     <div className="shrink-0 flex flex-col gap-0.5 items-end">
                       <div className="flex items-center gap-1.5">
+                        {job.invoiced_at && job.invoice_number && (
+                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                            Rechnungsnummer {job.invoice_number}
+                          </span>
+                        )}
                         {isAnfrage && isMailStep && (
                           <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
                             {stepInfo.label}
