@@ -589,102 +589,110 @@ export default function AuftraegePage() {
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
               }`}>
-                {/* Zwei-spaltiges Layout, jede Spalte eigene 2 Zeilen.
-                    Rechte Spalte ist eigenes flex-col mit items-end, sodass
-                    sowohl Action-Icon (oben) als auch Step-Tracker (unten)
-                    am rechten Rand der Spalte enden — buendig zueinander. */}
-                <div className="flex items-center gap-3 px-4 py-1.5">
+                {/* Tabellen-aehnliche Spalten-Ausrichtung wie Bexio:
+                    Nr | Titel+Tags | Kunde | Standort | Datum | Aktionen
+                    Fixe Breiten fuer Kunde/Standort/Datum sorgen dafuer dass
+                    diese Felder ueber alle Cards hinweg in derselben Flucht
+                    stehen. Title nutzt minmax(0,1fr) damit lange Titel
+                    truncaten statt das Layout zu sprengen. Anfrage-Step-
+                    Tracker steht in einer eigenen Zeile darunter (rechts-
+                    buendig) — der ist zu breit fuer die Aktions-Spalte. */}
+                <div
+                  className="px-4 py-2 grid items-center gap-x-3"
+                  style={{ gridTemplateColumns: "auto minmax(0, 1fr) 180px 200px 180px auto" }}
+                >
+                  {/* Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
-                  <div className="flex-1 flex items-center gap-3 min-w-0">
-                    {/* LINKE SPALTE: Titel-Zeile + Meta-Zeile */}
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="auftrag-card-title font-medium text-sm truncate transition-colors">{job.title}</span>
-                        {job.priority === "dringend" && isActive && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
-                            <AlertCircle className="h-2.5 w-2.5" />
-                          </span>
-                        )}
-                        {job.was_anfrage && job.status !== "anfrage" && (
-                          <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
-                            Vermietung
-                          </span>
-                        )}
-                        {job.status !== "offen" && (
-                          <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
-                            {JOB_STATUS[job.status].label}
-                          </span>
-                        )}
-                      </div>
-                      {/* Sub-Line: IMMER Kunde + Standort, dann optional Datum.
-                          Bei Location-Auftraegen sind beide oft deckungs-
-                          gleich (Kunde = Verwaltungs-Kunde der Location)
-                          — beide trotzdem zeigen damit's app-weit konsis-
-                          tent ist. */}
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-                        <span className="truncate">{displayCustomerName ?? "—"}</span>
-                        <span className="opacity-50 shrink-0">|</span>
-                        <span className="truncate">{placeLabel ?? "—"}</span>
-                        {dateText && (
-                          <>
-                            <span className="opacity-50 shrink-0">|</span>
-                            <span className="whitespace-nowrap shrink-0">{dateText}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {/* RECHTE SPALTE: items-end sorgt fuer rechts-buendige Stapelung
-                        von Hint+Action (oben) und Tracker (unten). */}
-                    <div className="shrink-0 flex flex-col gap-0.5 items-end">
-                      <div className="flex items-center gap-1.5">
-                        {job.invoiced_at && job.invoice_number && (
-                          <button
-                            type="button"
-                            // <button> statt <a> weil die ganze Card schon
-                            // in einem <Link> verpackt ist — verschachtelte
-                            // <a>-Tags sind invalides HTML.
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              window.open(
-                                `/api/bexio/open-invoice?nr=${encodeURIComponent(job.invoice_number!)}`,
-                                "_blank",
-                                "noopener,noreferrer",
-                              );
-                            }}
-                            // Bexio-Lime-Pill — selbe Styling-Familie wie die
-                            // Kunden-Bexio-Nr in /kunden, damit "lime = Bexio"
-                            // app-weit eindeutig bleibt.
-                            className="inline-flex items-center gap-1 font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)] hover:bg-[rgba(196,214,0,0.22)] dark:hover:bg-[rgba(196,214,0,0.26)] transition-colors"
-                            data-tooltip="In Bexio öffnen"
-                          >
-                            Rechnung {job.invoice_number}
-                            <ExternalLink className="h-3 w-3 opacity-60" />
-                          </button>
-                        )}
-                        {isAnfrage && isMailStep && (
-                          <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
-                            {stepInfo.label}
-                          </span>
-                        )}
-                        {isAnfrage && !isMailStep && (
-                          <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
-                            Manuell in Details bestätigen
-                          </span>
-                        )}
-                        {!isAnfrage && noTermin && (
-                          <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
-                            Kein Termin geplant
-                          </span>
-                        )}
-                        {renderActionIcon("sm")}
-                      </div>
-                      {isAnfrage && (
-                        <RequestStepTracker currentStep={currentStep} size="sm" />
-                      )}
-                    </div>
+
+                  {/* Col 2: Titel + Inline-Tags */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="auftrag-card-title font-medium text-sm truncate transition-colors">{job.title}</span>
+                    {job.priority === "dringend" && isActive && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                        <AlertCircle className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                    {job.was_anfrage && job.status !== "anfrage" && (
+                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                        Vermietung
+                      </span>
+                    )}
+                    {job.status !== "offen" && (
+                      <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
+                        {JOB_STATUS[job.status].label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Col 3: Kunde */}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {displayCustomerName ?? "—"}
+                  </span>
+
+                  {/* Col 4: Standort */}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {placeLabel ?? "—"}
+                  </span>
+
+                  {/* Col 5: Datum */}
+                  <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
+                    {dateText ?? "—"}
+                  </span>
+
+                  {/* Col 6: Aktionen / Rechnungs-Pille / Hints */}
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end">
+                    {job.invoiced_at && job.invoice_number && (
+                      <button
+                        type="button"
+                        // <button> statt <a> weil die ganze Card schon
+                        // in einem <Link> verpackt ist — verschachtelte
+                        // <a>-Tags sind invalides HTML.
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(
+                            `/api/bexio/open-invoice?nr=${encodeURIComponent(job.invoice_number!)}`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }}
+                        // Bexio-Lime-Pill — selbe Styling-Familie wie die
+                        // Kunden-Bexio-Nr in /kunden, damit "lime = Bexio"
+                        // app-weit eindeutig bleibt.
+                        className="inline-flex items-center gap-1 font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)] hover:bg-[rgba(196,214,0,0.22)] dark:hover:bg-[rgba(196,214,0,0.26)] transition-colors"
+                        data-tooltip="In Bexio öffnen"
+                      >
+                        Rechnung {job.invoice_number}
+                        <ExternalLink className="h-3 w-3 opacity-60" />
+                      </button>
+                    )}
+                    {isAnfrage && isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
+                        {stepInfo.label}
+                      </span>
+                    )}
+                    {isAnfrage && !isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
+                        Manuell in Details bestätigen
+                      </span>
+                    )}
+                    {!isAnfrage && noTermin && (
+                      <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
+                        Kein Termin geplant
+                      </span>
+                    )}
+                    {renderActionIcon("sm")}
                   </div>
                 </div>
+
+                {/* Anfrage-Step-Tracker — eigene Zeile darunter, rechts-
+                    buendig. Zu breit (4 Step-Bubbles) fuer die Aktions-
+                    Spalte. */}
+                {isAnfrage && (
+                  <div className="px-4 pb-2 flex justify-end">
+                    <RequestStepTracker currentStep={currentStep} size="sm" />
+                  </div>
+                )}
               </Card>
             </Link>
             );
