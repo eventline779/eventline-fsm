@@ -21,6 +21,7 @@ import {
   Send,
   ChevronDown,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 const ARCHIVE_PAGE_SIZE = 100;
@@ -639,28 +640,26 @@ export default function AuftraegePage() {
                         {job.invoiced_at && job.invoice_number && (
                           <button
                             type="button"
-                            // <button> statt <a> weil das ganze Card-Layout
-                            // schon in einem <Link> verpackt ist (Auftrags-
-                            // Detail-Navigation). Verschachtelte <a>-Tags sind
-                            // invalides HTML und triggern einen Next-Hydration-
-                            // Fehler. Wir oeffnen Bexio programmatisch via
-                            // window.open + stopPropagation gegen den Card-Click.
+                            // <button> statt <a> weil die ganze Card schon
+                            // in einem <Link> verpackt ist — verschachtelte
+                            // <a>-Tags sind invalides HTML.
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              // Lookup ueber unseren Bexio-Proxy: holt die
-                              // interne Rechnungs-ID via API und redirected
-                              // dann auf den Direkt-Link in Bexio.
                               window.open(
                                 `/api/bexio/open-invoice?nr=${encodeURIComponent(job.invoice_number!)}`,
                                 "_blank",
                                 "noopener,noreferrer",
                               );
                             }}
-                            className="text-xs font-medium whitespace-nowrap text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] hover:underline"
+                            // Bexio-Lime-Pill — selbe Styling-Familie wie die
+                            // Kunden-Bexio-Nr in /kunden, damit "lime = Bexio"
+                            // app-weit eindeutig bleibt.
+                            className="inline-flex items-center gap-1 font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)] hover:bg-[rgba(196,214,0,0.22)] dark:hover:bg-[rgba(196,214,0,0.26)] transition-colors"
                             data-tooltip="In Bexio öffnen"
                           >
-                            Rechnungsnummer {job.invoice_number}
+                            Rechnung {job.invoice_number}
+                            <ExternalLink className="h-3 w-3 opacity-60" />
                           </button>
                         )}
                         {isAnfrage && isMailStep && (
