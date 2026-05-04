@@ -37,9 +37,13 @@ PGPASSWORD="$PG_PASSWORD" pg_dump \
 DUMP_SIZE=$(du -h "$DEST/db.dump" | cut -f1)
 log "DB-Dump fertig — Groesse: $DUMP_SIZE"
 
-log "Storage-Sync (s3:documents) nach $DEST/storage..."
+log "Storage-Sync (alle Buckets) nach $DEST/storage..."
+# s3: ohne Bucket-Name = alle Buckets unter /storage/<bucket>/...
+# Vorteil: neue Buckets in der App werden automatisch mitgesichert ohne
+# Script-Aenderung. Wenn du je auf einen einzelnen Bucket einschraenken
+# willst, hier "s3:bucketname" schreiben.
 rclone --config /tmp/rclone.conf \
-  sync "s3:documents" "$DEST/storage" \
+  sync "s3:" "$DEST/storage" \
   --create-empty-src-dirs \
   --transfers=4 \
   --log-file="$LOG" \
