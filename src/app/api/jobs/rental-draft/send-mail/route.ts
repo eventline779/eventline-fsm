@@ -48,9 +48,13 @@ function formatDate(d: string | null | undefined) {
 // HMAC-Token analog zur Verify-Seite — passt zum hmacToken() in
 // /api/auftraege/vermietentwurf/confirm/route.ts. Wenn jemand das Secret
 // nicht kennt, kann er offline keinen Token konstruieren auch wenn er die
-// Job-UUID kennt.
+// Job-UUID kennt. CONFIRM_SECRET ist Pflicht — kein Fallback auf
+// SERVICE_ROLE_KEY mehr (wuerde Trust-Boundary verschmutzen).
 function confirmToken(jobId: string, type: "konditionen" | "angebot"): string {
-  const secret = process.env.CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const secret = process.env.CONFIRM_SECRET;
+  if (!secret) {
+    throw new Error("CONFIRM_SECRET fehlt in der Server-Config");
+  }
   return createHmac("sha256", secret).update(`${jobId}:${type}`).digest("hex");
 }
 

@@ -2,13 +2,31 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireUser } from "@/lib/api-auth";
+import { logError } from "@/lib/log";
 
 export const maxDuration = 30;
+
+// Belege werden aus tickets/ Storage-Pfaden gemailt — andere Pfade haben
+// in dieser Route nichts zu suchen. Vorher hat User beliebigen filePath
+// schicken koennen und Service-Role hat alles aus dem documents-Bucket
+// rausgemailt = Datei-Exfiltration via Mail-an-Buchhaltung-Trick.
+const ALLOWED_FILE_PREFIXES = ["tickets/"] as const;
+
+function isFilePathAllowed(p: string): boolean {
+  if (!p) return false;
+  if (p.startsWith("/") || p.includes("..") || p.includes("//")) return false;
+  return ALLOWED_FILE_PREFIXES.some((prefix) => p.startsWith(prefix));
+}
 
 export async function POST(request: Request) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const { filePath, fileName, date, reason, creatorName } = await request.json();
+
+  if (!isFilePathAllowed(filePath)) {
+    logError("api.invoices.send.path-rejected", null, { userId: auth.user.id, filePath });
+    return NextResponse.json({ success: false, error: "Ungültiger Datei-Pfad" }, { status: 400 });
+  }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return NextResponse.json({ success: false, error: "Kein RESEND_API_KEY" });

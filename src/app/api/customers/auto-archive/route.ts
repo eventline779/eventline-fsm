@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireUser } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/api-auth";
 
 // POST — Auto-Archiv: Kunden, die mindestens einen Auftrag hatten, aber seit
 // ueber einem Jahr keinen neuen mehr, werden ins Archiv verschoben.
@@ -28,9 +28,11 @@ export async function GET(request: Request) {
   return runAutoArchive();
 }
 
-// POST = manueller Trigger durch Admin (z.B. via Settings-Page)
+// POST = manueller Trigger durch Admin (z.B. via Settings-Page).
+// Vorher requireUser → jeder Techniker konnte den Massen-Archive-Job
+// triggern. Jetzt admin-only entsprechend dem Kommentar oben.
 export async function POST() {
-  const auth = await requireUser();
+  const auth = await requireAdmin();
   if (auth.error) return auth.error;
   return runAutoArchive();
 }

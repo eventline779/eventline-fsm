@@ -11,32 +11,24 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 //
 // Sicherheit: Token = HMAC-SHA256(jobId+":"+type) mit CONFIRM_SECRET als
 // Server-Secret. Ohne das Secret kann niemand offline einen gueltigen Token
-// erzeugen, auch nicht wer die Job-UUID kennt. Vorher base64(jobId+"-confirm")
-// war reine Obfuskation — wer die UUID kannte, konnte den Token rechnen.
-//
-// Backwards-Compat: Alte base64-Tokens aus Mails die VOR diesem Deploy
-// verschickt wurden, bleiben uebergangsweise akzeptiert. Sobald Leo bestaetigt
-// dass keine alten Mails mehr im Umlauf sind, kann der Fallback raus.
+// erzeugen, auch nicht wer die Job-UUID kennt.
 
 function hmacToken(jobId: string, type: string): string {
-  const secret = process.env.CONFIRM_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const secret = process.env.CONFIRM_SECRET;
+  if (!secret) {
+    throw new Error("CONFIRM_SECRET fehlt in der Server-Config");
+  }
   return createHmac("sha256", secret).update(`${jobId}:${type}`).digest("hex");
-}
-
-function legacyBase64Token(jobId: string): string {
-  return Buffer.from(jobId + "-confirm").toString("base64");
 }
 
 function isTokenValid(jobId: string, type: string, token: string): boolean {
   const expected = hmacToken(jobId, type);
-  if (token.length === expected.length) {
-    try {
-      if (timingSafeEqual(Buffer.from(token), Buffer.from(expected))) return true;
-    } catch { /* length mismatch fallthrough */ }
+  if (token.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  } catch {
+    return false;
   }
-  // Legacy: erst-deployte Tokens — entfernen wenn 60 Tage nach Deploy
-  // keine alten Mails mehr im Umlauf sein sollten.
-  return token === legacyBase64Token(jobId);
 }
 
 export async function GET(request: NextRequest) {
@@ -48,7 +40,15 @@ export async function GET(request: NextRequest) {
     return new NextResponse(errorPage("Ungueltiger Link"), { headers: { "Content-Type": "text/html" } });
   }
 
-  if (!isTokenValid(id, type, token)) {
+  let tokenOk: boolean;
+  try {
+    tokenOk = isTokenValid(id, type, token);
+  } catch {
+    // CONFIRM_SECRET fehlt in der Server-Config — kein Hard-Fail mit
+    // 503 weil das eine kunden-facing Page ist; sauberer Hinweis.
+    return new NextResponse(errorPage("Bestaetigungslink kann gerade nicht geprueft werden"), { headers: { "Content-Type": "text/html" } });
+  }
+  if (!tokenOk) {
     return new NextResponse(errorPage("Ungueltiger Best&auml;tigungslink"), { headers: { "Content-Type": "text/html" } });
   }
 

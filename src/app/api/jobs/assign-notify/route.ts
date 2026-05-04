@@ -1,10 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  // Permission-Gate: das Anlegen von calendar_events fuer ANDERE User
+  // hebelt sonst die has_permission()-RLS aus 073 aus (Service-Role-
+  // Insert). Wer Termine fuer Mitarbeiter anlegen darf, hat kalender:create.
+  const auth = await requirePermission("kalender:create");
   if (auth.error) return auth.error;
   const body = await request.json();
   const { job_id, profile_ids, job_title, start_date, end_date } = body;
@@ -47,16 +50,16 @@ export async function POST(request: Request) {
         .single();
 
       if (!existing) {
-        const { data: { users } } = await supabase.auth.admin.listUsers();
-        const adminId = users?.[0]?.id;
-
+        // created_by = der eingeloggte User der die Zuteilung ausloest
+        // (audit-trail). Vorher: random first-user-from-listUsers, das war
+        // nicht-deterministisch und semantisch falsch.
         await supabase.from("calendar_events").insert({
           title: `Auftrag: ${job_title}`,
           start_time: startTime,
           end_time: endTime,
           profile_id: profileId,
           color: "#3b82f6",
-          created_by: adminId || profileId,
+          created_by: auth.user.id,
           all_day: false,
         });
       }

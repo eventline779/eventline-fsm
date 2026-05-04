@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requirePermission } from "@/lib/api-auth";
 
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  // Auth-Gate: nur User mit vertrieb:edit duerfen Buchhaltungs-Mails ausloesen.
+  // Vorher war die Route komplett offen — anonymer Phishing-Vektor an
+  // buchhaltung@eventline-basel.com mit attacker-controlled Inhalt + Anhang.
+  const auth = await requirePermission("vertrieb:edit");
+  if (auth.error) return auth.error;
+
   const { type, contact, message, senderName, pdfBase64, pdfName } = await request.json();
   // type: "benachrichtigung" | "verbesserung" | "offerte_bestaetigt"
 
