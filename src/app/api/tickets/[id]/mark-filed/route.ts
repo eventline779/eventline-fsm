@@ -59,12 +59,19 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Beleg wurde bereits abgelegt" }, { status: 400 });
   }
 
+  // Beleg-Ablage schliesst das Ticket ab — status auf 'erledigt' und
+  // resolved_*-Felder mit-setzen, damit der Beleg im /tickets-Lifecycle
+  // konsistent als done markiert ist (nicht mehr als "offen" rumhaengt).
+  const nowIso = new Date().toISOString();
   const { error } = await admin
     .from("tickets")
     .update({
-      filed_at: new Date().toISOString(),
+      filed_at: nowIso,
       filed_reference: raw,
       filed_by: auth.user.id,
+      status: "erledigt",
+      resolved_at: nowIso,
+      resolved_by: auth.user.id,
     })
     .eq("id", id);
 

@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
-import { Receipt, FileText, Clock, CheckCircle2, FolderArchive } from "lucide-react";
+import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -142,6 +142,7 @@ function aggregatePerUser(entries: TimeEntryData[]): { name: string; minutes: nu
 type ModalState =
   | { kind: "job"; job: UnbilledJob }
   | { kind: "beleg"; beleg: UnfiledBeleg }
+  | { kind: "beleg-reject"; beleg: UnfiledBeleg }
   | null;
 
 export default function AbrechnungPage() {
@@ -238,6 +239,11 @@ export default function AbrechnungPage() {
     setReference("");
   }
 
+  function openBelegRejectModal(beleg: UnfiledBeleg) {
+    setModal({ kind: "beleg-reject", beleg });
+    setReference("");
+  }
+
   function closeModal() {
     if (submitting) return;
     setModal(null);
@@ -247,24 +253,45 @@ export default function AbrechnungPage() {
   async function submit() {
     if (!modal) return;
     const trimmed = reference.trim();
-    if (!trimmed) {
+
+    // Validation pro Modal-Kind: Rechnung/Ablage brauchen 5-stellige Nr,
+    // Reject braucht eine Begruendung (>= 1 Zeichen, max 500).
+    if (modal.kind === "beleg-reject") {
+      if (!trimmed) {
+        TOAST.requiredField("Begründung");
+        return;
+      }
+      if (trimmed.length > 500) {
+        TOAST.error("Begründung zu lang (max 500 Zeichen)");
+        return;
+      }
+    } else if (!trimmed) {
       TOAST.requiredField(modal.kind === "job" ? "Rechnungsnummer" : "Ablage-Referenz");
       return;
     }
 
-    // Zweite Bestaetigung mit der Nummer prominent — schuetzt vor Vertippern
-    // (5-stellige Zahl ist schnell falsch eingegeben). Aktion ist via UI nicht
-    // mehr rueckgaengig zu machen, daher das zweite Gate.
+    // Zweite Bestaetigung — Aktion ist via UI nicht mehr rueckgaengig
+    // zu machen, daher das zweite Gate.
+    let confirmTitle: string;
+    let confirmMessage: string;
+    let variant: "red" | "blue" = "blue";
+    if (modal.kind === "job") {
+      confirmTitle = `Rechnung Nr. ${trimmed} bestätigen?`;
+      confirmMessage = `Der Auftrag INT-${modal.job.job_number ?? "?"} wird als abgerechnet markiert. Die Nummer kann nur über die Datenbank geändert werden.`;
+    } else if (modal.kind === "beleg") {
+      confirmTitle = `Beleg-Referenz Nr. ${trimmed} bestätigen?`;
+      confirmMessage = `Das Beleg-Ticket T-${modal.beleg.ticket_number} wird als abgelegt markiert (Status: erledigt). Die Nummer kann nur über die Datenbank geändert werden.`;
+    } else {
+      confirmTitle = `Beleg T-${modal.beleg.ticket_number} ablehnen?`;
+      confirmMessage = `Der Mitarbeiter sieht die Begründung im Ticket-Detail. Status wird auf "abgelehnt" gesetzt.`;
+      variant = "red";
+    }
     const ok = await confirm({
-      title: modal.kind === "job"
-        ? `Rechnung Nr. ${trimmed} bestätigen?`
-        : `Beleg-Referenz Nr. ${trimmed} bestätigen?`,
-      message: modal.kind === "job"
-        ? `Der Auftrag INT-${modal.job.job_number ?? "?"} wird als abgerechnet markiert. Die Nummer kann nur über die Datenbank geändert werden.`
-        : `Das Beleg-Ticket T-${modal.beleg.ticket_number} wird als abgelegt markiert. Die Nummer kann nur über die Datenbank geändert werden.`,
-      confirmLabel: "Definitiv bestätigen",
+      title: confirmTitle,
+      message: confirmMessage,
+      confirmLabel: modal.kind === "beleg-reject" ? "Definitiv ablehnen" : "Definitiv bestätigen",
       cancelLabel: "Zurück",
-      variant: "blue",
+      variant,
     });
     if (!ok) return;
 
@@ -273,12 +300,13 @@ export default function AbrechnungPage() {
     let body: Record<string, string>;
     if (modal.kind === "job") {
       url = `/api/jobs/${modal.job.id}/mark-invoiced`;
-      // Rechnungsnummer wird 1:1 gespeichert — kein Prefix. DB-Trennung
-      // ist sauber via Tabelle (jobs.invoice_number vs tickets.filed_reference).
       body = { invoice_number: trimmed };
-    } else {
+    } else if (modal.kind === "beleg") {
       url = `/api/tickets/${modal.beleg.id}/mark-filed`;
       body = { filed_reference: trimmed };
+    } else {
+      url = `/api/tickets/${modal.beleg.id}/reject-beleg`;
+      body = { reason: trimmed };
     }
     const res = await fetch(url, {
       method: "POST",
@@ -288,14 +316,17 @@ export default function AbrechnungPage() {
     const json = await res.json();
     setSubmitting(false);
     if (!json.success) {
-      TOAST.errorOr(json.error, "Markieren fehlgeschlagen");
+      TOAST.errorOr(json.error, "Aktion fehlgeschlagen");
       return;
     }
     if (modal.kind === "job") {
       toast.success(`INT-${modal.job.job_number ?? "?"} als Rechnung ${trimmed} abgerechnet`);
       setJobs((prev) => prev.filter((j) => j.id !== modal.job.id));
-    } else {
+    } else if (modal.kind === "beleg") {
       toast.success(`Beleg T-${modal.beleg.ticket_number} abgelegt (${trimmed})`);
+      setBelege((prev) => prev.filter((b) => b.id !== modal.beleg.id));
+    } else {
+      toast.success(`Beleg T-${modal.beleg.ticket_number} abgelehnt`);
       setBelege((prev) => prev.filter((b) => b.id !== modal.beleg.id));
     }
     setModal(null);
@@ -306,19 +337,33 @@ export default function AbrechnungPage() {
 
   if (!ready) return null;
 
-  const isJobModal = modal?.kind === "job";
+  const modalKind = modal?.kind ?? null;
+  const isJobModal = modalKind === "job";
+  const isBelegFile = modalKind === "beleg";
+  const isBelegReject = modalKind === "beleg-reject";
+
   const modalTitle = !modal
     ? ""
     : modal.kind === "job"
       ? `Rechnung gestellt für INT-${modal.job.job_number ?? "?"}`
-      : `Beleg abgelegt — T-${modal.beleg.ticket_number}`;
+      : modal.kind === "beleg"
+        ? `Beleg abgelegt — T-${modal.beleg.ticket_number}`
+        : `Beleg ablehnen — T-${modal.beleg.ticket_number}`;
   const modalIcon = isJobModal
     ? <Receipt className="h-5 w-5 text-blue-500" />
-    : <FolderArchive className="h-5 w-5 text-blue-500" />;
-  const fieldLabel = isJobModal ? "Rechnungsnummer" : "Ablage-Referenz";
+    : isBelegFile
+      ? <FolderArchive className="h-5 w-5 text-blue-500" />
+      : <XCircle className="h-5 w-5 text-red-500" />;
+  const fieldLabel = isJobModal
+    ? "Rechnungsnummer"
+    : isBelegFile
+      ? "Ablage-Referenz"
+      : "Begründung für Ablehnung";
   const fieldHint = isJobModal
     ? `Rechnungsnummer aus Bexio o.ä.`
-    : `Bexio-Beleg-Nummer oder andere Ablage-Referenz.`;
+    : isBelegFile
+      ? `Bexio-Beleg-Nummer oder andere Ablage-Referenz.`
+      : `Wird dem Mitarbeiter im Ticket-Detail angezeigt.`;
 
   return (
     <div className="space-y-6">
@@ -376,7 +421,13 @@ export default function AbrechnungPage() {
             ) : (
               <div className="space-y-3">
                 {belege.map((beleg) => (
-                  <BelegCard key={beleg.id} beleg={beleg} onMarkFiled={() => openBelegModal(beleg)} canEdit={canEdit} />
+                  <BelegCard
+                    key={beleg.id}
+                    beleg={beleg}
+                    onMarkFiled={() => openBelegModal(beleg)}
+                    onReject={() => openBelegRejectModal(beleg)}
+                    canEdit={canEdit}
+                  />
                 ))}
               </div>
             )}
@@ -395,29 +446,36 @@ export default function AbrechnungPage() {
         <div>
           <label className="text-sm font-medium">{fieldLabel}</label>
           <p className="text-xs text-muted-foreground mt-0.5 mb-2">{fieldHint}</p>
-          {/* Beide Streams (Auftrag + Beleg) ohne Prefix — User tippt die
-              Nummer wie sie in Bexio steht direkt ein. DB-Trennung ist
-              durch die Tabellen sichergestellt (jobs.invoice_number vs
-              tickets.filed_reference). */}
-          <Input
-            value={reference}
-            // Hard-Constraint: nur Ziffern, max 5 Stellen. onChange filtert
-            // Buchstaben/Sonderzeichen raus bevor sie ins State landen —
-            // verhindert Paste von "RE-12345" oder ähnlichem.
-            onChange={(e) => setReference(e.target.value.replace(/\D/g, "").slice(0, 5))}
-            placeholder="00000"
-            autoFocus
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={5}
-            className="font-mono"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                submit();
-              }
-            }}
-          />
+          {isBelegReject ? (
+            // Reject braucht Textarea fuer die Begruendung.
+            <textarea
+              value={reference}
+              onChange={(e) => setReference(e.target.value.slice(0, 500))}
+              placeholder="z.B. fehlender Beleg, falscher Betrag, nicht genehmigt..."
+              autoFocus
+              rows={3}
+              maxLength={500}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+          ) : (
+            <Input
+              value={reference}
+              // Number-Input fuer Rechnungs-/Ablage-Nr: nur Ziffern, max 5 Stellen.
+              onChange={(e) => setReference(e.target.value.replace(/\D/g, "").slice(0, 5))}
+              placeholder="00000"
+              autoFocus
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={5}
+              className="font-mono"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+            />
+          )}
         </div>
         <div className="flex gap-2 pt-2">
           <button
@@ -432,10 +490,16 @@ export default function AbrechnungPage() {
             type="button"
             onClick={submit}
             disabled={submitting || !reference.trim()}
-            className="kasten kasten-green flex-1"
+            className={`flex-1 ${isBelegReject ? "kasten kasten-red" : "kasten kasten-green"}`}
           >
-            {isJobModal ? <Receipt className="h-3.5 w-3.5" /> : <FolderArchive className="h-3.5 w-3.5" />}
-            {submitting ? "Speichere…" : "Bestätigen"}
+            {isJobModal ? (
+              <Receipt className="h-3.5 w-3.5" />
+            ) : isBelegFile ? (
+              <FolderArchive className="h-3.5 w-3.5" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5" />
+            )}
+            {submitting ? "Speichere…" : isBelegReject ? "Ablehnen" : "Bestätigen"}
           </button>
         </div>
       </Modal>
@@ -694,10 +758,11 @@ function JobCard({ job, onMarkBilled, canEdit }: JobCardProps) {
 interface BelegCardProps {
   beleg: UnfiledBeleg;
   onMarkFiled: () => void;
+  onReject: () => void;
   canEdit: boolean;
 }
 
-function BelegCard({ beleg, onMarkFiled, canEdit }: BelegCardProps) {
+function BelegCard({ beleg, onMarkFiled, onReject, canEdit }: BelegCardProps) {
   const d = beleg.data;
   const betragText = d.betrag_chf != null ? `CHF ${d.betrag_chf.toFixed(2)}` : null;
 
@@ -733,10 +798,21 @@ function BelegCard({ beleg, onMarkFiled, canEdit }: BelegCardProps) {
           />
         </div>
         {canEdit && (
-          <button type="button" onClick={onMarkFiled} className="kasten kasten-green shrink-0">
-            <FolderArchive className="h-3.5 w-3.5" />
-            Beleg abgelegt
-          </button>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={onReject}
+              className="kasten kasten-red"
+              data-tooltip="Beleg ablehnen"
+              aria-label="Beleg ablehnen"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onMarkFiled} className="kasten kasten-green">
+              <FolderArchive className="h-3.5 w-3.5" />
+              Beleg abgelegt
+            </button>
+          </div>
         )}
       </div>
 

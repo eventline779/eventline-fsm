@@ -89,6 +89,10 @@ export default function TicketsPage() {
         resolver:profiles!resolved_by(full_name),
         attachments:ticket_attachments(id, filename, storage_path, mime_type)
       `)
+      // Belege leben jetzt auf /abrechnung — aus der Tickets-Liste raus,
+      // damit IT/Material/Stempel-Tickets nicht mit Buchhaltungs-Krempel
+      // gemischt sind.
+      .neq("type", "beleg")
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       // PAGE_SIZE+1: der "(n+1)-Trick" → wenn wir 101 zurueckkriegen,
@@ -241,7 +245,6 @@ export default function TicketsPage() {
             items={[
               { id: "alle", label: "Alle Typen" },
               { id: "it", label: "IT-Problem" },
-              { id: "beleg", label: "Beleg" },
               { id: "stempel_aenderung", label: "Stempel-Änderung" },
               { id: "material", label: "Material" },
             ]}
