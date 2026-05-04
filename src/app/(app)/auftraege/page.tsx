@@ -597,15 +597,20 @@ export default function AuftraegePage() {
                     hat fixe Breite (220px) damit das Mittel-Feld ueber alle
                     Cards hinweg in derselben Flucht startet. */}
                 <div
-                  className="px-4 py-2 grid items-center gap-x-2"
-                  // Alle Spalten fix breit (auch Nr und Actions) damit die
-                  // 1fr-Spacer ueber alle Cards hinweg gleich breit sind und
-                  // Title-/Daten-/Aktions-Zone an derselben X-Position sitzen.
-                  // Werte so gewaehlt dass das Grid auch auf 1280-1366px-
-                  // Laptops noch in den Card-Inhalt passt — sonst rutscht
-                  // die rechte Aktions-Zelle (Rechnungs-Pille) hinter den
-                  // overflow:hidden-Card-Rand und ist abgeschnitten.
-                  style={{ gridTemplateColumns: "80px 180px minmax(0,1fr) 110px 130px 130px 100px minmax(0,1fr) 140px" }}
+                  className="px-4 py-2 grid items-center gap-x-3"
+                  // Adaptive Spalten via minmax(min, max): jede Spalte hat
+                  // ein Min (Inhalt MUSS hineinpassen, sonst wird abgeschnitten)
+                  // und ein Max (kein unnoetiges Auseinanderziehen). Bei
+                  // engem Viewport schrumpfen die Spalten auf ihr Minimum,
+                  // bei breitem Viewport waechsen sie bis zum Maximum.
+                  //
+                  // Cross-Card-Alignment funktioniert weil alle Cards dieselbe
+                  // Container-Breite und denselben Template-String haben —
+                  // CSS Grid resolved die Spalten daher in jeder Card identisch.
+                  //
+                  // Min-Summe: 80+140+0+90+100+100+80+0+110 = 700px + 8*12 (gap) = 796
+                  // -> fits ab Card-Inner-Breite ~800px (Browser ~1100px).
+                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 220px) minmax(0, 1fr) minmax(90px, 130px) minmax(100px, 150px) minmax(100px, 130px) minmax(80px, 110px) minmax(0, 1fr) minmax(110px, 160px)" }}
                 >
                   {/* LINKS — Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
