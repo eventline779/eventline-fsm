@@ -637,19 +637,28 @@ export default function AuftraegePage() {
                     <div className="shrink-0 flex flex-col gap-0.5 items-end">
                       <div className="flex items-center gap-1.5">
                         {job.invoiced_at && job.invoice_number && (
-                          <a
-                            href={`https://office.bexio.com/index.php/kb_invoice?q=${encodeURIComponent(job.invoice_number)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            // stopPropagation — sonst triggert das umschliessende
-                            // <Link> auf den Auftrags-Detail-Pfad und der Bexio-
-                            // Link oeffnet nichts.
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            // <button> statt <a> weil das ganze Card-Layout
+                            // schon in einem <Link> verpackt ist (Auftrags-
+                            // Detail-Navigation). Verschachtelte <a>-Tags sind
+                            // invalides HTML und triggern einen Next-Hydration-
+                            // Fehler. Wir oeffnen Bexio programmatisch via
+                            // window.open + stopPropagation gegen den Card-Click.
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.open(
+                                `https://office.bexio.com/index.php/kb_invoice?q=${encodeURIComponent(job.invoice_number!)}`,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
                             className="text-xs font-medium whitespace-nowrap text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] hover:underline"
                             data-tooltip="In Bexio öffnen"
                           >
                             Rechnungsnummer {job.invoice_number}
-                          </a>
+                          </button>
                         )}
                         {isAnfrage && isMailStep && (
                           <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
