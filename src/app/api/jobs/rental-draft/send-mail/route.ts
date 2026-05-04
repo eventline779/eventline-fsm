@@ -4,7 +4,7 @@ import { Resend } from "resend";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHmac } from "node:crypto";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 export const maxDuration = 60;
 
@@ -59,7 +59,7 @@ function confirmToken(jobId: string, type: "konditionen" | "angebot"): string {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  const auth = await requirePermission("auftraege:edit");
   if (auth.error) return auth.error;
   const body = (await request.json()) as Body;
   const { jobId, step, email, cc, message, customerName, locationName, eventDate, eventEndDate, documentPaths } = body;

@@ -1,86 +1,135 @@
 "use client";
 
-// Permissions-Context fuer die ganze (app)/-Seitenleiste.
+// Permissions + Profile-Context fuer die ganze (app)/-Seitenleiste.
 //
-// Vorher: usePermissions() lud bei jedem Hook-Call zwei DB-Queries (profile +
-// role) → bei 16 Konsumenten und vielen Sub-Komponenten 30+ redundante
-// Roundtrips pro Page-Mount. Jetzt: ein Provider im (app)/layout, der die
-// Permissions EINMAL laedt und allen Sub-Komponenten via Context bereitstellt.
-//
-// Nutzung im Layout:
-//   <PermissionsProvider>
-//     <App />
-//   </PermissionsProvider>
-//
-// Nutzung im Code (kein Setup-Wechsel — selber Hook-Name):
-//   const { can } = usePermissions();
-//   {can("kunden:edit") && <button>Bearbeiten</button>}
-//
-// Nutzung ausserhalb des Providers (z.B. /login): Hook fuehrt einen einmaligen
-// Self-Load aus, identisch zum frueheren Verhalten — Backwards-Compat.
+// EIN Loader im Provider, alle Sub-Komponenten konsumieren via Hook.
+// Vorher gabs zwei Loader-Pfade (Layout selbst + dieser Provider) und
+// jeder Page-Mount hat profiles + roles doppelt geladen.
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hasPermission } from "@/lib/permissions";
+import type { Profile } from "@/types";
 
-interface PermissionState {
+interface AppContextState {
+  profile: Profile | null;
   permissions: string[];
   role: string;
   ready: boolean;
+  loadError: string | null;
 }
 
-const PermissionsContext = createContext<PermissionState | null>(null);
+const PermissionsContext = createContext<AppContextState | null>(null);
 
 export function PermissionsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PermissionState>({ permissions: [], role: "", ready: false });
+  const [state, setState] = useState<AppContextState>({
+    profile: null,
+    permissions: [],
+    role: "",
+    ready: false,
+    loadError: null,
+  });
   const supabase = createClient();
 
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setState({ permissions: [], role: "", ready: true });
-        return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (!user) {
+          setState({ profile: null, permissions: [], role: "", ready: true, loadError: null });
+          return;
+        }
+
+        const { data: profile, error: profErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (cancelled) return;
+        if (profErr) {
+          setState({ profile: null, permissions: [], role: "", ready: true, loadError: `Profil-Laden fehlgeschlagen: ${profErr.message}` });
+          return;
+        }
+        if (!profile) {
+          setState({ profile: null, permissions: [], role: "", ready: true, loadError: "Profil nicht gefunden für diesen User." });
+          return;
+        }
+
+        const role = (profile as Profile).role ?? "";
+        const { data: roleRow } = await supabase
+          .from("roles")
+          .select("permissions")
+          .eq("slug", role)
+          .single();
+        if (cancelled) return;
+
+        const perms = Array.isArray(roleRow?.permissions) ? (roleRow.permissions as string[]) : [];
+        setState({
+          profile: profile as Profile,
+          permissions: perms,
+          role,
+          ready: true,
+          loadError: null,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setState({
+          profile: null, permissions: [], role: "", ready: true,
+          loadError: err instanceof Error ? err.message : "Unbekannter Fehler beim Laden",
+        });
       }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      const role = profile?.role ?? "";
-      const { data: roleRow } = await supabase.from("roles").select("permissions").eq("slug", role).single();
-      const perms = Array.isArray(roleRow?.permissions) ? (roleRow.permissions as string[]) : [];
-      setState({ permissions: perms, role, ready: true });
-    })();
+    }
+    load();
+
+    // Re-Load bei Auth-Wechsel (Login/Logout in anderem Tab) — verhindert
+    // dass die App mit alter Profile-Sicht weiterlaeuft nachdem der User
+    // sich anders eingeloggt hat.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        load();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
-  return <PermissionsContext.Provider value={state}>{children}</PermissionsContext.Provider>;
+  // Memo-isiertes Value damit Konsumenten nicht bei jedem Provider-Render
+  // re-rendern obwohl sich nichts geaendert hat.
+  const value = useMemo(() => state, [state]);
+
+  return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
 }
 
+/**
+ * Permissions-Hook. Liefert can()-Helper + Profile + Meta.
+ * Funktioniert nur innerhalb eines PermissionsProvider.
+ */
 export function usePermissions() {
   const ctx = useContext(PermissionsContext);
-  // Fallback: ohne Provider (z.B. /login) eigenstaendig laden.
-  // So bleibt der Hook overall robust.
-  const [fallback, setFallback] = useState<PermissionState>({ permissions: [], role: "", ready: false });
-  const supabase = createClient();
-
-  useEffect(() => {
-    if (ctx) return;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setFallback({ permissions: [], role: "", ready: true });
-        return;
-      }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      const role = profile?.role ?? "";
-      const { data: roleRow } = await supabase.from("roles").select("permissions").eq("slug", role).single();
-      const perms = Array.isArray(roleRow?.permissions) ? (roleRow.permissions as string[]) : [];
-      setFallback({ permissions: perms, role, ready: true });
-    })();
-  }, [ctx, supabase]);
-
-  const state = ctx ?? fallback;
+  const state = ctx ?? {
+    profile: null,
+    permissions: [] as string[],
+    role: "",
+    ready: false,
+    loadError: null,
+  };
 
   function can(perm: string): boolean {
     return hasPermission(state.permissions, state.role, perm);
   }
 
-  return { can, ready: state.ready, role: state.role, permissions: state.permissions };
+  return {
+    can,
+    ready: state.ready,
+    role: state.role,
+    permissions: state.permissions,
+    profile: state.profile,
+    loadError: state.loadError,
+  };
 }

@@ -86,9 +86,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
+    // upsert:false — verhindert dass User A eine Datei von User B
+    // ueberschreibt indem er den Pfad raet. Wer eine bestehende Datei
+    // ersetzen will muss erst loeschen, dann neu hochladen — der Caller
+    // bekommt einen 500-Konflikt zurueck und kann das in der UI signalisieren.
     const { error } = await supabase.storage.from("documents").upload(path, buffer, {
       contentType: file.type,
-      upsert: true,
+      upsert: false,
     });
 
     if (error) {

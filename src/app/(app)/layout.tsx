@@ -7,7 +7,6 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { StempelWidget } from "@/components/stempel/stempel-widget";
 import { Toaster } from "@/components/ui/sonner";
-import type { Profile } from "@/types";
 import { NAV_GROUPS, ADMIN_NAV_GROUP } from "@/lib/constants";
 import { isPathAllowed } from "@/lib/permissions";
 import Link from "next/link";
@@ -24,18 +23,32 @@ import { Logo } from "@/components/logo";
 import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { useEnterAsTab } from "@/lib/use-enter-as-tab";
-import { PermissionsProvider } from "@/lib/use-permissions";
+import { PermissionsProvider, usePermissions } from "@/lib/use-permissions";
 
+// Outer-Wrapper — nur Provider. Der Inner-Layout kann den Provider
+// dann via Hook konsumieren statt eigenem Self-Load.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  return (
+    <PermissionsProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </PermissionsProvider>
+  );
+}
+
+function AppLayoutInner({ children }: { children: React.ReactNode }) {
+  const { profile, permissions, ready, loadError } = usePermissions();
+  const loading = !ready;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const supabase = createClient();
+
+  // Wenn kein User → Login. Re-direct erst wenn ready damit kein Flicker.
+  useEffect(() => {
+    if (ready && !profile && !loadError) router.push("/login");
+  }, [ready, profile, loadError, router]);
 
   // Globale Regel: Enter im Input/Select springt zum nächsten Feld, statt zu submitten.
   useEnterAsTab();
@@ -96,57 +109,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [loadError, setLoadError] = useState<string | null>(null);
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          setLoadError(`Profil-Laden fehlgeschlagen: ${error.message}`);
-          setLoading(false);
-          return;
-        }
-        if (!data) {
-          setLoadError("Profil nicht gefunden für diesen User.");
-          setLoading(false);
-          return;
-        }
-
-        setProfile(data as Profile);
-        // Permissions zur Rolle des Users laden. Falls die Rolle (warum
-        // auch immer) nicht existiert, fallen wir auf leere Permissions
-        // zurueck — admin-Rolle wird im Helper sowieso special-cased.
-        const { data: roleRow } = await supabase
-          .from("roles")
-          .select("permissions")
-          .eq("slug", (data as Profile).role)
-          .single();
-        const perms = Array.isArray(roleRow?.permissions) ? roleRow.permissions as string[] : [];
-        setPermissions(perms);
-        setLoading(false);
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : "Unbekannter Fehler beim Laden");
-        setLoading(false);
-      }
-    }
-
-    loadProfile();
-  }, []);
-
   // Path-Guard: wenn der aktuelle Pfad fuer diese Rolle nicht erlaubt ist,
   // zurueck aufs Dashboard. Greift wenn jemand eine URL direkt aufruft die
   // nicht in seiner Sidebar steht.
@@ -200,7 +162,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     .filter((g) => g.items.length > 0);
 
   return (
-    <PermissionsProvider>
     <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
@@ -317,6 +278,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Toaster />
     </div>
-    </PermissionsProvider>
   );
 }
