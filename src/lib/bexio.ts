@@ -19,8 +19,10 @@ const TOKEN_URL = "https://auth.bexio.com/realms/bexio/protocol/openid-connect/t
 const API_BASE = "https://api.bexio.com";
 
 // Was wir mindestens brauchen: openid (OIDC), offline_access (Refresh-Token),
-// contact_show + contact_edit (Lesen + Anlegen von Kontakten).
-export const SCOPES = ["openid", "offline_access", "contact_show", "contact_edit"];
+// contact_show + contact_edit (Lesen + Anlegen von Kontakten),
+// kb_invoice_show (Rechnungen suchen — fuer den "Rechnungsnummer -> Bexio
+// oeffnen"-Link auf abgerechneten Auftraegen).
+export const SCOPES = ["openid", "offline_access", "contact_show", "contact_edit", "kb_invoice_show"];
 
 // Wieviele Millisekunden VOR Token-Ablauf wir refreshen — verhindert dass eine
 // laufende User-Aktion mitten drin auf 401 laeuft. 60s ist der uebliche Branchen-
@@ -407,3 +409,46 @@ export function bexioContactUrl(contactId: number): string {
 // Liste — dort ist der "Neuer Kontakt"-Button gross sichtbar oben rechts.
 // Pre-fill via URL-Parameter unterstuetzt Bexio sowieso nicht.
 export const BEXIO_NEW_CONTACT_URL = "https://office.bexio.com/index.php/kontakt/list";
+
+// === Rechnungs-Suche fuer Deep-Linking aus dem Auftrags-Archiv ===
+//
+// Bexio's /kb_invoice/show/id/X braucht die interne Bexio-ID, nicht die
+// menschenlesbare Rechnungsnummer. Der User tippt aber nur die Nummer ein
+// (z.B. "26017") — wir muessen die ID via API-Suche rausfinden.
+
+export interface BexioInvoiceSearchResult {
+  id: number;
+  document_nr: string;
+  title?: string;
+  contact_id?: number;
+  total?: string;
+  is_valid_from?: string;
+}
+
+/** Sucht in Bexio nach einer Rechnung mit der gegebenen document_nr.
+ *  Returnt das erste exakte Match (oder null wenn nicht gefunden / Fehler). */
+export async function findInvoiceByNr(nr: string): Promise<BexioInvoiceSearchResult | null> {
+  try {
+    const res = await bexioFetch("/2.0/kb_invoice/search?limit=10", {
+      method: "POST",
+      body: JSON.stringify([{ field: "document_nr", value: nr, criteria: "=" }]),
+    });
+    if (!res.ok) return null;
+    const list = (await res.json()) as BexioInvoiceSearchResult[];
+    if (!Array.isArray(list) || list.length === 0) return null;
+    // Bevorzugt exact-match (sollte mit criteria:"=" eh schon der Fall sein).
+    return list.find((i) => i.document_nr === nr) ?? list[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** URL zur Rechnungs-Detailseite in Bexio. */
+export function bexioInvoiceUrl(invoiceId: number): string {
+  return `https://office.bexio.com/index.php/kb_invoice/show/id/${invoiceId}`;
+}
+
+/** Fallback wenn kein Direkt-Link moeglich ist (Rechnung nicht gefunden,
+ *  Bexio nicht verbunden, Scope fehlt). User landet auf der Liste und
+ *  kann manuell suchen. */
+export const BEXIO_INVOICE_LIST_URL = "https://office.bexio.com/index.php/kb_invoice";

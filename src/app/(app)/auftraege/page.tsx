@@ -648,8 +648,11 @@ export default function AuftraegePage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              // Lookup ueber unseren Bexio-Proxy: holt die
+                              // interne Rechnungs-ID via API und redirected
+                              // dann auf den Direkt-Link in Bexio.
                               window.open(
-                                `https://office.bexio.com/index.php/kb_invoice?q=${encodeURIComponent(job.invoice_number!)}`,
+                                `/api/bexio/open-invoice?nr=${encodeURIComponent(job.invoice_number!)}`,
                                 "_blank",
                                 "noopener,noreferrer",
                               );
