@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 
 export default function RaumDetailPage() {
   const { id } = useParams();
@@ -129,8 +130,8 @@ export default function RaumDetailPage() {
       formData.append("path", path);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const json = await res.json();
-      if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); setUploadingDoc(false); e.target.value = ""; return; }
-    } catch { toast.error("Upload fehlgeschlagen"); setUploadingDoc(false); e.target.value = ""; return; }
+      if (!json.success) { TOAST.uploadError(json.error); setUploadingDoc(false); e.target.value = ""; return; }
+    } catch { TOAST.networkError("Upload"); setUploadingDoc(false); e.target.value = ""; return; }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
     await saveDocs(newDocs);
     setDocs(newDocs);
@@ -170,7 +171,7 @@ export default function RaumDetailPage() {
         setDeleting(false);
       }
     } catch {
-      toast.error("Fehler beim Löschen");
+      TOAST.deleteError();
       setDeleting(false);
     }
   }

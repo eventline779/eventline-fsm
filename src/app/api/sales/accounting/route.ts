@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     headerText = "Verbesserungs-Vorschlag zur Offerte";
     headerBg = "#f97316";
   } else if (type === "offerte_bestaetigt") {
-    subject = `✅ Vertrieb: ${contact.firma} — Offerte bestätigt`;
+    subject = `Vertrieb: ${contact.firma} — Offerte bestätigt`;
     headerText = "Offerte bestätigt";
     headerBg = "#16a34a";
   }

@@ -24,6 +24,7 @@ import {
 import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { SearchableSelect } from "@/components/searchable-select";
 import { useConfirm } from "@/components/ui/use-confirm";
 
@@ -146,7 +147,7 @@ export default function TodosPage() {
       created_by: user?.id,
     });
     if (insertErr) {
-      toast.error("Erstellen fehlgeschlagen: " + insertErr.message);
+      TOAST.createError(insertErr.message);
       return;
     }
 
@@ -211,7 +212,7 @@ export default function TodosPage() {
     }
     const result = await deleteRow("todos", id);
     if (!result.ok) {
-      toast.error("Löschen fehlgeschlagen: " + (result.error ?? "Unbekannt"));
+      TOAST.deleteError(result.error);
       return;
     }
     setSelectedTodo(null);
@@ -237,7 +238,7 @@ export default function TodosPage() {
     const path = `todos/${selectedTodo.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error: upErr } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (upErr) {
-      toast.error("Upload fehlgeschlagen: " + upErr.message);
+      TOAST.uploadError(upErr.message);
       setUploading(false);
       e.target.value = "";
       return;
@@ -251,7 +252,7 @@ export default function TodosPage() {
     });
     if (insErr) {
       await supabase.storage.from("documents").remove([path]);
-      toast.error("Upload fehlgeschlagen: " + insErr.message);
+      TOAST.uploadError(insErr.message);
       setUploading(false);
       e.target.value = "";
       return;

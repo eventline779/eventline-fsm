@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Clock, Square } from "lucide-react";
 import { useStempel } from "@/lib/use-stempel";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 
 interface Props {
   jobId: string;
@@ -31,11 +32,11 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
     if (onSameJob) {
       const r = await clockOut();
       if (r.success) toast.success("Ausgestempelt");
-      else toast.error(r.error || "Fehler");
+      else TOAST.stempelError(r.error);
     } else {
       const r = await clockIn({ jobId });
       if (r.success) toast.success(`Eingestempelt auf INT-${jobNumber}`);
-      else toast.error(r.error || "Fehler");
+      else TOAST.stempelError(r.error);
     }
   }
 
@@ -54,9 +55,10 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
     );
   }
 
-  // Style 1:1 wie kasten-green / kasten-red: 2px voller Akzent-Border,
-  // 12/22% Background-Tint, Text in Tailwind-Akzent-Klasse. Aktiv (auf
-  // diesem Auftrag) = rot, sonst gruen wie das "Einstempeln" in der Sidebar.
+  // Style 1:1 wie kasten-red: 2px voller Akzent-Border, 12/22% Background-
+  // Tint, Text in Tailwind-Akzent-Klasse. Aktiv (auf diesem Auftrag) = rot,
+  // sonst teal — bewusst NICHT gruen, damit Stempel-Aktion sich optisch von
+  // "Erledigt"-Status unterscheidet (sonst signal-doppelt belegt).
   const tones = onSameJob
     ? {
         bg: hovered ? "rgba(220,38,38,0.22)" : "rgba(220,38,38,0.12)",
@@ -64,9 +66,9 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
         text: "text-red-700 dark:text-red-300",
       }
     : {
-        bg: hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)",
-        border: "2px solid var(--status-green, #00a86b)",
-        text: "text-green-700 dark:text-green-300",
+        bg: hovered ? "rgba(20,184,166,0.22)" : "rgba(20,184,166,0.12)",
+        border: "2px solid var(--stempel-color, #14b8a6)",
+        text: "text-teal-700 dark:text-teal-300",
       };
 
   return (

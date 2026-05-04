@@ -210,9 +210,13 @@ export async function POST(request: Request) {
     } catch (e) { logError("appointments.notify.assignee", e, { email: assignee.email }); failed.push(assignee.email); }
   }
 
-  // Weitere zugewiesene Techniker
+  // Weitere zugewiesene Techniker — Hard-Cap bei 20 Mails pro Aufruf damit
+  // ein Auftrag mit 50+ Assignments nicht in einer Aktion 50+ externe Mails
+  // ausloest (Resend-Quota + Reputation-Risiko).
+  const MAX_RECIPIENTS = 20;
   if (assignments) {
     for (const a of assignments as Array<{ profile?: { full_name: string; email: string | null } | null }>) {
+      if (sentTo.length + failed.length >= MAX_RECIPIENTS) break;
       const techEmail = a.profile?.email;
       if (techEmail && techEmail !== projectLead?.email && techEmail !== assignee?.email) {
         try {

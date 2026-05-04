@@ -116,7 +116,7 @@ export default function AnfrageDetailPage() {
     await supabase.storage.from("documents").remove([storagePath]);
     const result = await deleteRow("documents", docId);
     if (!result.ok) {
-      toast.error("Fehler beim Löschen: " + (result.error ?? "Unbekannt"));
+      TOAST.deleteError(result.error);
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== docId));

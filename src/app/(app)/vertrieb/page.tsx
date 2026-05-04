@@ -390,7 +390,7 @@ export default function VertriebPage() {
         TOAST.errorOr(json.error);
       }
     } catch {
-      toast.error("Fehler beim Senden");
+      TOAST.sendError();
     }
     setSendingBuchhaltung(false);
   }
@@ -408,7 +408,7 @@ export default function VertriebPage() {
       formData.append("path", path);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const json = await res.json();
-      if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); setUploadingOfferte(false); e.target.value = ""; return; }
+      if (!json.success) { TOAST.uploadError(json.error); setUploadingOfferte(false); e.target.value = ""; return; }
       setOffertePdf({ name: file.name, path });
       // In notizen speichern
       const c = contacts.find((c) => c.id === editingId);
@@ -420,7 +420,7 @@ export default function VertriebPage() {
         load();
       }
       toast.success("Offerte hochgeladen");
-    } catch { toast.error("Upload fehlgeschlagen"); }
+    } catch { TOAST.networkError("Upload"); }
     setUploadingOfferte(false);
     e.target.value = "";
   }
@@ -448,7 +448,7 @@ export default function VertriebPage() {
         setShowVerbesserung(false);
         setVerbesserungText("");
       } else TOAST.errorOr(json.error);
-    } catch { toast.error("Fehler beim Senden"); }
+    } catch { TOAST.sendError(); }
     setSendingVerbesserung(false);
   }
 
@@ -487,7 +487,7 @@ export default function VertriebPage() {
       if (json.success) {
         toast.success("Offerten-Bestätigung gesendet");
       } else TOAST.errorOr(json.error);
-    } catch { toast.error("Fehler beim Senden"); }
+    } catch { TOAST.sendError(); }
     setSendingBestaetigung(false);
   }
 

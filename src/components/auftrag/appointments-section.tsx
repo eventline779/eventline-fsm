@@ -19,6 +19,7 @@ import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { Calendar, Clock, User, Plus, Send, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
 import type { JobAppointment, Profile } from "@/types";
 
@@ -167,7 +168,7 @@ export function AppointmentsSection({
       }
     } catch (e) {
       logError("auftrag.appt.notify", e, { apptId, jobId });
-      toast.error("Fehler beim Senden");
+      TOAST.sendError();
     }
     setNotifyPopup(null);
     setEmailField1("");

@@ -224,7 +224,7 @@ export default function AuftragDetailPage() {
     await supabase.storage.from("documents").remove([storagePath]);
     const result = await deleteRow("documents", docId);
     if (!result.ok) {
-      toast.error("Fehler beim Löschen: " + (result.error ?? "Unbekannt"));
+      TOAST.deleteError(result.error);
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
@@ -248,12 +248,12 @@ export default function AuftragDetailPage() {
         formData.append("path", path);
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const json = await res.json();
-        if (!json.success) { toast.error("Upload-Fehler: " + (json.error || "Unbekannt")); continue; }
+        if (!json.success) { TOAST.uploadError(json.error); continue; }
         await supabase.from("documents").insert({
           name: file.name, storage_path: path, file_size: file.size, mime_type: file.type,
           job_id: id as string, uploaded_by: user.id,
         });
-      } catch (err) { toast.error("Upload-Fehler: " + (err instanceof Error ? err.message : "Netzwerkfehler")); continue; }
+      } catch (err) { TOAST.uploadError(err instanceof Error ? err.message : "Netzwerkfehler"); continue; }
     }
     toast.success("Datei(en) hochgeladen");
     loadAll();

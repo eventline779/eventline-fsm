@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   if (leo?.id) {
     await supabase.from("notifications").insert({
       user_id: leo.id,
-      title: `🎉 Neuer Auftrag aus Vertrieb: INT-${jobNumber}`,
+      title: `Neuer Auftrag aus Vertrieb: INT-${jobNumber}`,
       message: `${firma} — ${title}${creatorName ? ` (erstellt von ${creatorName})` : ""}`,
       link: `/auftraege/${jobId}`,
     });

@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useStempel } from "@/lib/use-stempel";
 import { Briefcase, FileText, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 
 interface JobOption {
   id: string;
@@ -90,7 +91,7 @@ export function StempelModal({ open, onClose }: Props) {
     const res = await clockIn({ jobId: selectedJob.id, description: description || null });
     setSaving(false);
     if (!res.success) {
-      toast.error(res.error || "Einstempeln fehlgeschlagen");
+      TOAST.stempelError(res.error || "Einstempeln fehlgeschlagen");
       return;
     }
     toast.success(`Eingestempelt auf INT-${selectedJob.job_number}`);
@@ -106,7 +107,7 @@ export function StempelModal({ open, onClose }: Props) {
     const res = await clockIn({ description });
     setSaving(false);
     if (!res.success) {
-      toast.error(res.error || "Einstempeln fehlgeschlagen");
+      TOAST.stempelError(res.error || "Einstempeln fehlgeschlagen");
       return;
     }
     toast.success("Eingestempelt");
@@ -118,7 +119,7 @@ export function StempelModal({ open, onClose }: Props) {
       open={open}
       onClose={() => !saving && onClose()}
       title="Einstempeln"
-      icon={<Clock className="h-5 w-5 text-green-500" />}
+      icon={<Clock className="h-5 w-5 text-teal-500" />}
       size="md"
       closable={!saving}
     >

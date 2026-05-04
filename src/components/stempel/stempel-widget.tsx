@@ -76,7 +76,7 @@ export function StempelWidget() {
             {expanded && (
               <div
                 className="bg-card rounded-xl p-3 shadow-2xl min-w-[260px] max-w-[320px] animate-in fade-in slide-in-from-bottom-2 duration-200"
-                style={{ border: "1px solid rgba(0,168,107,0.4)" }}
+                style={{ border: "1px solid rgba(20,184,166,0.4)" }}
               >
                 <div className="flex items-start gap-2">
                   <div
@@ -126,19 +126,19 @@ export function StempelWidget() {
               onMouseLeave={() => { setHovered(false); setPressed(false); }}
               onMouseDown={() => setPressed(true)}
               onMouseUp={() => setPressed(false)}
-              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full text-green-700 dark:text-green-300"
+              className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full text-teal-700 dark:text-teal-300"
               style={{
                 transform: pressed ? "scale(0.95)" : hovered ? "scale(1.05) translateY(-2px)" : "scale(1) translateY(0)",
                 transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms",
-                backgroundColor: hovered ? "rgba(0,168,107,0.22)" : "rgba(0,168,107,0.12)",
-                border: "2px solid var(--status-green, #00a86b)",
-                boxShadow: hovered ? "0 8px 20px -6px rgba(0,168,107,0.25)" : "0 3px 10px -3px rgba(0,168,107,0.15)",
+                backgroundColor: hovered ? "rgba(20,184,166,0.22)" : "rgba(20,184,166,0.12)",
+                border: "2px solid var(--stempel-color, #14b8a6)",
+                boxShadow: hovered ? "0 8px 20px -6px rgba(20,184,166,0.25)" : "0 3px 10px -3px rgba(20,184,166,0.15)",
               }}
               aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details oeffnen"}
             >
               <span className="relative flex">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-50" style={{ backgroundColor: "rgb(0,168,107)" }} />
-                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: "rgb(0,168,107)" }} />
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-50" style={{ backgroundColor: "rgb(20,184,166)" }} />
+                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: "rgb(20,184,166)" }} />
               </span>
               <span className="font-mono text-sm font-semibold tabular-nums">
                 {formatStempelDuration(active.clock_in, now)}
@@ -159,11 +159,11 @@ export function StempelWidget() {
               transform: pressed ? "scale(0.95)" : hovered ? "scale(1.1) translateY(-4px)" : "scale(1) translateY(0)",
               transition: "transform 200ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms cubic-bezier(0.4,0,0.2,1), border-color 200ms",
               boxShadow: hovered ? "0 20px 40px -10px rgba(0,0,0,0.25)" : "0 10px 20px -5px rgba(0,0,0,0.15)",
-              border: hovered ? "2px solid rgb(0,168,107)" : "2px solid var(--border)",
+              border: hovered ? "2px solid rgb(20,184,166)" : "2px solid var(--border)",
             }}
             aria-label="Einstempeln"
           >
-            <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <Clock className="h-4 w-4 text-teal-600 dark:text-teal-400" />
             <span className="text-sm font-medium">Einstempeln</span>
           </button>
         )}

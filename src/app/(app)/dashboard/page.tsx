@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, CheckSquare, Ticket, ArrowRight } from "lucide-react";
+import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle } from "lucide-react";
 
 function greetingForHour(h: number): string {
   if (h < 12) return "Guten Morgen";
@@ -216,7 +216,9 @@ export default function HeutePage() {
                     className="flex items-center justify-between gap-2 p-3 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04] hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.08] transition-colors min-w-0"
                   >
                     <p className="font-medium text-sm truncate flex-1 min-w-0">
-                      {t.priority === "dringend" && <span className="text-red-600 dark:text-red-400 mr-1">🚨</span>}
+                      {t.priority === "dringend" && (
+                        <AlertCircle className="inline h-3.5 w-3.5 -mt-0.5 mr-1 text-red-600 dark:text-red-400" />
+                      )}
                       {t.title}
                     </p>
                     {t.due_date && (

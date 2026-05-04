@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Check, ArrowRight, AlertTriangle, Mail, Phone, Calendar, Filter, Plus, Trash2, PartyPopper, Building2 } from "lucide-react";
+import { X, Check, ArrowRight, AlertTriangle, Mail, Phone, Calendar, Filter, Plus, Trash2, PartyPopper, Building2, Users } from "lucide-react";
 import type { VertriebContact, VertriebStatus, VertriebPriority } from "@/types";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, KATEGORIE_OPTIONS, STEPS, BEDARF_BEREICHE, type VertriebFormState } from "@/app/(app)/vertrieb/constants";
 
@@ -167,7 +167,11 @@ export function LeadForm({
                     <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Geplante Termine ({termine.length})</p>
                     {termine.map((t) => (
                       <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border border-blue-200 text-xs">
-                        <span className="text-base shrink-0">{t.type === "telefon" ? "📞" : "👥"}</span>
+                        {t.type === "telefon" ? (
+                          <Phone className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                        ) : (
+                          <Users className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="font-medium truncate">{t.type === "telefon" ? "Telefon-Termin" : "Kunden-Termin"}</p>
                           <p className="text-muted-foreground text-[11px]">

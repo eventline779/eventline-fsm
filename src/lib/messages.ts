@@ -26,6 +26,22 @@ export const TOAST = {
   mailError: (msg: string | null | undefined) =>
     toast.error(`Mail-Fehler: ${msg || "Unbekannt"}`),
 
+  /** Loeschen-Fehler mit optionalem Detail */
+  deleteError: (msg?: string | null) =>
+    toast.error(msg ? `Löschen fehlgeschlagen: ${msg}` : "Löschen fehlgeschlagen"),
+
+  /** Erstellen-Fehler mit optionalem Detail */
+  createError: (msg?: string | null) =>
+    toast.error(msg ? `Erstellen fehlgeschlagen: ${msg}` : "Erstellen fehlgeschlagen"),
+
+  /** Senden-Fehler (Mails, Notifications, Belege) */
+  sendError: (msg?: string | null) =>
+    toast.error(msg ? `Senden fehlgeschlagen: ${msg}` : "Senden fehlgeschlagen"),
+
+  /** Stempel-Operationen */
+  stempelError: (msg?: string | null) =>
+    toast.error(msg || "Stempel-Aktion fehlgeschlagen"),
+
   /** Network/Catch-Fallback wenn fetch geworfen hat ohne strukturierte Antwort */
   networkError: (label: string) =>
     toast.error(`${label} fehlgeschlagen`),
