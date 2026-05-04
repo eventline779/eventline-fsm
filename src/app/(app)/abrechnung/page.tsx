@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
-import { Receipt, Calendar, MapPin, User, FileText, Clock, CheckCircle2, Banknote, Building2, FolderArchive } from "lucide-react";
+import { Receipt, FileText, Clock, CheckCircle2, FolderArchive } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -402,6 +402,55 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
 }
 
 // =====================================================================
+// Shared sub-components — fuer Konsistenz zwischen Job- und Beleg-Card.
+// =====================================================================
+
+/** Identifier-Badge: subtle outlined pill mit "PREFIX-NUMMER". Identische
+ *  Optik fuer INT-X (Auftraege) und T-X (Tickets), damit beide Cards
+ *  visuell zur selben Familie gehoeren. */
+function IdentifierBadge({ prefix, number }: { prefix: string; number: number | string | null | undefined }) {
+  return (
+    <span className="inline-flex items-center font-mono font-semibold text-[11px] px-1.5 py-0.5 rounded border border-foreground/15 bg-foreground/[0.04] dark:bg-foreground/[0.06] shrink-0">
+      {prefix}-{number ?? "?"}
+    </span>
+  );
+}
+
+/** Meta-Zeile mit Pipe-Separator — bewusst ohne Icons damit's ruhig wirkt.
+ *  Pattern matched die Sub-Line auf /auftraege. Null/undefined Items werden
+ *  rausgefiltert, sodass Caller einfach durchschicken kann. */
+function MetaLine({ items, primary }: { items: (string | null | undefined)[]; primary?: string | null }) {
+  const filtered = items.filter((s): s is string => Boolean(s && s.trim()));
+  if (!primary && filtered.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5 min-w-0 flex-wrap">
+      {primary && (
+        <>
+          <span className="font-mono font-semibold text-foreground shrink-0">{primary}</span>
+          {filtered.length > 0 && <span className="opacity-50 shrink-0">|</span>}
+        </>
+      )}
+      {filtered.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5 min-w-0">
+          {i > 0 && <span className="opacity-50 shrink-0">|</span>}
+          <span className="truncate">{item}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Section-Label fuer Body-Inhalte (Arbeitsrapport, Stunden, Beschreibung). */
+function SectionLabel({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+      <Icon className="h-3 w-3" />
+      {children}
+    </h4>
+  );
+}
+
+// =====================================================================
 // JobCard
 // =====================================================================
 
@@ -420,85 +469,73 @@ function JobCard({ job, onMarkBilled, canEdit }: JobCardProps) {
     : formatDate(job.end_date ?? job.start_date);
 
   return (
-    <Card className="bg-card">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                INT-{job.job_number ?? "?"}
-              </span>
-            </div>
-            <h3 className="font-semibold text-sm">
-              <Link href={`/auftraege/${job.id}`} className="hover:underline">{job.title}</Link>
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
-              {job.customer?.name && (
-                <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{job.customer.name}</span>
-              )}
-              <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />{dateRange}</span>
-              {job.location?.name && (
-                <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location.name}</span>
-              )}
-            </div>
+    <Card className="bg-card overflow-hidden">
+      {/* Header — items-center vertikal-zentriert den Button mit dem Text-Block,
+          unabhaengig von Title-/Meta-Zeilenanzahl. */}
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <IdentifierBadge prefix="INT" number={job.job_number} />
           </div>
-          {canEdit && (
-            <button type="button" onClick={onMarkBilled} className="kasten kasten-green shrink-0">
-              <Receipt className="h-3.5 w-3.5" />
-              Rechnung gestellt
-            </button>
+          <h3 className="font-semibold text-sm truncate">
+            <Link href={`/auftraege/${job.id}`} className="hover:underline">{job.title}</Link>
+          </h3>
+          <MetaLine items={[job.customer?.name, dateRange, job.location?.name]} />
+        </div>
+        {canEdit && (
+          <button type="button" onClick={onMarkBilled} className="kasten kasten-green shrink-0">
+            <Receipt className="h-3.5 w-3.5" />
+            Rechnung gestellt
+          </button>
+        )}
+      </div>
+
+      {/* Body — getrennt durch dezente Border-Linie */}
+      <div className="border-t px-4 py-3 space-y-3">
+        <div>
+          <SectionLabel icon={FileText}>Arbeitsrapport</SectionLabel>
+          {report ? (
+            <div className="space-y-1.5 text-sm">
+              <p className="whitespace-pre-wrap text-foreground">{report.work_description}</p>
+              {report.equipment_used && (
+                <p className="text-xs">
+                  <span className="font-semibold text-muted-foreground">Material: </span>
+                  <span className="whitespace-pre-wrap">{report.equipment_used}</span>
+                </p>
+              )}
+              {report.issues && (
+                <p className="text-xs">
+                  <span className="font-semibold text-muted-foreground">Probleme: </span>
+                  <span className="whitespace-pre-wrap">{report.issues}</span>
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">Kein Rapport erfasst.</p>
           )}
         </div>
 
-        <div className="pt-3 border-t space-y-3">
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              <FileText className="h-3 w-3" />Arbeitsrapport
-            </h4>
-            {report ? (
-              <div className="space-y-1.5 text-sm">
-                <p className="whitespace-pre-wrap text-foreground">{report.work_description}</p>
-                {report.equipment_used && (
-                  <p className="text-xs">
-                    <span className="font-semibold text-muted-foreground">Material: </span>
-                    <span className="whitespace-pre-wrap">{report.equipment_used}</span>
-                  </p>
-                )}
-                {report.issues && (
-                  <p className="text-xs">
-                    <span className="font-semibold text-muted-foreground">Probleme: </span>
-                    <span className="whitespace-pre-wrap">{report.issues}</span>
-                  </p>
-                )}
+        <div>
+          <SectionLabel icon={Clock}>Stunden</SectionLabel>
+          {perUser.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Keine Stempelzeiten erfasst.</p>
+          ) : (
+            <div className="text-xs space-y-0.5">
+              {perUser.map((p) => (
+                <div key={p.name} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="text-muted-foreground truncate">{p.name}</span>
+                  <span className="font-mono tabular-nums shrink-0">{formatHours(p.minutes)}</span>
+                </div>
+              ))}
+              {/* Total-Zeile als Summen-Footer */}
+              <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t font-semibold text-sm">
+                <span>Total</span>
+                <span className="font-mono tabular-nums">{formatHours(totalMinutes)}</span>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Kein Rapport erfasst.</p>
-            )}
-          </div>
-
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              <Clock className="h-3 w-3" />Stunden
-            </h4>
-            <div className="flex items-baseline gap-3 mb-1.5">
-              <p className="text-xl font-bold tabular-nums">{formatHours(totalMinutes)}</p>
-              {perUser.length === 0 && (
-                <p className="text-xs text-muted-foreground italic">Keine Stempelzeiten</p>
-              )}
             </div>
-            {perUser.length > 0 && (
-              <div className="space-y-0.5 text-xs">
-                {perUser.map((p) => (
-                  <div key={p.name} className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground truncate">{p.name}</span>
-                    <span className="font-mono tabular-nums shrink-0">{formatHours(p.minutes)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }
@@ -515,64 +552,53 @@ interface BelegCardProps {
 
 function BelegCard({ beleg, onMarkFiled, canEdit }: BelegCardProps) {
   const d = beleg.data;
-  return (
-    <Card className="bg-card">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                T-{beleg.ticket_number}
-              </span>
-              {beleg.status === "offen" && (
-                <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300">
-                  Offen
-                </span>
-              )}
-              {beleg.status === "erledigt" && (
-                <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300">
-                  Genehmigt
-                </span>
-              )}
-            </div>
-            <h3 className="font-semibold text-sm">
-              <Link href={`/tickets/${beleg.id}`} className="hover:underline">{beleg.title}</Link>
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1 font-mono font-semibold text-foreground">
-                <Banknote className="h-3 w-3" />CHF {d.betrag_chf?.toFixed(2)}
-              </span>
-              {d.kaufdatum && (
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />{formatDate(d.kaufdatum)}
-                </span>
-              )}
-              {d.lieferant && (
-                <span className="inline-flex items-center gap-1">
-                  <Building2 className="h-3 w-3" />{d.lieferant}
-                </span>
-              )}
-              {beleg.creator?.full_name && (
-                <span className="inline-flex items-center gap-1">
-                  <User className="h-3 w-3" />{beleg.creator.full_name}
-                </span>
-              )}
-            </div>
-          </div>
-          {canEdit && (
-            <button type="button" onClick={onMarkFiled} className="kasten kasten-green shrink-0">
-              <FolderArchive className="h-3.5 w-3.5" />
-              Beleg abgelegt
-            </button>
-          )}
-        </div>
+  const betragText = d.betrag_chf != null ? `CHF ${d.betrag_chf.toFixed(2)}` : null;
 
-        {beleg.description && (
-          <div className="pt-3 border-t">
-            <p className="text-sm whitespace-pre-wrap">{beleg.description}</p>
+  return (
+    <Card className="bg-card overflow-hidden">
+      {/* Header — selbe Struktur wie JobCard fuer visuelle Konsistenz. */}
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <IdentifierBadge prefix="T" number={beleg.ticket_number} />
+            {beleg.status === "offen" && (
+              <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300">
+                Offen
+              </span>
+            )}
+            {beleg.status === "erledigt" && (
+              <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300">
+                Genehmigt
+              </span>
+            )}
           </div>
+          <h3 className="font-semibold text-sm truncate">
+            <Link href={`/tickets/${beleg.id}`} className="hover:underline">{beleg.title}</Link>
+          </h3>
+          {/* primary=Betrag (das wichtigste Feld auf einem Beleg). */}
+          <MetaLine
+            primary={betragText}
+            items={[
+              d.kaufdatum ? formatDate(d.kaufdatum) : null,
+              d.lieferant,
+              beleg.creator?.full_name,
+            ]}
+          />
+        </div>
+        {canEdit && (
+          <button type="button" onClick={onMarkFiled} className="kasten kasten-green shrink-0">
+            <FolderArchive className="h-3.5 w-3.5" />
+            Beleg abgelegt
+          </button>
         )}
-      </CardContent>
+      </div>
+
+      {beleg.description && (
+        <div className="border-t px-4 py-3">
+          <SectionLabel icon={FileText}>Beschreibung</SectionLabel>
+          <p className="text-sm whitespace-pre-wrap">{beleg.description}</p>
+        </div>
+      )}
     </Card>
   );
 }
