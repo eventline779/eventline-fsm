@@ -195,15 +195,15 @@ export default function AbrechnungPage() {
     setSubmitting(true);
     let url: string;
     let body: Record<string, string>;
-    let prefix: string;
     if (modal.kind === "job") {
       url = `/api/jobs/${modal.job.id}/mark-invoiced`;
-      prefix = "RE-";
-      body = { invoice_number: `${prefix}${trimmed}` };
+      // Auftrags-Rechnungen haben "RE-"-Prefix — interne Konvention.
+      body = { invoice_number: `RE-${trimmed}` };
     } else {
       url = `/api/tickets/${modal.beleg.id}/mark-filed`;
-      prefix = "BL-";
-      body = { filed_reference: `${prefix}${trimmed}` };
+      // Belege haben keinen festen Prefix — User tippt die Bexio-/Ablage-Nr
+      // 1:1 ein, wir speichern den Wert wie er ist.
+      body = { filed_reference: trimmed };
     }
     const res = await fetch(url, {
       method: "POST",
@@ -217,10 +217,10 @@ export default function AbrechnungPage() {
       return;
     }
     if (modal.kind === "job") {
-      toast.success(`INT-${modal.job.job_number ?? "?"} als ${prefix}${trimmed} abgerechnet`);
+      toast.success(`INT-${modal.job.job_number ?? "?"} als RE-${trimmed} abgerechnet`);
       setJobs((prev) => prev.filter((j) => j.id !== modal.job.id));
     } else {
-      toast.success(`Beleg T-${modal.beleg.ticket_number} abgelegt`);
+      toast.success(`Beleg T-${modal.beleg.ticket_number} abgelegt (${trimmed})`);
       setBelege((prev) => prev.filter((b) => b.id !== modal.beleg.id));
     }
     setModal(null);
@@ -243,8 +243,9 @@ export default function AbrechnungPage() {
   const fieldLabel = isJobModal ? "Rechnungsnummer" : "Ablage-Referenz";
   const fieldHint = isJobModal
     ? `Tippe nur den Nummern-Teil ein — "RE-" wird automatisch vorangestellt.`
-    : `Tippe die Bexio-Beleg-Nummer / Ablage-Referenz ein — "BL-" wird automatisch vorangestellt.`;
-  const fieldPrefix = isJobModal ? "RE-" : "BL-";
+    : `Bexio-Beleg-Nummer oder andere Ablage-Referenz.`;
+  // Belege haben keinen festen Prefix — Span weglassen, Input ohne extra Padding.
+  const fieldPrefix = isJobModal ? "RE-" : null;
 
   return (
     <div className="space-y-6">
@@ -318,17 +319,20 @@ export default function AbrechnungPage() {
         <div>
           <label className="text-sm font-medium">{fieldLabel}</label>
           <p className="text-xs text-muted-foreground mt-0.5 mb-2">{fieldHint}</p>
-          {/* Prefix-im-Padding-Pattern, identisch zum INT-000000-Suchfeld auf /auftraege */}
+          {/* Prefix-im-Padding-Pattern wie INT-000000-Suchfeld auf /auftraege.
+              Bei Belegen kein Prefix -> Span weglassen, normales Input. */}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
-              {fieldPrefix}
-            </span>
+            {fieldPrefix && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+                {fieldPrefix}
+              </span>
+            )}
             <Input
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="000000"
               autoFocus
-              className="pl-[3rem] font-mono"
+              className={`font-mono ${fieldPrefix ? "pl-[3rem]" : ""}`}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
