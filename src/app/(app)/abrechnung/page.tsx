@@ -407,7 +407,7 @@ function JobCard({ job, onMarkBilled, canEdit }: JobCardProps) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                INT-{String(job.job_number ?? "?").padStart(6, "0")}
+                INT-{job.job_number ?? "?"}
               </span>
             </div>
             <h3 className="font-semibold text-sm">
