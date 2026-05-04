@@ -19,6 +19,7 @@ import { Briefcase, FileText, Clock, Calendar, User, Trash2 } from "lucide-react
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
+import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import Link from "next/link";
@@ -69,6 +70,7 @@ export default function StempelzeitenPage() {
   const { confirm, ConfirmModalElement } = useConfirm();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [showStempelTicket, setShowStempelTicket] = useState(false);
   const [ownEntries, setOwnEntries] = useState<OwnEntry[]>([]);
   const [adminEntries, setAdminEntries] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,16 +173,30 @@ export default function StempelzeitenPage() {
             </p>
           </div>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-2">
+          {/* Direktlink zum Stempel-Aenderungs-Ticket — vorher musste der
+              User zu /tickets, "+ Neues Ticket", "Stempel-Aenderung"-Karte
+              waehlen. Jetzt ein Klick. */}
           <button
             type="button"
-            onClick={() => setShowAll(!showAll)}
-            className={showAll ? "kasten-active" : "kasten-toggle-off"}
+            onClick={() => setShowStempelTicket(true)}
+            className="kasten kasten-blue"
+            data-tooltip="Stempel-Aenderung anfragen"
           >
-            <User className="h-3.5 w-3.5" />
-            {showAll ? "Eigene Sicht" : "Alle Mitarbeiter"}
+            <Clock className="h-3.5 w-3.5" />
+            Stempel-Änderung
           </button>
-        )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAll(!showAll)}
+              className={showAll ? "kasten-active" : "kasten-toggle-off"}
+            >
+              <User className="h-3.5 w-3.5" />
+              {showAll ? "Eigene Sicht" : "Alle Mitarbeiter"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Aktiver Eintrag-Banner */}
@@ -295,6 +311,16 @@ export default function StempelzeitenPage() {
       )}
 
       {ConfirmModalElement}
+
+      <NewTicketModal
+        open={showStempelTicket}
+        onClose={() => setShowStempelTicket(false)}
+        onCreated={() => {
+          setShowStempelTicket(false);
+          toast.success("Ticket erstellt — Admin wurde benachrichtigt");
+        }}
+        initialType="stempel_aenderung"
+      />
     </div>
   );
 }

@@ -33,6 +33,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  /** Optional: Type direkt vorauswaehlen und Picker ueberspringen.
+   *  Wird z.B. von /stempelzeiten benutzt um direkt ins Stempel-
+   *  Aenderung-Form zu springen, ohne dass der User erst die Karte
+   *  klicken muss. */
+  initialType?: TicketType;
 }
 
 const TYPES: { id: TicketType; label: string; description: string; icon: React.ComponentType<{ className?: string }>; tone: TypePickerTone }[] = [
@@ -42,10 +47,10 @@ const TYPES: { id: TicketType; label: string; description: string; icon: React.C
   { id: "material",          label: "Material",         description: "Etwas einkaufen — Genehmigung",      icon: Package, tone: "red"    },
 ];
 
-export function NewTicketModal({ open, onClose, onCreated }: Props) {
+export function NewTicketModal({ open, onClose, onCreated, initialType }: Props) {
   const supabase = createClient();
-  const [step, setStep] = useState<Step>("pick");
-  const [type, setType] = useState<TicketType | null>(null);
+  const [step, setStep] = useState<Step>(initialType ? "form" : "pick");
+  const [type, setType] = useState<TicketType | null>(initialType ?? null);
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
 
@@ -94,10 +99,12 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
   const [device, setDevice] = useState("");
 
   // Beim Oeffnen Reset; bei Stempel-Auswahl die letzten Stempel-Eintraege laden.
+  // Wenn initialType gesetzt ist, ueberspringen wir den Picker und landen
+  // direkt im Form fuer den Type.
   useEffect(() => {
     if (!open) {
-      setStep("pick");
-      setType(null);
+      setStep(initialType ? "form" : "pick");
+      setType(initialType ?? null);
       setSaving(false);
       setFiles([]);
       setTitle("");
@@ -932,9 +939,19 @@ export function NewTicketModal({ open, onClose, onCreated }: Props) {
           {type !== "beleg" && type !== "material" && fileUploadBlock}
 
           <div className="flex gap-2 pt-2">
-            <button type="button" onClick={() => setStep("pick")} disabled={saving} className="kasten kasten-muted flex-1">
-              Zurück
-            </button>
+            {/* "Zurück" zur Type-Auswahl macht nur Sinn wenn der User
+                ueber den Picker reingekommen ist. Wenn das Modal mit
+                initialType direkt aufgerufen wurde (z.B. von /stempelzeiten),
+                dann zeigt "Zurück" auf "Abbrechen" stattdessen. */}
+            {initialType ? (
+              <button type="button" onClick={onClose} disabled={saving} className="kasten kasten-muted flex-1">
+                Abbrechen
+              </button>
+            ) : (
+              <button type="button" onClick={() => setStep("pick")} disabled={saving} className="kasten kasten-muted flex-1">
+                Zurück
+              </button>
+            )}
             <button type="button" onClick={submit} disabled={saving} className="kasten kasten-red flex-1">
               {saving ? "Erstellt…" : "Ticket einreichen"}
             </button>
