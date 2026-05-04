@@ -24,13 +24,16 @@ import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { useEnterAsTab } from "@/lib/use-enter-as-tab";
 import { PermissionsProvider, usePermissions } from "@/lib/use-permissions";
+import { StempelProvider } from "@/lib/use-stempel";
 
 // Outer-Wrapper — nur Provider. Der Inner-Layout kann den Provider
 // dann via Hook konsumieren statt eigenem Self-Load.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PermissionsProvider>
-      <AppLayoutInner>{children}</AppLayoutInner>
+      <StempelProvider>
+        <AppLayoutInner>{children}</AppLayoutInner>
+      </StempelProvider>
     </PermissionsProvider>
   );
 }

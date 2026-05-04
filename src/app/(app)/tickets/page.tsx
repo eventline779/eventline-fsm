@@ -123,7 +123,13 @@ export default function TicketsPage() {
     }
     const titleQ = searchTitle.trim();
     if (titleQ) {
-      const like = `%${titleQ}%`;
+      // PostgREST or-Filter parsed Komma als Trennzeichen und Klammern als
+      // Gruppierung. User-Input mit "," oder "(" zerschiesst sonst die Query
+      // (search "ABB, Basel" wuerde unintendend zwei Filter werden).
+      // Loesung: in Double-Quotes wrappen und embedded \"" + \\\\ escapen,
+      // damit PostgREST den ganzen String als einen Wert behandelt.
+      const escaped = titleQ.replace(/[\\"]/g, "\\$&");
+      const like = `"%${escaped}%"`;
       q = q.or(`title.ilike.${like},description.ilike.${like}`);
     }
     return q;

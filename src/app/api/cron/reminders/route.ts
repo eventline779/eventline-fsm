@@ -23,11 +23,29 @@ export async function GET(request: Request) {
   // Notifications-Cleanup: alles aelter als 90 Tage wird geloescht damit
   // die Tabelle bei mehrjaehriger Nutzung nicht ungebremst waechst (vor
   // allem die Stempel-Reminder-Notifications die alle 30min entstehen).
+  //
+  // Batched in 5000er-Chunks: ein einziges DELETE auf 100k+ Zeilen kann
+  // das pg_replication-WAL ueberlaufen lassen oder Locks fuer mehrere
+  // Sekunden halten. Loop mit early-exit wenn weniger als BATCH_SIZE
+  // geloescht wurden (= keine weiteren Kandidaten mehr).
   const cleanupCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const { count: deletedNotifications } = await supabase
-    .from("notifications")
-    .delete({ count: "exact" })
-    .lt("created_at", cleanupCutoff);
+  const BATCH_SIZE = 5000;
+  let deletedNotifications = 0;
+  for (let i = 0; i < 200; i++) { // safety-cap: max 1M rows pro Cron-Run
+    const { data: batch } = await supabase
+      .from("notifications")
+      .select("id")
+      .lt("created_at", cleanupCutoff)
+      .limit(BATCH_SIZE);
+    if (!batch || batch.length === 0) break;
+    const ids = batch.map((r) => r.id);
+    const { count } = await supabase
+      .from("notifications")
+      .delete({ count: "exact" })
+      .in("id", ids);
+    deletedNotifications += count ?? 0;
+    if (batch.length < BATCH_SIZE) break;
+  }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
