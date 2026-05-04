@@ -322,9 +322,15 @@ export default function AbrechnungPage() {
               tickets.filed_reference). */}
           <Input
             value={reference}
-            onChange={(e) => setReference(e.target.value)}
+            // Hard-Constraint: nur Ziffern, max 5 Stellen. onChange filtert
+            // Buchstaben/Sonderzeichen raus bevor sie ins State landen —
+            // verhindert Paste von "RE-12345" oder ähnlichem.
+            onChange={(e) => setReference(e.target.value.replace(/\D/g, "").slice(0, 5))}
             placeholder="00000"
             autoFocus
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={5}
             className="font-mono"
             onKeyDown={(e) => {
               if (e.key === "Enter") {

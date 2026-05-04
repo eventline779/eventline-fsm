@@ -33,8 +33,10 @@ export async function POST(
   if (!raw) {
     return NextResponse.json({ success: false, error: "Ablage-Referenz ist Pflicht" }, { status: 400 });
   }
-  if (raw.length > 64) {
-    return NextResponse.json({ success: false, error: "Referenz zu lang (max 64 Zeichen)" }, { status: 400 });
+  // Format: 1-5 Ziffern (Bexio-Beleg-Nr-Konvention). Server-Check zusaetzlich
+  // zur Frontend-Validation — schuetzt gegen manipulierte Requests.
+  if (!/^\d{1,5}$/.test(raw)) {
+    return NextResponse.json({ success: false, error: "Referenz muss 1–5 Ziffern sein" }, { status: 400 });
   }
 
   const admin = createAdminClient();
