@@ -24,6 +24,7 @@ import { Logo } from "@/components/logo";
 import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { useEnterAsTab } from "@/lib/use-enter-as-tab";
+import { PermissionsProvider } from "@/lib/use-permissions";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -176,6 +177,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     .filter((g) => g.items.length > 0);
 
   return (
+    <PermissionsProvider>
     <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
@@ -292,5 +294,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Toaster />
     </div>
+    </PermissionsProvider>
   );
 }
