@@ -598,7 +598,12 @@ export default function AuftraegePage() {
                     Cards hinweg in derselben Flucht startet. */}
                 <div
                   className="px-4 py-2 grid items-center gap-x-3"
-                  style={{ gridTemplateColumns: "auto 220px minmax(0,1fr) 140px 160px 140px 130px minmax(0,1fr) auto" }}
+                  // Alle Spalten fix breit (auch Nr und Actions) damit die
+                  // 1fr-Spacer ueber alle Cards hinweg gleich breit sind und
+                  // Title-/Daten-/Aktions-Zone an derselben X-Position sitzen,
+                  // unabhaengig von Inhalt-Breite (z.B. Cards mit Rechnungs-
+                  // Pille vs. nur Action-Icon).
+                  style={{ gridTemplateColumns: "92px 220px minmax(0,1fr) 130px 150px 130px 110px minmax(0,1fr) 160px" }}
                 >
                   {/* LINKS — Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
