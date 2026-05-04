@@ -597,13 +597,15 @@ export default function AuftraegePage() {
                     hat fixe Breite (220px) damit das Mittel-Feld ueber alle
                     Cards hinweg in derselben Flucht startet. */}
                 <div
-                  className="px-4 py-2 grid items-center gap-x-3"
+                  className="px-4 py-2 grid items-center gap-x-2"
                   // Alle Spalten fix breit (auch Nr und Actions) damit die
                   // 1fr-Spacer ueber alle Cards hinweg gleich breit sind und
-                  // Title-/Daten-/Aktions-Zone an derselben X-Position sitzen,
-                  // unabhaengig von Inhalt-Breite (z.B. Cards mit Rechnungs-
-                  // Pille vs. nur Action-Icon).
-                  style={{ gridTemplateColumns: "92px 220px minmax(0,1fr) 130px 150px 130px 110px minmax(0,1fr) 160px" }}
+                  // Title-/Daten-/Aktions-Zone an derselben X-Position sitzen.
+                  // Werte so gewaehlt dass das Grid auch auf 1280-1366px-
+                  // Laptops noch in den Card-Inhalt passt — sonst rutscht
+                  // die rechte Aktions-Zelle (Rechnungs-Pille) hinter den
+                  // overflow:hidden-Card-Rand und ist abgeschnitten.
+                  style={{ gridTemplateColumns: "80px 180px minmax(0,1fr) 110px 130px 130px 100px minmax(0,1fr) 140px" }}
                 >
                   {/* LINKS — Col 1: Nr-Badge */}
                   <JobNumber number={job.job_number} />
