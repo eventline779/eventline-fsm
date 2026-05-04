@@ -17,11 +17,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
-import { Calendar, Clock, User, Plus, Send, Check, Trash2 } from "lucide-react";
+import { Calendar, Clock, User, Plus, Send, Check, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
-import type { JobAppointment, Profile } from "@/types";
+import type { JobAppointment, Profile, TimeOffType } from "@/types";
+import { useTimeOffConflicts, buildConflictMap } from "@/lib/use-time-off-conflicts";
 
 interface Props {
   jobId: string;
@@ -61,6 +62,23 @@ export function AppointmentsSection({
   const [emailField1, setEmailField1] = useState("");
   const [emailField2, setEmailField2] = useState("");
   const { confirm, ConfirmModalElement } = useConfirm();
+
+  // Ferien-Konflikte am Termin-Datum — Hook gated auf showApptForm
+  // (sonst polled das im Hintergrund obwohl das Form geschlossen ist).
+  const timeOffConflicts = useTimeOffConflicts(showApptForm ? apptForm.date : null);
+  const conflictByUser = buildConflictMap(timeOffConflicts);
+
+  const TYPE_LABEL: Record<TimeOffType, string> = {
+    ferien: "Ferien",
+    krank: "Krank",
+    kompensation: "Kompensation",
+    frei: "Frei",
+  };
+
+  function formatDateShort(iso: string): string {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d, 12).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
+  }
 
   async function addAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -204,22 +222,56 @@ export function AppointmentsSection({
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {profiles.map((p) => {
                     const selected = apptForm.assigned_to.includes(p.id);
+                    const conflict = conflictByUser.get(p.id);
                     return (
                       <button
                         key={p.id}
                         type="button"
                         onClick={() => setApptForm({ ...apptForm, assigned_to: selected ? apptForm.assigned_to.filter((pid) => pid !== p.id) : [...apptForm.assigned_to, p.id] })}
                         className={selected ? "kasten-active" : "kasten-toggle-off"}
+                        title={conflict ? `${TYPE_LABEL[conflict.type]} ${formatDateShort(conflict.start_date)}–${formatDateShort(conflict.end_date)} (${conflict.status})` : undefined}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
                           {p.full_name.charAt(0)}
                         </div>
                         {p.full_name.split(" ")[0]}
+                        {conflict && (
+                          <AlertTriangle
+                            className={`h-3.5 w-3.5 ${conflict.status === "genehmigt" ? "text-red-500" : "text-amber-500"}`}
+                          />
+                        )}
                       </button>
                     );
                   })}
                 </div>
                 {apptForm.assigned_to.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst</p>}
+
+                {/* Konflikt-Liste: zeigt JEDEN User mit Konflikt am Datum,
+                    nicht nur die selektierten — hilft beim Auswaehlen. */}
+                {timeOffConflicts.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                      Abwesend am {formatDateShort(apptForm.date)}
+                    </p>
+                    <ul className="space-y-0.5 text-[11px] text-amber-900 dark:text-amber-200">
+                      {timeOffConflicts.map((c) => {
+                        const isSelected = apptForm.assigned_to.includes(c.user_id);
+                        return (
+                          <li key={c.id} className="flex items-center gap-1.5">
+                            <AlertTriangle className={`h-3 w-3 shrink-0 ${c.status === "genehmigt" ? "text-red-500" : "text-amber-500"}`} />
+                            <span className={isSelected ? "font-semibold" : ""}>
+                              {c.user?.full_name ?? "Unbekannt"}
+                            </span>
+                            <span className="opacity-75">
+                              · {TYPE_LABEL[c.type]} {formatDateShort(c.start_date)}–{formatDateShort(c.end_date)}
+                              {c.status === "beantragt" ? " (Antrag offen)" : ""}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </div>
               <textarea placeholder="Beschreibung..." value={apptForm.description} onChange={(e) => setApptForm({ ...apptForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-card resize-none" rows={2} />
               <div className="flex gap-2">

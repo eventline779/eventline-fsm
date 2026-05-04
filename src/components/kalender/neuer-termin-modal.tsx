@@ -19,8 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
-import type { Profile } from "@/types";
+import type { Profile, TimeOffType } from "@/types";
 import type { CalendarItem } from "./types";
+import { useTimeOffConflicts, buildConflictMap } from "@/lib/use-time-off-conflicts";
+import { AlertTriangle } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -92,6 +94,22 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
       setDate(toLocalDateString(initialDate));
     }
   }, [open, initialDate]);
+
+  // Ferien-Konflikte am gewaehlten Datum
+  const timeOffConflicts = useTimeOffConflicts(open ? date : null);
+  const conflictByUser = buildConflictMap(timeOffConflicts);
+
+  const TYPE_LABEL: Record<TimeOffType, string> = {
+    ferien: "Ferien",
+    krank: "Krank",
+    kompensation: "Kompensation",
+    frei: "Frei",
+  };
+
+  function formatDateShort(iso: string): string {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d, 12).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
+  }
 
   function reset() {
     setJobId(null);
@@ -258,22 +276,52 @@ export function NeuerTerminModal({ open, onClose, items, onCreated, initialDate 
           <div className="mt-1.5 flex flex-wrap gap-2">
             {profiles.map((p) => {
               const selected = assignedTo.includes(p.id);
+              const conflict = conflictByUser.get(p.id);
               return (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setAssignedTo(selected ? assignedTo.filter((pid) => pid !== p.id) : [...assignedTo, p.id])}
                   className={selected ? "kasten-active" : "kasten-toggle-off"}
+                  title={conflict ? `${TYPE_LABEL[conflict.type]} ${formatDateShort(conflict.start_date)}–${formatDateShort(conflict.end_date)} (${conflict.status})` : undefined}
                 >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
                     {p.full_name.charAt(0)}
                   </div>
                   {p.full_name.split(" ")[0]}
+                  {conflict && (
+                    <AlertTriangle className={`h-3.5 w-3.5 ${conflict.status === "genehmigt" ? "text-red-500" : "text-amber-500"}`} />
+                  )}
                 </button>
               );
             })}
           </div>
           {assignedTo.length === 0 && <p className="text-[11px] text-muted-foreground mt-1">Keine Auswahl = mir selbst</p>}
+
+          {timeOffConflicts.length > 0 && (
+            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2">
+              <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                Abwesend am {formatDateShort(date)}
+              </p>
+              <ul className="space-y-0.5 text-[11px] text-amber-900 dark:text-amber-200">
+                {timeOffConflicts.map((c) => {
+                  const isSelected = assignedTo.includes(c.user_id);
+                  return (
+                    <li key={c.id} className="flex items-center gap-1.5">
+                      <AlertTriangle className={`h-3 w-3 shrink-0 ${c.status === "genehmigt" ? "text-red-500" : "text-amber-500"}`} />
+                      <span className={isSelected ? "font-semibold" : ""}>
+                        {c.user?.full_name ?? "Unbekannt"}
+                      </span>
+                      <span className="opacity-75">
+                        · {TYPE_LABEL[c.type]} {formatDateShort(c.start_date)}–{formatDateShort(c.end_date)}
+                        {c.status === "beantragt" ? " (Antrag offen)" : ""}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
 
         <textarea
