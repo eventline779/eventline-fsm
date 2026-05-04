@@ -222,7 +222,7 @@ export default function AbrechnungPage() {
             <Input
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
-              placeholder="2026-001"
+              placeholder="000000"
               autoFocus
               className="pl-[3rem] font-mono"
               onKeyDown={(e) => {
