@@ -54,8 +54,6 @@ services:
         force_path_style = true
         RCLONE
 
-        chmod +x /usr/local/bin/backup.sh
-
         echo "[Init] Connectivity-Tests..."
         if PGPASSWORD="$$PG_PASSWORD" pg_isready -h "$$PG_HOST" -p "$$PG_PORT" -U "$$PG_USER" -d "$$PG_DATABASE" >/dev/null 2>&1; then
           echo "[Init] Postgres OK"
@@ -85,5 +83,5 @@ services:
           MIN=$$(( (SLEEP % 3600) / 60 ))
           echo "[Loop] Sleep $${HRS}h $${MIN}m bis naechstem Run..."
           sleep "$$SLEEP"
-          /usr/local/bin/backup.sh || echo "[Loop] [FEHLER] Backup-Run abgebrochen, schlafe weiter"
+          sh /usr/local/bin/backup.sh || echo "[Loop] [FEHLER] Backup-Run abgebrochen, schlafe weiter"
         done
