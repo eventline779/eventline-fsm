@@ -462,48 +462,44 @@ function TrendChart({ data }: { data: TrendMonth[] }) {
 
   return (
     <Card className="bg-card">
-      <CardContent className="p-5">
-        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
-          <div>
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-teal-500" />
-              Abgerechnete Stunden — Trend
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Letzte 6 Monate, gruppiert nach Monat der Rechnungsstellung.
-            </p>
-          </div>
-          <div className="flex items-baseline gap-3">
+      <CardContent className="p-3">
+        {/* Header + Chart kompakt: Header in einer Zeile, gleich darunter
+            der Bar-Chart. Subtitle weggelassen — Title + Icon erklaeren
+            es bereits. */}
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 text-muted-foreground">
+            <Clock className="h-3.5 w-3.5 text-teal-500" />
+            Abgerechnete Stunden
+          </h2>
+          <div className="flex items-baseline gap-2.5">
             {delta !== null && (
               <span
-                className={`text-xs font-medium tabular-nums ${
+                className={`text-[11px] font-medium tabular-nums ${
                   trendUp ? "text-green-600 dark:text-green-400"
                     : trendDown ? "text-red-600 dark:text-red-400"
                     : "text-muted-foreground"
                 }`}
               >
-                {trendUp ? "↑" : trendDown ? "↓" : "→"} {Math.abs(Math.round(delta))}% ggü. Vormonat
+                {trendUp ? "↑" : trendDown ? "↓" : "→"} {Math.abs(Math.round(delta))}%
               </span>
             )}
-            <div className="text-right">
-              <div className="text-2xl font-bold tabular-nums">{Math.round(totalHours)}h</div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gesamt</p>
+            <div className="text-base font-bold tabular-nums leading-none">
+              {Math.round(totalHours)}h
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-normal ml-1.5">Gesamt</span>
             </div>
           </div>
         </div>
 
-        {/* Bar-Chart: feste Hoehe BAR_AREA_PX fuer den Bar-Bereich.
-            Hoehen werden in Pixel gerechnet (nicht %) — vermeidet das
-            "flex-1-im-content-height-Parent"-Problem wo Prozente gegen 0
-            resolven. Aktueller Monat heller (noch nicht abgeschlossen). */}
-        <div className="flex items-end gap-3 mb-1.5" style={{ height: 110 }}>
+        {/* Bar-Bereich: 56px verfuegbar fuer Bar (66 - 10 Wert-Label).
+            Pixel-basiert damit Bars auch in flex-Containers korrekt rendern. */}
+        <div className="flex items-end gap-2 mb-1" style={{ height: 66 }}>
           {data.map((m) => {
-            const BAR_AREA_PX = 88; // verfuegbare Hoehe fuer den Bar (110 - Wert-Label 22)
-            const heightPx = m.hours > 0 ? Math.max((m.hours / maxHours) * BAR_AREA_PX, 4) : 0;
+            const BAR_AREA_PX = 56;
+            const heightPx = m.hours > 0 ? Math.max((m.hours / maxHours) * BAR_AREA_PX, 3) : 0;
             return (
               <div key={m.key} className="flex-1 flex flex-col items-center justify-end min-w-0">
                 {m.hours > 0 && (
-                  <div className="text-[10px] tabular-nums text-muted-foreground mb-1 leading-none">
+                  <div className="text-[9px] tabular-nums text-muted-foreground mb-0.5 leading-none">
                     {Math.round(m.hours)}h
                   </div>
                 )}
@@ -521,12 +517,11 @@ function TrendChart({ data }: { data: TrendMonth[] }) {
             );
           })}
         </div>
-        {/* X-Achsen-Labels separat, ueber alle Monate identische Position */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {data.map((m) => (
             <div
               key={m.key}
-              className={`flex-1 text-[11px] text-center tabular-nums ${m.isCurrent ? "font-semibold" : "text-muted-foreground"}`}
+              className={`flex-1 text-[10px] text-center tabular-nums ${m.isCurrent ? "font-semibold" : "text-muted-foreground"}`}
             >
               {m.label}
             </div>
