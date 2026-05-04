@@ -153,7 +153,8 @@ export function IcalFeedBlock({ title, description, source = "user" }: Props) {
             onClick={rotate}
             disabled={!icalUrl || rotating}
             className="kasten kasten-muted"
-            data-tooltip="Token rotieren — alter Link wird ungueltig"
+            data-tooltip="Token rotieren — alter Link wird ungültig"
+            data-tooltip-align="end"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${rotating ? "animate-spin" : ""}`} />
           </button>
