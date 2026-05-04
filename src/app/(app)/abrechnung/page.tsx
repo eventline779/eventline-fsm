@@ -24,6 +24,7 @@ import { Receipt, Calendar, MapPin, User, FileText, Clock, CheckCircle2, Banknot
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
+import { useConfirm } from "@/components/ui/use-confirm";
 import Link from "next/link";
 import type { TicketDataBeleg } from "@/types";
 
@@ -133,6 +134,7 @@ type ModalState =
 export default function AbrechnungPage() {
   const supabase = createClient();
   const { can, ready } = usePermissions();
+  const { confirm, ConfirmModalElement } = useConfirm();
   const [jobs, setJobs] = useState<UnbilledJob[]>([]);
   const [belege, setBelege] = useState<UnfiledBeleg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,6 +194,23 @@ export default function AbrechnungPage() {
       TOAST.requiredField(modal.kind === "job" ? "Rechnungsnummer" : "Ablage-Referenz");
       return;
     }
+
+    // Zweite Bestaetigung mit der Nummer prominent — schuetzt vor Vertippern
+    // (5-stellige Zahl ist schnell falsch eingegeben). Aktion ist via UI nicht
+    // mehr rueckgaengig zu machen, daher das zweite Gate.
+    const ok = await confirm({
+      title: modal.kind === "job"
+        ? `Rechnung Nr. ${trimmed} bestätigen?`
+        : `Beleg-Referenz Nr. ${trimmed} bestätigen?`,
+      message: modal.kind === "job"
+        ? `Der Auftrag INT-${modal.job.job_number ?? "?"} wird als abgerechnet markiert. Die Nummer kann nur über die Datenbank geändert werden.`
+        : `Das Beleg-Ticket T-${modal.beleg.ticket_number} wird als abgelegt markiert. Die Nummer kann nur über die Datenbank geändert werden.`,
+      confirmLabel: "Definitiv bestätigen",
+      cancelLabel: "Zurück",
+      variant: "blue",
+    });
+    if (!ok) return;
+
     setSubmitting(true);
     let url: string;
     let body: Record<string, string>;
@@ -360,6 +379,7 @@ export default function AbrechnungPage() {
           </button>
         </div>
       </Modal>
+      {ConfirmModalElement}
     </div>
   );
 }
