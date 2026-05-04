@@ -35,6 +35,7 @@ import type { CalendarItem, CalendarShift, CalendarView, ItemType } from "@/comp
 import { MonthView } from "@/components/kalender/month-view";
 import { WeekView } from "@/components/kalender/week-view";
 import { NeuerTerminModal } from "@/components/kalender/neuer-termin-modal";
+import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 import { usePermissions } from "@/lib/use-permissions";
 
 // Supabase-Joined-Shape — am API-Boundary getypt damit die Loader-Logik
@@ -329,6 +330,19 @@ export default function KalenderPage() {
 
         </CardContent>
       </Card>
+
+      {/* Persoenlicher iCal-Feed — jeder User kann hier seinen Token kopieren
+          und in Google/Apple/Outlook abonnieren. Vorher nur in /einstellungen,
+          aber Mitarbeiter ohne Settings-Zugriff hatten keinen Pfad dahin. */}
+      <IcalFeedBlock
+        title="Mein Kalender abonnieren"
+        description={
+          <>
+            Persönlicher iCal-Feed mit deinen Aufträgen + Terminen. Kopiere die URL und füge sie in Google
+            Calendar / Apple Calendar / Outlook über <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
+          </>
+        }
+      />
 
       <NeuerTerminModal
         open={showNeuerTermin}

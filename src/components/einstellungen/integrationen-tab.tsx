@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, Plug, X, Copy, Check } from "lucide-react";
+import { AlertCircle, CheckCircle2, Plug, X } from "lucide-react";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { createClient } from "@/lib/supabase/client";
+import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 
 export function IntegrationenTab() {
   const supabase = createClient();
@@ -14,41 +15,26 @@ export function IntegrationenTab() {
   const [status, setStatus] = useState<{ connected: boolean; connectedAt?: string; bexioEmail?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [icalUrl, setIcalUrl] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { confirm, ConfirmModalElement } = useConfirm();
 
-  // iCal-URL ist pro User unterschiedlich — der calendar_feed_token aus
-  // dem profile kommt als ?token=... in der URL. Ohne Token kriegt der
-  // Endpoint einen 401. Token wird beim Anlegen des Profils per Default
-  // automatisch generiert (Migration 066).
+  // Role-Check fuer das iCal-Feed-Sektion: nur Admins kriegen den Block
+  // hier — fuer sie ist der Token-Filter automatisch der ganze Firma-
+  // Kalender. Fuer normale User wuerde der Token nur den eigenen Feed
+  // liefern, das ist nicht "Firma" und sie haben den Block jetzt eh
+  // direkt auf der /kalender-Page.
   useEffect(() => {
-    if (typeof window === "undefined") return;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("calendar_feed_token")
+        .select("role")
         .eq("id", user.id)
         .maybeSingle();
-      const token = profile?.calendar_feed_token;
-      if (token) {
-        setIcalUrl(`${window.location.origin}/api/calendar.ics?token=${token}`);
-      }
+      setIsAdmin(profile?.role === "admin");
     })();
   }, [supabase]);
-
-  async function copyIcalUrl() {
-    try {
-      await navigator.clipboard.writeText(icalUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast.success("URL kopiert");
-    } catch {
-      toast.error("Kopieren fehlgeschlagen");
-    }
-  }
 
   // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
   useEffect(() => {
@@ -99,47 +85,22 @@ export function IntegrationenTab() {
         </p>
       </div>
 
-      {/* Google Calendar — iCal-Feed-URL. User kopiert die URL und fuegt
-          sie in Google Calendar via "Anderer Kalender → Per URL hinzufuegen"
-          ein. Google synced dann automatisch alle Auftraege + Termine. */}
-      <Card className="bg-card border-gray-100">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center text-white font-bold shrink-0">
-              G
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold">Mein Kalender (iCal-Feed)</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Dein <strong>persönlicher</strong> Kalender-Feed. Enthält nur Aufträge + Termine die dir
-                zugewiesen sind (Admin sieht alle). Kopiere die URL und füge sie in Google Calendar / Apple
-                Calendar / Outlook über <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
-                <br />
-                <span className="text-amber-700 dark:text-amber-400">
-                  Diese URL enthält dein persönliches Token — nicht weitergeben.
-                </span>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-stretch gap-2">
-            <input
-              readOnly
-              value={icalUrl}
-              onClick={(e) => e.currentTarget.select()}
-              className="flex-1 min-w-0 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/40 truncate focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
-            <button
-              type="button"
-              onClick={copyIcalUrl}
-              disabled={!icalUrl}
-              className={`kasten ${copied ? "kasten-green" : "kasten-blue"}`}
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Kopiert" : "Kopieren"}
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* iCal-Feed nur fuer Admins: ihr Token resolved im Endpoint zur
+          Komplett-Sicht (alle Auftraege + Termine der Firma). Normale User
+          sehen den Block hier nicht — sie haben den persoenlichen Feed
+          jetzt direkt auf der /kalender-Page. */}
+      {isAdmin && (
+        <IcalFeedBlock
+          title="Kalender der Firma (iCal-Feed)"
+          description={
+            <>
+              Als Admin enthält dein Feed <strong>alle Aufträge + Termine</strong> der Firma. Kopiere die URL
+              und füge sie in Google Calendar / Apple Calendar / Outlook über{" "}
+              <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
+            </>
+          }
+        />
+      )}
 
       <Card className="bg-card border-gray-100">
         <CardContent className="p-5">
