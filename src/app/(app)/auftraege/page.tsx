@@ -637,9 +637,19 @@ export default function AuftraegePage() {
                     <div className="shrink-0 flex flex-col gap-0.5 items-end">
                       <div className="flex items-center gap-1.5">
                         {job.invoiced_at && job.invoice_number && (
-                          <span className="text-xs font-medium whitespace-nowrap text-blue-700 dark:text-blue-300">
+                          <a
+                            href={`https://office.bexio.com/index.php/kb_invoice?q=${encodeURIComponent(job.invoice_number)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            // stopPropagation — sonst triggert das umschliessende
+                            // <Link> auf den Auftrags-Detail-Pfad und der Bexio-
+                            // Link oeffnet nichts.
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs font-medium whitespace-nowrap text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] hover:underline"
+                            data-tooltip="In Bexio öffnen"
+                          >
                             Rechnungsnummer {job.invoice_number}
-                          </span>
+                          </a>
                         )}
                         {isAnfrage && isMailStep && (
                           <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
