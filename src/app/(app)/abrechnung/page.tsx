@@ -212,8 +212,11 @@ export default function AbrechnungPage() {
           <p className="text-xs text-muted-foreground mt-0.5 mb-2">
             Tippe nur den Nummern-Teil ein — "RE-" wird automatisch vorangestellt.
           </p>
-          <div className="flex items-center">
-            <span className="px-3 py-2 text-sm font-mono bg-muted/40 border border-r-0 rounded-l-lg text-muted-foreground">
+          {/* Pattern 1:1 wie das INT-000000-Feld auf /auftraege — Prefix
+              absolut positioniert im Input-Padding statt separater Pille,
+              fuer ein einzelnes integriertes Look. */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
               RE-
             </span>
             <Input
@@ -221,7 +224,7 @@ export default function AbrechnungPage() {
               onChange={(e) => setInvoiceNumber(e.target.value)}
               placeholder="2026-001"
               autoFocus
-              className="rounded-l-none font-mono"
+              className="pl-[3rem] font-mono"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
