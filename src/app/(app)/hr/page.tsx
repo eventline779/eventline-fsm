@@ -11,7 +11,7 @@
 
 import { useRouter } from "next/navigation";
 import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
-import { CheckSquare, Clock, Ticket } from "lucide-react";
+import { CheckSquare, Clock, Ticket, Plane } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface HRSection {
@@ -26,9 +26,10 @@ interface HRSection {
 // wieder eintragen. Vorher zeigte die Karte auf eine "Kommt bald"-Page,
 // das war eine Sackgasse fuer den User.
 const sections: HRSection[] = [
-  { href: "/todos",         label: "Todos",         description: "Persönliche Aufgaben verwalten",          icon: CheckSquare,    tone: "amber"  },
-  { href: "/stempelzeiten", label: "Stempelzeiten", description: "Arbeitszeit-Erfassung pro Auftrag",       icon: Clock,          tone: "green"  },
-  { href: "/tickets",       label: "Tickets",       description: "IT, Belege, Stempel-Änderungen, Material", icon: Ticket,        tone: "red"    },
+  { href: "/todos",         label: "Todos",         description: "Persönliche Aufgaben verwalten",            icon: CheckSquare,    tone: "amber"  },
+  { href: "/stempelzeiten", label: "Stempelzeiten", description: "Arbeitszeit-Erfassung pro Auftrag",         icon: Clock,          tone: "green"  },
+  { href: "/tickets",       label: "Tickets",       description: "IT, Stempel-Änderungen, Material",          icon: Ticket,         tone: "red"    },
+  { href: "/ferien",        label: "Ferien",        description: "Ferien, Krankheit & Frei-Tage eintragen",   icon: Plane,          tone: "blue"   },
 ];
 
 export default function HRPage() {

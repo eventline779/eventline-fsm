@@ -13,7 +13,7 @@
 // Module die keine Action-Granularitaet haben (Kalender, HR, Vertrieb,
 // Einstellungen): nur "view". Wer diese Module sieht, sieht alles drin.
 
-export type PermissionAction = "view" | "create" | "edit" | "archive" | "delete" | "manage";
+export type PermissionAction = "view" | "create" | "edit" | "archive" | "delete" | "manage" | "approve";
 
 export interface PermissionModule {
   slug: string;
@@ -50,6 +50,10 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { slug: "stempelzeiten", label: "Stempelzeiten", paths: ["/stempelzeiten"],                                    actions: ["view"] },
   { slug: "tickets",       label: "Tickets",       paths: ["/tickets"],                                          actions: ["view", "create", "manage"] },
   { slug: "einstellungen", label: "Einstellungen", paths: ["/einstellungen"],                                    actions: ["view"] },
+  // Ferien: Mitarbeiter sehen + beantragen ihre eigenen via RLS
+  // (kein view-Slug noetig). approve = Admin/Genehmiger genehmigt
+  // oder lehnt ab. /ferien Pfad fuer alle authenticated User offen.
+  { slug: "ferien",        label: "Ferien",        paths: ["/ferien"],                                           actions: ["view", "approve"] },
   // Admin-only: User-Aktivitaets-Log einsehen (wann welcher Mitarbeiter
   // in der App war). Hat keinen eigenen Pfad — Tab im /einstellungen.
   // Wird via has_permission('admin:activity') gegated, Admin durch.

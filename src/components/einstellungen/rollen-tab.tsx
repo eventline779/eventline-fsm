@@ -46,9 +46,10 @@ const ACTION_LABELS: Record<PermissionAction, string> = {
   archive: "Archivieren",
   delete: "Löschen",
   manage: "Verwalten",
+  approve: "Genehmigen",
 };
 
-const ACTION_COLUMNS: PermissionAction[] = ["view", "create", "edit", "archive", "delete"];
+const ACTION_COLUMNS: PermissionAction[] = ["view", "create", "edit", "archive", "delete", "approve"];
 
 // Visuelles Toggle-Cell: aktive Permission = rotes X im Cell, sonst leer.
 // `onToggle` fehlt bei locked-Rollen (Admin) damit die Cells nicht klickbar sind.

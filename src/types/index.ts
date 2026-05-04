@@ -9,6 +9,24 @@ export type CustomerType = "company" | "individual" | "organization";
 
 export type ReportStatus = "entwurf" | "abgeschlossen";
 
+export type TimeOffType = "ferien" | "krank" | "kompensation" | "frei";
+export type TimeOffStatus = "beantragt" | "genehmigt" | "abgelehnt";
+
+export interface TimeOff {
+  id: string;
+  user_id: string;
+  start_date: string; // YYYY-MM-DD
+  end_date: string;
+  type: TimeOffType;
+  status: TimeOffStatus;
+  note: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;
