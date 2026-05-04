@@ -42,6 +42,13 @@ services:
         echo "[Init] Installiere pg_dump + rclone..."
         apk add --no-cache postgresql17-client rclone tzdata >/dev/null
 
+        # Falls backup.sh mit CRLF (Windows-Zeilenenden) gespeichert wurde —
+        # passiert wenn der NAS-Texteditor das so default-mässig macht — dann
+        # stolpert sh ueber die \r-Zeichen ("illegal option" beim set -eu).
+        # Wir kopieren in einen schreibbaren Ort und strippen alle CRs.
+        echo "[Init] Normalisiere backup.sh (CRLF -> LF)..."
+        tr -d '\r' < /usr/local/bin/backup.sh > /tmp/backup.sh
+
         echo "[Init] Schreibe rclone-Config..."
         cat > /tmp/rclone.conf <<RCLONE
         [s3]
@@ -83,5 +90,5 @@ services:
           MIN=$$(( (SLEEP % 3600) / 60 ))
           echo "[Loop] Sleep $${HRS}h $${MIN}m bis naechstem Run..."
           sleep "$$SLEEP"
-          sh /usr/local/bin/backup.sh || echo "[Loop] [FEHLER] Backup-Run abgebrochen, schlafe weiter"
+          sh /tmp/backup.sh || echo "[Loop] [FEHLER] Backup-Run abgebrochen, schlafe weiter"
         done
