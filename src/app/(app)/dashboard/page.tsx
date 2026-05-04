@@ -106,7 +106,6 @@ export default function HeutePage() {
   const { profile } = usePermissions();
   const isAdmin = profile?.role === "admin";
   const [userName, setUserName] = useState("");
-  const [appointments, setAppointments] = useState<ApptToday[]>([]);
   const [todos, setTodos] = useState<OpenTodo[]>([]);
   const [tickets, setTickets] = useState<OpenTicket[]>([]);
   const [stats, setStats] = useState<PersonalStats | null>(null);
@@ -126,9 +125,8 @@ export default function HeutePage() {
         .single();
       if (profile?.full_name) setUserName(profile.full_name.split(" ")[0]);
 
-      // Termine heute (eigene oder Auftrag-Mitglied — RLS regelt)
+      // Tagesgrenze fuer Stempel-Aggregationen + Look-Ahead-Start
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
 
       // Wochenstart Montag 00:00. JS-getDay() gibt Sonntag=0, Montag=1, ...
       // Mit ((dow + 6) % 7) wird Mo=0, So=6 — so kann man Tage von Montag
@@ -142,14 +140,7 @@ export default function HeutePage() {
       sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7);
       sevenDaysAhead.setHours(23, 59, 59, 999);
 
-      const [apptRes, todoRes, ticketRes, entriesRes, totalEntriesRes, assignedJobsRes, leadJobsRes, doneTodosRes, upcomingRes] = await Promise.all([
-        supabase
-          .from("job_appointments")
-          .select("id, title, start_time, end_time, job:jobs(id, job_number, title)")
-          .eq("assigned_to", user.id)
-          .gte("start_time", startOfDay.toISOString())
-          .lte("start_time", endOfDay.toISOString())
-          .order("start_time"),
+      const [todoRes, ticketRes, entriesRes, totalEntriesRes, assignedJobsRes, leadJobsRes, doneTodosRes, upcomingRes] = await Promise.all([
         supabase
           .from("todos")
           .select("id, title, priority, due_date")
@@ -208,12 +199,6 @@ export default function HeutePage() {
           .order("start_time"),
       ]);
 
-      type ApptRow = Omit<ApptToday, "job"> & { job: ApptToday["job"] | ApptToday["job"][] | null };
-      const apptRows = (apptRes.data ?? []) as ApptRow[];
-      setAppointments(apptRows.map((a) => ({
-        ...a,
-        job: Array.isArray(a.job) ? a.job[0] ?? null : a.job,
-      })));
       setTodos((todoRes.data ?? []) as OpenTodo[]);
       setTickets((ticketRes.data ?? []) as OpenTicket[]);
 
@@ -374,9 +359,6 @@ export default function HeutePage() {
 
   const greeting = greetingForHour(new Date().getHours());
 
-  function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" });
-  }
   function formatDate(iso: string): string {
     return new Date(iso + "T12:00:00").toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" });
   }
@@ -443,54 +425,7 @@ export default function HeutePage() {
       {/* Kommende 7 Tage — Look-Ahead-Agenda fuer alle User */}
       {!loading && <UpcomingCard days={upcoming} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Termine heute */}
-        <Card className="bg-card">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <h2 className="font-semibold text-sm">Heute</h2>
-                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                  {appointments.length}
-                </span>
-              </div>
-              <Link href="/kalender" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-                Kalender <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2].map((i) => <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />)}
-              </div>
-            ) : appointments.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-4 text-center">Keine Termine heute.</p>
-            ) : (
-              <div className="space-y-2">
-                {appointments.map((a) => (
-                  <Link
-                    key={a.id}
-                    href={a.job ? `/auftraege/${a.job.id}` : "/kalender"}
-                    className="block p-3 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04] hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.08] transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2 min-w-0">
-                      <p className="font-medium text-sm truncate">{a.title}</p>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {formatTime(a.start_time)}{a.end_time ? `–${formatTime(a.end_time)}` : ""}
-                      </span>
-                    </div>
-                    {a.job && (
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                        {a.job.job_number ? `INT-${a.job.job_number} · ` : ""}{a.job.title}
-                      </p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Offene Todos */}
         <Card className="bg-card">
           <CardContent className="p-5">
