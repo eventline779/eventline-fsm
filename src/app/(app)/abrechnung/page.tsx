@@ -58,7 +58,7 @@ const SELECT = `
   customer:customers(name),
   location:locations(name),
   service_reports(id, work_description, equipment_used, issues, report_date),
-  time_entries(id, user_id, clock_in, clock_out, user:profiles!time_entries_user_id_fkey(full_name))
+  time_entries(id, user_id, clock_in, clock_out, user:profiles!time_entries_profile_id_fkey(full_name))
 `.replace(/\s+/g, " ").trim();
 
 function formatDate(iso: string | null): string {
