@@ -348,8 +348,11 @@ export default function AuftraegePage() {
         </div>
       </div>
 
-      {/* Kreis-Diagramm — Counts kommen aus DB-Count-Queries (entkoppelt vom geladenen State) */}
-      {(counts.anfrage + counts.offen + counts.abgeschlossen + counts.storniert + counts.entwurf) > 0 && (() => {
+      {/* Kreis-Diagramm — nur in der Aktiv-Ansicht. Im Archiv-Modus
+          waere es nur "Abgeschlossen + Storniert"-Aufteilung, die ist
+          in der Liste eh sichtbar (Status-Tag pro Card). Counts kommen
+          aus DB-Count-Queries (entkoppelt vom geladenen State). */}
+      {!showArchive && (counts.anfrage + counts.offen + counts.abgeschlossen + counts.storniert + counts.entwurf) > 0 && (() => {
         // Drafts gemeinsam: Vermietentwuerfe (anfrage) + Auftrag-Entwuerfe (entwurf)
         // gelten app-weit als WIP/lila und zaehlen als eigenes Donut-Segment.
         const draftCount = counts.anfrage + counts.entwurf;
@@ -635,9 +638,10 @@ export default function AuftraegePage() {
 
                   {/* MITTE — Col 6: Status-Tags. Reihenfolge: Dringend,
                       Status (Storniert/Abgeschlossen/...), dann Vermietung
-                      ganz rechts — Status ist die wichtigste Info, kommt
-                      zuerst nach dem Dringend-Indikator. */}
-                  <div className="flex items-center gap-1 min-w-0 flex-wrap">
+                      ganz rechts. Im Archiv gemuted (grayscale + opacity)
+                      damit die Liste ruhiger wirkt — wichtige Info ist da
+                      eh die Rechnungsnummer in der Actions-Spalte. */}
+                  <div className={`flex items-center gap-1 min-w-0 flex-wrap ${showArchive ? "grayscale opacity-60" : ""}`}>
                     {job.priority === "dringend" && isActive && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                         <AlertCircle className="h-2.5 w-2.5" />
