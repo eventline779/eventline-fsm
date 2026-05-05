@@ -377,17 +377,21 @@ export default function HeutePage() {
         </p>
       </div>
 
-      {/* Personal-Stats-Strip — eigene Wochenzahlen, gleicher Look fuer
-          alle User. Mini-Sparkline fuer "Diese Woche" zeigt die Stunden-
-          Verteilung nach Wochentag. */}
+      {/* Admin-Row ZUERST — Pending-Aktionen (Buchhaltung, Vermietentwurf-
+          Step-4) sind das Wichtigste, was Admin nach Login sehen soll.
+          Plus Heute-im-Team-Live-Sicht. Bei Mitarbeitern ohne Admin-Permission
+          wird die Reihe einfach nicht gerendert -> direkt KPI-Strip oben. */}
+      {isAdmin && !loading && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ActionQueueCard data={pending} />
+          <TeamHeuteCard data={teamToday} />
+        </div>
+      )}
+
+      {/* Personal-Stats-Strip — Reihenfolge nach Zeit-Logik:
+          aktuelle Woche -> Pipeline -> Wochen-Produktivitaet -> Karriere-Total.
+          Mini-Sparkline auf "Diese Woche" zeigt Stunden-Verteilung Mo..So. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          label="Total gestempelt"
-          value={loading ? "—" : formatHoursShort(stats?.hoursTotal ?? 0)}
-          icon={Clock}
-          accent="teal"
-          sub="seit Beginn"
-        />
         <StatCard
           label="Diese Woche"
           value={loading ? "—" : formatHoursShort(stats?.hoursWeek ?? 0)}
@@ -408,16 +412,14 @@ export default function HeutePage() {
           accent="green"
           sub="Todos"
         />
+        <StatCard
+          label="Total gestempelt"
+          value={loading ? "—" : formatHoursShort(stats?.hoursTotal ?? 0)}
+          icon={Clock}
+          accent="teal"
+          sub="seit Beginn"
+        />
       </div>
-
-      {/* Admin-Row — nur fuer Admins. Heute-im-Team links + Action-Queue
-          rechts. Auf schmaleren Screens stacken. */}
-      {isAdmin && !loading && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TeamHeuteCard data={teamToday} />
-          <ActionQueueCard data={pending} />
-        </div>
-      )}
 
       {/* Kommende 7 Tage — Look-Ahead-Agenda fuer alle User */}
       {!loading && <UpcomingCard days={upcoming} />}
