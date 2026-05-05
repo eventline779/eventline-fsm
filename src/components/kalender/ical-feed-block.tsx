@@ -127,7 +127,9 @@ export function IcalFeedBlock({ title, description, source = "user" }: Props) {
               {description}
               <br />
               <span className="text-amber-700 dark:text-amber-400">
-                Diese URL enthält dein persönliches Token — nicht weitergeben.
+                {source === "company"
+                  ? "Diese URL gibt Zugriff auf den ganzen Firma-Kalender — nicht extern weitergeben."
+                  : "Diese URL enthält dein persönliches Token — nicht weitergeben."}
               </span>
             </p>
           </div>
