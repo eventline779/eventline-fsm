@@ -82,10 +82,11 @@ interface TeamToday {
 }
 
 interface AdminPending {
-  unbilledJobs: number;     // status=abgeschlossen + invoiced_at NULL
-  unfiledBelege: number;    // type=beleg + filed_at NULL + status != abgelehnt
-  openBelegTickets: number; // type=beleg + status=offen
-  confirmedAnfragen: number;// status=anfrage + request_step=4
+  unbilledJobs: number;      // status=abgeschlossen + invoiced_at NULL
+  unfiledBelege: number;     // type=beleg + filed_at NULL + status != abgelehnt
+                             // (deckt sowohl Ablegen als auch Ablehnen ab —
+                             // Buttons sind direkt auf der Beleg-Karte)
+  confirmedAnfragen: number; // status=anfrage + request_step=4
 }
 
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -280,7 +281,7 @@ export default function HeutePage() {
 
       // Admin-Daten — nur fetchen wenn isAdmin (sonst RLS-Errors / Verschwendung)
       if (isAdmin) {
-        const [activeStempelRes, todayStempelRes, unbilledRes, unfiledRes, openBelegRes, anfrage4Res] = await Promise.all([
+        const [activeStempelRes, todayStempelRes, unbilledRes, unfiledRes, anfrage4Res] = await Promise.all([
           // Aktuell eingestempelt (clock_out IS NULL)
           supabase
             .from("time_entries")
@@ -299,19 +300,16 @@ export default function HeutePage() {
             .eq("status", "abgeschlossen")
             .is("invoiced_at", null)
             .neq("is_deleted", true),
-          // Belege zur Ablage
+          // Belege zur Ablage — deckt beide Admin-Aktionen ab
+          // (Ablegen UND Ablehnen werden direkt auf der Beleg-Karte
+          // erledigt, separater "Beleg-Tickets offen"-Counter waere
+          // redundant).
           supabase
             .from("tickets")
             .select("id", { count: "exact", head: true })
             .eq("type", "beleg")
             .is("filed_at", null)
             .neq("status", "abgelehnt"),
-          // Beleg-Tickets noch offen
-          supabase
-            .from("tickets")
-            .select("id", { count: "exact", head: true })
-            .eq("type", "beleg")
-            .eq("status", "offen"),
           // Vermietentwürfe in Step 4 (Kunde hat Angebot bestaetigt — Admin
           // muss manuell zu Auftrag konvertieren)
           supabase
@@ -348,7 +346,6 @@ export default function HeutePage() {
         setPending({
           unbilledJobs: unbilledRes.count ?? 0,
           unfiledBelege: unfiledRes.count ?? 0,
-          openBelegTickets: openBelegRes.count ?? 0,
           confirmedAnfragen: anfrage4Res.count ?? 0,
         });
       }
@@ -758,7 +755,7 @@ function QueueItem({ count, label, href, icon: Icon, accent }: QueueItemProps) {
 
 function ActionQueueCard({ data }: { data: AdminPending | null }) {
   if (!data) return null;
-  const total = data.unbilledJobs + data.unfiledBelege + data.openBelegTickets + data.confirmedAnfragen;
+  const total = data.unbilledJobs + data.unfiledBelege + data.confirmedAnfragen;
 
   return (
     <Card className="bg-card">
@@ -792,13 +789,6 @@ function ActionQueueCard({ data }: { data: AdminPending | null }) {
               href="/abrechnung"
               icon={FolderArchive}
               accent="blue"
-            />
-            <QueueItem
-              count={data.openBelegTickets}
-              label="Beleg-Tickets offen"
-              href="/tickets?type=beleg&status=offen"
-              icon={Ticket}
-              accent="red"
             />
             <QueueItem
               count={data.confirmedAnfragen}
