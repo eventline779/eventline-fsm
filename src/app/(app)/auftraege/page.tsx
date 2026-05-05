@@ -543,9 +543,16 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
+            // Bei abgeschlossenen/stornierten Auftraegen nur das Start-Datum
+            // anzeigen — End-Datum ist im Archiv nicht relevant. Nur aktive
+            // Auftraege brauchen den Range damit man das Event-Wochenende
+            // einplanen kann.
+            const isArchived = job.status === "abgeschlossen" || job.status === "storniert";
             const dateText = job.start_date
               ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
-                + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
+                + (!isArchived && job.end_date && job.end_date !== job.start_date
+                    ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
+                    : "")
               : "";
 
             // Action-Icon-Logik: kleines Icon in der Compact-Zeile.
