@@ -543,16 +543,9 @@ export default function AuftraegePage() {
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
-            // Bei abgeschlossenen/stornierten Auftraegen nur das Start-Datum
-            // anzeigen — End-Datum ist im Archiv nicht relevant. Nur aktive
-            // Auftraege brauchen den Range damit man das Event-Wochenende
-            // einplanen kann.
-            const isArchived = job.status === "abgeschlossen" || job.status === "storniert";
             const dateText = job.start_date
               ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
-                + (!isArchived && job.end_date && job.end_date !== job.start_date
-                    ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
-                    : "")
+                + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
               : "";
 
             // Action-Icon-Logik: kleines Icon in der Compact-Zeile.
@@ -640,21 +633,24 @@ export default function AuftraegePage() {
                     {dateText ?? "—"}
                   </span>
 
-                  {/* MITTE — Col 6: Status-Tags (Vermietung, Status, Dringend) */}
+                  {/* MITTE — Col 6: Status-Tags. Reihenfolge: Dringend,
+                      Status (Storniert/Abgeschlossen/...), dann Vermietung
+                      ganz rechts — Status ist die wichtigste Info, kommt
+                      zuerst nach dem Dringend-Indikator. */}
                   <div className="flex items-center gap-1 min-w-0 flex-wrap">
                     {job.priority === "dringend" && isActive && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                         <AlertCircle className="h-2.5 w-2.5" />
                       </span>
                     )}
-                    {job.was_anfrage && job.status !== "anfrage" && (
-                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
-                        Vermietung
-                      </span>
-                    )}
                     {job.status !== "offen" && (
                       <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
                         {JOB_STATUS[job.status].label}
+                      </span>
+                    )}
+                    {job.was_anfrage && job.status !== "anfrage" && (
+                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                        Vermietung
                       </span>
                     )}
                   </div>
