@@ -1,8 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const body = await request.json();
   const { profile_id, shift_title, shift_date, start_time, end_time } = body;
 

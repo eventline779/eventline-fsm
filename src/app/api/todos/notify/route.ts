@@ -1,8 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { title, description, due_date, assigned_to } = await request.json();
 
   if (!assigned_to || !title) {
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
     await resend.emails.send({
       from: "EVENTLINE FSM <noreply@eventline-basel.com>",
       to: profile.email,
-      subject: `🚨 DRINGEND: ${title}`,
+      subject: `DRINGEND: ${title}`,
       html: `
         <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto">
           <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">

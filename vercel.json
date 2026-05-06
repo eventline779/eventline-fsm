@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/reminders",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/stempel-reminder",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/customers/auto-archive",
+      "schedule": "0 4 * * *"
     }
   ]
 }

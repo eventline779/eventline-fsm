@@ -3,32 +3,42 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { deleteRow } from "@/lib/db-mutations";
+import { validateFileSize } from "@/lib/file-upload";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Location, LocationContact, MaintenanceTask, Customer } from "@/types";
 import {
-  ArrowLeft, Plus, UserPlus, Wrench, Check, StickyNote, MapPin,
+  Plus, UserPlus, Wrench, Check, MapPin,
   Users, Phone, Mail, Trash2, Camera, Image as ImageIcon, X,
   ClipboardList, Building2, FileText, Upload, Download,
 } from "lucide-react";
-import Link from "next/link";
+import { BackButton } from "@/components/ui/back-button";
+import { usePermissions } from "@/lib/use-permissions";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface MaintenanceTaskWithPhoto extends MaintenanceTask {
   photo_url?: string | null;
+  job_id?: string | null;
+  // Aus Postgres-FK-Join: maintenance_tasks.job_id → jobs.id
+  job?: { id: string; status: string } | null;
+}
+
+function effectiveTaskStatus(t: MaintenanceTaskWithPhoto): "offen" | "erledigt" {
+  if (t.job?.status === "abgeschlossen") return "erledigt";
+  return t.status;
 }
 
 export default function StandortDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { can } = usePermissions();
   const [location, setLocation] = useState<Location | null>(null);
   const [contacts, setContacts] = useState<LocationContact[]>([]);
   const [tasks, setTasks] = useState<MaintenanceTaskWithPhoto[]>([]);
-  const [notesList, setNotesList] = useState<{ id: string; content: string; created_at: string }[]>([]);
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [newNote, setNewNote] = useState("");
 
   // Contact form
   const [showContactForm, setShowContactForm] = useState(false);
@@ -36,7 +46,7 @@ export default function StandortDetailPage() {
 
   // Task form
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", due_date: "" });
+  const [taskForm, setTaskForm] = useState({ title: "", description: "" });
   const [taskPhoto, setTaskPhoto] = useState<{ file: File; preview: string } | null>(null);
   const taskPhotoRef = useRef<HTMLInputElement>(null);
   const taskCameraRef = useRef<HTMLInputElement>(null);
@@ -49,6 +59,7 @@ export default function StandortDetailPage() {
   const [docs, setDocs] = useState<{ name: string; path: string; uploaded_at: string }[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -56,25 +67,23 @@ export default function StandortDetailPage() {
     const [locRes, contRes, taskRes, custRes] = await Promise.all([
       supabase.from("locations").select("*").eq("id", id).single(),
       supabase.from("location_contacts").select("*").eq("location_id", id).order("name"),
-      supabase.from("maintenance_tasks").select("*").eq("location_id", id).order("created_at", { ascending: false }),
+      supabase.from("maintenance_tasks").select("*, job:jobs(id, status)").eq("location_id", id).order("created_at", { ascending: false }),
       supabase.from("customers").select("*").eq("is_active", true).order("name"),
     ]);
     if (locRes.data) {
       setLocation(locRes.data as Location);
+      // Wichtig: linkedCustomer IMMER setzen — auch auf null wenn customer_id
+      // entfernt wurde. Sonst bleibt der vorherige State stehen und User
+      // muss manuell refreshen damit die Aenderung sichtbar wird.
       if (locRes.data.customer_id && custRes.data) {
         setLinkedCustomer((custRes.data as Customer[]).find((c) => c.id === locRes.data.customer_id) || null);
+      } else {
+        setLinkedCustomer(null);
       }
     }
     if (contRes.data) setContacts(contRes.data as LocationContact[]);
     if (taskRes.data) setTasks(taskRes.data as MaintenanceTaskWithPhoto[]);
     if (custRes.data) setCustomers(custRes.data as Customer[]);
-
-    // Load notes via API
-    try {
-      const notesRes = await fetch(`/api/locations/${id}/notes`);
-      const notesJson = await notesRes.json();
-      if (notesJson.notes) setNotesList(notesJson.notes);
-    } catch {}
 
     // Load documents from technical_details
     if (locRes.data?.technical_details) {
@@ -91,63 +100,21 @@ export default function StandortDetailPage() {
     loadAll();
   }
 
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-    try {
-      const res = await fetch(`/api/locations/${id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newNote }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setNotesList(json.notes);
-        setNewNote("");
-        setShowNoteForm(false);
-        toast.success("Notiz hinzugefügt");
-      } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
-      }
-    } catch {
-      toast.error("Fehler beim Speichern");
-    }
-  }
-
-  async function deleteNote(noteId: string) {
-    try {
-      const res = await fetch(`/api/locations/${id}/notes`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteId }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setNotesList(json.notes);
-        toast.success("Notiz gelöscht");
-      }
-    } catch {}
-  }
-
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setUploadingDoc(true);
     const ext = file.name.split(".").pop() || "pdf";
     const path = `standorte/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) {
-      toast.error("Upload fehlgeschlagen: " + error.message);
+      TOAST.supabaseError(error, "Upload fehlgeschlagen");
       setUploadingDoc(false);
       e.target.value = "";
       return;
     }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    await fetch(`/api/locations/${id}/notes`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: location?.notes }),
-    });
     // Save docs list via admin API
     await fetch(`/api/locations/${id}/docs`, {
       method: "POST",
@@ -161,7 +128,13 @@ export default function StandortDetailPage() {
   }
 
   async function deleteDoc(doc: { name: string; path: string }) {
-    if (!confirm(`"${doc.name}" wirklich löschen?`)) return;
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${doc.name}" wird entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     await supabase.storage.from("documents").remove([doc.path]);
     const newDocs = docs.filter((d) => d.path !== doc.path);
     await fetch(`/api/locations/${id}/docs`, {
@@ -188,13 +161,14 @@ export default function StandortDetailPage() {
   }
 
   async function deleteContact(contactId: string) {
-    await supabase.from("location_contacts").delete().eq("id", contactId);
+    await deleteRow("location_contacts", contactId);
     loadAll();
   }
 
   function handleTaskPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFileSize(file)) return;
     setTaskPhoto({ file, preview: URL.createObjectURL(file) });
     e.target.value = "";
   }
@@ -211,37 +185,36 @@ export default function StandortDetailPage() {
       if (!error) photoUrl = path;
     }
 
-    await supabase.from("maintenance_tasks").insert({
+    const { error: insertErr } = await supabase.from("maintenance_tasks").insert({
       location_id: id,
       title: taskForm.title,
       description: taskForm.description || null,
-      due_date: taskForm.due_date || null,
       photo_url: photoUrl,
       created_by: user?.id,
     });
+    if (insertErr) {
+      toast.error("Erstellen fehlgeschlagen: " + insertErr.message);
+      return;
+    }
 
-    setTaskForm({ title: "", description: "", due_date: "" });
+    setTaskForm({ title: "", description: "" });
     if (taskPhoto) { URL.revokeObjectURL(taskPhoto.preview); setTaskPhoto(null); }
     setShowTaskForm(false);
     loadAll();
     toast.success("Instandhaltungsarbeit erstellt");
   }
 
-  async function toggleTask(taskId: string, currentStatus: string) {
-    const newStatus = currentStatus === "offen" ? "erledigt" : "offen";
-    await supabase.from("maintenance_tasks").update({
-      status: newStatus,
-      completed_at: newStatus === "erledigt" ? new Date().toISOString() : null,
-    }).eq("id", taskId);
-    loadAll();
-  }
-
   async function deleteTask(task: MaintenanceTaskWithPhoto) {
-    if (!confirm("Arbeit wirklich löschen?")) return;
+    const ok = await confirm({
+      title: "Arbeit löschen?",
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
     if (task.photo_url) {
       await supabase.storage.from("documents").remove([task.photo_url]);
     }
-    await supabase.from("maintenance_tasks").delete().eq("id", task.id);
+    await deleteRow("maintenance_tasks", task.id);
     loadAll();
     toast.success("Arbeit gelöscht");
   }
@@ -252,6 +225,9 @@ export default function StandortDetailPage() {
     if (task.description) params.set("description", task.description);
     if (id) params.set("location_id", id as string);
     if (location?.customer_id) params.set("customer_id", location.customer_id);
+    // Verknuepft den neuen Auftrag bei Submit zurueck mit dieser Instandhaltung
+    // — sobald der Auftrag abgeschlossen ist, gilt die Arbeit als erledigt.
+    params.set("from_maintenance", task.id);
     router.push(`/auftraege/neu?${params.toString()}`);
   }
 
@@ -273,12 +249,12 @@ export default function StandortDetailPage() {
 
   if (!location) return <div className="py-20 text-center text-muted-foreground">Laden...</div>;
 
-  const filteredTasks = tasks.filter((t) => taskFilter === "all" || t.status === taskFilter);
+  const filteredTasks = tasks.filter((t) => taskFilter === "all" || effectiveTaskStatus(t) === taskFilter);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
-        <Link href="/standorte"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
+        <BackButton fallbackHref="/standorte" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{location.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -289,7 +265,7 @@ export default function StandortDetailPage() {
       </div>
 
       {/* Kunde verknüpfen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Building2 className="h-4 w-4" />Zugewiesener Kunde</CardTitle>
         </CardHeader>
@@ -303,13 +279,13 @@ export default function StandortDetailPage() {
                   {linkedCustomer.address_city && <p className="text-xs text-muted-foreground">{linkedCustomer.address_zip} {linkedCustomer.address_city}</p>}
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => linkCustomer("")} className="text-xs text-red-500 border-red-200 hover:bg-red-50">Entfernen</Button>
+              <button type="button" onClick={() => linkCustomer("")} className="kasten kasten-muted">Entfernen</button>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <select
                 onChange={(e) => { if (e.target.value) linkCustomer(e.target.value); }}
-                className="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                className="flex-1 h-9 px-3 text-sm rounded-lg border border-border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-red-500/20"
                 defaultValue=""
               >
                 <option value="">Kunde auswählen...</option>
@@ -320,55 +296,20 @@ export default function StandortDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Notizen */}
-      <Card className="bg-white">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><StickyNote className="h-4 w-4" />Notizen ({notesList.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowNoteForm(!showNoteForm)}>
-            {showNoteForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-            {showNoteForm ? "Abbrechen" : "Neue Notiz"}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {showNoteForm && (
-            <form onSubmit={addNote} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Notiz eingeben..." className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={3} required />
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { setShowNoteForm(false); setNewNote(""); }}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
-              </div>
-            </form>
-          )}
-          {notesList.length === 0 && !showNoteForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Notizen.</p>}
-          {notesList.map((n) => (
-            <div key={n.id} className="flex items-start justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm whitespace-pre-wrap">{n.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                  part.match(/^https?:\/\//) ? (
-                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
-                  ) : part
-                )}</p>
-                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-              </div>
-              <button onClick={() => deleteNote(n.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"><Trash2 className="h-4 w-4" /></button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
       {/* Dokumente */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => docRef.current?.click()} disabled={uploadingDoc}>
-            <Upload className="h-4 w-4 mr-1" />{uploadingDoc ? "Hochladen..." : "PDF hochladen"}
-          </Button>
+          <button type="button" onClick={() => docRef.current?.click()} disabled={uploadingDoc} className="kasten kasten-muted">
+            <Upload className="h-3.5 w-3.5" />
+            {uploadingDoc ? "Hochladen…" : "PDF hochladen"}
+          </button>
           <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
         </CardHeader>
         <CardContent className="space-y-3">
           {docs.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Dokumente.</p>}
           {docs.map((d) => (
-            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={d.path} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <button onClick={() => openDoc(d.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-600 transition-colors">
                 <FileText className="h-5 w-5 text-red-500 shrink-0" />
                 <div className="min-w-0">
@@ -377,8 +318,8 @@ export default function StandortDetailPage() {
                 </div>
               </button>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onClick={() => openDoc(d.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Öffnen"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Löschen"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => openDoc(d.path)} className="icon-btn icon-btn-blue" data-tooltip="Öffnen"><Download className="h-4 w-4" /></button>
+                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" data-tooltip="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
@@ -386,14 +327,19 @@ export default function StandortDetailPage() {
       </Card>
 
       {/* Kontaktpersonen */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Kontaktpersonen ({contacts.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowContactForm(!showContactForm)}><UserPlus className="h-4 w-4 mr-1" />Hinzufügen</Button>
+          {can("locations:edit") && (
+            <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
+              <UserPlus className="h-3.5 w-3.5" />
+              Hinzufügen
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {showContactForm && (
-            <form onSubmit={addContact} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+            <form onSubmit={addContact} className="p-4 rounded-xl bg-muted/40 border space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Name *" value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} required />
                 <Input placeholder="Funktion (z.B. Hausmeister)" value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} />
@@ -403,44 +349,58 @@ export default function StandortDetailPage() {
                 <Input placeholder="Telefon" value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowContactForm(false)}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Speichern</Button>
+                <button type="button" onClick={() => setShowContactForm(false)} className="kasten kasten-muted">Abbrechen</button>
+                <button type="submit" className="kasten kasten-red">Speichern</button>
               </div>
             </form>
           )}
           {contacts.length === 0 && !showContactForm && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Kontaktpersonen.</p>}
           {contacts.map((c) => (
-            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{c.name}</span>
-                  {c.role && <span className="text-xs text-muted-foreground bg-gray-200 px-2 py-0.5 rounded-full">{c.role}</span>}
+                  {c.role && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{c.role}</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                   {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Mail className="h-3 w-3" />{c.email}</a>}
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => deleteContact(c.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
         </CardContent>
       </Card>
 
       {/* Instandhaltung */}
-      <Card className="bg-white">
+      <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Instandhaltung ({tasks.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setShowTaskForm(!showTaskForm)}>
-            {showTaskForm ? <X className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-            {showTaskForm ? "Abbrechen" : "Neue Arbeit"}
-          </Button>
+          {can("locations:edit") && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!showTaskForm) {
+                  setTaskForm({
+                    title: location ? `Instandhaltung ${location.name}` : "Instandhaltung",
+                    description: "",
+                  });
+                }
+                setShowTaskForm(!showTaskForm);
+              }}
+              className="kasten kasten-muted"
+            >
+              {showTaskForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              {showTaskForm ? "Abbrechen" : "Neue Arbeit"}
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filter */}
           <div className="flex gap-2">
             {(["all", "offen", "erledigt"] as const).map((f) => (
-              <button key={f} onClick={() => setTaskFilter(f)} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${taskFilter === f ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200"}`}>
+              <button key={f} type="button" onClick={() => setTaskFilter(f)} className={taskFilter === f ? "kasten-active" : "kasten-toggle-off"}>
                 {f === "all" ? "Alle" : f === "offen" ? "Offen" : "Erledigt"}
               </button>
             ))}
@@ -448,14 +408,13 @@ export default function StandortDetailPage() {
 
           {/* Neue Arbeit Formular */}
           {showTaskForm && (
-            <form onSubmit={addTask} className="p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
-              <Input placeholder="Titel der Arbeit *" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} required />
-              <textarea placeholder="Beschreibung..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white resize-none" rows={2} />
-              <Input type="date" value={taskForm.due_date} onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })} />
+            <form onSubmit={addTask} className="p-4 rounded-xl bg-muted/40 border space-y-3">
+              <Input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder="Titel *" required />
+              <textarea placeholder="Beschreibung *" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring" rows={2} required />
 
               {/* Foto */}
               {taskPhoto ? (
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 w-fit">
+                <div className="relative rounded-xl overflow-hidden border border-border w-fit">
                   <img src={taskPhoto.preview} alt="Foto" className="h-32 w-auto object-cover rounded-xl" />
                   <button
                     type="button"
@@ -467,10 +426,10 @@ export default function StandortDetailPage() {
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskCameraRef.current?.click()} className="kasten kasten-muted flex-1 py-2.5">
                     <Camera className="h-4 w-4" />Foto aufnehmen
                   </button>
-                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-medium text-gray-400 hover:border-red-300 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => taskPhotoRef.current?.click()} className="kasten kasten-muted flex-1 py-2.5">
                     <ImageIcon className="h-4 w-4" />Aus Galerie
                   </button>
                 </div>
@@ -480,68 +439,62 @@ export default function StandortDetailPage() {
               <input ref={taskPhotoRef} type="file" accept="image/*" onChange={handleTaskPhoto} className="hidden" />
 
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => { setShowTaskForm(false); if (taskPhoto) { URL.revokeObjectURL(taskPhoto.preview); setTaskPhoto(null); } }}>Abbrechen</Button>
-                <Button type="submit" size="sm" className="bg-red-600 hover:bg-red-700 text-white">Erstellen</Button>
+                <button type="button" onClick={() => { setShowTaskForm(false); if (taskPhoto) { URL.revokeObjectURL(taskPhoto.preview); setTaskPhoto(null); } }} className="kasten kasten-muted">Abbrechen</button>
+                <button type="submit" className="kasten kasten-red">Erstellen</button>
               </div>
             </form>
           )}
 
           {filteredTasks.length === 0 && !showTaskForm && <p className="text-sm text-muted-foreground py-4 text-center">Keine Instandhaltungsarbeiten.</p>}
 
-          {filteredTasks.map((t) => (
-            <div key={t.id} className={`p-3 rounded-xl border ${t.status === "erledigt" ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <button onClick={() => toggleTask(t.id, t.status)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all mt-0.5 shrink-0 ${t.status === "erledigt" ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
-                    {t.status === "erledigt" && <Check className="h-4 w-4" />}
-                  </button>
+          {filteredTasks.map((t) => {
+            const status = effectiveTaskStatus(t);
+            const done = status === "erledigt";
+            return (
+              <div key={t.id} className={`p-3 rounded-xl border ${done ? "bg-green-50 border-green-100 dark:bg-green-500/10 dark:border-green-500/20" : "bg-muted/40 border-border"}`}>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <span className={`font-medium text-sm ${t.status === "erledigt" ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium text-sm ${done ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                      {done && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-green-700 dark:text-green-300">
+                          <Check className="h-3 w-3" />Erledigt
+                        </span>
+                      )}
+                    </div>
                     {t.description && <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>}
                     <div className="flex items-center gap-2 mt-1">
-                      {t.due_date && <span className="text-xs text-muted-foreground">Fällig: {new Date(t.due_date).toLocaleDateString("de-CH")}</span>}
-                      {t.completed_at && <span className="text-xs text-green-600">Erledigt: {new Date(t.completed_at).toLocaleDateString("de-CH")}</span>}
+                      <span className="text-xs text-muted-foreground">Erstellt: {new Date(t.created_at).toLocaleDateString("de-CH")}</span>
+                      {t.job && <span className="text-xs text-muted-foreground">· Auftrag verknüpft</span>}
                     </div>
-                    {/* Foto anzeigen */}
                     {t.photo_url && photoUrls[t.id] && (
                       <div className="mt-2">
                         <img
                           src={photoUrls[t.id]}
                           alt="Foto"
-                          className="h-24 w-auto rounded-lg border border-gray-200 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          className="h-24 w-auto rounded-lg border border-border object-cover cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => window.open(photoUrls[t.id], "_blank")}
                         />
                       </div>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Auftrag erstellen Button */}
-                  {t.status === "offen" && (
-                    <button
-                      onClick={() => createJobFromTask(t)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
-                      title="Auftrag aus Instandhaltung erstellen"
-                    >
-                      <ClipboardList className="h-3.5 w-3.5" />
-                      Auftrag
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!done && !t.job_id && (
+                      <button onClick={() => createJobFromTask(t)} className="kasten kasten-red">
+                        <ClipboardList className="h-3.5 w-3.5" />Zu Auftrag
+                      </button>
+                    )}
+                    <button onClick={() => deleteTask(t)} className="kasten kasten-muted">
+                      <Trash2 className="h-3.5 w-3.5" />Löschen
                     </button>
-                  )}
-                  {/* Löschen Button */}
-                  <button
-                    onClick={() => deleteTask(t)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
-                    title="Arbeit löschen"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Löschen
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
+      {ConfirmModalElement}
     </div>
   );
 }

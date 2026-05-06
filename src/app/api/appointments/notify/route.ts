@@ -1,8 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
+import { logError } from "@/lib/log";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const body = await request.json();
   const { appointment_id, job_id, additional_email, send_to_emails } = body;
 
@@ -40,10 +44,13 @@ export async function POST(request: Request) {
     .select("*, profile:profiles(full_name, email)")
     .eq("job_id", job_id);
 
-  const customer = job.customer as any;
-  const location = job.location as any;
-  const projectLead = job.project_lead as any;
-  const assignee = appt.assignee as any;
+  // Supabase-Joins kommen nominell als Array | Objekt | null. Hier ist die
+  // FK 1:1, also nur Single-Object oder null. Inline-Type dokumentiert das.
+  type Joined<T> = T | null;
+  const customer = job.customer as Joined<{ name: string; email: string | null }>;
+  const location = job.location as Joined<{ name: string; address_street: string | null; address_zip: string | null; address_city: string | null }>;
+  const projectLead = job.project_lead as Joined<{ full_name: string; email: string | null }>;
+  const assignee = appt.assignee as Joined<{ full_name: string; email: string | null }>;
 
   const apptDate = new Date(appt.start_time).toLocaleDateString("de-CH", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -61,8 +68,19 @@ export async function POST(request: Request) {
   const sentTo: string[] = [];
   const failed: string[] = [];
 
-  // Wenn send_to_emails gesetzt ist, sende NUR an diese Adressen
+  // Wenn send_to_emails gesetzt ist, sende NUR an diese Adressen.
+  // Limit + Format-Validation gegen Spam-Missbrauch — vorher konnte ein
+  // authentifizierter User beliebig viele externe Mails ueber unsere
+  // Domain triggern (Resend-Quota + Reputation-Risiko).
   if (send_to_emails && Array.isArray(send_to_emails) && send_to_emails.length > 0) {
+    if (send_to_emails.length > 5) {
+      return NextResponse.json({ success: false, error: "Maximal 5 Empfaenger pro Aufruf" }, { status: 400 });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = send_to_emails.filter((e: unknown) => typeof e !== "string" || !emailRegex.test(e));
+    if (invalid.length > 0) {
+      return NextResponse.json({ success: false, error: "Ungueltige Email-Adresse(n)" }, { status: 400 });
+    }
     for (const email of send_to_emails) {
       try {
         await resend.emails.send({
@@ -91,7 +109,7 @@ export async function POST(request: Request) {
           `,
         });
         sentTo.push(email);
-      } catch { failed.push(email); }
+      } catch (e) { logError("appointments.notify.mail", e, { email }); failed.push(email); }
     }
     return NextResponse.json({ success: true, sentTo, failed });
   }
@@ -126,7 +144,7 @@ export async function POST(request: Request) {
         `,
       });
       sentTo.push(`Kunde: ${customer.email}`);
-    } catch { failed.push(customer.email); }
+    } catch (e) { logError("appointments.notify.customer", e, { email: customer.email }); failed.push(customer.email); }
   }
 
   // E-Mail an Projektleiter
@@ -158,7 +176,7 @@ export async function POST(request: Request) {
         `,
       });
       sentTo.push(`Projektleiter: ${projectLead.email}`);
-    } catch { failed.push(projectLead.email); }
+    } catch (e) { logError("appointments.notify.projectLead", e, { email: projectLead.email }); failed.push(projectLead.email); }
   }
 
   // E-Mail an zugewiesenen Techniker (wenn nicht gleich Projektleiter)
@@ -189,12 +207,16 @@ export async function POST(request: Request) {
         `,
       });
       sentTo.push(`Techniker: ${assignee.email}`);
-    } catch { failed.push(assignee.email); }
+    } catch (e) { logError("appointments.notify.assignee", e, { email: assignee.email }); failed.push(assignee.email); }
   }
 
-  // Weitere zugewiesene Techniker
+  // Weitere zugewiesene Techniker — Hard-Cap bei 20 Mails pro Aufruf damit
+  // ein Auftrag mit 50+ Assignments nicht in einer Aktion 50+ externe Mails
+  // ausloest (Resend-Quota + Reputation-Risiko).
+  const MAX_RECIPIENTS = 20;
   if (assignments) {
-    for (const a of assignments as any[]) {
+    for (const a of assignments as Array<{ profile?: { full_name: string; email: string | null } | null }>) {
+      if (sentTo.length + failed.length >= MAX_RECIPIENTS) break;
       const techEmail = a.profile?.email;
       if (techEmail && techEmail !== projectLead?.email && techEmail !== assignee?.email) {
         try {
@@ -208,7 +230,7 @@ export async function POST(request: Request) {
                   <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH</h2>
                 </div>
                 <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
-                  <p style="margin:0 0 12px">Hallo ${a.profile.full_name},</p>
+                  <p style="margin:0 0 12px">Hallo ${a.profile?.full_name ?? ""},</p>
                   <p style="margin:0 0 16px">Termin-Info für Auftrag <strong>${job.title}</strong>:</p>
                   <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #ef4444;margin:0 0 16px">
                     <p style="margin:0 0 4px;font-weight:600">${appt.title}</p>
@@ -222,7 +244,7 @@ export async function POST(request: Request) {
             `,
           });
           sentTo.push(`Techniker: ${techEmail}`);
-        } catch { failed.push(techEmail); }
+        } catch (e) { logError("appointments.notify.tech", e, { email: techEmail }); failed.push(techEmail); }
       }
     }
   }
@@ -256,7 +278,7 @@ export async function POST(request: Request) {
         `,
       });
       sentTo.push(additional_email);
-    } catch { failed.push(additional_email); }
+    } catch (e) { logError("appointments.notify.additional", e, { email: additional_email }); failed.push(additional_email); }
   }
 
   return NextResponse.json({ success: true, sentTo, failed });

@@ -1,66 +1,301 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JOB_STATUS, JOB_PRIORITY } from "@/lib/constants";
-import type { Job, JobStatus, Profile } from "@/types";
+import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
+import type { JobStatus, Profile, JobWithRelations } from "@/types";
 import Link from "next/link";
+import { RequestStepTracker } from "@/components/request-step-tracker";
 import {
   Plus,
   Search,
   ClipboardList,
-  Calendar,
-  MapPin,
-  User,
-  Users,
-  AlertTriangle,
+  CalendarPlus,
+  AlertCircle,
   Archive,
+  X,
+  Pencil,
+  Check,
+  Send,
+  ChevronDown,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 
+const ARCHIVE_PAGE_SIZE = 100;
+const ACTIVE_PAGE_SIZE = 100;
+// Location wird mit dem Verwaltungs-Kunden gejoint, sodass Standort-Auftraege
+// (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
+// Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
+const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)";
+import { useRouter } from "next/navigation";
+import { SearchableSelect } from "@/components/searchable-select";
+import { JobNumber } from "@/components/job-number";
+import { DonutChart } from "@/components/donut-chart";
+import { SendStepModal } from "@/components/send-step-modal";
+import { toast } from "sonner";
+import { usePermissions } from "@/lib/use-permissions";
+import { TOAST } from "@/lib/messages";
+
+type DonutCounts = {
+  anfrage: number;
+  offen: number;
+  offenVermietung: number;
+  abgeschlossen: number;
+  storniert: number;
+  entwurf: number;
+};
+
+const EMPTY_COUNTS: DonutCounts = {
+  anfrage: 0,
+  offen: 0,
+  offenVermietung: 0,
+  abgeschlossen: 0,
+  storniert: 0,
+  entwurf: 0,
+};
+
 export default function AuftraegePage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const { can } = usePermissions();
+  // Active + Archive: beide cursor-paginiert. Active war frueher voll geladen
+  // mit limit(500) als Sicherung — bei Wachstum in Eventline-Skala braucht es
+  // echte Pagination, sonst werden initial 5MB+ geladen sobald die Liste
+  // dichter wird. Die Donut-Counts kommen unabhaengig aus auftraege_counts
+  // (View) — der angezeigte/geladene Subset bleibt also stets vergleichbar
+  // mit dem Total.
+  const [activeJobs, setActiveJobs] = useState<JobWithRelations[]>([]);
+  const [activeHasMore, setActiveHasMore] = useState(false);
+  const [activeLoadingMore, setActiveLoadingMore] = useState(false);
+  const [archiveJobs, setArchiveJobs] = useState<JobWithRelations[]>([]);
+  const [archiveHasMore, setArchiveHasMore] = useState(false);
+  const [archiveLoadingMore, setArchiveLoadingMore] = useState(false);
+  // Counts kommen ausschliesslich aus der DB — entkoppelt vom geladenen State,
+  // damit der Donut auch bei paginierter Archive-Liste korrekt bleibt.
+  const [counts, setCounts] = useState<DonutCounts>(EMPTY_COUNTS);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [search, setSearch] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search") || "" : "");
+  const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
+  const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
-  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as any) || "all" : "all");
+  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as "all" | "scala" | "barakuba" | "bau3" | "sonstige" | null) || "all" : "all");
   const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
   const [loading, setLoading] = useState(true);
+  // Inline-Step-Aktion: welche Anfrage-Karte hat aktuell das Mail-Modal offen?
+  const [activeStepJobId, setActiveStepJobId] = useState<string | null>(null);
   const supabase = createClient();
+  const router = useRouter();
+
+  // Race-Guard fuer Archive-Queries (alte Antworten verwerfen, wenn neuere unterwegs sind)
+  const archiveQueryIdRef = useRef(0);
+  // Debounce-Timer fuer Suche (Tippen feuert nicht jede Query sofort)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filter in localStorage speichern
-  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search", search); }, [search]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-number", searchNumber); }, [searchNumber]);
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-title", searchTitle); }, [searchTitle]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-status", filterStatus); }, [filterStatus]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
 
-  useEffect(() => { loadJobs(); }, []);
+  // Active + Counts + Profiles: filter-unabhaengig, wird bei Mount und Invalidate geladen.
+  // Archive: filter-abhaengig, eigener Effect mit Debounce (siehe weiter unten).
+  useEffect(() => {
+    loadActiveAndCounts();
+    const handler = () => {
+      loadActiveAndCounts();
+      // Bei Datenaenderung im Archive-Modus auch die Archive-Liste neu ziehen.
+      if (showArchive) reloadArchive();
+    };
+    window.addEventListener("jobs:invalidate", handler);
+    return () => window.removeEventListener("jobs:invalidate", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchive]);
 
-  async function loadJobs() {
-    const [jobsRes, profRes] = await Promise.all([
-      supabase
+  // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber.
+  // Bei Warte-Schritten (2, 4) direkter UPDATE.
+  // Nach Schritt 4 (Angebot bestaetigt) -> direkt umwandeln in Auftrag
+  // (status='offen', kein Entwurf-Zwischenschritt). was_anfrage bleibt true.
+  async function advanceAnfrageStep(jobId: string) {
+    const job = activeJobs.find((j) => j.id === jobId);
+    if (!job?.request_step) return;
+    const nextStep = job.request_step + 1;
+    if (nextStep > 4) {
+      // Schritt 4 erledigt -> Vermietentwurf -> Auftrag (offen)
+      const { error } = await supabase
         .from("jobs")
-        .select("*, customer:customers(name), location:locations(name), project_lead_id, assignments:job_assignments(profile_id), appointments:job_appointments(id, start_time)")
-        .neq("is_deleted", true)
-        .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+        .update({ status: "offen", request_step: null })
+        .eq("id", jobId);
+      if (error) {
+        TOAST.supabaseError(error);
+        return;
+      }
+      toast.success("Vermietentwurf in Auftrag umgewandelt");
+      window.dispatchEvent(new Event("jobs:invalidate"));
+      return;
+    }
+    const { error } = await supabase
+      .from("jobs")
+      .update({ request_step: nextStep })
+      .eq("id", jobId);
+    if (error) {
+      TOAST.supabaseError(error);
+      return;
+    }
+    toast.success(REQUEST_STEPS[nextStep - 1].label);
+    window.dispatchEvent(new Event("jobs:invalidate"));
+  }
+
+  async function handleAnfrageNext(jobId: string) {
+    const job = activeJobs.find((j) => j.id === jobId);
+    if (!job?.request_step) return;
+    if (REQUEST_MAIL_STEPS.has(job.request_step)) {
+      setActiveStepJobId(jobId);
+      return;
+    }
+    await advanceAnfrageStep(jobId);
+  }
+
+  // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
+  // Damit ist der Donut entkoppelt vom geladenen State und auch bei paginierter
+  // Archive-Liste korrekt — und skaliert auf beliebig viele Jobs in der DB.
+  // Counts kommen aus der DB-View `auftraege_counts` — ein einziger
+  // Round-Trip mit count(*) filter (...) statt 6 parallelen HEAD-Queries.
+  // Definition: supabase/migrations/040_auftraege_counts_view.sql.
+  async function loadCounts(): Promise<DonutCounts> {
+    const { data } = await supabase.from("auftraege_counts").select("*").single();
+    return {
+      anfrage: data?.anfrage ?? 0,
+      offen: data?.offen ?? 0,
+      offenVermietung: data?.offen_vermietung ?? 0,
+      abgeschlossen: data?.abgeschlossen ?? 0,
+      storniert: data?.storniert ?? 0,
+      entwurf: data?.entwurf ?? 0,
+    };
+  }
+
+  // Active-Query: cursor-basiert (created_at) wie das Archive. ACTIVE_PAGE_SIZE+1
+  // damit hasMore ueber den (n+1)-Trick erkannt wird ohne Extra-Count-Query.
+  const buildActiveQuery = useCallback((cursor: string | null) => {
+    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    let q = supabase
+      .from("jobs")
+      .select(JOBS_SELECT)
+      .neq("is_deleted", true)
+      .or(cancelledFilter)
+      .not("status", "in", '("abgeschlossen","storniert")');
+    if (cursor !== null) q = q.lt("created_at", cursor);
+    return q.order("created_at", { ascending: false }).limit(ACTIVE_PAGE_SIZE + 1);
+  }, [supabase]);
+
+  async function loadActiveAndCounts() {
+    const [activeRes, profRes, freshCounts] = await Promise.all([
+      buildActiveQuery(null),
+      supabase.rpc("get_assignable_users"),
+      loadCounts(),
     ]);
-    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    if (activeRes.data) {
+      const rows = activeRes.data as unknown as JobWithRelations[];
+      setActiveHasMore(rows.length > ACTIVE_PAGE_SIZE);
+      setActiveJobs(rows.slice(0, ACTIVE_PAGE_SIZE));
+    }
     if (profRes.data) setProfiles(profRes.data as Profile[]);
+    setCounts(freshCounts);
     setLoading(false);
+  }
+
+  async function loadActiveMore() {
+    if (activeLoadingMore || activeJobs.length === 0) return;
+    setActiveLoadingMore(true);
+    const cursor = activeJobs[activeJobs.length - 1].created_at;
+    const { data } = await buildActiveQuery(cursor);
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setActiveHasMore(rows.length > ACTIVE_PAGE_SIZE);
+      setActiveJobs((prev) => [...prev, ...rows.slice(0, ACTIVE_PAGE_SIZE)]);
+    }
+    setActiveLoadingMore(false);
+  }
+
+  // Archive-Query mit Filtern: status, title, exakte Nummer — alles server-seitig.
+  // Location bleibt client-seitig (joined-table-Filter wuerde die Datenform aendern).
+  // job_number ist Integer — partial-Match nicht via PostgREST moeglich, daher
+  // nur bei vollstaendiger Eingabe (6 Ziffern) als exact-Filter.
+  const buildArchiveQuery = useCallback((cursor: string | null) => {
+    const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    let q = supabase
+      .from("jobs")
+      .select(JOBS_SELECT)
+      .neq("is_deleted", true)
+      .or(cancelledFilter);
+
+    if (filterStatus === "abgeschlossen" || filterStatus === "storniert") {
+      q = q.eq("status", filterStatus);
+    } else {
+      q = q.in("status", ["abgeschlossen", "storniert"]);
+    }
+
+    const titleQ = searchTitle.trim();
+    if (titleQ) q = q.ilike("title", `%${titleQ}%`);
+
+    const numQ = searchNumber.trim();
+    if (numQ.length === 6 && /^\d+$/.test(numQ)) {
+      q = q.eq("job_number", parseInt(numQ, 10));
+    }
+
+    if (cursor !== null) q = q.lt("created_at", cursor);
+    return q.order("created_at", { ascending: false }).limit(ARCHIVE_PAGE_SIZE + 1);
+  }, [supabase, filterStatus, searchTitle, searchNumber]);
+
+  const reloadArchive = useCallback(async () => {
+    const myId = ++archiveQueryIdRef.current;
+    const { data } = await buildArchiveQuery(null);
+    if (myId !== archiveQueryIdRef.current) return; // ueberholt — verwerfen
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setArchiveJobs(rows.slice(0, ARCHIVE_PAGE_SIZE));
+    }
+  }, [buildArchiveQuery]);
+
+  // Archive: erst-laden bei Mount/Modus-Wechsel; bei Filter/Suche-Aenderung
+  // mit 250ms Debounce neu ziehen (nicht jeden Tastenanschlag).
+  useEffect(() => {
+    if (!showArchive) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => { reloadArchive(); }, 250);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [showArchive, reloadArchive]);
+
+  async function loadArchiveMore() {
+    if (archiveLoadingMore || archiveJobs.length === 0) return;
+    setArchiveLoadingMore(true);
+    const cursor = archiveJobs[archiveJobs.length - 1].created_at;
+    const { data } = await buildArchiveQuery(cursor);
+    if (data) {
+      const rows = data as unknown as JobWithRelations[];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setArchiveJobs((prev) => [...prev, ...rows.slice(0, ARCHIVE_PAGE_SIZE)]);
+    }
+    setArchiveLoadingMore(false);
   }
 
   // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayMs = todayStart.getTime();
-  const isArchived = (j: Job) => j.status === "abgeschlossen" || j.status === "storniert";
-  const filtered = jobs.filter((j) => {
-    const matchesArchive = showArchive ? isArchived(j) : !isArchived(j);
-    const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase());
+  // Quelle haengt vom Modus ab — Active ist voll geladen, Archive ist paginiert.
+  const sourceJobs = showArchive ? archiveJobs : activeJobs;
+  const totalForSource = showArchive ? counts.abgeschlossen + counts.storniert : counts.anfrage + counts.offen + counts.entwurf;
+  const filtered = sourceJobs.filter((j) => {
+    const numQ = searchNumber.trim();
+    const titleQ = searchTitle.trim().toLowerCase();
+    const matchesNumber = !numQ ? true : String(j.job_number ?? "").includes(numQ);
+    const matchesTitle = !titleQ ? true : j.title.toLowerCase().includes(titleQ);
+    const matchesSearch = matchesNumber && matchesTitle;
     const matchesStatus = filterStatus === "all" || j.status === filterStatus;
-    const locName = ((j.location as unknown as { name: string })?.name || "").toLowerCase();
+    const locName = (j.location?.name || "").toLowerCase();
     const isScala = locName.includes("scala");
     const isBarakuba = locName.includes("barakuba");
     const isBau3 = locName.includes("bau3");
@@ -69,7 +304,7 @@ export default function AuftraegePage() {
     else if (filterLocation === "barakuba") matchesLocation = isBarakuba;
     else if (filterLocation === "bau3") matchesLocation = isBau3;
     else if (filterLocation === "sonstige") matchesLocation = !isScala && !isBarakuba && !isBau3;
-    return matchesArchive && matchesSearch && matchesStatus && matchesLocation;
+    return matchesSearch && matchesStatus && matchesLocation;
   }).sort((a, b) => {
     // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
     const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -86,179 +321,161 @@ export default function AuftraegePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Archiv" : "Aufträge"}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {jobs.filter((j) => showArchive ? (j.status === "abgeschlossen" || j.status === "storniert") : !(j.status === "abgeschlossen" || j.status === "storniert")).length} {showArchive ? "archiviert" : "aktiv"} von {jobs.length} gesamt
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Operations Archiv" : "Operations"}</h1>
+          {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
+              identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
+              auf gleicher Linie sitzen wie auf den anderen Seiten. */}
+          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${showArchive ? "bg-gray-700 text-white border-gray-700" : "bg-white text-gray-600 border-gray-200"}`}>
-            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${jobs.filter((j) => j.status === "abgeschlossen" || j.status === "storniert").length})`}
+          <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
+            <Archive className="h-3.5 w-3.5" />{showArchive ? "Aktive anzeigen" : `Archiv (${counts.abgeschlossen + counts.storniert})`}
           </button>
-          {!showArchive && (
-            <Link href="/auftraege/neu">
-              <Button className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-                <Plus className="h-4 w-4 mr-2" />
+          {!showArchive && can("auftraege:create") && (
+            <>
+              <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
+                <Plus className="h-3.5 w-3.5" />
+                Neuer Vermietentwurf
+              </Link>
+              <Link href="/auftraege/neu" className="kasten kasten-red">
+                <Plus className="h-3.5 w-3.5" />
                 Neuer Auftrag
-              </Button>
-            </Link>
+              </Link>
+            </>
           )}
         </div>
       </div>
 
-      {/* Kreis-Diagramm */}
-      {jobs.length > 0 && (() => {
-        const activeJobs = jobs;
+      {/* Kreis-Diagramm — nur in der Aktiv-Ansicht. Im Archiv-Modus
+          waere es nur "Abgeschlossen + Storniert"-Aufteilung, die ist
+          in der Liste eh sichtbar (Status-Tag pro Card). Counts kommen
+          aus DB-Count-Queries (entkoppelt vom geladenen State). */}
+      {!showArchive && (counts.anfrage + counts.offen + counts.abgeschlossen + counts.storniert + counts.entwurf) > 0 && (() => {
+        // Drafts gemeinsam: Vermietentwuerfe (anfrage) + Auftrag-Entwuerfe (entwurf)
+        // gelten app-weit als WIP/lila und zaehlen als eigenes Donut-Segment.
+        const draftCount = counts.anfrage + counts.entwurf;
         const segments = [
-          { label: "Entwurf", count: activeJobs.filter((j) => j.status === "entwurf").length, color: "#a855f7" },
-          { label: "Offen", count: activeJobs.filter((j) => j.status === "offen").length, color: "#9ca3af" },
-          { label: "Geplant", count: activeJobs.filter((j) => j.status === "geplant").length, color: "#3b82f6" },
-          { label: "In Arbeit", count: activeJobs.filter((j) => j.status === "in_arbeit").length, color: "#eab308" },
-          { label: "Abgeschlossen", count: activeJobs.filter((j) => j.status === "abgeschlossen").length, color: "#16a34a" },
-          { label: "Storniert", count: activeJobs.filter((j) => j.status === "storniert").length, color: "#dc2626" },
-        ].filter((s) => s.count > 0);
-        const total = segments.reduce((sum, s) => sum + s.count, 0);
-        const radius = 70;
-        const strokeWidth = 26;
-        const circumference = 2 * Math.PI * radius;
-        let offset = 0;
+          {
+            label: "Bevorstehend",
+            count: counts.offen,
+            color: "var(--status-gray)",
+            // Untersegment: Aufträge die aus einer Vermietung kommen — hellblau,
+            // sitzt als schmalerer Innenring innerhalb des Bevorstehend-Segments.
+            sub: {
+              label: "Vermietung",
+              count: counts.offenVermietung,
+              color: "#38bdf8",
+            },
+          },
+          { label: "Entwürfe", count: draftCount, color: "var(--status-purple)" },
+          { label: "Abgeschlossen", count: counts.abgeschlossen, color: "var(--status-green)" },
+          { label: "Storniert", count: counts.storniert, color: "var(--status-red)" },
+        ];
         return (
-          <Card className="bg-white">
-            <CardContent className="p-5">
-              <h2 className="text-sm font-semibold mb-4">Auftrags-Übersicht</h2>
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="relative shrink-0">
-                  <svg width={radius * 2 + strokeWidth} height={radius * 2 + strokeWidth} className="-rotate-90">
-                    <circle cx={radius + strokeWidth / 2} cy={radius + strokeWidth / 2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} className="dark:stroke-gray-800" />
-                    {segments.map((s, i) => {
-                      const portion = s.count / total;
-                      const dash = portion * circumference;
-                      const gap = circumference - dash;
-                      const el = (
-                        <circle
-                          key={i}
-                          cx={radius + strokeWidth / 2}
-                          cy={radius + strokeWidth / 2}
-                          r={radius}
-                          fill="none"
-                          stroke={s.color}
-                          strokeWidth={strokeWidth}
-                          strokeDasharray={`${dash} ${gap}`}
-                          strokeDashoffset={-offset}
-                          strokeLinecap="butt"
-                        />
-                      );
-                      offset += dash;
-                      return el;
-                    })}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-bold">{total}</span>
-                    <span className="text-xs text-muted-foreground">Aufträge</span>
-                  </div>
-                </div>
-                <div className="flex-1 w-full space-y-2">
-                  {segments.map((s) => {
-                    const pct = total > 0 ? (s.count / total) * 100 : 0;
-                    return (
-                      <div key={s.label} className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium truncate">{s.label}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              <strong className="text-foreground">{s.count}</strong> · {pct.toFixed(0)}%
-                            </span>
-                          </div>
-                          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden mt-1">
-                            <div className="h-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <DonutChart
+            segments={segments}
+            centerLabel="Aufträge"
+            emptyMessage="Keine Aufträge vorhanden."
+          />
         );
       })()}
 
-      {/* Suche */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Aufträge suchen..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-white border-gray-200"
-        />
-      </div>
-
-      {/* Filter: Location */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location</p>
-        <div className="flex gap-2 flex-wrap">
-          {([
-            { v: "all", label: "Alle" },
-            { v: "scala", label: "SCALA Basel" },
-            { v: "barakuba", label: "Barakuba" },
-            { v: "bau3", label: "Theater BAU3" },
-            { v: "sonstige", label: "Sonstige" },
-          ] as const).map((opt) => (
-            <button
-              key={opt.v}
-              onClick={() => setFilterLocation(opt.v as any)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                filterLocation === opt.v
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {opt.v === "all" ? <Users className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
-              {opt.label}
-            </button>
-          ))}
+      {/* Such- und Filter-Bar — kompakt, getrennte Felder fuer Nummer und Titel */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Suche Nummer */}
+        <div className="relative w-full sm:w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+            INT-
+          </span>
+          <Input
+            placeholder="000000"
+            value={searchNumber}
+            onChange={(e) => setSearchNumber(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="pl-[3rem] h-9 font-mono"
+            aria-label="Auftragsnummer"
+          />
         </div>
-      </div>
 
-      {/* Filter: Status */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-        <div className="flex gap-2 flex-wrap">
+        {/* Suche Titel */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Titel suchen…"
+            value={searchTitle}
+            onChange={(e) => setSearchTitle(e.target.value)}
+            className="pl-9 h-9"
+            aria-label="Titel"
+          />
+        </div>
+
+        {/* Status-Filter */}
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterStatus}
+            onChange={(v) => setFilterStatus(v as JobStatus | "all")}
+            items={[
+              { id: "all", label: "Alle Status" },
+              ...(Object.keys(JOB_STATUS) as JobStatus[]).map((s) => ({
+                id: s,
+                label: JOB_STATUS[s].label,
+              })),
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterStatus !== "all"}
+          />
+        </div>
+
+        {/* Location-Filter */}
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterLocation}
+            onChange={(v) =>
+              setFilterLocation(
+                v as "all" | "scala" | "barakuba" | "bau3" | "sonstige"
+              )
+            }
+            items={[
+              { id: "all", label: "Alle Locations" },
+              { id: "scala", label: "SCALA Basel" },
+              { id: "barakuba", label: "Barakuba" },
+              { id: "bau3", label: "Theater BAU3" },
+              { id: "sonstige", label: "Sonstige" },
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterLocation !== "all"}
+          />
+        </div>
+
+        {/* Reset (nur wenn ein Filter aktiv) */}
+        {(searchNumber || searchTitle || filterStatus !== "all" || filterLocation !== "all") && (
           <button
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-              filterStatus === "all"
-                ? "bg-black text-white border-black"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-            }`}
+            type="button"
+            onClick={() => {
+              setSearchNumber("");
+              setSearchTitle("");
+              setFilterStatus("all");
+              setFilterLocation("all");
+            }}
+            className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
+            data-tooltip="Alle Filter zurücksetzen"
           >
-            Alle
+            <X className="h-3.5 w-3.5" />
+            Reset
           </button>
-          {(Object.keys(JOB_STATUS) as JobStatus[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                filterStatus === status
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {JOB_STATUS[status].label}
-            </button>
-          ))}
-        </div>
+        )}
       </div>
 
       {/* Job List */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse bg-white">
+            <Card key={i} className="animate-pulse bg-card">
               <CardContent className="p-5">
                 <div className="h-5 bg-gray-200 rounded w-1/2 mb-3" />
                 <div className="h-4 bg-gray-100 rounded w-1/3" />
@@ -267,99 +484,296 @@ export default function AuftraegePage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed bg-white">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-              <ClipboardList className="h-7 w-7 text-gray-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 text-lg">
-              {search || filterStatus !== "all" ? "Keine Ergebnisse" : "Noch keine Aufträge"}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {search || filterStatus !== "all"
-                ? "Versuche andere Filter."
-                : "Erstelle deinen ersten Auftrag."}
-            </p>
-            {!search && filterStatus === "all" && (
-              <Link href="/auftraege/neu">
-                <Button className="mt-5 bg-red-600 hover:bg-red-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ersten Auftrag erstellen
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+        (() => {
+          const hasFilter = !!searchNumber || !!searchTitle || filterStatus !== "all" || filterLocation !== "all";
+          return (
+            <Card className="border-dashed bg-card">
+              <CardContent className="py-16 text-center">
+                <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                  <ClipboardList className="h-7 w-7 text-gray-400" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-lg">
+                  {hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Aufträge"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {hasFilter
+                    ? `${totalForSource} Auftrag${totalForSource === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
+                    : "Erstelle deinen ersten Auftrag."}
+                </p>
+                {hasFilter ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchNumber("");
+                      setSearchTitle("");
+                      setFilterStatus("all");
+                      setFilterLocation("all");
+                    }}
+                    className="kasten kasten-muted mt-5"
+                  >
+                    Filter zurücksetzen
+                  </button>
+                ) : (
+                  <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+                    <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
+                      <Plus className="h-3.5 w-3.5" />
+                      Neuer Vermietentwurf
+                    </Link>
+                    <Link href="/auftraege/neu" className="kasten kasten-red">
+                      <Plus className="h-3.5 w-3.5" />
+                      Neuer Auftrag
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {filtered.map((job) => {
-            const appointments = (job as any).appointments as { id: string; start_time: string }[] | null;
+            const appointments = job.appointments ?? null;
             const hasAppointment = appointments && appointments.length > 0;
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
-            const noTermin = isActive && !hasAppointment;
+            const isAnfrage = job.status === "anfrage";
+            // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
+            // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
+            const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
+            const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
+            const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
+            const stepInfo = REQUEST_STEPS[currentStep - 1];
+            const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
+            const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
+            const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
+            const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
+            const dateText = job.start_date
+              ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
+                + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
+              : "";
+
+            // Action-Icon-Logik: kleines Icon in der Compact-Zeile.
+            // Volle Action-Behandlung (Send-Modal, Bearbeiten-Page, Termin-Plan)
+            // bleibt identisch zum vorherigen Verhalten.
+            function renderActionIcon(size: "sm") {
+              const iconCls = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+              const padCls = size === "sm" ? "p-1.5" : "p-2.5";
+              if (isAnfrage) {
+                if (isMailStep) return (
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAnfrageNext(job.id); }}
+                    className={`${padCls} rounded-lg text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors`} aria-label={stepInfo.label}>
+                    <Send className={iconCls} />
+                  </button>
+                );
+                return null;
+              }
+              if (job.status === "entwurf") return (
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}/bearbeiten`); }}
+                  className={`${padCls} rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors`} aria-label="Bearbeiten">
+                  <Pencil className={iconCls} />
+                </button>
+              );
+              if (noTermin) return (
+                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}?termin=neu`); }}
+                  className={`${padCls} rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors`} aria-label="Termin planen">
+                  <CalendarPlus className={iconCls} />
+                </button>
+              );
+              if (allGood) return (
+                <span className={`${padCls} rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex`} aria-label="Alles bereit">
+                  <Check className={iconCls} strokeWidth={3} />
+                </span>
+              );
+              return null;
+            }
+
+
             return (
-            <Link key={job.id} href={`/auftraege/${job.id}`}>
-            <div className="flex items-stretch gap-2">
-              {/* Linke Seite: Termin-Status */}
-              <div className={`flex flex-col items-center justify-center w-10 shrink-0 rounded-xl border text-center ${noTermin ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"}`}>
-                {noTermin ? (
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                ) : (
-                  <Calendar className="h-4 w-4 text-green-500" />
-                )}
-              </div>
-              <Card className="bg-white dark:bg-gray-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group flex-1">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {job.job_number && <span className="text-xs font-mono text-muted-foreground bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">INT-{job.job_number}</span>}
-                        <h3 className="font-semibold truncate">{job.title}</h3>
-                        <span className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${JOB_STATUS[job.status].color}`}>
-                          {JOB_STATUS[job.status].label}
-                        </span>
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${JOB_PRIORITY[job.priority].color}`}>
-                          {JOB_PRIORITY[job.priority].label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        {(job.customer as unknown as { name: string })?.name && (
-                          <span className="flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5" />
-                            {(job.customer as unknown as { name: string }).name}
-                          </span>
-                        )}
-                        {(job.location as unknown as { name: string })?.name && (
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {(job.location as unknown as { name: string }).name}
-                          </span>
-                        )}
-                        {job.start_date && (
-                          <span className="flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
-                          </span>
-                        )}
-                      </div>
-                      {noTermin && (
-                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                          Kein Termin geplant{job.start_date ? ` — fällig bis ${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""}
-                        </p>
-                      )}
-                      {job.description && (
-                        <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{job.description}</p>
-                      )}
-                    </div>
+            <Link key={job.id} href={detailHref} className="block group">
+              <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
+                job.status === "entwurf" ? "border-dashed opacity-80" : ""
+              }`}>
+                {/* Drei-Zonen-Layout (wie Leo's Skizze):
+                    LINKS  : Nr + Title eng zusammen
+                    MITTE  : Kunde Ort Datum Status, gruppiert
+                    RECHTS : Rechnungs-Pille / Aktion
+                    Die zwei 1fr-Spalten dazwischen sind die Luecken. Title
+                    hat fixe Breite (220px) damit das Mittel-Feld ueber alle
+                    Cards hinweg in derselben Flucht startet. */}
+                <div
+                  className="px-4 py-2 grid items-center gap-x-3"
+                  // Adaptive Spalten via minmax(min, max): jede Spalte hat
+                  // ein Min (Inhalt MUSS hineinpassen, sonst wird abgeschnitten)
+                  // und ein Max (kein unnoetiges Auseinanderziehen). Bei
+                  // engem Viewport schrumpfen die Spalten auf ihr Minimum,
+                  // bei breitem Viewport waechsen sie bis zum Maximum.
+                  //
+                  // Cross-Card-Alignment funktioniert weil alle Cards dieselbe
+                  // Container-Breite und denselben Template-String haben —
+                  // CSS Grid resolved die Spalten daher in jeder Card identisch.
+                  //
+                  // Ort/Standort-Spalte raus (Leo: "vollgestopft" — Datum
+                  // + Kunde reicht, Standort steht eh im Detail-View).
+                  // Min-Summe: 80+140+0+100+110+90+0+120 = 640px + 7*12 (gap) = 724
+                  // -> fits locker ab Card-Inner-Breite ~750px (Browser ~1050px).
+                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
+                >
+                  {/* LINKS — Col 1: Nr-Badge */}
+                  <JobNumber number={job.job_number} />
+
+                  {/* LINKS — Col 2: Titel (fixed width, truncate) */}
+                  <span className="auftrag-card-title font-medium text-sm truncate transition-colors min-w-0">{job.title}</span>
+
+                  {/* Col 3: Spacer (1fr) — leer */}
+                  <div />
+
+                  {/* MITTE — Col 4: Kunde */}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {displayCustomerName ?? "—"}
+                  </span>
+
+                  {/* MITTE — Col 5: Datum */}
+                  <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
+                    {dateText ?? "—"}
+                  </span>
+
+                  {/* MITTE — Col 6: Status-Tags. Reihenfolge: Dringend,
+                      Status (Storniert/Abgeschlossen/...), dann Vermietung
+                      ganz rechts. Im Archiv gemuted (grayscale + opacity)
+                      damit die Liste ruhiger wirkt — wichtige Info ist da
+                      eh die Rechnungsnummer in der Actions-Spalte. */}
+                  <div className={`flex items-center gap-1 min-w-0 flex-wrap ${showArchive ? "grayscale opacity-60" : ""}`}>
+                    {job.priority === "dringend" && isActive && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                        <AlertCircle className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                    {job.status !== "offen" && (
+                      <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${JOB_STATUS[job.status].color}`}>
+                        {JOB_STATUS[job.status].label}
+                      </span>
+                    )}
+                    {job.was_anfrage && job.status !== "anfrage" && (
+                      <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
+                        Vermietung
+                      </span>
+                    )}
                   </div>
-                </CardContent>
+
+                  {/* Col 8: Spacer (1fr) — leer */}
+                  <div />
+
+                  {/* RECHTS — Col 9: Rechnungs-Pille / Hint / Aktion-Icon */}
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end">
+                    {job.invoiced_at && job.invoice_number && (
+                      <button
+                        type="button"
+                        // <button> statt <a> weil die ganze Card schon
+                        // in einem <Link> verpackt ist — verschachtelte
+                        // <a>-Tags sind invalides HTML.
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(
+                            `/api/bexio/open-invoice?nr=${encodeURIComponent(job.invoice_number!)}`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }}
+                        // Bexio-Lime-Pill — selbe Styling-Familie wie die
+                        // Kunden-Bexio-Nr in /kunden, damit "lime = Bexio"
+                        // app-weit eindeutig bleibt.
+                        className="inline-flex items-center gap-1 font-mono text-xs font-semibold px-1.5 py-0.5 rounded text-[rgb(132,152,0)] dark:text-[rgb(196,214,0)] bg-[rgba(196,214,0,0.12)] dark:bg-[rgba(196,214,0,0.18)] hover:bg-[rgba(196,214,0,0.22)] dark:hover:bg-[rgba(196,214,0,0.26)] transition-colors"
+                        data-tooltip="In Bexio öffnen"
+                      >
+                        Rechnung {job.invoice_number}
+                        <ExternalLink className="h-3 w-3 opacity-60" />
+                      </button>
+                    )}
+                    {isAnfrage && isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
+                        {stepInfo.label}
+                      </span>
+                    )}
+                    {isAnfrage && !isMailStep && (
+                      <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
+                        Manuell in Details bestätigen
+                      </span>
+                    )}
+                    {!isAnfrage && noTermin && (
+                      <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
+                        Kein Termin geplant
+                      </span>
+                    )}
+                    {renderActionIcon("sm")}
+                  </div>
+                </div>
+
+                {/* Anfrage-Step-Tracker — eigene Zeile darunter, rechts-
+                    buendig. Zu breit (4 Step-Bubbles) fuer die Aktions-
+                    Spalte. */}
+                {isAnfrage && (
+                  <div className="px-4 pb-2 flex justify-end">
+                    <RequestStepTracker currentStep={currentStep} size="sm" />
+                  </div>
+                )}
               </Card>
-            </div>
             </Link>
             );
           })}
+          {showArchive && archiveHasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadArchiveMore}
+                disabled={archiveLoadingMore}
+                className="kasten kasten-muted"
+              >
+                {archiveLoadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {archiveLoadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
+          {!showArchive && activeHasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadActiveMore}
+                disabled={activeLoadingMore}
+                className="kasten kasten-muted"
+              >
+                {activeLoadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {activeLoadingMore ? "Lade…" : "Mehr aktive Aufträge laden"}
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Inline-Mail-Modal fuer Vermietentwuerfe — wird vom "Nächster Schritt"-Button auf jeder
+          Anfrage-Karte gefuettert. Beim Bestaetigen ruft onAdvance den entsprechenden
+          Step-+1 (oder oeffnet den Convert-Modal) auf. */}
+      {(() => {
+        // Nur Active-Anfragen bekommen das Mail-Modal — Anfragen sind nie im Archiv.
+        const activeJob = activeStepJobId ? activeJobs.find((j) => j.id === activeStepJobId) ?? null : null;
+        if (!activeJob) return null;
+        const customer = activeJob.customer;
+        const location = activeJob.location;
+        return (
+          <SendStepModal
+            open={true}
+            jobId={activeJob.id}
+            step={(activeJob.request_step ?? 1) as 1 | 2 | 3 | 4}
+            customerEmail={customer?.email ?? ""}
+            customerName={customer?.name ?? null}
+            locationName={location?.name ?? null}
+            eventDate={activeJob.start_date}
+            eventEndDate={activeJob.end_date}
+            onClose={() => setActiveStepJobId(null)}
+            onAdvance={() => advanceAnfrageStep(activeJob.id)}
+          />
+        );
+      })()}
+
     </div>
   );
 }

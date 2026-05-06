@@ -1,8 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { assignedTo, title, date, time, endTime, jobTitle, creatorName } = await request.json();
 
   if (!assignedTo) return NextResponse.json({ success: false });

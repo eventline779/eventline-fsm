@@ -1,15 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-
-const DELETE_CODE = "5225";
+import { requirePermission } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
-  const { id, code } = await request.json();
+  const auth = await requirePermission("locations:delete");
+  if (auth.error) return auth.error;
 
-  if (code !== DELETE_CODE) {
-    return NextResponse.json({ success: false, error: "Falscher Code" }, { status: 403 });
-  }
-
+  const { id } = await request.json();
   const supabase = createAdminClient();
 
   // Dokumente aus Storage löschen

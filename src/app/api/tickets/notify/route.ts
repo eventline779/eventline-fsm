@@ -1,74 +1,108 @@
-import { NextResponse } from "next/server";
-import { Resend } from "resend";
+// POST /api/tickets/notify — In-App-Notification fuer Ticket-Events.
+// Events:
+//   "created"          → an alle Admins (neues Ticket vom Mitarbeiter)
+//   "status_changed"   → an Ersteller (Admin hat erledigt/abgelehnt)
+//
+// Notifications gehen NUR in die In-App-notifications-Tabelle (Glocke
+// in der Sidebar) — KEINE Mails. Das ist eine bewusste Eventline-Regel
+// damit der Mail-Eingang nicht von App-Events ueberschwemmt wird.
 
-const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
-  bestellung: { label: "Bestellung", emoji: "🛒" },
-  it: { label: "IT-Problem", emoji: "💻" },
-  reparatur: { label: "Reparatur", emoji: "🔧" },
-  sonstiges: { label: "Sonstiges", emoji: "📋" },
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/api-auth";
+
+const TYPE_LABEL: Record<string, string> = {
+  it: "IT-Problem",
+  beleg: "Beleg",
+  stempel_aenderung: "Stempel-Änderung",
+  material: "Material-Anfrage",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  offen: "offen",
+  erledigt: "erledigt",
+  abgelehnt: "abgelehnt",
 };
 
 export async function POST(request: Request) {
-  const { title, description, category, priority, reporter, reporterEmail, emails: customEmails } = await request.json();
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return NextResponse.json({ success: false, error: "Kein RESEND_API_KEY" });
-
-  const resend = new Resend(resendKey);
-  const cat = CATEGORY_LABELS[category] || CATEGORY_LABELS.sonstiges;
-  const ticketNr = `TK-${Date.now().toString(36).toUpperCase()}`;
-  const isDringend = priority === "dringend";
-  const timestamp = new Date().toLocaleString("de-CH", {
-    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-
-  const html = `
-    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto">
-      <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
-        <h2 style="color:white;margin:0;font-size:16px">EVENTLINE GmbH – Ticket ${ticketNr}</h2>
-      </div>
-      <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
-        <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
-          <tr>
-            <td style="padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0;width:120px"><strong>Ticket-Nr.</strong></td>
-            <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0;font-family:monospace">${ticketNr}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0"><strong>Kategorie</strong></td>
-            <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0">${cat.emoji} ${cat.label}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0"><strong>Erstellt von</strong></td>
-            <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0">${reporter}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0"><strong>Datum</strong></td>
-            <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0">${timestamp}</td>
-          </tr>
-          ${isDringend ? `<tr><td style="padding:8px 12px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0"><strong>Priorität</strong></td><td style="padding:8px 12px;border-bottom:1px solid #f0f0f0"><span style="background:#dc2626;color:white;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600">DRINGEND</span></td></tr>` : ""}
-        </table>
-        <div style="background:#f8f9fa;padding:16px;border-radius:8px;border-left:4px solid ${isDringend ? "#dc2626" : "#3b82f6"};margin:0 0 16px">
-          <p style="margin:0 0 6px;font-weight:600;font-size:15px;color:#1a1a1a">${title}</p>
-          <p style="margin:0;color:#555;font-size:14px;white-space:pre-wrap;line-height:1.6">${description}</p>
-        </div>
-        <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
-        <p style="margin:0;color:#bbb;font-size:11px">EVENTLINE GmbH · St. Jakobs-Strasse 200 · CH-4052 Basel</p>
-      </div>
-    </div>
-  `;
-
-  try {
-    await resend.emails.send({
-      from: "EVENTLINE FSM <noreply@eventline-basel.com>",
-      to: customEmails || (category === "bestellung"
-        ? ["mischa@eventline-basel.com", "leo@eventline-basel.com"]
-        : ["mischa@eventline-basel.com"]),
-      replyTo: reporterEmail || undefined,
-      subject: `${isDringend ? "🚨 DRINGEND: " : ""}${cat.emoji} Ticket ${ticketNr}: ${title}`,
-      html,
-    });
-    return NextResponse.json({ success: true, ticketNr });
-  } catch {
-    return NextResponse.json({ success: false, error: "E-Mail fehlgeschlagen" });
+  const body = await request.json().catch(() => null);
+  if (!body?.ticket_id || !body?.event) {
+    return NextResponse.json({ success: false, error: "ticket_id + event noetig" }, { status: 400 });
   }
+
+  const admin = createAdminClient();
+
+  // Ticket laden (mit creator-Name fuer den Notification-Text).
+  const { data: ticket } = await admin
+    .from("tickets")
+    .select("id, type, status, title, created_by, creator:profiles!created_by(full_name)")
+    .eq("id", body.ticket_id)
+    .maybeSingle();
+
+  if (!ticket) {
+    return NextResponse.json({ success: false, error: "Ticket nicht gefunden" }, { status: 404 });
+  }
+
+  type TicketRow = {
+    id: string;
+    type: string;
+    status: string;
+    title: string;
+    created_by: string;
+    creator: { full_name: string } | null;
+  };
+  const t = ticket as unknown as TicketRow;
+
+  if (body.event === "created") {
+    // An alle aktiven Admins — die kuemmern sich um die Bearbeitung.
+    const { data: admins } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .eq("is_active", true);
+
+    const adminIds = (admins ?? []).map((a) => a.id).filter((id) => id !== t.created_by);
+    if (adminIds.length === 0) {
+      return NextResponse.json({ success: true, sent: 0 });
+    }
+
+    const rows = adminIds.map((userId) => ({
+      user_id: userId,
+      type: "ticket_new",
+      title: `Neues Ticket: ${TYPE_LABEL[t.type] ?? t.type}`,
+      message: `${t.creator?.full_name ?? "Unbekannt"}: ${t.title}`,
+      link: `/tickets/${t.id}`,
+      resource_type: "ticket",
+      resource_id: t.id,
+    }));
+
+    const { error } = await admin.from("notifications").insert(rows);
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, sent: rows.length });
+  }
+
+  if (body.event === "status_changed") {
+    // An den Ersteller — der will wissen ob's erledigt oder abgelehnt wurde.
+    const notifType = t.status === "abgelehnt" ? "ticket_rejected" : "ticket_done";
+    const { error } = await admin.from("notifications").insert({
+      user_id: t.created_by,
+      type: notifType,
+      title: `Ticket ${STATUS_LABEL[t.status] ?? t.status}: ${t.title}`,
+      message: typeof body.note === "string" && body.note.trim() ? body.note : null,
+      link: `/tickets/${t.id}`,
+      resource_type: "ticket",
+      resource_id: t.id,
+    });
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, sent: 1 });
+  }
+
+  return NextResponse.json({ success: false, error: `Unbekanntes event: ${body.event}` }, { status: 400 });
 }

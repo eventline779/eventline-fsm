@@ -1,377 +1,97 @@
 "use client";
 
+/**
+ * Einstellungen-Page — Tabs: Team, Rollen, Aktivitaet (admin-only),
+ * Integrationen. Backup-Tab raus: nightly Backup laeuft vom Ugreen-NAS
+ * gepullt.
+ */
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { USER_ROLES } from "@/lib/constants";
-import type { Profile } from "@/types";
-import {
-  UserPlus,
-  Shield,
-  User,
-  X,
-  Mail,
-  Phone,
-  Users,
-  Clock,
-  Play,
-  Calendar,
-  Plus,
-  Trash2,
-  Download,
-} from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
+import { Plug, Users, Shield, Activity } from "lucide-react";
+import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
+import { TeamTab } from "@/components/einstellungen/team-tab";
+import { RollenTab } from "@/components/einstellungen/rollen-tab";
+import { AktivitaetTab } from "@/components/einstellungen/aktivitaet-tab";
+import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
 
-type Tab = "team" | "zeiten" | "schichten" | "backup";
-
-const TEAM_PRESETS = [
-  { name: "Dario", email: "dario@eventline-basel.com", role: "admin" as const },
-  { name: "Mischa", email: "mischa@eventline-basel.com", role: "admin" as const },
-  { name: "Tim", email: "tim@eventline-basel.com", role: "admin" as const },
-];
-
-interface TeamTimeEntry {
-  id: string;
-  profile_id: string;
-  clock_in: string;
-  clock_out: string | null;
-  break_minutes: number;
-  notes: string | null;
-  job: { title: string } | null;
-  profile: { full_name: string; role: string } | null;
-}
-
-interface Shift {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  profile_id: string | null;
-  profile?: { full_name: string } | null;
-  color: string | null;
-}
+type Tab = "integrationen" | "team" | "rollen" | "aktivitaet";
 
 export default function EinstellungenPage() {
+  const supabase = createClient();
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab) ? urlTab : "team");
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "techniker">("techniker");
-  const [saving, setSaving] = useState(false);
+  // Default = "team" weil das der erste sichtbare Tab fuer Admin ist
+  // (Reihenfolge: Team → Rollen → Integrationen). Fuer Non-Admin wird
+  // unten via useEffect auf "integrationen" umgeleitet sobald der
+  // Admin-Status geladen ist.
+  const [tab, setTab] = useState<Tab>(urlTab && ["integrationen", "team", "rollen", "aktivitaet"].includes(urlTab) ? urlTab : "team");
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
-  // Zeiten
-  const [timeEntries, setTimeEntries] = useState<TeamTimeEntry[]>([]);
-  const [timeLoading, setTimeLoading] = useState(false);
-  const [timeFilter, setTimeFilter] = useState("heute");
-
-  // Schichten
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [shiftLoading, setShiftLoading] = useState(false);
-  const [shiftFilter, setShiftFilter] = useState("woche");
-  const [shiftDate, setShiftDate] = useState(new Date().toISOString().split("T")[0]);
-  const [showShiftForm, setShowShiftForm] = useState(false);
-  const [shiftForm, setShiftForm] = useState({
-    title: "",
-    start_time: "08:00",
-    end_time: "17:00",
-    profile_id: "",
-  });
-
-  const supabase = createClient();
-
-  // Sync tab from URL when navigating via sidebar
-  useEffect(() => {
-    if (urlTab && ["team", "zeiten", "schichten", "backup"].includes(urlTab)) {
-      setTab(urlTab);
-    } else if (!urlTab) {
-      setTab("team");
+  // Tab-Wechsel: state = sofortige UI-Quelle, URL parallel updaten via
+  // History-API damit Hard-Reload den gleichen Tab zeigt. Wir umgehen
+  // den Next-Router (router.replace mit Query-Only-Update triggerte in
+  // Next 16 weder re-render noch URL-Update zuverlaessig). History.API
+  // ist garantiert synchron + ohne Navigation.
+  function selectTab(t: Tab) {
+    setTab(t);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", t);
+      window.history.replaceState({}, "", url.toString());
     }
-  }, [urlTab]);
+  }
 
   useEffect(() => {
-    loadProfiles();
-  }, []);
-
-  useEffect(() => {
-    if (tab === "zeiten") loadTimeEntries();
-    if (tab === "schichten") loadShifts();
-  }, [tab, timeFilter, shiftFilter]);
-
-  async function loadProfiles() {
-    const { data } = await supabase.from("profiles").select("*").order("full_name");
-    if (data) setProfiles(data as Profile[]);
-    setLoading(false);
-  }
-
-  async function loadTimeEntries() {
-    setTimeLoading(true);
-    let query = supabase
-      .from("time_entries")
-      .select("id, profile_id, clock_in, clock_out, break_minutes, notes, job:jobs(title), profile:profiles(full_name, role)")
-      .order("clock_in", { ascending: false })
-      .limit(50);
-
-    if (timeFilter === "heute") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      query = query.gte("clock_in", today.toISOString());
-    } else if (timeFilter === "woche") {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      query = query.gte("clock_in", weekAgo.toISOString());
-    } else if (timeFilter === "monat") {
-      const monthAgo = new Date();
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      query = query.gte("clock_in", monthAgo.toISOString());
-    }
-
-    const { data } = await query;
-    if (data) setTimeEntries(data as unknown as TeamTimeEntry[]);
-    setTimeLoading(false);
-  }
-
-  async function loadShifts() {
-    setShiftLoading(true);
-    const now = new Date();
-    let startDate: string;
-    let endDate: string;
-
-    if (shiftFilter === "woche") {
-      const dayOfWeek = (now.getDay() + 6) % 7;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - dayOfWeek);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      startDate = monday.toISOString().split("T")[0] + "T00:00:00";
-      endDate = sunday.toISOString().split("T")[0] + "T23:59:59";
-    } else {
-      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01T00:00:00`;
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      endDate = `${lastDay.toISOString().split("T")[0]}T23:59:59`;
-    }
-
-    const { data } = await supabase
-      .from("calendar_events")
-      .select("id, title, start_time, end_time, profile_id, color, profile:profiles(full_name)")
-      .gte("start_time", startDate)
-      .lte("start_time", endDate)
-      .order("start_time");
-    if (data) setShifts(data as unknown as Shift[]);
-    setShiftLoading(false);
-  }
-
-  async function addUser(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email: newEmail,
-      password: newPassword,
-      options: { data: { full_name: newName, role: newRole } },
-    });
-
-    if (error) {
-      toast.error("Fehler: " + error.message);
-      setSaving(false);
-      return;
-    }
-
-    if (data.user) {
-      await supabase.from("profiles").update({ role: newRole, full_name: newName }).eq("id", data.user.id);
-    }
-
-    toast.success(`${newName} wurde erfolgreich erstellt`);
-    setShowAdd(false);
-    setNewEmail("");
-    setNewPassword("");
-    setNewName("");
-    setNewRole("techniker");
-    loadProfiles();
-    setSaving(false);
-  }
-
-  async function toggleRole(profile: Profile) {
-    const newRole = profile.role === "admin" ? "techniker" : "admin";
-    await supabase.from("profiles").update({ role: newRole }).eq("id", profile.id);
-    toast.success(`${profile.full_name} ist jetzt ${USER_ROLES[newRole]}`);
-    loadProfiles();
-  }
-
-  function prefillUser(preset: (typeof TEAM_PRESETS)[0]) {
-    setNewName(preset.name);
-    setNewEmail(preset.email);
-    setNewRole(preset.role);
-    setShowAdd(true);
-  }
-
-  async function createShift(e: React.FormEvent) {
-    e.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
-    const assignee = profiles.find((p) => p.id === shiftForm.profile_id);
-    const shiftTitle = shiftForm.title || `Schicht ${assignee?.full_name || ""}`;
-
-    const { error } = await supabase.from("calendar_events").insert({
-      title: shiftTitle,
-      start_time: (() => { const o = -new Date().getTimezoneOffset(); const s = o >= 0 ? "+" : "-"; const h = String(Math.floor(Math.abs(o) / 60)).padStart(2, "0"); const m = String(Math.abs(o) % 60).padStart(2, "0"); return `${shiftDate}T${shiftForm.start_time}:00${s}${h}:${m}`; })(),
-      end_time: (() => { const o = -new Date().getTimezoneOffset(); const s = o >= 0 ? "+" : "-"; const h = String(Math.floor(Math.abs(o) / 60)).padStart(2, "0"); const m = String(Math.abs(o) % 60).padStart(2, "0"); return `${shiftDate}T${shiftForm.end_time}:00${s}${h}:${m}`; })(),
-      profile_id: shiftForm.profile_id || null,
-      color: "#ef4444",
-      created_by: user?.id,
-      all_day: false,
-    });
-
-    if (error) {
-      toast.error("Fehler: " + error.message);
-      return;
-    }
-
-    toast.success("Schicht erstellt");
-
-    // E-Mail an zugeteilten Mitarbeiter senden
-    if (shiftForm.profile_id) {
-      try {
-        const res = await fetch("/api/shifts/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile_id: shiftForm.profile_id,
-            shift_title: shiftTitle,
-            shift_date: shiftDate,
-            start_time: shiftForm.start_time,
-            end_time: shiftForm.end_time,
-          }),
-        });
-        const result = await res.json();
-        if (result.emailSent) {
-          toast.success(`E-Mail an ${assignee?.full_name} gesendet`);
-        }
-      } catch {
-        // E-Mail fehlgeschlagen, Schicht wurde trotzdem erstellt
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdmin(false);
+        return;
       }
-    }
-
-    setShowShiftForm(false);
-    setShiftForm({ title: "", start_time: "08:00", end_time: "17:00", profile_id: "" });
-    loadShifts();
-  }
-
-  async function deleteShift(id: string) {
-    await supabase.from("calendar_events").delete().eq("id", id);
-    toast.success("Schicht gelöscht");
-    loadShifts();
-  }
-
-  const admins = profiles.filter((p) => p.role === "admin");
-  const techniker = profiles.filter((p) => p.role === "techniker");
-
-  const existingNames = profiles.map((p) => p.full_name.toLowerCase());
-  const availablePresets = TEAM_PRESETS.filter(
-    (preset) => !existingNames.some((n) => n.includes(preset.name.toLowerCase()))
-  );
-
-  // Gruppe Zeiteinträge nach Person
-  const activeNow = timeEntries.filter((e) => !e.clock_out);
-  const completed = timeEntries.filter((e) => e.clock_out);
-
-  function exportCSV() {
-    const rows = [["Name", "Datum", "Von", "Bis", "Pause (Min)", "Arbeitszeit", "Kategorie", "Auftrag"]];
-    const catLabels: Record<string, string> = { scala: "Verwaltung SCALA Basel", barakuba: "Verwaltung Barakuba", bau3: "Verwaltung Theater BAU3", buero: "Büro", meeting: "Meeting" };
-    for (const e of completed) {
-      const name = e.profile?.full_name || "Unbekannt";
-      const date = formatDate(e.clock_in);
-      const von = formatTime(e.clock_in);
-      const bis = formatTime(e.clock_out!);
-      const duration = formatDuration(e.clock_in, e.clock_out!, e.break_minutes);
-      const category = catLabels[(e as any).category] || "";
-      const job = e.job?.title || "";
-      rows.push([name, date, von, bis, String(e.break_minutes), duration, category, job]);
-    }
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Zeiterfassung_${timeFilter}_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV exportiert");
-  }
-
-  async function exportTable(table: string, label: string) {
-    const { data, error } = await supabase.from(table).select("*");
-    if (error || !data || data.length === 0) {
-      toast.error(`Keine Daten in ${label}`);
-      return;
-    }
-    const headers = Object.keys(data[0]);
-    const rows = [headers.join(";")];
-    for (const row of data) {
-      rows.push(headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(";"));
-    }
-    const csv = "\uFEFF" + rows.join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${label}_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`${label} exportiert`);
-  }
-
-  async function exportAll() {
-    const tables = [
-      { table: "customers", label: "Kunden" },
-      { table: "jobs", label: "Auftraege" },
-      { table: "time_entries", label: "Zeiterfassung" },
-      { table: "service_reports", label: "Rapporte" },
-      { table: "locations", label: "Standorte" },
-      { table: "rental_requests", label: "Vermietungen" },
-      { table: "profiles", label: "Team" },
-    ];
-    for (const t of tables) {
-      await exportTable(t.table, t.label);
-    }
-    toast.success("Alle Daten exportiert!");
-  }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      const admin = profile?.role === "admin";
+      setIsAdmin(admin);
+      // Non-Admin auf einem Admin-only-Tab → auf integrationen umlenken,
+      // sonst sieht er einen leeren Tab.
+      if (!admin && (tab === "team" || tab === "rollen" || tab === "aktivitaet")) {
+        selectTab("integrationen");
+      }
+    })();
+  }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
-    { key: "zeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" /> },
-    { key: "schichten", label: "Schichtplanung", icon: <Calendar className="h-4 w-4" /> },
-    { key: "backup", label: "Backup", icon: <Download className="h-4 w-4" /> },
+    ...(isAdmin ? [
+      { key: "team" as Tab, label: "Team", icon: <Users className="h-4 w-4" /> },
+      { key: "rollen" as Tab, label: "Rollen", icon: <Shield className="h-4 w-4" /> },
+      { key: "aktivitaet" as Tab, label: "Aktivität", icon: <Activity className="h-4 w-4" /> },
+    ] : []),
+    { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Team & Einstellungen</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Team verwalten, Zeiten einsehen und Schichten planen
-        </p>
+    <div className="space-y-6">
+      {/* Header — gleiche Struktur wie /auftraege etc. (h1 + Subtitle-Spacer
+          fuer konsistente Hoehe app-weit). Rechts oben das Build-Info-
+          Fun-Fact-Widget (Version, LOC, Wort-Count). */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Einstellungen</h1>
+          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
+        </div>
+        <BuildInfoBadge />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+      {/* Tab-Bar im selben kasten-Toggle-Stil wie Filter-Buttons in /auftraege,
+          /todos, /kunden — kein eigenes Pill-Container-Pattern. */}
+      <div className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              tab === t.key
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            type="button"
+            onClick={() => selectTab(t.key)}
+            className={tab === t.key ? "kasten-active" : "kasten-toggle-off"}
           >
             {t.icon}
             {t.label}
@@ -379,588 +99,13 @@ export default function EinstellungenPage() {
         ))}
       </div>
 
-      {/* ===== TAB: TEAM ===== */}
-      {tab === "team" && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{profiles.length} Mitglieder</p>
-            <Button
-              onClick={() => setShowAdd(!showAdd)}
-              className="bg-red-600 hover:bg-red-700 text-white shadow-sm"
-            >
-              {showAdd ? <X className="h-4 w-4 mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-              {showAdd ? "Abbrechen" : "Hinzufügen"}
-            </Button>
-          </div>
+      {tab === "integrationen" && <IntegrationenTab />}
 
-          {/* Quick Add */}
-          {!showAdd && availablePresets.length > 0 && (
-            <Card className="bg-blue-50/50 border-blue-100">
-              <CardContent className="p-4">
-                <p className="text-sm font-medium text-blue-900 mb-3">Schnell hinzufügen</p>
-                <div className="flex flex-wrap gap-2">
-                  {availablePresets.map((preset) => (
-                    <button
-                      key={preset.name}
-                      onClick={() => prefillUser(preset)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      {preset.name}
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-semibold">
-                        Admin
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+      {tab === "team" && isAdmin && <TeamTab />}
 
-          {/* Add Form */}
-          {showAdd && (
-            <Card className="border-red-100 shadow-sm">
-              <CardContent className="p-6">
-                <form onSubmit={addUser} className="space-y-5">
-                  <h3 className="font-semibold text-base">Neuen Benutzer erstellen</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Name *</label>
-                      <Input placeholder="Vor- und Nachname" value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" required />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">E-Mail *</label>
-                      <Input type="email" placeholder="name@eventline-basel.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" required />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Passwort *</label>
-                      <Input type="password" placeholder="Min. 6 Zeichen" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" required />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Rolle</label>
-                      <select value={newRole} onChange={(e) => setNewRole(e.target.value as "admin" | "techniker")} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300">
-                        <option value="techniker">Service-Techniker</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 pt-1">
-                    <Button type="button" variant="outline" onClick={() => setShowAdd(false)} className="border-gray-200">Abbrechen</Button>
-                    <Button type="submit" disabled={saving} className="bg-red-600 hover:bg-red-700 text-white">{saving ? "Erstellen..." : "Benutzer erstellen"}</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
+      {tab === "rollen" && isAdmin && <RollenTab />}
 
-          {/* Team List */}
-          {loading ? (
-            <LoadingSkeleton />
-          ) : (
-            <div className="space-y-6">
-              {admins.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-3.5 w-3.5 text-red-500" />
-                    <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Administratoren ({admins.length})</h2>
-                  </div>
-                  <div className="space-y-2">
-                    {admins.map((p) => <TeamMemberCard key={p.id} profile={p} onToggleRole={toggleRole} />)}
-                  </div>
-                </div>
-              )}
-              {techniker.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <User className="h-3.5 w-3.5 text-gray-500" />
-                    <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Service-Techniker ({techniker.length})</h2>
-                  </div>
-                  <div className="space-y-2">
-                    {techniker.map((p) => <TeamMemberCard key={p.id} profile={p} onToggleRole={toggleRole} />)}
-                  </div>
-                </div>
-              )}
-              {profiles.length === 0 && (
-                <Card className="bg-white">
-                  <CardContent className="p-8 text-center">
-                    <Users className="h-10 w-10 text-gray-300 mx-auto" />
-                    <p className="mt-3 text-sm text-muted-foreground">Noch keine Teammitglieder.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== TAB: STEMPELZEITEN ===== */}
-      {tab === "zeiten" && (
-        <div className="space-y-6">
-          {/* Filter & Export */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex gap-2">
-            {[
-              { key: "heute", label: "Heute" },
-              { key: "woche", label: "7 Tage" },
-              { key: "monat", label: "30 Tage" },
-              { key: "alle", label: "Alle" },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setTimeFilter(f.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  timeFilter === f.key
-                    ? "bg-red-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-            </div>
-            {completed.length > 0 && (
-              <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-sm font-medium transition-colors">
-                <Download className="h-4 w-4" />CSV Export
-              </button>
-            )}
-          </div>
-
-          {/* Aktuell eingestempelt */}
-          {activeNow.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Jetzt eingestempelt ({activeNow.length})
-                </h2>
-              </div>
-              <div className="space-y-2">
-                {activeNow.map((entry) => (
-                  <Card key={entry.id} className="bg-green-50 border-green-200">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-xl bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                          {entry.profile?.full_name?.charAt(0).toUpperCase() || "?"}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-sm">{entry.profile?.full_name || "Unbekannt"}</h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 flex items-center gap-1">
-                              <Play className="h-3 w-3" />
-                              Seit {formatTime(entry.clock_in)}
-                            </span>
-                            {entry.job && (
-                              <span className="text-xs text-green-600">
-                                — {entry.job.title}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <LiveTimer clockIn={entry.clock_in} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Abgeschlossene Einträge */}
-          <div>
-            <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-              {activeNow.length > 0 ? "Abgeschlossene Einträge" : "Stempelzeiten"} ({completed.length})
-            </h2>
-            {timeLoading ? (
-              <LoadingSkeleton />
-            ) : completed.length === 0 ? (
-              <Card className="bg-white border-dashed">
-                <CardContent className="py-10 text-center">
-                  <Clock className="h-8 w-8 text-gray-300 mx-auto" />
-                  <p className="mt-2 text-sm text-muted-foreground">Keine Einträge im gewählten Zeitraum.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {completed.map((entry) => (
-                  <Card key={entry.id} className="bg-white border-gray-100">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white text-sm font-bold">
-                          {entry.profile?.full_name?.charAt(0).toUpperCase() || "?"}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-sm">{entry.profile?.full_name || "Unbekannt"}</h3>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(entry.clock_in)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-muted-foreground">
-                              {formatTime(entry.clock_in)} – {formatTime(entry.clock_out!)}
-                            </span>
-                            {entry.job && (
-                              <span className="text-xs text-muted-foreground">
-                                — {entry.job.title}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {formatDuration(entry.clock_in, entry.clock_out!, entry.break_minutes)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ===== TAB: EINSATZÜBERSICHT ===== */}
-      {tab === "schichten" && (
-        <TeamOverview profiles={profiles} supabase={supabase} />
-      )}
-
-      {/* ===== TAB: BACKUP ===== */}
-      {tab === "backup" && (
-        <div className="space-y-6">
-          <div>
-            <p className="text-sm text-muted-foreground">Exportiere alle Daten als CSV-Dateien für dein Backup oder die Buchhaltung.</p>
-          </div>
-
-          {/* Alle exportieren */}
-          <Card className="bg-white border-gray-100">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-sm">Komplett-Backup</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Alle Tabellen als separate CSV-Dateien herunterladen</p>
-                </div>
-                <Button onClick={exportAll} className="bg-red-600 hover:bg-red-700 text-white">
-                  <Download className="h-4 w-4 mr-2" />Alles exportieren
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Einzelne Tabellen */}
-          <div>
-            <h2 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Einzelne Bereiche exportieren</h2>
-            <div className="space-y-2">
-              {[
-                { table: "customers", label: "Kunden", desc: "Alle Kundendaten mit Kontaktinfos" },
-                { table: "jobs", label: "Aufträge", desc: "Alle Aufträge mit Status und Details" },
-                { table: "time_entries", label: "Zeiterfassung", desc: "Alle Stempelzeiten aller Mitarbeiter" },
-                { table: "service_reports", label: "Rapporte", desc: "Alle Einsatzrapporte" },
-                { table: "locations", label: "Standorte", desc: "Alle Standorte und Adressen" },
-                { table: "rental_requests", label: "Vermietungen", desc: "Alle Vermietungsanfragen" },
-                { table: "profiles", label: "Team", desc: "Alle Teammitglieder" },
-                { table: "job_appointments", label: "Termine", desc: "Alle Auftrags-Termine" },
-                { table: "maintenance_tasks", label: "Instandhaltung", desc: "Alle Instandhaltungsarbeiten" },
-                { table: "calendar_events", label: "Schichten", desc: "Alle Kalendereinträge und Schichten" },
-              ].map((item) => (
-                <Card key={item.table} className="bg-white border-gray-100">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-sm">{item.label}</h3>
-                      <p className="text-xs text-muted-foreground">{item.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => exportTable(item.table, item.label)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-medium transition-colors"
-                    >
-                      <Download className="h-3.5 w-3.5" />CSV
-                    </button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {tab === "aktivitaet" && isAdmin && <AktivitaetTab />}
     </div>
   );
-}
-
-// === Helper Components ===
-
-function LiveTimer({ clockIn }: { clockIn: string }) {
-  const [elapsed, setElapsed] = useState("");
-
-  useEffect(() => {
-    function update() {
-      const diff = Date.now() - new Date(clockIn).getTime();
-      const h = Math.floor(diff / 3600000).toString().padStart(2, "0");
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, "0");
-      setElapsed(`${h}:${m}`);
-    }
-    update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
-  }, [clockIn]);
-
-  return <span className="text-sm font-mono font-semibold text-green-700">{elapsed}</span>;
-}
-
-function TeamMemberCard({ profile, onToggleRole }: { profile: Profile; onToggleRole: (p: Profile) => void }) {
-  const isAdmin = profile.role === "admin";
-  return (
-    <Card className="bg-white border-gray-100 hover:border-gray-200 transition-colors">
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${isAdmin ? "bg-gradient-to-br from-red-500 to-red-700" : "bg-gradient-to-br from-gray-400 to-gray-600"}`}>
-            {profile.full_name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm">{profile.full_name}</h3>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${isAdmin ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
-                {isAdmin ? <Shield className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
-                {USER_ROLES[profile.role]}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 mt-0.5">
-              <a href={`mailto:${profile.email}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
-                <Mail className="h-3 w-3" />{profile.email}
-              </a>
-              {profile.phone && (
-                <a href={`tel:${profile.phone}`} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-blue-600 transition-colors">
-                  <Phone className="h-3 w-3" />{profile.phone}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => onToggleRole(profile)} className="text-xs border-gray-200 hover:border-gray-300">
-          {isAdmin ? "Zu Techniker" : "Zu Admin"}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TeamOverview({ profiles }: { profiles: Profile[]; supabase: any }) {
-  const [data, setData] = useState<Record<string, { jobs: any[]; appointments: any[]; hours: number; plannedHours?: number }>>({});
-  const [filter, setFilter] = useState("monat");
-  const [loading, setLoading] = useState(true);
-  const [serverProfiles, setServerProfiles] = useState<Profile[]>(profiles);
-  const [showArchive, setShowArchive] = useState(false);
-  const [archivedJobs, setArchivedJobs] = useState<any[]>([]);
-
-  useEffect(() => { loadOverview(); }, [filter]);
-
-  async function loadOverview() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/team-overview?filter=${filter}`);
-      const json = await res.json();
-      if (json.profiles) setServerProfiles(json.profiles);
-      if (json.data) setData(json.data);
-    } catch (e) {
-      console.error("Team overview error:", e);
-    }
-
-    // Archiv laden
-    try {
-      const archiveRes = await fetch("/api/team-overview?filter=archiv");
-      const archiveJson = await archiveRes.json();
-      if (archiveJson.archivedJobs) setArchivedJobs(archiveJson.archivedJobs);
-    } catch {}
-
-    setLoading(false);
-  }
-
-  if (loading) return <LoadingSkeleton />;
-
-  return (
-    <div className="space-y-6">
-      {/* Filter */}
-      <div className="flex gap-2">
-        {[
-          { key: "woche", label: "Diese Woche" },
-          { key: "monat", label: "Dieser Monat" },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filter === f.key ? "bg-red-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Archiv Toggle */}
-      {archivedJobs.length > 0 && (
-        <button
-          onClick={() => setShowArchive(!showArchive)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showArchive ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-        >
-          Archiv ({archivedJobs.length})
-        </button>
-      )}
-
-      {/* Archiv */}
-      {showArchive && archivedJobs.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Abgeschlossene Aufträge</p>
-          {archivedJobs.map((j: any) => (
-            <Link key={j.id} href={`/auftraege/${j.id}`}>
-              <Card className="bg-white border-gray-100 hover:shadow-sm transition-all opacity-70">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-gray-400">INT-{j.job_number}</span>
-                    <span className="font-medium text-sm">{j.title}</span>
-                    {j.customer?.name && <span className="text-xs text-muted-foreground">· {j.customer.name}</span>}
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${j.status === "abgeschlossen" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                    {j.status === "abgeschlossen" ? "Erledigt" : "Storniert"}
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Pro Person */}
-      {!showArchive && serverProfiles.map((p) => {
-        const d = data[p.id] || { jobs: [], appointments: [], hours: 0 };
-        return (
-          <Card key={p.id} className="bg-white border-gray-100">
-            <CardContent className="p-5">
-              {/* Person Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white text-sm font-bold">
-                    {p.full_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{p.full_name}</h3>
-                    <p className="text-xs text-muted-foreground">{p.email}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold">{d.hours}h</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">Gestempelt</p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-green-50 text-center">
-                  <p className="text-lg font-bold text-green-700">{d.appointments.length}</p>
-                  <p className="text-[10px] text-green-600 font-medium">Termine</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-blue-50 text-center">
-                  <p className="text-lg font-bold text-blue-700">{d.plannedHours || 0}h</p>
-                  <p className="text-[10px] text-blue-600 font-medium">Geplant</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-amber-50 text-center">
-                  <p className="text-lg font-bold text-amber-700">{d.hours}h</p>
-                  <p className="text-[10px] text-amber-600 font-medium">Gestempelt</p>
-                </div>
-              </div>
-
-              {/* Termine als Wochenansicht */}
-              {d.appointments.length > 0 ? (() => {
-                const days = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-                const fullDays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-                const byDay: Record<string, any[]> = {};
-                for (const a of d.appointments) {
-                  const date = new Date(a.start_time);
-                  const key = date.toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
-                  if (!byDay[key]) byDay[key] = [];
-                  byDay[key].push(a);
-                }
-                const sortedDays = Object.entries(byDay).sort((a, b) => {
-                  const dateA = new Date(a[1][0].start_time).getTime();
-                  const dateB = new Date(b[1][0].start_time).getTime();
-                  return dateA - dateB;
-                });
-                return (
-                  <div className="space-y-2">
-                    {sortedDays.map(([day, appts]) => {
-                      const isToday = new Date(appts[0].start_time).toDateString() === new Date().toDateString();
-                      return (
-                        <div key={day} className={`rounded-xl border ${isToday ? "border-red-200 bg-red-50/30" : "border-gray-100"}`}>
-                          <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-red-600" : "text-muted-foreground"} border-b ${isToday ? "border-red-100" : "border-gray-100"}`}>
-                            {day}{isToday ? " · Heute" : ""}
-                          </div>
-                          <div className="divide-y divide-gray-50">
-                            {appts.map((a: any, i: number) => (
-                              <Link key={i} href={a.job_id ? `/auftraege/${a.job_id}` : "#"}>
-                                <div className="flex items-center justify-between px-3 py-2 hover:bg-gray-50/50 transition-colors">
-                                  <div className="min-w-0">
-                                    <span className={`font-medium text-sm ${a.is_done ? "line-through text-muted-foreground" : ""}`}>{a.title}</span>
-                                    {a.job?.title && <span className="text-xs text-blue-600 ml-2">→ {a.job.title}</span>}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">
-                                    {new Date(a.start_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
-                                    {a.end_time ? ` – ${new Date(a.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}
-                                  </span>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })() : d.hours === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-2">Keine Einsätze in diesem Zeitraum</p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-2">
-      {[1, 2, 3].map((i) => (
-        <Card key={i} className="animate-pulse bg-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-gray-200" />
-              <div className="space-y-2 flex-1">
-                <div className="h-4 bg-gray-200 rounded w-1/3" />
-                <div className="h-3 bg-gray-100 rounded w-1/4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// === Helper Functions ===
-
-function formatTime(date: string) {
-  return new Date(date).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("de-CH", { weekday: "short", day: "2-digit", month: "2-digit" });
-}
-
-function formatDuration(clockIn: string, clockOut: string, breakMin: number) {
-  const diff = new Date(clockOut).getTime() - new Date(clockIn).getTime() - breakMin * 60000;
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  return `${h}h ${m}m`;
 }

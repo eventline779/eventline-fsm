@@ -1,234 +1,374 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Customer, Location, Profile, JobPriority } from "@/types";
-import { ArrowLeft, Save, UserCheck, Users } from "lucide-react";
+import {
+  AuftragFormFields,
+  type AuftragFormState,
+  type Customer,
+  type Location,
+  type Room,
+  todayLocalISO,
+} from "@/components/auftrag-form-fields";
+import { Save, FileEdit, Paperclip, X } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
+import { scrollToError } from "@/lib/scroll-to-error";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
+import { JobNumber } from "@/components/job-number";
+import { popFormDraft, saveFormDraft } from "@/lib/form-resume";
+import { validateFileList } from "@/lib/file-upload";
+import { logError } from "@/lib/log";
 
-export default function NeuerAuftragPage() {
+const RETURN_PATH = "/auftraege/neu";
+
+function NeuerAuftragPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const [saving, setSaving] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [form, setForm] = useState({
+  // Aus Instandhaltung kommend: Titel/Location/Veranstalter-Kontakt fallen
+  // weg, "Als Entwurf"-Pfad ebenfalls — eine technische Arbeit am Standort
+  // soll nicht als Vermarktungs-Entwurf parkiert werden.
+  const fromMaintenance = !!searchParams.get("from_maintenance");
+  const [saving, setSaving] = useState<"draft" | "create" | null>(null);
+  const [customers, setCustomers] = useState<Customer[] | null>(null);
+  const [locations, setLocations] = useState<Location[] | null>(null);
+  const [rooms, setRooms] = useState<Room[] | null>(null);
+  const [nextJobNumber, setNextJobNumber] = useState<number | null>(null);
+  // Stage-Uploads: Dateien werden client-seitig gehalten und erst NACH der
+  // Job-Insertion (wenn die ID feststeht) zur Storage hochgeladen.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  const [form, setForm] = useState<AuftragFormState>({
+    job_type: "location",
     title: searchParams.get("title") || "",
     description: searchParams.get("description") || "",
-    priority: "normal" as JobPriority,
-    customer_id: searchParams.get("customer_id") || "",
     location_id: searchParams.get("location_id") || "",
-    project_lead_id: "",
+    customer_id: searchParams.get("customer_id") || "",
+    external_address: "",
+    room_id: "",
     start_date: "",
     end_date: "",
-    notes: "",
+    urgent: false,
+    contact_person: "",
+    contact_phone: "",
+    contact_email: "",
   });
-  const [assignedTechnicians, setAssignedTechnicians] = useState<string[]>([]);
+
+  // Draft-Restore wenn von /kunden/neu zurueckkommend
+  useEffect(() => {
+    const newCustomerId = searchParams.get("customerId");
+    if (!newCustomerId) return;
+    const draft = popFormDraft<AuftragFormState>(RETURN_PATH);
+    if (draft) {
+      setForm({ ...draft, customer_id: newCustomerId, job_type: "extern" });
+    } else {
+      setForm((p) => ({ ...p, customer_id: newCustomerId, job_type: "extern" }));
+    }
+    router.replace(RETURN_PATH, { scroll: false });
+  }, [searchParams, router]);
+
+  function startCreateCustomer(query: string) {
+    saveFormDraft<AuftragFormState>(RETURN_PATH, form);
+    router.push(`/kunden/neu?prefillName=${encodeURIComponent(query)}&return=${encodeURIComponent(RETURN_PATH)}`);
+  }
 
   useEffect(() => {
     async function loadData() {
-      const [custRes, locRes, profRes] = await Promise.all([
-        supabase.from("customers").select("*").eq("is_active", true).order("name"),
-        supabase.from("locations").select("*").eq("is_active", true).order("name"),
-        supabase.from("profiles").select("*").eq("is_active", true).order("full_name"),
+      const [custRes, locRes, roomRes, maxRes] = await Promise.all([
+        supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
+        supabase
+          .from("locations")
+          .select("id, name, address_street, address_zip, address_city")
+          .eq("is_active", true)
+          .order("name"),
+        supabase
+          .from("rooms")
+          .select("id, name, address_street, address_zip, address_city")
+          .eq("is_active", true)
+          .order("name"),
+        supabase
+          .from("jobs")
+          .select("job_number")
+          .not("job_number", "is", null)
+          .order("job_number", { ascending: false })
+          .limit(1),
       ]);
-      if (custRes.data) setCustomers(custRes.data as Customer[]);
-      if (locRes.data) setLocations(locRes.data as Location[]);
-      if (profRes.data) setProfiles(profRes.data as Profile[]);
+      setCustomers((custRes.data as Customer[]) ?? []);
+      setLocations((locRes.data as Location[]) ?? []);
+      setRooms((roomRes.data as Room[]) ?? []);
+      const maxRow = maxRes.data?.[0] as { job_number: number } | undefined;
+      setNextJobNumber(maxRow?.job_number ? maxRow.job_number + 1 : 26200);
     }
     loadData();
   }, []);
 
-  function update(field: string, value: string) {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      // Wenn Kunde gewählt wird und kein Standort gesetzt ist → Standort des Kunden nehmen
-      if (field === "customer_id" && value && !prev.location_id) {
-        const match = locations.find((l) => l.customer_id === value);
-        if (match) next.location_id = match.id;
+  // Validate liefert sowohl die Fehlermeldung als auch die ID des Feldes
+  // — damit der submit-Handler beim Fehler an die richtige Stelle scrollen
+  // kann (Form ist mehrere Bildschirme lang, Toast allein wird leicht
+  // uebersehen).
+  function validate(target: "draft" | "create"): { error: string; field?: string } | null {
+    if (!form.title.trim()) return { error: "Titel ist Pflicht", field: "title" };
+    if (target === "draft") {
+      if (form.start_date && form.end_date && form.end_date < form.start_date) {
+        return { error: "Enddatum darf nicht vor dem Startdatum liegen", field: "end_date" };
       }
-      return next;
-    });
+      return null;
+    }
+    if (form.job_type === "location" && !form.location_id) {
+      return { error: "Bitte eine Location auswählen", field: "location_id" };
+    }
+    if (form.job_type === "extern") {
+      if (!form.customer_id) return { error: "Bitte einen Kunden auswählen", field: "customer_id" };
+      if (!form.external_address.trim()) return { error: "Bitte einen Ort angeben", field: "external_address" };
+    }
+    if (form.job_type === "location" && !fromMaintenance) {
+      if (!form.contact_person.trim()) return { error: "Bitte Ansprechperson angeben", field: "contact_person" };
+      if (!form.contact_phone.trim()) return { error: "Bitte Telefon der Ansprechperson angeben", field: "contact_phone" };
+    }
+    if (!form.start_date) return { error: "Bitte Startdatum angeben", field: "start_date" };
+    if (!form.end_date) return { error: "Bitte Enddatum angeben", field: "end_date" };
+    const todayStr = todayLocalISO();
+    if (form.start_date < todayStr) return { error: "Startdatum darf nicht in der Vergangenheit liegen", field: "start_date" };
+    if (form.end_date < todayStr) return { error: "Enddatum darf nicht in der Vergangenheit liegen", field: "end_date" };
+    if (form.end_date < form.start_date) {
+      return { error: "Enddatum darf nicht vor dem Startdatum liegen", field: "end_date" };
+    }
+    return null;
   }
 
-  function toggleTechnician(id: string) {
-    setAssignedTechnicians((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    );
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (form.start_date && form.end_date && form.end_date < form.start_date) {
-      toast.error("Enddatum darf nicht vor dem Startdatum liegen");
+  async function submit(target: "draft" | "create") {
+    const err = validate(target);
+    if (err) {
+      toast.error(err.error);
+      scrollToError(err.field);
       return;
     }
+    setSaving(target);
 
-    setSaving(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { data: job, error } = await supabase.from("jobs").insert({
-      title: form.title,
-      description: form.description || null,
-      status: "entwurf",
-      priority: form.priority,
-      customer_id: form.customer_id,
-      location_id: form.location_id || null,
-      project_lead_id: form.project_lead_id || null,
+    const payload = {
+      job_type: form.job_type,
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      status: target === "draft" ? "entwurf" : "offen",
+      priority: form.urgent ? "dringend" : "normal",
+      customer_id: form.job_type === "extern" && form.customer_id ? form.customer_id : null,
+      location_id: form.job_type === "location" && form.location_id ? form.location_id : null,
+      room_id: form.job_type === "extern" && form.room_id ? form.room_id : null,
+      external_address: form.job_type === "extern" ? form.external_address.trim() || null : null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      notes: form.notes || null,
+      // Kontakt-Felder bleiben im Form-State (UX-Recovery), werden aber
+      // bei extern-Auftraegen NICHT persistiert — der Customer ist dort
+      // selber der Kontakt.
+      contact_person: form.job_type === "location" ? (form.contact_person.trim() || null) : null,
+      contact_phone:  form.job_type === "location" ? (form.contact_phone.trim()  || null) : null,
+      contact_email:  form.job_type === "location" ? (form.contact_email.trim()  || null) : null,
       created_by: user?.id,
-    }).select("id").single();
+    };
 
-    if (error) {
-      toast.error("Fehler: " + error.message);
-      setSaving(false);
+    const { data: inserted, error } = await supabase
+      .from("jobs")
+      .insert(payload)
+      .select("id, job_number")
+      .single();
+
+    if (error || !inserted) {
+      TOAST.supabaseError(error, "Auftrag konnte nicht angelegt werden");
+      setSaving(null);
       return;
     }
 
-    // Techniker zuweisen
-    if (job && assignedTechnicians.length > 0) {
-      await supabase.from("job_assignments").insert(
-        assignedTechnicians.map((pid) => ({ job_id: job.id, profile_id: pid }))
-      );
+    // Wenn der Auftrag aus einer Instandhaltungsarbeit erstellt wurde,
+    // verknuepfen wir hier zurueck. Sobald der Auftrag spaeter abgeschlossen
+    // wird, gilt die Instandhaltung als erledigt.
+    const fromMaintenance = searchParams.get("from_maintenance");
+    if (fromMaintenance) {
+      await supabase.from("maintenance_tasks").update({ job_id: inserted.id }).eq("id", fromMaintenance);
     }
 
-    toast.success("Auftrag erfolgreich erstellt");
-    router.push("/auftraege");
+    // Stage-Files hochladen falls vorhanden — Fehler werden gesammelt und
+    // dem User danach als Toast angezeigt, der Job-Insert ist schon durch.
+    const uploadFails: string[] = [];
+    if (pendingFiles.length > 0 && user) {
+      for (const file of pendingFiles) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `jobs/${inserted.id}/${Date.now()}_${safeName}`;
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("path", path);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const json = await res.json();
+          if (!json.success) {
+            logError("auftrag.neu.upload", json.error, { fileName: file.name });
+            uploadFails.push(file.name);
+            continue;
+          }
+          await supabase.from("documents").insert({
+            name: file.name,
+            storage_path: path,
+            file_size: file.size,
+            mime_type: file.type,
+            job_id: inserted.id,
+            uploaded_by: user.id,
+          });
+        } catch (err) {
+          logError("auftrag.neu.upload", err, { fileName: file.name });
+          uploadFails.push(file.name);
+        }
+      }
+    }
+    if (uploadFails.length > 0) {
+      const list = uploadFails.length <= 3
+        ? uploadFails.join(", ")
+        : `${uploadFails.slice(0, 3).join(", ")} +${uploadFails.length - 3} weitere`;
+      toast.error(`${uploadFails.length} Datei(en) konnten nicht hochgeladen werden: ${list}. Du kannst sie nachträglich auf der Detail-Seite hochladen.`, {
+        duration: 8000,
+      });
+    }
+
+    if (target === "draft") {
+      toast.success(`Entwurf INT-${inserted.job_number} gespeichert`);
+      router.push("/auftraege");
+    } else {
+      toast.success(`Auftrag INT-${inserted.job_number} erstellt`, {
+        duration: 5000,
+        action: {
+          label: "Rückgängig",
+          onClick: async () => {
+            const { data: updated, error: delErr } = await supabase
+              .from("jobs")
+              .update({ is_deleted: true })
+              .eq("id", inserted.id)
+              .select("id");
+            if (delErr || !updated || updated.length === 0) {
+              toast.error("Konnte nicht rückgängig gemacht werden");
+              return;
+            }
+            toast.success(`INT-${inserted.job_number} verworfen`);
+            window.dispatchEvent(new Event("jobs:invalidate"));
+          },
+        },
+      });
+      router.push("/auftraege");
+    }
   }
 
-  const priorities: { value: JobPriority; label: string; color: string }[] = [
-    { value: "niedrig", label: "Niedrig", color: "border-gray-200 bg-gray-50 text-gray-600" },
-    { value: "normal", label: "Normal", color: "border-blue-200 bg-blue-50 text-blue-700" },
-    { value: "hoch", label: "Hoch", color: "border-orange-200 bg-orange-50 text-orange-700" },
-    { value: "dringend", label: "Dringend", color: "border-red-200 bg-red-50 text-red-700" },
-  ];
-
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/auftraege"><button className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button></Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Neuer Auftrag</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Auftrag erstellen und zuweisen</p>
-        </div>
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <BackButton fallbackHref="/auftraege" size="sm" />
+        {nextJobNumber ? (
+          <JobNumber number={nextJobNumber} size="xl" />
+        ) : (
+          <span className="font-mono text-xl font-semibold text-muted-foreground">INT-…</span>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Titel & Beschreibung */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Auftrag</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="title">Titel *</Label>
-              <Input id="title" placeholder="z.B. Licht & Ton Setup Konzert" value={form.title} onChange={(e) => update("title", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" required />
-            </div>
-            <div>
-              <Label>Beschreibung</Label>
-              <textarea placeholder="Details zum Auftrag..." value={form.description} onChange={(e) => update("description", e.target.value)} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={3} />
-            </div>
-          </CardContent>
-        </Card>
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit("create");
+        }}
+        className="rounded-xl border bg-card p-5 space-y-5"
+      >
+        <AuftragFormFields
+          form={form}
+          onChange={setForm}
+          customers={customers}
+          locations={locations}
+          rooms={rooms}
+          onCreateCustomer={startCreateCustomer}
+          fromMaintenance={fromMaintenance}
+        />
 
-        {/* Priorität */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Priorität</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-4 gap-2">
-              {priorities.map((p) => (
-                <button key={p.value} type="button" onClick={() => update("priority", p.value)} className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${form.priority === p.value ? p.color + " border-current" : "border-gray-100 bg-gray-50 text-gray-400"}`}>{p.label}</button>
+        <hr className="border-border/50" />
+
+        {/* Dokumente — werden nach dem Speichern unter dem neuen Auftrag
+            in Storage hochgeladen + als documents-Row registriert. */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dokumente</p>
+          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors cursor-pointer">
+            <Paperclip className="h-4 w-4" />
+            Dateien auswählen…
+            <input
+              type="file"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                const fs = e.target.files;
+                if (!fs || fs.length === 0) return;
+                const validated = validateFileList(fs);
+                if (validated) setPendingFiles((prev) => [...prev, ...validated]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {pendingFiles.length > 0 && (
+            <ul className="space-y-1">
+              {pendingFiles.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 text-sm bg-muted/20 px-3 py-1.5 rounded-lg">
+                  <span className="truncate flex-1">{f.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    aria-label="Entfernen"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+            </ul>
+          )}
+        </div>
 
-        {/* Kunde & Standort */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Kunde & Standort</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Kunde *</Label>
-              <select value={form.customer_id} onChange={(e) => update("customer_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" required>
-                <option value="">Kunde auswählen...</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {customers.length === 0 && <p className="text-xs text-muted-foreground mt-1">Noch keine Kunden. <Link href="/kunden/neu" className="text-red-600 hover:underline">Jetzt erstellen</Link></p>}
-            </div>
-            <div>
-              <Label>Standort</Label>
-              <select value={form.location_id} onChange={(e) => update("location_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500">
-                <option value="">Standort auswählen (optional)...</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Projektleiter & Techniker */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Team</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="flex items-center gap-2"><UserCheck className="h-4 w-4" />Projektleiter</Label>
-              <select value={form.project_lead_id} onChange={(e) => update("project_lead_id", e.target.value)} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500">
-                <option value="">Projektleiter auswählen...</option>
-                {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="flex items-center gap-2"><Users className="h-4 w-4" />Techniker zuweisen</Label>
-              <div className="mt-2 space-y-2">
-                {profiles.map((p) => (
-                  <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${assignedTechnicians.includes(p.id) ? "border-red-200 bg-red-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}>
-                    <input type="checkbox" checked={assignedTechnicians.includes(p.id)} onChange={() => toggleTechnician(p.id)} className="rounded border-gray-300 text-red-600 focus:ring-red-500" />
-                    <div className="h-8 w-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold">{p.full_name.charAt(0)}</div>
-                    <div>
-                      <span className="text-sm font-medium">{p.full_name}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Datum */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Zeitraum</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Startdatum</Label><Input type="date" value={form.start_date} onChange={(e) => update("start_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
-              <div><Label>Enddatum</Label><Input type="date" value={form.end_date} onChange={(e) => update("end_date", e.target.value)} className="mt-1.5 bg-gray-50 border-gray-200" /></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Notizen */}
-        <Card className="bg-white">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Notizen</CardTitle></CardHeader>
-          <CardContent>
-            <textarea placeholder="Interne Notizen..." value={form.notes} onChange={(e) => update("notes", e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" rows={3} />
-          </CardContent>
-        </Card>
-
+        {/* Buttons */}
         <div className="flex gap-3 pt-2">
-          <Link href="/auftraege" className="flex-1"><Button type="button" variant="outline" className="w-full">Abbrechen</Button></Link>
-          <Button type="submit" disabled={!form.title || !form.customer_id || saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-            <Save className="h-4 w-4 mr-2" />{saving ? "Speichern..." : "Auftrag erstellen"}
-          </Button>
+          <Link
+            href="/auftraege"
+            className="kasten kasten-muted flex-1"
+          >
+            Abbrechen
+          </Link>
+          <button
+            type="button"
+            disabled={saving !== null || fromMaintenance}
+            onClick={() => submit("draft")}
+            className="kasten kasten-purple flex-1"
+            data-tooltip={fromMaintenance ? "Instandhaltungs-Aufträge werden direkt erstellt, nicht als Entwurf gespeichert" : undefined}
+          >
+            <FileEdit className="h-3.5 w-3.5" />
+            {saving === "draft" ? "Speichert…" : "Als Entwurf"}
+          </button>
+          <button
+            type="submit"
+            disabled={saving !== null}
+            className="kasten kasten-red flex-1"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {saving === "create" ? "Speichert…" : "Auftrag erstellen"}
+          </button>
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NeuerAuftragPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-muted-foreground">Laden…</div>}>
+      <NeuerAuftragPageContent />
+    </Suspense>
   );
 }

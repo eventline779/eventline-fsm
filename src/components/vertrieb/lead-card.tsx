@@ -1,0 +1,137 @@
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Trash2, Mail, Phone, Calendar, PartyPopper, Check, AlertTriangle } from "lucide-react";
+import type { VertriebContact } from "@/types";
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, KATEGORIE_OPTIONS, STEPS } from "@/app/(app)/vertrieb/constants";
+
+interface Props {
+  contact: VertriebContact;
+  onClick: (contact: VertriebContact) => void;
+  onDelete: (id: string) => void;
+  /** Wenn false: Delete-Button im Hover wird nicht gerendert. */
+  canDelete?: boolean;
+}
+
+export function LeadCard({ contact: c, onClick, onDelete, canDelete = true }: Props) {
+  const statusConf = STATUS_OPTIONS.find((s) => s.value === c.status)!;
+  const prioConf = PRIORITY_OPTIONS.find((p) => p.value === c.prioritaet)!;
+  const katConf = KATEGORIE_OPTIONS.find((o) => o.value === c.kategorie);
+  const KatIcon = katConf?.icon;
+  const currentStepNr = c.step || 1;
+  const stepLabel = STEPS.find((s) => s.nr === currentStepNr)?.label || "";
+  const isGewonnen = c.status === "gewonnen";
+  const isVerloren = c.status === "abgesagt";
+  // Job-Nummer + Event-Datum ermitteln
+  let jobNumber: number | null = null;
+  let eventStart: string | null = null;
+  let eventEnd: string | null = null;
+  try {
+    const parsed = JSON.parse(c.notizen || "{}");
+    jobNumber = parsed._details?.job_number || null;
+    eventStart = parsed._details?.event_start || null;
+    eventEnd = parsed._details?.event_end || null;
+  } catch {}
+
+  return (
+    <Card
+      onClick={() => onClick(c)}
+      className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 group relative ${
+        isGewonnen ? "bg-green-50 border-green-200" :
+        isVerloren ? "bg-red-50/60 border-red-200 opacity-70" :
+        "bg-card"
+      }`}
+    >
+      <CardContent className="p-4">
+        {/* Top row: Number, Firma, Category */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] font-mono text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">LEAD-{String(c.nr).padStart(4, "0")}</span>
+              {katConf && KatIcon && (
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border ${katConf.color}`}>
+                  <KatIcon className="h-2.5 w-2.5" />
+                  {c.kategorie === "verwaltung" ? "Verwaltung" : "Event"}
+                </span>
+              )}
+            </div>
+            <h3 className="font-semibold text-[15px] leading-tight truncate">{c.firma}</h3>
+            {c.branche && <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.branche}</p>}
+          </div>
+          {canDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
+              className="icon-btn icon-btn-red opacity-0 group-hover:opacity-100"
+              data-tooltip="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Contact info */}
+        {(c.ansprechperson || c.email || c.telefon) && (
+          <div className="space-y-0.5 mb-3 pb-3 border-b border-gray-100">
+            {c.ansprechperson && (
+              <p className="text-xs text-gray-700 truncate">{c.ansprechperson}{c.position ? ` · ${c.position}` : ""}</p>
+            )}
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
+              {c.email && <a onClick={(e) => e.stopPropagation()} href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-blue-600 truncate max-w-[180px]"><Mail className="h-3 w-3 shrink-0" /><span className="truncate">{c.email}</span></a>}
+              {c.telefon && <a onClick={(e) => e.stopPropagation()} href={`tel:${c.telefon}`} className="flex items-center gap-1 hover:text-blue-600"><Phone className="h-3 w-3" />{c.telefon}</a>}
+            </div>
+          </div>
+        )}
+
+        {/* Event-Datum */}
+        {eventStart && (
+          <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
+            <PartyPopper className="h-3.5 w-3.5 shrink-0" />
+            {new Date(eventStart).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}
+            {eventEnd && eventEnd !== eventStart && ` – ${new Date(eventEnd).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}`}
+          </div>
+        )}
+
+        {/* Step progress bar */}
+        {!isGewonnen && !isVerloren && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Schritt {currentStepNr}/4</span>
+              <span className="text-[10px] text-gray-500">{stepLabel}</span>
+            </div>
+            <div className="flex gap-1">
+              {STEPS.map((s) => (
+                <div key={s.nr} className={`flex-1 h-1.5 rounded-full ${s.nr <= currentStepNr ? "bg-blue-500" : "bg-gray-200"}`} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Won/Lost Banner */}
+        {isGewonnen && (
+          <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-green-100 text-green-800 text-xs font-medium">
+            <Check className="h-3.5 w-3.5" />
+            Gewonnen{jobNumber ? ` · INT-${jobNumber}` : ""}
+          </div>
+        )}
+        {isVerloren && (
+          <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-100 text-red-800 text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Verloren{c.verloren_grund ? `: ${c.verloren_grund}` : ""}
+          </div>
+        )}
+
+        {/* Status + Priority als Badges (nicht editierbar) */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${statusConf.color}`}>{statusConf.label}</span>
+          <span className={`text-[11px] font-medium px-2 py-1 rounded-md border ${prioConf.color}`}>{prioConf.label}</span>
+          {c.datum_kontakt && (
+            <span className="ml-auto text-[10px] text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-2.5 w-2.5" />
+              {(() => { const [y,m,d] = c.datum_kontakt!.split("-").map(Number); return new Date(y, m-1, d, 12).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }); })()}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

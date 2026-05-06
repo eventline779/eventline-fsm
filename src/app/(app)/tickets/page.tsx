@@ -1,399 +1,357 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+/**
+ * Tickets-Listenseite.
+ *
+ * Vier Typen (it, beleg, stempel_aenderung, material), drei Status
+ * (offen, erledigt, abgelehnt). RLS sortiert: Mitarbeiter sehen ihre
+ * eigenen + die ihnen zugewiesenen, Admins sehen alles.
+ *
+ * Layout 1:1 wie /auftraege /todos: Header + Filter-Bar + Cards.
+ */
+
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Profile } from "@/types";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/searchable-select";
+import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import {
-  Plus, Ticket, ShoppingCart, Monitor, Wrench, HelpCircle,
-  ArrowLeft, Upload, FileText, Image as ImageIcon, Trash2, Download, X, Send, Check,
+  Plus, Search, Ticket as TicketIcon, Wrench, Receipt, Clock, Package,
 } from "lucide-react";
-import { toast } from "sonner";
+import type { TicketWithRelations, TicketType, TicketStatus } from "@/types";
 
-interface TicketItem {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  created_by: string;
-  created_at: string;
-  attachments?: { name: string; path: string; uploaded_at: string }[];
-}
+type FilterStatus = "alle" | TicketStatus;
+type FilterType = "alle" | TicketType;
 
-const CATEGORIES = [
-  { value: "bestellung", label: "Bestellung", icon: ShoppingCart, color: "bg-blue-50 text-blue-600" },
-  { value: "it", label: "IT-Problem", icon: Monitor, color: "bg-red-50 text-red-600" },
-  { value: "reparatur", label: "Reparatur", icon: Wrench, color: "bg-orange-50 text-orange-600" },
-  { value: "sonstiges", label: "Sonstiges", icon: HelpCircle, color: "bg-gray-100 text-gray-600" },
-];
+// Tickets gelten als 'archiviert' wenn sie erledigt/abgelehnt sind UND
+// das vor mehr als 14 Tagen passiert ist. Nur dann werden sie aus der
+// aktiven Liste ausgeblendet.
+const ARCHIVE_AFTER_DAYS = 14;
+
+// Cursor-Pagination — 100 Rows pro Page, "Mehr laden"-Button am Ende.
+// Bei 100 Mitarbeitern × ~5 Tickets/Monat ueberschreitet die Liste die
+// 500-Bound aus Phase D nach knapp einem Jahr — hier dann sauber paginiert.
+const PAGE_SIZE = 100;
+
+const TYPE_META: Record<TicketType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
+  it:               { label: "IT-Problem",        icon: Wrench,  color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/15" },
+  beleg:            { label: "Beleg",              icon: Receipt, color: "text-amber-600  dark:text-amber-400  bg-amber-50  dark:bg-amber-500/15"  },
+  stempel_aenderung:{ label: "Stempel-Änderung",  icon: Clock,   color: "text-green-600  dark:text-green-400  bg-green-50  dark:bg-green-500/15"  },
+  material:         { label: "Material",          icon: Package, color: "text-red-600    dark:text-red-400    bg-red-50    dark:bg-red-500/15"    },
+};
+
+const STATUS_META: Record<TicketStatus, { label: string; classes: string }> = {
+  offen:     { label: "Offen",     classes: "bg-blue-100  text-blue-700  dark:bg-blue-500/20  dark:text-blue-300"  },
+  erledigt:  { label: "Erledigt",  classes: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
+  abgelehnt: { label: "Abgelehnt", classes: "bg-red-100   text-red-700   dark:bg-red-500/20   dark:text-red-300"   },
+};
 
 export default function TicketsPage() {
-  const [tickets, setTickets] = useState<TicketItem[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", category: "bestellung", priority: "normal" });
-  const [sending, setSending] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<TicketItem | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
+  const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchNumber, setSearchNumber] = useState("");
+  const [searchTitle, setSearchTitle] = useState("");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("offen");
+  const [filterType, setFilterType] = useState<FilterType>("alle");
+  const [showNew, setShowNew] = useState(false);
+  const { can } = usePermissions();
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, []);
+  // Eigene User-ID laden — wird fuer den "Nur meine"-Filter gebraucht.
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+    })();
+  }, [supabase]);
 
-  async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser();
-    const [profRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("is_active", true),
-    ]);
-    if (profRes.data) {
-      setProfiles(profRes.data as Profile[]);
-      const me = (profRes.data as Profile[]).find((p) => p.id === user?.id);
-      if (me?.role === "admin") {
-        setIsAdmin(true);
-        const { data: ticketsData } = await supabase.from("tickets").select("*").order("created_at", { ascending: false });
-        if (ticketsData) setTickets(ticketsData as unknown as TicketItem[]);
-      }
-    }
-  }
+  // Query-Builder — beide Loader-Pfade (initial + load-more) bauen die
+  // gleiche Query mit unterschiedlichem Cursor.
+  // Cursor ist Composite (created_at, id) damit Tickets mit identischem
+  // created_at (Bulk-Imports, KI-Analyse-Massenanlagen) deterministisch
+  // sortiert werden und nichts in der naechsten Page durchrutscht.
+  const buildQuery = useCallback((cursor: { ts: string; id: string } | null) => {
+    let q = supabase
+      .from("tickets")
+      .select(`
+        *,
+        creator:profiles!created_by(full_name),
+        assignee:profiles!assigned_to(full_name),
+        resolver:profiles!resolved_by(full_name),
+        attachments:ticket_attachments(id, filename, storage_path, mime_type)
+      `)
+      // Belege leben jetzt auf /abrechnung — aus der Tickets-Liste raus,
+      // damit IT/Material/Stempel-Tickets nicht mit Buchhaltungs-Krempel
+      // gemischt sind.
+      .neq("type", "beleg")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      // PAGE_SIZE+1: der "(n+1)-Trick" → wenn wir 101 zurueckkriegen,
+      // wissen wir es gibt mindestens eine weitere Page, ohne extra
+      // count-Query zu machen.
+      .limit(PAGE_SIZE + 1);
 
-  function getProfileName(id: string) {
-    return profiles.find((p) => p.id === id)?.full_name || "Unbekannt";
-  }
-
-  async function createTicket(e: React.FormEvent) {
-    e.preventDefault();
-    setSending(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const profile = profiles.find((p) => p.id === user?.id);
-
-    // Save to DB
-    const { data, error } = await supabase.from("tickets").insert({
-      title: form.title,
-      description: form.description,
-      category: form.category,
-      priority: form.priority,
-      created_by: user?.id,
-    }).select().single();
-
-    if (error) {
-      // Table might not exist yet, send email anyway
-    }
-
-    // Push-Benachrichtigung an Leo + Mischa
-    const notifyEmails = form.category === "bestellung"
-      ? ["leo@eventline-basel.com", "mischa@eventline-basel.com"]
-      : ["mischa@eventline-basel.com"];
-    const { data: admins } = await supabase.from("profiles").select("id").in("email", notifyEmails);
-    if (admins && admins.length > 0) {
-      await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userIds: admins.map((a: any) => a.id),
-          title: `${form.priority === "dringend" ? "🚨 " : ""}Neues Ticket: ${form.title}`,
-          message: `Von ${profile?.full_name || "Unbekannt"} · ${form.category === "bestellung" ? "Bestellung" : form.category === "it" ? "IT-Problem" : form.category === "reparatur" ? "Reparatur" : "Sonstiges"}`,
-          link: "/tickets",
-        }),
-      });
+    if (cursor !== null) {
+      // Composite-Cursor: lt(created_at) ODER (eq(created_at) AND lt(id))
+      q = q.or(`created_at.lt.${cursor.ts},and(created_at.eq.${cursor.ts},id.lt.${cursor.id})`);
     }
 
-    // E-Mail an Mischa (+ Leo bei Bestellungen)
-    await fetch("/api/tickets/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: form.title,
-        description: form.description,
-        category: form.category,
-        priority: form.priority,
-        reporter: profile?.full_name || "Unbekannt",
-        reporterEmail: profile?.email,
-      }),
-    });
+    // Im Archiv-Modus den Status-Filter ignorieren — archivierte Tickets sind
+    // per Definition NICHT "offen" (nur erledigt/abgelehnt nach 14 Tagen).
+    if (!showArchive && filterStatus !== "alle") q = q.eq("status", filterStatus);
+    if (filterType !== "alle") q = q.eq("type", filterType);
+    if (showOnlyMine && currentUserId) q = q.eq("created_by", currentUserId);
 
-    toast.success("Ticket erstellt");
-    setForm({ title: "", description: "", category: "bestellung", priority: "normal" });
-    setShowForm(false);
-    setSending(false);
-    if (!isAdmin) setSubmitted(true);
-    loadData();
-  }
-
-  async function deleteTicket(id: string) {
-    if (!confirm("Ticket wirklich löschen?")) return;
-    await supabase.from("tickets").delete().eq("id", id);
-    setSelectedTicket(null);
-    loadData();
-    toast.success("Ticket gelöscht");
-  }
-
-  async function completeTicket(ticket: TicketItem) {
-    if (!confirm("Ticket als erledigt markieren? Der Ersteller wird benachrichtigt.")) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const me = profiles.find((p) => p.id === user?.id);
-    try {
-      const res = await fetch("/api/tickets/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticketId: ticket.id,
-          ticketTitle: ticket.title,
-          createdBy: ticket.created_by,
-          completedBy: me?.full_name || "Unbekannt",
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Ticket erledigt — Ersteller wurde benachrichtigt");
-        setSelectedTicket(null);
-        loadData();
-      } else {
-        toast.error("Fehler: " + (json.error || "Unbekannt"));
-      }
-    } catch {
-      toast.error("Fehler beim Erledigen");
+    // Archive vs Active per Server-Side-Filter — vorher wurden ALLE Rows
+    // geladen und client-seitig gefiltert.
+    const archiveCutoff = new Date(Date.now() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    if (showArchive) {
+      q = q.in("status", ["erledigt", "abgelehnt"]).lt("resolved_at", archiveCutoff);
+    } else {
+      q = q.or(`resolved_at.is.null,resolved_at.gte.${archiveCutoff}`);
     }
-  }
 
-  async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedTicket) return;
-    setUploading(true);
-    const path = `tickets/${selectedTicket.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
-    if (error) { toast.error("Upload fehlgeschlagen"); setUploading(false); e.target.value = ""; return; }
-    const newAttachments = [...(selectedTicket.attachments || []), { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    await supabase.from("tickets").update({ attachments: newAttachments }).eq("id", selectedTicket.id);
-    setSelectedTicket({ ...selectedTicket, attachments: newAttachments });
-    toast.success("Datei hochgeladen");
-    setUploading(false);
-    e.target.value = "";
-    loadData();
-  }
+    const numQ = searchNumber.trim();
+    if (numQ) {
+      const n = parseInt(numQ, 10);
+      if (Number.isFinite(n)) q = q.eq("ticket_number", n);
+    }
+    const titleQ = searchTitle.trim();
+    if (titleQ) {
+      // PostgREST or-Filter parsed Komma als Trennzeichen und Klammern als
+      // Gruppierung. User-Input mit "," oder "(" zerschiesst sonst die Query
+      // (search "ABB, Basel" wuerde unintendend zwei Filter werden).
+      // Loesung: in Double-Quotes wrappen und embedded \"" + \\\\ escapen,
+      // damit PostgREST den ganzen String als einen Wert behandelt.
+      const escaped = titleQ.replace(/[\\"]/g, "\\$&");
+      const like = `"%${escaped}%"`;
+      q = q.or(`title.ilike.${like},description.ilike.${like}`);
+    }
+    return q;
+  }, [supabase, filterStatus, filterType, showOnlyMine, showArchive, currentUserId, searchNumber, searchTitle]);
 
-  async function deleteAttachment(att: { name: string; path: string }) {
-    if (!selectedTicket) return;
-    await supabase.storage.from("documents").remove([att.path]);
-    const newAttachments = (selectedTicket.attachments || []).filter((a) => a.path !== att.path);
-    await supabase.from("tickets").update({ attachments: newAttachments }).eq("id", selectedTicket.id);
-    setSelectedTicket({ ...selectedTicket, attachments: newAttachments });
-    toast.success("Datei gelöscht");
-    loadData();
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await buildQuery(null);
+    const rows = (data as unknown as TicketWithRelations[]) ?? [];
+    setHasMore(rows.length > PAGE_SIZE);
+    setTickets(rows.slice(0, PAGE_SIZE));
+    setLoading(false);
+  }, [buildQuery]);
 
-  function openFile(path: string) {
-    const { data } = supabase.storage.from("documents").getPublicUrl(path);
-    window.open(data.publicUrl, "_blank");
-  }
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || tickets.length === 0) return;
+    setLoadingMore(true);
+    const last = tickets[tickets.length - 1];
+    const { data } = await buildQuery({ ts: last.created_at, id: last.id });
+    const rows = (data as unknown as TicketWithRelations[]) ?? [];
+    setHasMore(rows.length > PAGE_SIZE);
+    setTickets((prev) => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    setLoadingMore(false);
+  }, [buildQuery, loadingMore, hasMore, tickets]);
 
-  const getCat = (val: string) => CATEGORIES.find((c) => c.value === val) || CATEGORIES[3];
+  useEffect(() => {
+    const t = setTimeout(() => { load(); }, 200);
+    return () => clearTimeout(t);
+  }, [load]);
 
-  // Detail view
-  if (selectedTicket) {
-    const cat = getCat(selectedTicket.category);
-    const atts = selectedTicket.attachments || [];
-    return (
-      <div className="space-y-6 max-w-3xl">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setSelectedTicket(null)} className="p-2 rounded-lg hover:bg-white transition-colors"><ArrowLeft className="h-5 w-5" /></button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{selectedTicket.title}</h1>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full ${cat.color}`}>
-                <cat.icon className="h-3 w-3" />{cat.label}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Von {getProfileName(selectedTicket.created_by)} · {new Date(selectedTicket.created_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-            </p>
-          </div>
-        </div>
-
-        <Card className="bg-white">
-          <CardContent className="p-5 space-y-4">
-            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => completeTicket(selectedTicket)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 text-green-700 text-sm font-medium border border-green-200 hover:bg-green-100 transition-colors">
-                <Check className="h-4 w-4" />Als erledigt markieren
-              </button>
-              <button onClick={() => deleteTicket(selectedTicket.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-200 hover:bg-red-100 transition-colors">
-                <Trash2 className="h-4 w-4" />Löschen
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Anhänge */}
-        <Card className="bg-white">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Anhänge ({atts.length})</h2>
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                <Upload className="h-4 w-4 mr-1" />{uploading ? "Hochladen..." : "Datei hochladen"}
-              </Button>
-              <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif" onChange={uploadFile} className="hidden" />
-            </div>
-            <div className="space-y-2">
-              {atts.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Noch keine Anhänge.</p>}
-              {atts.map((a) => {
-                const isImage = /\.(jpg|jpeg|png|gif)$/i.test(a.name);
-                return (
-                  <div key={a.path} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                    <button onClick={() => openFile(a.path)} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:text-blue-600 transition-colors">
-                      {isImage ? <ImageIcon className="h-5 w-5 text-blue-500 shrink-0" /> : <FileText className="h-5 w-5 text-red-500 shrink-0" />}
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{a.name}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(a.uploaded_at).toLocaleDateString("de-CH")}</p>
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <button onClick={() => openFile(a.path)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"><Download className="h-4 w-4" /></button>
-                      <button onClick={() => deleteAttachment(a)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Nicht-Admin: nur Formular + Bestätigung
-  if (!isAdmin && submitted) {
-    return (
-      <div className="space-y-6">
-        <div><h1 className="text-2xl font-bold tracking-tight">Tickets</h1></div>
-        <Card className="bg-white">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
-              <Send className="h-7 w-7 text-green-500" />
-            </div>
-            <h3 className="font-semibold text-lg">Ticket eingereicht</h3>
-            <p className="text-sm text-muted-foreground mt-1">Du bekommst eine E-Mail sobald dein Ticket bearbeitet wurde.</p>
-            <Button onClick={() => { setSubmitted(false); setShowForm(true); }} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />Weiteres Ticket erstellen
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  function formatDate(iso: string): string {
+    // timeZone explizit Europe/Zurich — sonst rendern Mitarbeiter in
+    // anderen TZ den falschen Tag (created_at ist UTC im DB).
+    return new Date(iso).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", year: "2-digit" });
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tickets</h1>
-          <p className="text-sm text-muted-foreground mt-1">{isAdmin ? "Alle Tickets verwalten" : "Bestellungen, IT-Probleme, Reparaturen anfragen"}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            IT-Probleme · Belege · Stempel-Änderungen · Material-Anfragen
+          </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white shadow-sm">
-          {showForm ? <X className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-          {showForm ? "Abbrechen" : "Neues Ticket"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowArchive((v) => !v)}
+            className={showArchive ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Archiv
+          </button>
+          {can("tickets:create") && (
+            <button type="button" onClick={() => setShowNew(true)} className="kasten kasten-red">
+              <Plus className="h-3.5 w-3.5" />Neues Ticket
+            </button>
+          )}
+        </div>
       </div>
 
-      {showForm && (
-        <Card className="bg-white border-red-100">
-          <CardContent className="p-6">
-            <form onSubmit={createTicket} className="space-y-4">
-              {/* Kategorie */}
-              <div>
-                <label className="text-sm font-medium">Kategorie</label>
-                <div className="flex gap-2 mt-1">
-                  {CATEGORIES.map((c) => (
-                    <button key={c.value} type="button" onClick={() => setForm({ ...form, category: c.value })}
-                      className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg border transition-all ${form.category === c.value ? c.color + " border-current" : "bg-white text-gray-500 border-gray-200"}`}>
-                      <c.icon className="h-4 w-4" />{c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Input placeholder="Betreff *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="bg-gray-50" required />
-              <textarea placeholder="Beschreibung – Was wird benötigt? Details, Menge, Link..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20" rows={4} required />
-              <div>
-                <label className="text-sm font-medium">Priorität</label>
-                <div className="flex gap-2 mt-1">
-                  {[{ v: "normal", l: "Normal" }, { v: "dringend", l: "Dringend" }].map((p) => (
-                    <button key={p.v} type="button" onClick={() => setForm({ ...form, priority: p.v })}
-                      className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${form.priority === p.v ? (p.v === "dringend" ? "bg-red-50 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-300") : "bg-white text-gray-500 border-gray-200"}`}>
-                      {p.l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">E-Mail geht an Mischa Dittus & Leo Balaszeskul</p>
-              <div className="flex gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
-                <Button type="submit" disabled={sending} className="bg-red-600 hover:bg-red-700 text-white">
-                  <Send className="h-4 w-4 mr-2" />{sending ? "Senden..." : "Ticket erstellen"}
-                </Button>
-              </div>
-            </form>
+      {/* Filter-Bar */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Suche Nummer */}
+        <div className="relative w-full sm:w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+            T-
+          </span>
+          <Input
+            placeholder="0000"
+            value={searchNumber}
+            onChange={(e) => setSearchNumber(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="pl-[2.4rem] h-9 font-mono bg-card"
+            aria-label="Ticket-Nummer"
+          />
+        </div>
+        {/* Suche Titel */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Titel oder Beschreibung…"
+            value={searchTitle}
+            onChange={(e) => setSearchTitle(e.target.value)}
+            className="pl-9 h-9 bg-card"
+            aria-label="Titel"
+          />
+        </div>
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterStatus}
+            onChange={(v) => setFilterStatus(v as FilterStatus)}
+            items={[
+              { id: "offen", label: "Offen" },
+              { id: "erledigt", label: "Erledigt" },
+              { id: "abgelehnt", label: "Abgelehnt" },
+              { id: "alle", label: "Alle Status" },
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterStatus !== "offen"}
+          />
+        </div>
+        <div className="w-full sm:w-44">
+          <SearchableSelect
+            value={filterType}
+            onChange={(v) => setFilterType(v as FilterType)}
+            items={[
+              { id: "alle", label: "Alle Typen" },
+              { id: "it", label: "IT-Problem" },
+              { id: "stempel_aenderung", label: "Stempel-Änderung" },
+              { id: "material", label: "Material" },
+            ]}
+            searchable={false}
+            clearable={false}
+            active={filterType !== "alle"}
+          />
+        </div>
+        {/* "Nur meine"-Toggle nur fuer User die normalerweise alle Tickets sehen
+            (tickets:manage). Andere sehen via RLS eh nur eigene — der Filter
+            waere redundant. */}
+        {can("tickets:manage") && (
+          <button
+            type="button"
+            onClick={() => setShowOnlyMine((v) => !v)}
+            className={showOnlyMine ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Nur meine
+          </button>
+        )}
+      </div>
+
+      {/* Liste */}
+      {loading ? (
+        <div className="space-y-2">{[1,2,3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4 h-20" /></Card>)}</div>
+      ) : tickets.length === 0 ? (
+        <Card className="bg-card border-dashed">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <TicketIcon className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-lg">Keine Tickets</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {searchNumber || searchTitle || filterType !== "alle" || filterStatus !== "offen" || showArchive
+                ? "Mit den aktuellen Filtern wurde nichts gefunden."
+                : "Erstelle dein erstes Ticket über den Knopf oben."}
+            </p>
           </CardContent>
         </Card>
-      )}
-
-      {/* Ticket List - nur für Admins */}
-      {isAdmin && (
-        tickets.length === 0 && !showForm ? (
-          <Card className="bg-white border-dashed">
-            <CardContent className="py-16 text-center">
-              <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
-              <h3 className="font-semibold text-lg">Keine offenen Tickets</h3>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {tickets.map((t) => {
-              const cat = getCat(t.category);
-              return (
-                <Card key={t.id} className="bg-white hover:shadow-sm transition-all cursor-pointer" onClick={() => { setSelectedTicket(t); }}>
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${cat.color}`}>
-                        <cat.icon className="h-4 w-4" />
+      ) : (
+        <div className="space-y-2">
+          {tickets.map((t) => {
+            const typeMeta = TYPE_META[t.type];
+            const Icon = typeMeta.icon;
+            return (
+              <Link key={t.id} href={`/tickets/${t.id}`} className="block">
+                <Card className="card-hover bg-card">
+                  <CardContent className="px-4 py-1.5 flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${typeMeta.color}`}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[11px] font-semibold text-muted-foreground shrink-0">T-{t.ticket_number}</span>
+                        <span className="font-medium text-sm truncate">{t.title}</span>
+                        <span className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${STATUS_META[t.status].classes}`}>
+                          {STATUS_META[t.status].label}
+                        </span>
+                        {t.priority === "dringend" && (
+                          <span className="inline-flex items-center px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
+                            Dringend
+                          </span>
+                        )}
+                        {t.filed_at && (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 shrink-0"
+                            data-tooltip={t.filed_reference ?? "Abgelegt"}
+                          >
+                            Abgelegt
+                          </span>
+                        )}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{t.title}</span>
-                          {t.priority === "dringend" && <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-600">Dringend</span>}
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                          <span>{getProfileName(t.created_by)}</span>
-                          <span>{new Date(t.created_at).toLocaleDateString("de-CH")}</span>
-                        </div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                        <span>{typeMeta.label}</span>
+                        <span>·</span>
+                        <span>{t.creator?.full_name ?? "—"}</span>
+                        <span>·</span>
+                        <span>{formatDate(t.created_at)}</span>
+                        {t.attachments.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>{t.attachments.length} Anhang{t.attachments.length === 1 ? "" : "e"}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        )
+              </Link>
+            );
+          })}
+          {hasMore && (
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="kasten kasten-muted"
+              >
+                {loadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Nicht-Admin: Info wenn kein Formular offen */}
-      {!isAdmin && !showForm && (
-        <Card className="bg-white border-dashed">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Ticket className="h-7 w-7 text-gray-400" /></div>
-            <h3 className="font-semibold text-lg">Ticket erstellen</h3>
-            <p className="text-sm text-muted-foreground mt-1">Bestellungen, IT-Probleme oder Reparaturen anfragen.</p>
-            <Button onClick={() => setShowForm(true)} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />Neues Ticket
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <NewTicketModal open={showNew} onClose={() => setShowNew(false)} onCreated={load} />
     </div>
   );
 }

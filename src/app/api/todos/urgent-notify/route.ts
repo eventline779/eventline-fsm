@@ -1,8 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireUser } from "@/lib/api-auth";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
   const { assignedTo, title, description, dueDate, creatorName } = await request.json();
 
   const resendKey = process.env.RESEND_API_KEY;
@@ -31,11 +35,11 @@ export async function POST(request: Request) {
     await resend.emails.send({
       from: "EVENTLINE GmbH <noreply@eventline-basel.com>",
       to: profile.email,
-      subject: `🚨 Dringendes Todo: ${title}`,
+      subject: `Dringendes Todo: ${title}`,
       html: `
         <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
           <div style="background:#dc2626;padding:20px 24px;border-radius:12px 12px 0 0">
-            <h2 style="color:white;margin:0;font-size:16px">🚨 Dringendes Todo</h2>
+            <h2 style="color:white;margin:0;font-size:16px">Dringendes Todo</h2>
           </div>
           <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
             <p style="margin:0 0 12px">Hallo ${profile.full_name},</p>
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
             <p style="margin:0 0 16px;color:#666;font-size:14px">Erstellt von: <strong>${creatorName}</strong></p>
 
             <div style="text-align:center;margin:24px 0">
-              <a href="https://eventline-fsm-usyk.vercel.app/todos" style="display:inline-block;background:#dc2626;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
+              <a href="${appUrl("/todos")}" style="display:inline-block;background:#dc2626;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">
                 Todo öffnen
               </a>
             </div>

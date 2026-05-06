@@ -15,8 +15,46 @@ export default function PasswortResetPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Recovery-Token aus dem URL-Hash uebernehmen.
+  //
+  // Supabase's admin-generate_link liefert Recovery-URLs im "implicit
+  // flow"-Format: nach dem Verify-Hop steht im Hash
+  //   #access_token=...&refresh_token=...&type=recovery
+  // Der @supabase/ssr-Browser-Client ist aber per Default fuer PKCE
+  // konfiguriert und greift den Hash nicht zuverlaessig auf — daher
+  // setzen wir die Session hier explizit. Danach Hash aus der URL
+  // raeumen damit der Token nicht in History/Referer leakt.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+
+    if (accessToken && refreshToken) {
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          if (error) {
+            setError("Reset-Link ungültig oder abgelaufen. Bitte neuen Link anfordern.");
+          } else {
+            setSessionReady(true);
+            // Hash aus der URL entfernen — kein Token-Leak in History
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        });
+      return;
+    }
+
+    // Kein Hash → vielleicht hat die Session schon (z.B. Reload nach Fix)
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setSessionReady(true);
+      else setError("Kein gültiger Reset-Link. Bitte den Link aus deiner Mail erneut öffnen.");
+    });
+  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,11 +86,11 @@ export default function PasswortResetPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-white border-0 shadow-2xl">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <Card className="w-full max-w-md border shadow-2xl">
         <CardHeader className="text-center pb-2">
           <div className="mb-4 flex justify-center">
-            <Logo size="lg" variant="dark" />
+            <Logo size="lg" />
           </div>
         </CardHeader>
         <CardContent>
@@ -94,9 +132,9 @@ export default function PasswortResetPage() {
               <Button
                 type="submit"
                 className="w-full bg-red-600 hover:bg-red-700 text-white"
-                disabled={loading}
+                disabled={loading || !sessionReady}
               >
-                {loading ? "Speichern..." : "Passwort ändern"}
+                {loading ? "Speichern..." : !sessionReady ? "Lade…" : "Passwort ändern"}
               </Button>
             </form>
           )}

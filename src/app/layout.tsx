@@ -1,7 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { Comfortaa } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+
+// Comfortaa fuer Ueberschriften — gleicher Font wie auf der Eventline-Website
+const comfortaa = Comfortaa({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-comfortaa",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "EVENTLINE FSM",
@@ -39,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="de" className={`h-full antialiased ${comfortaa.variable}`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col overflow-x-hidden" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <ThemeProvider>
           <Suspense>{children}</Suspense>

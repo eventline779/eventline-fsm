@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,6 +19,10 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  // ?reason=inactive — Login-Page wurde nach Inaktivitaets-Logout angesteuert.
+  // Hinweis fuer den User damit er weiss warum er ausgeloggt wurde.
+  const reason = useSearchParams().get("reason");
+  const wasInactive = reason === "inactive";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -60,17 +64,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-white border-0 shadow-2xl">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <Card className="w-full max-w-md border shadow-2xl">
         <CardHeader className="text-center pb-2">
           <div className="mb-4 flex justify-center">
-            <Logo size="lg" variant="dark" />
+            <Logo size="lg" />
           </div>
           <p className="text-sm text-gray-500">
             Field Service Management
           </p>
         </CardHeader>
         <CardContent>
+          {wasInactive && !resetMode && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2.5 text-xs">
+              <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <div className="text-amber-800 dark:text-amber-200">
+                <strong className="font-semibold">Wegen Inaktivität ausgeloggt.</strong>{" "}
+                Bitte erneut anmelden um weiterzumachen.
+              </div>
+            </div>
+          )}
           {resetMode ? (
             resetSent ? (
               <div className="text-center py-4">

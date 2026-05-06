@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', Monaco, monospace;
-  --font-heading: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-heading: var(--font-comfortaa), 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -73,14 +73,27 @@
   --chart-4: oklch(0.7 0 0);
   --chart-5: oklch(0.85 0 0);
   --radius: 0.5rem;
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
+  /* Light-Mode Sidebar: hell, leicht abgesetzt vom Hintergrund */
+  --sidebar: oklch(0.97 0 0);
+  --sidebar-foreground: oklch(0.18 0 0);
   --sidebar-primary: oklch(0.577 0.245 27.325);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.25 0 0);
+  --sidebar-accent: oklch(0.92 0 0);
+  --sidebar-accent-foreground: oklch(0.18 0 0);
+  --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
+  /* Diagramm-Status-Farben: Jewel-Tone Palette mit Jade-Gruen als Anker */
+  --status-purple: #7c3aed;
+  --status-gray: #64748b;
+  --status-green: #00a86b;
+  --status-red: #dc2626;
+  --status-blue: #2563eb;
+  --status-orange: #ea580c;
+  --status-emerald: #047857;
+  --status-amber: #f59e0b;
+  /* Stempel: bewusst teal (nicht jade-gruen wie status-green) damit
+     "eingestempelt" optisch nicht mit "erledigt" verwechselt werden kann. */
+  --stempel-color: #14b8a6;
 }
 
 .dark {
@@ -115,6 +128,18 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.2 0 0);
   --sidebar-ring: oklch(0.577 0.245 27.325);
+  /* Diagramm-Status-Farben Dark: gleiche Jewel-Tone Palette wie Light */
+  --status-purple: #7c3aed;
+  --status-gray: #64748b;
+  --status-green: #00a86b;
+  --status-red: #dc2626;
+  --status-blue: #2563eb;
+  --status-orange: #ea580c;
+  --status-emerald: #047857;
+  --status-amber: #f59e0b;
+  /* Stempel: bewusst teal (nicht jade-gruen wie status-green) damit
+     "eingestempelt" optisch nicht mit "erledigt" verwechselt werden kann. */
+  --stempel-color: #14b8a6;
 }
 
 @layer base {
@@ -130,6 +155,18 @@
   html {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   }
+  /* Ueberschriften app-weit auf Comfortaa (gleicher Font wie Website) */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+  /* Donut-Segmente: gefuellt mit niedriger Opacity, Optik wie Card-Indikatoren */
+  .donut-segment {
+    fill-opacity: 0.12;
+  }
+  .dark .donut-segment {
+    fill-opacity: 0.18;
+  }
+  /* Donut-Stripe: 2px */
   /* iOS/Safari input Zoom verhindern */
   input, select, textarea {
     font-size: 16px;
@@ -272,4 +309,596 @@
   background: oklch(0.2 0 0) !important;
   border-color: oklch(0.3 0 0) !important;
   color: oklch(0.95 0 0) !important;
+}
+
+/* === Scrollbar — dezent, integriert, schmal === */
+/* Layout-Stabilitaet: Scrollbar IMMER da (auch wenn die Seite kurz ist und
+   gar nicht scrollt). overflow-y:scroll zwingt das, scrollbar-gutter:stable
+   ist der moderne Backup falls Browser bei overflow:scroll andere Defaults
+   haetten. So kein Zucken zwischen kurzen und langen Seiten. */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+/* Firefox: scrollbar-width wird NICHT vererbt, daher auf alle Container. */
+html, body, *, *::before, *::after {
+  scrollbar-width: thin !important;
+  scrollbar-color: oklch(0 0 0 / 0.2) transparent !important;
+}
+.dark, .dark *, .dark *::before, .dark *::after {
+  scrollbar-color: oklch(1 0 0 / 0.15) transparent !important;
+}
+
+/* Webkit (Chrome, Edge, Safari). Selektor ohne '*' und mit !important damit
+   Browser-Defaults und Tailwind-Preflight nicht gewinnen. */
+::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+::-webkit-scrollbar-thumb {
+  background-color: oklch(0 0 0 / 0.32) !important;
+  border-radius: 999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background-color 0.15s ease !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0 0 0 / 0.5) !important;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: oklch(1 0 0 / 0.15) !important;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(1 0 0 / 0.28) !important;
+}
+/* Pfeil-Buttons + Edge-Spezifika weg */
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-button:single-button,
+::-webkit-scrollbar-button:start:decrement,
+::-webkit-scrollbar-button:end:increment {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+/* Browser-Default-Spinner und Calendar/Clock-Icons app-weit unterdruecken
+   bei date/time/number-Inputs. Die nativen Widgets fuehlen sich klobig
+   an — Eventline-User wollen direkt tippen. Date-Picker bleibt durch
+   Klick auf Input-Feld weiter zugaenglich (Browser-Behavior), nur das
+   visuelle Icon rechts und die hoch/runter-Pfeile verschwinden. */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="time"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-outer-spin-button,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-outer-spin-button,
+input[type="datetime-local"]::-webkit-inner-spin-button,
+input[type="datetime-local"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* === Globale Linien-Staerke: alle Tailwind .border-* Utilities auf 2px ===
+   In @layer utilities platziert — innerhalb dieses Layers gewinnt source-order,
+   und meine Regeln kommen nach Tailwinds .border (1px) durch File-Position.
+   Selektoren mit :not([class*="border-X-0"]) lassen explizit gesetzte border-0 in Ruhe. */
+  /* Tinted-Pill-Pattern: gefuellter, getoenter Hintergrund + voller Border + dezenterer Text.
+     Optik wie Donut-Segmente. Pro Farbe eine self-contained Klasse mit rgba — keine
+     CSS-Variable-Indirection, keine color-mix-Funktion. Robust ueber alle Browser.
+     Verwendung: <div className="tinted-amber border">.
+     Text-Stufen:
+       Light-Mode: -700 (dunkler, weniger knallig auf hellem getoentem Hintergrund)
+       Dark-Mode:  -300 (heller, besserer Kontrast gegen dunklen getoenten Hintergrund) */
+  .tinted-amber   { background-color: rgba(245, 158,  11, 0.12); border-color: #f59e0b; color: #b45309; } /* amber-700 */
+  .tinted-blue    { background-color: rgba( 37,  99, 235, 0.12); border-color: #2563eb; color: #1d4ed8; } /* blue-700 */
+  .tinted-green   { background-color: rgba(  0, 168, 107, 0.12); border-color: #00a86b; color: #006847; } /* Jade dark */
+  .tinted-red     { background-color: rgba(220,  38,  38, 0.12); border-color: #dc2626; color: #b91c1c; } /* red-700 */
+  .tinted-purple  { background-color: rgba(124,  58, 237, 0.12); border-color: #7c3aed; color: #6d28d9; } /* violet-700 */
+  .tinted-orange  { background-color: rgba(234,  88,  12, 0.12); border-color: #ea580c; color: #c2410c; } /* orange-700 */
+  .tinted-emerald { background-color: rgba(  4, 120,  87, 0.12); border-color: #047857; color: #065f46; } /* emerald-800 */
+  .tinted-gray    { background-color: rgba(100, 116, 139, 0.12); border-color: #64748b; color: #334155; } /* slate-700 */
+  .dark .tinted-amber   { background-color: rgba(245, 158,  11, 0.18); color: #fcd34d; } /* amber-300 */
+  .dark .tinted-blue    { background-color: rgba( 37,  99, 235, 0.18); color: #93c5fd; } /* blue-300 */
+  .dark .tinted-green   { background-color: rgba(  0, 168, 107, 0.18); color: #6ee7b7; } /* Jade light */
+  .dark .tinted-red     { background-color: rgba(220,  38,  38, 0.18); color: #fca5a5; } /* red-300 */
+  .dark .tinted-purple  { background-color: rgba(124,  58, 237, 0.18); color: #c4b5fd; } /* violet-300 */
+  .dark .tinted-orange  { background-color: rgba(234,  88,  12, 0.18); color: #fdba74; } /* orange-300 */
+  .dark .tinted-emerald { background-color: rgba(  4, 120,  87, 0.18); color: #6ee7b7; } /* emerald-300 */
+  .dark .tinted-gray    { background-color: rgba(100, 116, 139, 0.18); color: #cbd5e1; } /* slate-300 */
+  .tinted-amber:hover   { background-color: rgba(245, 158,  11, 0.18); }
+  .tinted-blue:hover    { background-color: rgba( 37,  99, 235, 0.18); }
+  .tinted-green:hover   { background-color: rgba(  0, 168, 107, 0.18); }
+  .tinted-red:hover     { background-color: rgba(220,  38,  38, 0.18); }
+  .tinted-purple:hover  { background-color: rgba(124,  58, 237, 0.18); }
+  .tinted-orange:hover  { background-color: rgba(234,  88,  12, 0.18); }
+  .tinted-emerald:hover { background-color: rgba(  4, 120,  87, 0.18); }
+  .tinted-gray:hover    { background-color: rgba(100, 116, 139, 0.18); }
+  .dark .tinted-amber:hover   { background-color: rgba(245, 158,  11, 0.26); }
+  .dark .tinted-blue:hover    { background-color: rgba( 37,  99, 235, 0.26); }
+  .dark .tinted-green:hover   { background-color: rgba(  0, 168, 107, 0.26); }
+  .dark .tinted-red:hover     { background-color: rgba(220,  38,  38, 0.26); }
+  .dark .tinted-purple:hover  { background-color: rgba(124,  58, 237, 0.26); }
+  .dark .tinted-orange:hover  { background-color: rgba(234,  88,  12, 0.26); }
+  .dark .tinted-emerald:hover { background-color: rgba(  4, 120,  87, 0.26); }
+  .dark .tinted-gray:hover    { background-color: rgba(100, 116, 139, 0.26); }
+
+/* === Kasten-Buttons: einheitliches Aktions-Element app-weit ===
+   Optik wie eine Donut-Card im Mini: GLEICHER Ring + GLEICHES rounded-xl + GLEICHES
+   bg-card. Realisiert via @apply auf Tailwind-Klassen, damit Theme-Werte
+   (--radius-xl, ring-foreground/10) 1:1 wie bei der Card greifen.
+
+   Verwendung: <button className="kasten kasten-red">…</button>
+   Tone-Klassen: kasten-red | kasten-blue | kasten-green | kasten-purple | kasten-muted
+   Aktive Toggle (z.B. Archiv): kasten-active (gefuellt + invertiert).
+   Zusatz-Layout (flex-1, w-full, mt-X, px-6, py-4) als normale Tailwind-Utilities
+   daneben — die ueberschreiben dank @layer components / utilities-Reihenfolge. */
+/* Card-Rand app-weit: 2px solid border in foreground/10. Liegt in
+   @layer components, sodass utilities (z.B. border-dashed, hover-Border-Color)
+   die Werte ueberschreiben koennen. Vorher ring-2 — auf border umgestellt
+   damit der Rand zuverlaessig sichtbar ist (gleiche Logik wie Kasten-Buttons). */
+@layer components {
+  [data-slot="card"] {
+    border: 2px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+
+  /* Hover-Animation für Auftrag-Cards — als CSS-Klasse statt Tailwind-Utilities
+     damit Cascade-Konflikte mit dem [data-slot="card"]-Border ausgeschlossen sind.
+     Tritt mit hoher Specificity (Klasse + :hover + !important auf border-color)
+     auf damit's auch gegen die Component-Layer-Border greift. */
+  .auftrag-card-hover {
+    transition: box-shadow 200ms ease, transform 200ms ease,
+                border-color 200ms ease, background-color 200ms ease;
+  }
+  .auftrag-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    border-color: color-mix(in oklab, var(--foreground) 50%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 3%, transparent);
+  }
+  .dark .auftrag-card-hover:hover {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    border-color: color-mix(in oklab, var(--foreground) 60%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+
+  /* Generische Card-Hover-Klasse fuer alle Listing-Pages
+     (Locations, Tickets, Rapporte, HR, Todos, Dashboard-Stat-Cards).
+     Identisch zu .auftrag-card-hover, ohne Title-Color-Aenderung.
+     Hover: Card hebt 2px an, weicher Schatten, kraeftigerer Border, dezenter
+     Hintergrund-Tint. Funktioniert in beiden Themes via color-mix. */
+  .card-hover {
+    transition: box-shadow 200ms ease, transform 200ms ease,
+                border-color 200ms ease, background-color 200ms ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    border-color: color-mix(in oklab, var(--foreground) 50%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 3%, transparent);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    border-color: color-mix(in oklab, var(--foreground) 60%, transparent) !important;
+    background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+}
+
+/* Kunden-Liste-Hover: bewusst AUSSERHALB @layer und mit !important damit
+   keine Tailwind-Utility und kein component-layer-Border-Override es
+   uebersteuern kann. .kunden-row markiert die Tabellen-Zeile, .kunden-name
+   die Verlinkung — Name wird rot wenn man die Zeile hovert. */
+.kunden-row {
+  transition: background-color 150ms ease !important;
+}
+.kunden-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 6%, transparent) !important;
+}
+.dark .kunden-row:hover {
+  background-color: color-mix(in oklab, var(--foreground) 10%, transparent) !important;
+}
+.kunden-row .kunden-name {
+  transition: color 150ms ease;
+}
+.kunden-row:hover .kunden-name {
+  color: rgb(220, 38, 38) !important;
+}
+
+/* Auftrag-Dropdown-Item (Neuer-Termin-Modal): bewusst AUSSERHALB @layer und mit
+   !important damit keine Tailwind-Utility es uebersteuern kann. Hover dezent —
+   Brand-roter Tint statt knall-rot, Text bleibt erhalten. */
+.auftrag-dropdown-item:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+.dark .auftrag-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+.dark .kunden-row:hover .kunden-name {
+  color: rgb(248, 113, 113) !important;
+}
+
+/* App-weiter Tooltip — das native HTML title-Attribut sieht haesslich
+   aus (gelb, System-Font, falsche Position). Wir nutzen stattdessen
+   data-tooltip="..." auf dem Element + dieses globale CSS. Kommt sofort
+   beim Hover, gleicher Look wie der Rest der App (popover-Hintergrund,
+   border, dezenter Schatten). Variante data-tooltip-side="bottom" rendert
+   den Tooltip unter dem Element (z.B. fuer Header-Buttons mit zu wenig
+   Platz oben). */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
+  animation: tooltip-fade-in 120ms ease-out;
+}
+[data-tooltip-side="bottom"]:hover::after,
+[data-tooltip-side="bottom"]:focus-visible::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+/* data-tooltip-align="end" — Tooltip mit rechter Kante am Button-Ende
+   verankern statt zentriert. Nutzen wenn der Button am rechten Rand
+   eines Containers steht und der Tooltip-Text so lang ist dass die
+   zentrierte Variante rechts ueber den Container-Rand geclippt wuerde. */
+[data-tooltip-align="end"]:hover::after,
+[data-tooltip-align="end"]:focus-visible::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+@keyframes tooltip-fade-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes tooltip-fade-in-end {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+[data-tooltip-align="end"]:hover::after,
+[data-tooltip-align="end"]:focus-visible::after {
+  animation: tooltip-fade-in-end 120ms ease-out;
+}
+
+@layer components {
+  .kasten {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl bg-card transition-all;
+    border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+  .kasten:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 4%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 24%, transparent);
+  }
+  .dark .kasten:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 9%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+  .kasten:disabled { @apply opacity-50 pointer-events-none; }
+
+  /* Tone-Varianten — Optik wie die Felder im Donut-Diagramm:
+     2px Stroke in der Tone-Farbe + getoenter Fill (12% Light / 18% Dark).
+     Identische Werte und Farben wie .tinted-X / .donut-segment, damit
+     Buttons und Diagramm-Felder visuell die gleiche Sprache sprechen. */
+  .kasten-red, .kasten-blue, .kasten-green, .kasten-purple, .kasten-bexio { border-width: 2px; }
+  .kasten-red    { @apply text-red-700 dark:text-red-300;       border-color: var(--status-red);    background-color: rgba(220,  38,  38, 0.12); }
+  .kasten-blue   { @apply text-blue-700 dark:text-blue-300;     border-color: var(--status-blue);   background-color: rgba( 37,  99, 235, 0.12); }
+  .kasten-green  { @apply text-green-700 dark:text-green-300;   border-color: var(--status-green);  background-color: rgba(  0, 168, 107, 0.12); }
+  .kasten-purple { @apply text-purple-700 dark:text-purple-300; border-color: var(--status-purple); background-color: rgba(124,  58, 237, 0.12); }
+  /* Bexio-Lime — gleicher tinted-Stil wie die anderen kasten, in der
+     Lime-Schriftzug-Farbe vom Bexio-Logo (#C4D600 = rgb(196,214,0)).
+     Text dunkler im Light fuer Lesbarkeit auf hellem Tint, voll-Lime im Dark. */
+  .kasten-bexio  { color: rgb(132, 152,   0);                   border-color: rgb(196, 214,   0);    background-color: rgba(196, 214,   0, 0.12); }
+  .dark .kasten-red    { background-color: rgba(220,  38,  38, 0.18); }
+  .dark .kasten-blue   { background-color: rgba( 37,  99, 235, 0.18); }
+  .dark .kasten-green  { background-color: rgba(  0, 168, 107, 0.18); }
+  .dark .kasten-purple { background-color: rgba(124,  58, 237, 0.18); }
+  .dark .kasten-bexio  { color: rgb(196, 214,   0); background-color: rgba(196, 214,   0, 0.18); }
+  /* Hover-Tint linear an die wahrgenommene Helligkeit des Basistons gekoppelt:
+     je heller die Farbe, desto kleiner der Sprung beim Hovern. Helle Farben
+     (Lime) sind schon bei 12% gut sichtbar — 18% reichen. Dunkle Farben
+     (Rot, Violett) wirken bei 18% kaum veraendert — daher 32-34%. So fuehlt
+     sich der Hover-Effekt ueber alle Akzentfarben gleich an, statt mal
+     "wuchtig" mal "tot". Werte handgefittet auf Basis relativer Luminanz:
+       Lime    L ≈ 195 → 0.18 / 0.26
+       Green   L ≈ 128 → 0.22 / 0.30
+       Blue    L ≈  96 → 0.26 / 0.36
+       Purple  L ≈  85 → 0.30 / 0.40
+       Red     L ≈  77 → 0.32 / 0.42
+     (Light / Dark, Default-State bleibt bei 0.12 / 0.18). */
+  .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.32); border-color: var(--status-red); }
+  .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.26); border-color: var(--status-blue); }
+  .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.22); border-color: var(--status-green); }
+  .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.30); border-color: var(--status-purple); }
+  .kasten-bexio:hover:not(:disabled)  { background-color: rgba(196, 214,   0, 0.18); border-color: rgb(196, 214,   0); }
+  .dark .kasten-red:hover:not(:disabled)    { background-color: rgba(220,  38,  38, 0.42); border-color: var(--status-red); }
+  .dark .kasten-blue:hover:not(:disabled)   { background-color: rgba( 37,  99, 235, 0.36); border-color: var(--status-blue); }
+  .dark .kasten-green:hover:not(:disabled)  { background-color: rgba(  0, 168, 107, 0.30); border-color: var(--status-green); }
+  .dark .kasten-purple:hover:not(:disabled) { background-color: rgba(124,  58, 237, 0.40); border-color: var(--status-purple); }
+  .dark .kasten-bexio:hover:not(:disabled)  { background-color: rgba(196, 214,   0, 0.26); border-color: rgb(196, 214,   0); }
+
+  .kasten-muted  { @apply text-foreground/70; }
+  .kasten-muted:hover:not(:disabled) { @apply text-foreground; }
+  /* Toggle-Buttons (z.B. Archiv-Umschalter, Mitarbeiter-Auswahl):
+     Beide Zustaende im tinted-Stil wie kasten-X (2px Border + getoenter bg),
+     nur in foreground-Farbe statt rot/blau/gruen. Active = staerker getoent,
+     Off = subtiler aber gleicher Aufbau. So fluchten Toggle-Buttons visuell
+     mit dem Rest der kasten-Familie. */
+  /* Active-State im Tinted-Stil wie kasten-X: voller Foreground-Border (schwarz
+     Light / weiss Dark) + leicht getoenter Hintergrund. Innen wirkt fast
+     transparent — passt zur restlichen kasten-Familie. */
+  .kasten-active {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl text-foreground transition-all;
+    border: 2px solid var(--foreground);
+    background-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+  .kasten-active:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+  }
+  .dark .kasten-active {
+    background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  }
+  .dark .kasten-active:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+
+  /* Archive-Action-Button — visuell zur kasten-X-Familie (2px Border + tinted Bg)
+     aber neutral grau statt schwarz/weiss wie kasten-active. Dezenter, weil
+     "Archivieren" nicht so prominent sein soll wie "Loeschen" (rot) oder
+     "Reaktivieren" (gruen) — aber Border muss klar sichtbar sein, sonst sieht
+     der Icon-only-Header-Button auf weisser Card aus wie kein Button. */
+  .kasten-archive {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
+    color: var(--muted-foreground);
+    border: 2px solid var(--muted-foreground);
+    background-color: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
+  }
+  .kasten-archive:hover:not(:disabled) {
+    color: var(--foreground);
+    background-color: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
+  }
+  .dark .kasten-archive {
+    background-color: color-mix(in oklab, var(--muted-foreground) 18%, transparent);
+  }
+  .dark .kasten-archive:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
+  }
+
+  .kasten-toggle-off {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap rounded-xl transition-all;
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+    border: 2px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+    background-color: color-mix(in oklab, var(--foreground) 4%, transparent);
+  }
+  .kasten-toggle-off:hover:not(:disabled) {
+    color: var(--foreground);
+    background-color: color-mix(in oklab, var(--foreground) 10%, transparent);
+    border-color: color-mix(in oklab, var(--foreground) 32%, transparent);
+  }
+  .dark .kasten-toggle-off {
+    background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+  }
+  .dark .kasten-toggle-off:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--foreground) 16%, transparent);
+  }
+
+  /* ============================================================
+     Icon-Buttons — kleine Aktion-Icons (Trash, Download, Edit, X).
+     Ersetzt die inkonsistenten inline-Tailwind-Patterns:
+       - hover:bg-red-50 ... hover:text-red-500
+       - hover:bg-blue-50 ... hover:text-blue-500
+       - hover:bg-gray-100
+     Die alten Patterns hatten keine Dark-Mode-Overrides — Hover war
+     im Dark unsichtbar. Hier wird immer Light + Dark gepflegt.
+
+     Nutzung: <button class="icon-btn icon-btn-red">…</button>
+     ============================================================ */
+  .icon-btn {
+    @apply inline-flex items-center justify-center p-1.5 rounded-lg transition-colors;
+    color: var(--muted-foreground);
+  }
+  .icon-btn:disabled { @apply opacity-50 pointer-events-none; }
+
+  .icon-btn-red:hover:not(:disabled) {
+    background-color: rgba(239, 68, 68, 0.10);
+    color: rgb(239, 68, 68);
+  }
+  .dark .icon-btn-red:hover:not(:disabled) {
+    background-color: rgba(239, 68, 68, 0.18);
+    color: rgb(248, 113, 113);
+  }
+
+  .icon-btn-blue:hover:not(:disabled) {
+    background-color: rgba(59, 130, 246, 0.10);
+    color: rgb(59, 130, 246);
+  }
+  .dark .icon-btn-blue:hover:not(:disabled) {
+    background-color: rgba(59, 130, 246, 0.18);
+    color: rgb(96, 165, 250);
+  }
+
+  .icon-btn-green:hover:not(:disabled) {
+    background-color: rgba(34, 197, 94, 0.10);
+    color: rgb(34, 197, 94);
+  }
+  .dark .icon-btn-green:hover:not(:disabled) {
+    background-color: rgba(34, 197, 94, 0.18);
+    color: rgb(74, 222, 128);
+  }
+
+  .icon-btn-purple:hover:not(:disabled) {
+    background-color: rgba(168, 85, 247, 0.10);
+    color: rgb(168, 85, 247);
+  }
+  .dark .icon-btn-purple:hover:not(:disabled) {
+    background-color: rgba(168, 85, 247, 0.18);
+    color: rgb(192, 132, 252);
+  }
+
+  /* Neutral — fuer Modal-Close-X und allgemeine Toolbar-Aktionen */
+  .icon-btn-muted:hover:not(:disabled) {
+    background-color: var(--muted);
+    color: var(--foreground);
+  }
+}
+
+@layer utilities {
+
+  .border:not([class*="border-0"]) {
+    border-width: 2px;
+  }
+  .border-t:not([class*="border-t-0"]) { border-top-width: 2px; }
+  .border-b:not([class*="border-b-0"]) { border-bottom-width: 2px; }
+  .border-l:not([class*="border-l-0"]) { border-left-width: 2px; }
+  .border-r:not([class*="border-r-0"]) { border-right-width: 2px; }
+  .border-x:not([class*="border-x-0"]) { border-left-width: 2px; border-right-width: 2px; }
+  .border-y:not([class*="border-y-0"]) { border-top-width: 2px; border-bottom-width: 2px; }
+  hr {
+    border-top-width: 2px;
+  }
+  .divide-x > :not([hidden]) ~ :not([hidden]):not([class*="divide-x-0"]) {
+    border-left-width: 2px;
+  }
+  .divide-y > :not([hidden]) ~ :not([hidden]):not([class*="divide-y-0"]) {
+    border-top-width: 2px;
+  }
+}
+
+/* ============================================================
+   Karten-Marker-System fuer locations-switzerland-map.
+   Cluster-Bubbles bekommen einen Hover-Scale, Spider-Marker poppen mit
+   einer cubic-bezier-Overshoot-Animation auf — staggered ueber animation-delay
+   das die divIcon-HTML inline setzt. Leaflet's eigene Position-Transform liegt
+   auf dem .leaflet-marker-icon Wrapper, unsere Transforms greifen auf das
+   Inner-div => kein Konflikt.
+   ============================================================ */
+/* Karten-Tooltip + Popup im App-Stil — Comfortaa, Card-Background, Border-
+   Radius wie der Rest der App, dezenter Shadow. Leaflet-Default-Pfeil
+   (::before) wird ausgeblendet damit es eine clean rectangle-Bubble bleibt. */
+.leaflet-tooltip.eventline-map-tooltip,
+.leaflet-popup.eventline-map-popup .leaflet-popup-content-wrapper {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.leaflet-tooltip.eventline-map-tooltip {
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+.leaflet-tooltip.eventline-map-tooltip:before {
+  display: none;
+}
+.leaflet-popup.eventline-map-popup .leaflet-popup-tip {
+  display: none;
+}
+.leaflet-popup.eventline-map-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 4px;
+  font-family: var(--font-heading);
+}
+.eventline-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+.eventline-tooltip-row + .eventline-tooltip-row {
+  margin-top: 2px;
+}
+.eventline-popup-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--card-foreground);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+  cursor: pointer;
+}
+.eventline-popup-link:hover {
+  background-color: var(--muted);
+}
+.eventline-popup-link + .eventline-popup-link {
+  margin-top: 1px;
+}
+
+.eventline-cluster-marker {
+  transition: transform 180ms ease;
+  transform-origin: center;
+  cursor: pointer;
+}
+.eventline-cluster-marker:hover {
+  transform: scale(1.08);
+}
+/* Inner-Kreis im uMap-Stil — Halo (outer) ist drumherum, Inner zentriert. */
+.eventline-cluster-inner {
+  transition: box-shadow 180ms ease;
+}
+.eventline-cluster-marker:hover .eventline-cluster-inner {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Leaflet-Zoom-Buttons im App-Stil — kein heller Standard-Border, sondern
+   Card-Background + Border-Token, damit sie im Dark-Mode nicht rausstechen. */
+.leaflet-control-zoom {
+  border: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+.leaflet-control-zoom a {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+  width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  font-size: 18px !important;
+  font-weight: 500 !important;
+}
+.leaflet-control-zoom a:hover {
+  background-color: var(--muted) !important;
+}
+.leaflet-control-zoom a.leaflet-disabled {
+  background-color: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.5;
 }
