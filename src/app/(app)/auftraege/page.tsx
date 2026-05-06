@@ -17,6 +17,7 @@ import {
   Archive,
   X,
   Pencil,
+  Check,
   Send,
   ChevronDown,
   Loader2,
@@ -543,6 +544,7 @@ export default function AuftraegePage() {
             const stepInfo = REQUEST_STEPS[currentStep - 1];
             const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
             const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
+            const allGood = isActive && hasAppointment && job.status !== "entwurf" && !isAnfrage;
             const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
             const dateText = job.start_date
               ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
@@ -575,6 +577,11 @@ export default function AuftraegePage() {
                   className={`${padCls} rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors`} aria-label="Termin planen">
                   <CalendarPlus className={iconCls} />
                 </button>
+              );
+              if (allGood) return (
+                <span className={`${padCls} rounded-lg text-emerald-600 dark:text-emerald-400 inline-flex`} aria-label="Alles bereit">
+                  <Check className={iconCls} strokeWidth={3} />
+                </span>
               );
               return null;
             }
