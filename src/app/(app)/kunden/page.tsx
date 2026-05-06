@@ -477,8 +477,10 @@ export default function KundenPage() {
                       <button
                         type="button"
                         onClick={() => setActionTarget(action)}
-                        className={`p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/50 ${hoverColor} transition-all`}
+                        className={`p-1 rounded text-muted-foreground/50 ${hoverColor} transition-colors`}
                         aria-label={`${c.name}: ${actionTitle}`}
+                        data-tooltip={actionTitle}
+                        data-tooltip-align="end"
                       >
                         <ActionIcon className="h-3.5 w-3.5" />
                       </button>

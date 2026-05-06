@@ -290,6 +290,10 @@ export default function AuftragDetailPage() {
 
   const availableActions = statusActions.filter((a) => a.from.includes(job.status));
   const isDringend = job.priority === "dringend";
+  // Archiv-Sperre: abgeschlossene + stornierte Auftraege sind read-only fuer
+  // Loesch-Aktionen — sonst kann der User Dokumente aus historischen Auftraegen
+  // wegloeschen und damit den Audit-Trail beschaedigen.
+  const isArchivedJob = job.status === "abgeschlossen" || job.status === "storniert";
 
   // Abschliessen ist erst möglich, wenn das Enddatum erreicht ist
   const todayISO = (() => {
@@ -668,14 +672,16 @@ export default function AuftragDetailPage() {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {/* Trash links, Download rechts. Bei Mail-Doks Trash unsichtbar (visibility:hidden),
-                          aber Platz reservieren — so verschiebt sich der Download-Pfeil nie. */}
+                          aber Platz reservieren — so verschiebt sich der Download-Pfeil nie.
+                          Bei archivierten Auftraegen (abgeschlossen/storniert) ebenfalls
+                          unsichtbar: Archiv ist app-weit read-only fuer Loesch-Aktionen. */}
                       <button
                         type="button"
                         onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
-                        className={`kasten kasten-red ${fromMail ? "invisible pointer-events-none" : ""}`}
+                        className={`kasten kasten-red ${fromMail || isArchivedJob ? "invisible pointer-events-none" : ""}`}
                         data-tooltip="Löschen"
-                        aria-hidden={fromMail || undefined}
-                        tabIndex={fromMail ? -1 : undefined}
+                        aria-hidden={fromMail || isArchivedJob || undefined}
+                        tabIndex={fromMail || isArchivedJob ? -1 : undefined}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

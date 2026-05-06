@@ -309,9 +309,13 @@ export default function TodosPage() {
                   Wieder öffnen
                 </button>
               )}
-              <button onClick={() => deleteTodo(selectedTodo.id)} className="kasten kasten-red">
-                <Trash2 className="h-3.5 w-3.5" />Löschen
-              </button>
+              {/* Loeschen nur bei offenen Todos. Erledigte sind read-only — Archiv-
+                  Konsistenz mit /auftraege + /kunden. */}
+              {selectedTodo.status === "offen" && (
+                <button onClick={() => deleteTodo(selectedTodo.id)} className="kasten kasten-red">
+                  <Trash2 className="h-3.5 w-3.5" />Löschen
+                </button>
+              )}
             </div>
             {selectedTodo.description && (
               <div className="p-3 rounded-xl bg-muted/40 border border-border">
@@ -355,7 +359,9 @@ export default function TodosPage() {
                     </button>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <button onClick={() => openFile(a.path)} className="icon-btn icon-btn-blue"><Download className="h-4 w-4" /></button>
-                      <button onClick={() => deleteAttachment(a)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+                      {selectedTodo.status === "offen" && (
+                        <button onClick={() => deleteAttachment(a)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+                      )}
                     </div>
                   </div>
                 );
@@ -544,13 +550,15 @@ export default function TodosPage() {
                       Abschliessen
                     </button>
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-                    aria-label="Löschen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {todo.status === "offen" && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+                      aria-label="Löschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </Card>
             );

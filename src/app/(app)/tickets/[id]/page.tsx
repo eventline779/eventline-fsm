@@ -452,8 +452,10 @@ export default function TicketDetailPage() {
         </Card>
       )}
 
-      {/* Lösch-Aktion via tickets:manage. */}
-      {can("tickets:manage") && (
+      {/* Lösch-Aktion via tickets:manage — aber nur solange das Ticket noch
+          aktiv ist. Erledigte/abgelehnte Tickets sind read-only fuer
+          Loeschen (Archiv-Konsistenz mit /auftraege + /todos + /kunden). */}
+      {can("tickets:manage") && ticket.status !== "erledigt" && ticket.status !== "abgelehnt" && (
         <div className="flex justify-end">
           <button type="button" onClick={deleteTicket} disabled={busy} className="kasten kasten-red">
             <Trash2 className="h-3.5 w-3.5" />Ticket löschen
