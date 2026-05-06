@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import {
   NOTIFICATION_META,
@@ -26,6 +27,7 @@ import {
   TIME_BUCKET_LABEL,
 } from "@/lib/notification-meta";
 import type { Notification, NotificationType } from "@/types";
+import { usePermissions } from "@/lib/use-permissions";
 
 interface Props {
   /** Auf welcher Seite das Dropdown aufklappt. Default 'bottom' (unter
@@ -39,6 +41,10 @@ const PREVIEW_LIMIT = 12;
 export function NotificationsBell({ side = "bottom" }: Props = {}) {
   const supabase = createClient();
   const router = useRouter();
+  const { role } = usePermissions();
+  // Glocke ist fuer Techniker noch nicht freigeschaltet — Click zeigt Toast,
+  // Dropdown bleibt zu, Counter-Bubble unsichtbar damit nichts triggert.
+  const isLocked = role === "techniker";
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<"alle" | "ungelesen">("alle");
@@ -294,19 +300,25 @@ export function NotificationsBell({ side = "bottom" }: Props = {}) {
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (isLocked) {
+            toast.info("Diese Funktion ist noch in Bearbeitung.");
+            return;
+          }
+          setOpen((o) => !o);
+        }}
         className="relative p-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
         data-tooltip="Benachrichtigungen"
         aria-label="Benachrichtigungen"
       >
         <Bell className="h-5 w-5" />
-        {unread > 0 && (
+        {!isLocked && unread > 0 && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
-      {mounted && dropdown && createPortal(dropdown, document.body)}
+      {!isLocked && mounted && dropdown && createPortal(dropdown, document.body)}
     </div>
   );
 }
