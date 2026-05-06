@@ -366,15 +366,17 @@ export function AppointmentsSection({
                       </Modal>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => deleteAppointment(appt.id)}
-                    className="kasten kasten-red"
-                    data-tooltip="Termin löschen"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Löschen
-                  </button>
+                  {!isClosed && (
+                    <button
+                      type="button"
+                      onClick={() => deleteAppointment(appt.id)}
+                      className="kasten kasten-red"
+                      data-tooltip="Termin löschen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Löschen
+                    </button>
+                  )}
                 </div>
               </div>
             );
