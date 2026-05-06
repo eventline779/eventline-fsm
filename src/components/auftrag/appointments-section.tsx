@@ -140,11 +140,6 @@ export function AppointmentsSection({
     toast.success(`Termin für ${assignees.length} Person${assignees.length > 1 ? "en" : ""} erstellt`);
   }
 
-  async function toggleAppointment(apptId: string, isDone: boolean) {
-    await supabase.from("job_appointments").update({ is_done: !isDone }).eq("id", apptId);
-    onReload();
-  }
-
   // useConfirm-Pattern statt vorherigem hardcoded Code "5225"-Modal —
   // konsistent mit allen anderen Loesch-Flows app-weit.
   async function deleteAppointment(apptId: string) {
@@ -304,13 +299,10 @@ export function AppointmentsSection({
           {appointments.map((appt) => {
             const assignee = appt.assignee;
             return (
-              <div key={appt.id} className={`flex items-center justify-between p-3 rounded-xl border ${appt.is_done ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-100"}`}>
+              <div key={appt.id} className="flex items-center justify-between p-3 rounded-xl border bg-gray-50 border-gray-100">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <button onClick={() => toggleAppointment(appt.id, appt.is_done)} className={`flex items-center justify-center w-6 h-6 rounded-md border-2 shrink-0 transition-all ${appt.is_done ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-red-400"}`}>
-                    {appt.is_done && <Check className="h-4 w-4" />}
-                  </button>
                   <div className="min-w-0">
-                    <span className={`font-medium text-sm ${appt.is_done ? "line-through text-muted-foreground" : ""}`}>{appt.title}</span>
+                    <span className="font-medium text-sm">{appt.title}</span>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(appt.start_time).toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{appt.end_time ? ` – ${new Date(appt.end_time).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
                       {assignee && <span className="flex items-center gap-1"><User className="h-3 w-3" />{assignee.full_name}</span>}
@@ -318,16 +310,15 @@ export function AppointmentsSection({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {!appt.is_done && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
-                        className={`kasten ${notifiedAppts.has(appt.id) ? "kasten-green" : "kasten-blue"}`}
-                      >
-                        {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                        {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
-                      </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setNotifyPopup(notifyPopup === appt.id ? null : appt.id)}
+                      className={`kasten ${notifiedAppts.has(appt.id) ? "kasten-green" : "kasten-blue"}`}
+                    >
+                      {notifiedAppts.has(appt.id) ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                      {notifiedAppts.has(appt.id) ? "Gesendet" : "Benachrichtigen"}
+                    </button>
                       <Modal
                         open={notifyPopup === appt.id}
                         onClose={() => { setNotifyPopup(null); setEmailField1(""); setEmailField2(""); }}
@@ -363,9 +354,8 @@ export function AppointmentsSection({
                             <Send className="h-3.5 w-3.5" />Senden
                           </button>
                         </div>
-                      </Modal>
-                    </div>
-                  )}
+                    </Modal>
+                  </div>
                   {!isClosed && (
                     <button
                       type="button"

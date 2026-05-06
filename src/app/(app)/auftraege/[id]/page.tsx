@@ -788,21 +788,6 @@ export default function AuftragDetailPage() {
         canFinish={canFinish}
         finishBlockReason={finishBlockReason}
         isMaintenance={isMaintenanceJob}
-        onBeforeFinalSubmit={async () => {
-          // Termine-Warnung erst beim tatsaechlichen Final-Submit, nicht
-          // beim Modal-Open — Draft-Pflege soll nicht durch Warnung
-          // unterbrochen werden.
-          const openTermine = appointments.filter((a) => !a.is_done).length;
-          if (openTermine > 0) {
-            return await confirm({
-              title: "Offene Termine",
-              message: `${openTermine} Termin${openTermine === 1 ? "" : "e"} ${openTermine === 1 ? "ist" : "sind"} noch nicht als erledigt markiert. Auftrag trotzdem abschliessen?`,
-              confirmLabel: "Trotzdem abschliessen",
-              variant: "red",
-            });
-          }
-          return true;
-        }}
       />
     </div>
   );

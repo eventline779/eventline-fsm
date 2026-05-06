@@ -215,7 +215,6 @@ export interface JobAppointment {
   start_time: string;
   end_time: string | null;
   assigned_to: string | null;
-  is_done: boolean;
   created_at: string;
   updated_at: string;
   // Joined
