@@ -9,7 +9,7 @@
 // hier die Token-Verwaltung serverseitig kapseln.
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { logWarn } from "@/lib/log";
+import { logWarn, logError } from "@/lib/log";
 
 // Bexio hat den IdP von idp.bexio.com auf auth.bexio.com migriert. Beim
 // Verbinden auf den alten Endpunkten gibt's 404 — auth.bexio.com ist der
@@ -435,7 +435,12 @@ export async function findMatchingContacts(opts: {
       for (const c of byName) {
         if (!seen.has(c.id)) seen.set(c.id, c);
       }
-    } catch {}
+    } catch (err) {
+      // Name-Suche darf leer zurueckkommen, aber wenn Bexio ausfaellt
+      // sollen wir das in den Server-Logs sehen — sonst wundern wir uns
+      // spaeter warum Match-Vorschlaege verschwinden.
+      logError("bexio.matchContacts.byName", err, { name: trimmedName });
+    }
   }
 
   return Array.from(seen.values());

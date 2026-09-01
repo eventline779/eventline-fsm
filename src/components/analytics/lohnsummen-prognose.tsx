@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
 import { Loading } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { logError } from "@/lib/log";
 
 interface AnnualMonth {
   month: number;
@@ -86,6 +87,12 @@ export function LohnsummenPrognose() {
           return;
         }
         setAnnualSummary(json.annualPayrollSummary ?? null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logError("lohnsummen-prognose.load", err, { period: fmtMonth(period) });
+        toast.error("Netzwerkfehler beim Laden der Lohnsummen");
+        setAnnualSummary(null);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

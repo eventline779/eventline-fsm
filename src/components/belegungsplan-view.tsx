@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { logError } from "@/lib/log";
 
 type Location = {
   id: string;
@@ -113,7 +114,11 @@ export function BelegungsplanView({ restrictToLocationId }: Props = {}) {
     const [locRes, bpRes] = await Promise.all([
       locationsQuery,
       fetch(`/api/belegungsplan?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`)
-        .then((r) => r.ok ? r.json() : Promise.resolve({ bookings: [] })),
+        .then((r) => r.ok ? r.json() : Promise.resolve({ bookings: [] }))
+        .catch((err) => {
+          logError("belegungsplan-view.fetch", err, { startIso, endIso });
+          return { bookings: [] };
+        }),
     ]);
 
     setLocations((locRes.data as Location[]) ?? []);

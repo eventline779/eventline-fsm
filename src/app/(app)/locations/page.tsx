@@ -24,6 +24,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import { LocationOverview } from "@/components/analytics/location-overview";
 import { TrustedDeviceGate } from "@/components/trust/trusted-device-gate";
 import { EmptyState } from "@/components/ui/empty-state";
+import { logError } from "@/lib/log";
 
 // Map ist Leaflet + GeoJSON + Plugins — ~250kb-Chunk. Lazy laden damit der
 // First-Paint nicht darauf wartet.
@@ -134,7 +135,7 @@ export default function OrtePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ table, id: inserted.id }),
-        }).catch(() => {});
+        }).catch((err) => logError("locations.geocode-after-insert", err, { table, id: inserted.id }));
       }
       setForm({ name: "", address_street: "", address_zip: "", address_city: "Basel", capacity: "", technical_details: "" });
       setShowForm(null);

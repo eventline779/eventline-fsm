@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { Modal } from "@/components/ui/modal";
 import { usePermissions } from "@/lib/use-permissions";
+import { logError } from "@/lib/log";
 
 interface MatchCandidate {
   id: number;
@@ -56,7 +57,12 @@ export function BexioButton({ customerId, bexioContactId, onLinked }: Props) {
     fetch("/api/bexio/status")
       .then((r) => r.json())
       .then((d) => setBexioConnected(!!d.connected))
-      .catch(() => setBexioConnected(false));
+      .catch((err) => {
+        // Status-Endpoint gab keinen Response — Button bleibt versteckt.
+        // Fehler in Server-Logs damit wir merken wenn Bexio dauerhaft aus ist.
+        logError("bexio-button.status", err);
+        setBexioConnected(false);
+      });
   }, []);
 
   if (bexioConnected !== true) return null;

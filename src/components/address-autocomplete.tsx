@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Building2, DoorOpen } from "lucide-react";
+import { logError } from "@/lib/log";
 
 type LocalLocation = {
   id: string;
@@ -211,7 +212,13 @@ export function AddressAutocomplete({
     if (!GOOGLE_KEY) return;
     loadGoogleScript()
       .then(() => setGoogleEnabled(true))
-      .catch(() => setGoogleEnabled(false));
+      .catch((err) => {
+        // Google-Script blockiert (Adblocker) oder Netz weg — Fallback
+        // auf lokale Location-Liste. Fehler in Server-Logs, damit wir
+        // dauerhafte Ausfaelle erkennen (statt sie erst per User-Report).
+        logError("address-autocomplete.google-load", err);
+        setGoogleEnabled(false);
+      });
   }, []);
 
   // Click outside → close (input + portal-rendered dropdown both count as inside)
