@@ -38,6 +38,7 @@ import { GeneralColumn } from "@/components/vertrieb/columns/general-column";
 import { PersonalColumn } from "@/components/vertrieb/columns/personal-column";
 import { VertriebFoldersSidebar, type FolderFilter } from "@/components/vertrieb/folders-sidebar";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { useBreadcrumbs } from "@/components/shell/breadcrumbs";
 
 type Counts = {
   total: number; offen: number; kontaktiert: number; gespraech: number;
@@ -146,6 +147,19 @@ export default function VertriebPage() {
     else url.searchParams.delete("lead");
     window.history.replaceState({}, "", url.toString());
   }, [selectedLeadId]);
+
+  // Globale Breadcrumbs: "Vertrieb › Lead {Firma}" wenn Lead offen.
+  const selectedLeadFirma = selectedLeadId
+    ? contacts.find((c) => c.id === selectedLeadId)?.firma ?? null
+    : null;
+  useBreadcrumbs(
+    selectedLeadId
+      ? [
+          { label: "Vertrieb", href: "/vertrieb" },
+          { label: `Lead ${selectedLeadFirma ?? ""}`.trim() },
+        ]
+      : [],
+  );
 
   // Assign-Handler: Lead in personal column droppen
   async function assignLead(leadId: string, toUserId: string) {

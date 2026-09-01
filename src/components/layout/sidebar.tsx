@@ -20,6 +20,7 @@ import {
 import { useTheme } from "next-themes";
 import { useNavCounts, getBadgeForHref } from "@/lib/use-nav-counts";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
+import { CommandPaletteTrigger } from "@/components/shell/command-palette";
 import type { Profile } from "@/types";
 
 interface SidebarProps {
@@ -92,10 +93,15 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
   return (
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[240px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
       {/* Logo — linksbündig mit der Navigation (px-5 = 20px, Flucht der Nav-Icons) */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-5 pt-5 pb-3">
         <Link href="/dashboard" className="block max-w-[116px]">
           <Logo size="sm" />
         </Link>
+      </div>
+
+      {/* Cmd-K Trigger direkt unter dem Logo — hoechste Discoverability. */}
+      <div className="px-3 pb-2">
+        <CommandPaletteTrigger />
       </div>
 
       {/* Navigation — mask-image fade nur an Raendern wo tatsaechlich noch

@@ -22,6 +22,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
+import { useBreadcrumbs } from "@/components/shell/breadcrumbs";
 
 type ActionKind = "delete" | "archive" | "unarchive";
 
@@ -204,6 +205,16 @@ export default function KundenDetailPage() {
       setActionKind(null);
     }
   }
+
+  // Globale Breadcrumbs: "Kunden › {Name}".
+  useBreadcrumbs(
+    customer
+      ? [
+          { label: "Kunden", href: "/kunden" },
+          { label: customer.name },
+        ]
+      : [],
+  );
 
   if (!customer) return <Loading className="py-20" label="Laden…" />;
 

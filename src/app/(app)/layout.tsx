@@ -31,6 +31,8 @@ import { StempelProvider } from "@/lib/use-stempel";
 import { NavCountsProvider, useNavCounts, getBadgeForHref } from "@/lib/use-nav-counts";
 import { MeinKontoOnboardingProvider, useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
 import { MeinKontoIntroModal } from "@/components/onboarding/mein-konto-intro-modal";
+import { CommandPalette, CMDK_OPEN_EVENT } from "@/components/shell/command-palette";
+import { BreadcrumbsProvider, Breadcrumbs } from "@/components/shell/breadcrumbs";
 import type { Profile } from "@/types";
 
 // Outer-Wrapper — nur Provider. Der Inner-Layout kann den Provider
@@ -49,6 +51,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const { profile, permissions, ready, loadError } = usePermissions();
   const loading = !ready;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cmdkOpen, setCmdkOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -62,6 +65,25 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Globale Regel: Enter im Input/Select springt zum nächsten Feld, statt zu submitten.
   useEnterAsTab();
+
+  // Cmd-K / Ctrl-K globaler Shortcut fuer die Command-Palette. Trigger-
+  // Button in der Sidebar feuert dasselbe CMDK_OPEN_EVENT.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isCmdK = (e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K");
+      if (isCmdK) {
+        e.preventDefault();
+        setCmdkOpen(true);
+      }
+    };
+    const onOpen = () => setCmdkOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(CMDK_OPEN_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(CMDK_OPEN_EVENT, onOpen);
+    };
+  }, []);
 
   // App-weit: Scroll-Position wiederherstellen wenn man zur vorherigen
   // Seite zurueck navigiert (Back-Pfeil, Browser-Back). Forward-Nav
@@ -272,6 +294,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <NavCountsProvider isAdmin={profile.role === "admin"}>
     <MeinKontoOnboardingProvider profileReady={!!profile}>
+    <BreadcrumbsProvider>
     <div className="flex min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <Sidebar
         profile={profile}
@@ -288,6 +311,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
           Scroll-Container der App und nicht window. useScrollRestoration
           targetiert das Element ueber diese id. */}
       <div id="app-scroll" className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden md:ml-[240px]">
+        <Breadcrumbs />
         <main
           className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-8 max-w-[1280px] w-full mx-auto min-w-0"
           style={{ ["--shell-py" as string]: "2.5rem" }}
@@ -373,9 +397,11 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <MeinKontoIntroModal />
+      <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
       <Toaster />
       <VersionWatcher />
     </div>
+    </BreadcrumbsProvider>
     </MeinKontoOnboardingProvider>
     </NavCountsProvider>
   );
