@@ -208,7 +208,7 @@ export function OverviewTab({
           </div>
           {job.description && (
             <div className="pt-3 mt-3 border-t">
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{job.description}</p>
+              <p className="text-sm whitespace-pre-wrap">{job.description}</p>
             </div>
           )}
         </CardContent>

@@ -161,7 +161,7 @@ function InfoCard({ project, canEdit, onSaved }: { project: Project; canEdit: bo
             )}
             {project.description && (
               <ReadField icon={<FileText className="h-3.5 w-3.5" />} label="Beschreibung">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{project.description}</p>
+                <p className="text-sm whitespace-pre-wrap">{project.description}</p>
               </ReadField>
             )}
             {project.notes && (
