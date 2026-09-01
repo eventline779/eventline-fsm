@@ -122,11 +122,13 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// Sidebar: Top-Level-Bereiche. Todos hat eine eigene Seite zurueck (war
-// frueher unter HR-Hub gebuendelt, aber gehoert in den Daily-Workflow —
-// nicht zwei Clicks tief). Alles andere (Rapporte, Belege, Vorlagen,
-// Zeiterfassung, Tickets, Schulungen, IT-Tickets, Team, Stempelzeiten,
-// Schichtplanung) bleibt via /hr erreichbar.
+// Sidebar-Struktur nach dem Audit-Rebuild (2026-08): flache Top-Level-
+// Einträge statt tiefer HR-Hub-Verschachtelung. Stempelzeiten/Tickets/
+// Ferien sind eigene Sidebar-Bereiche geworden — /hr ist damit nur noch
+// die admin-only Löhne-Seite (LohnsummenPrognose + Monatsstunden +
+// Lohn-Dokumente + Mitarbeiter-Löhne + Standardwerte).
+// Partner-Kontakte leben eigenständig unter /partner (vorher in
+// /einstellungen versteckt).
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "",
@@ -134,29 +136,28 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard", mobile: true },
       { href: "/todos", label: "Todos", icon: "CheckSquare", mobile: true },
       { href: "/kalender", label: "Kalender", icon: "Calendar", mobile: true },
-      // HR-Hub direkt unter Kalender (Leo, 2026-07-04): war frueher im
-      // Admin-Bereich, aber semantisch gehoert der Rapport-/Belege-/
-      // Zeiterfassungs-Hub zum Daily-Workflow, nicht in den Admin-Kontext.
-      { href: "/hr", label: "HR", icon: "Briefcase" },
     ],
   },
   {
-    label: "Buchungen",
+    label: "Mein Arbeitstag",
     items: [
-      { href: "/auftraege", label: "Operations", icon: "ClipboardList", mobile: true },
-      { href: "/projekte", label: "Projekte", icon: "FolderKanban" },
-      { href: "/abrechnung", label: "Abrechnung", icon: "Receipt" },
+      { href: "/stempelzeiten", label: "Stempelzeiten", icon: "Clock" },
+      { href: "/tickets", label: "Tickets", icon: "TicketCheck" },
+      { href: "/ferien", label: "Ferien", icon: "Palmtree" },
+    ],
+  },
+  {
+    label: "Kunden-Workflow",
+    items: [
       { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
+      { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", mobile: true },
+      { href: "/abrechnung", label: "Rechnungen", icon: "Receipt" },
     ],
   },
   {
-    label: "Räumlichkeiten",
+    label: "Intern",
     items: [
-      // Standorte (Verwaltungen, intern) und Räume (externe Reference) leben
-      // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
-      // Belegungsplan ist seit dem Locations-Refactor unter der Schweizer
-      // Karte direkt eingebettet, eigener Nav-Eintrag entfaellt.
-      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
+      { href: "/projekte", label: "Projekte", icon: "FolderKanban" },
     ],
   },
   {
@@ -164,6 +165,10 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/kunden", label: "Kunden", icon: "Users" },
       { href: "/lieferanten", label: "Lieferanten", icon: "Handshake" },
+      { href: "/partner", label: "Partner", icon: "HeartHandshake" },
+      // Standorte (Verwaltungen, intern) und Räume (externe Reference) leben
+      // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
+      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
     ],
   },
 ];
@@ -171,10 +176,10 @@ export const NAV_GROUPS: NavGroup[] = [
 export const ADMIN_NAV_GROUP: NavGroup = {
   label: "Admin",
   items: [
-    // Analytics: Firmen-Kennzahlen (Lohnsummen-Prognose fuer Ausgleichskasse,
-    // SUVA, BVG-Meldung — kommt spaeter weitere Kennzahlen dazu). Strikt
-    // admin-only via ADMIN_ONLY_PREFIXES in src/lib/permissions.ts.
-    { href: "/analytics", label: "Analytics", icon: "BarChart3" },
+    // Löhne: LohnsummenPrognose (Ausgleichskasse/SUVA/BVG) + Monatsstunden
+    // + Lohnabrechnungen + Mitarbeiter-Löhne + Standardwerte. Admin-only
+    // via ADMIN_ONLY_PREFIXES in src/lib/permissions.ts + TrustedDeviceGate.
+    { href: "/hr", label: "Löhne", icon: "Wallet" },
     { href: "/einstellungen", label: "Einstellungen", icon: "Settings" },
   ],
 };

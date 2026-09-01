@@ -432,7 +432,7 @@ export default function StempelzeitenPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div className="flex items-center gap-4">
-          <BackButton fallbackHref="/hr" />
+          <BackButton fallbackHref="/dashboard" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Stempelzeiten</h1>
             <p className="text-sm text-muted-foreground mt-1">

@@ -527,7 +527,7 @@ export default function TodosPage() {
           damit man via HR-Hub mit dem Pfeil wieder rauskommt. */}
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div className="flex items-center gap-4">
-          <BackButton fallbackHref="/hr" />
+          <BackButton fallbackHref="/dashboard" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Todos Archiv" : "Todos"}</h1>
             <p className="text-xs text-muted-foreground/70 mt-1">

@@ -16,26 +16,27 @@ import { TeamTab } from "@/components/einstellungen/team-tab";
 import { RollenTab } from "@/components/einstellungen/rollen-tab";
 import { PermissionAuditLogCard } from "@/components/einstellungen/permission-audit-log";
 import { AktivitaetTab } from "@/components/einstellungen/aktivitaet-tab";
-import { PartnerTab } from "@/components/einstellungen/partner-tab";
 import { PartnerFormTab } from "@/components/einstellungen/partner-form-tab";
 import { FirmaTab } from "@/components/einstellungen/firma-tab";
 import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
 
-type Tab = "integrationen" | "firma-stammdaten" | "team" | "rollen" | "aktivitaet" | "partner" | "partner-rollen" | "partner-aktivitaet" | "partner-form";
+type Tab = "integrationen" | "firma-stammdaten" | "team" | "rollen" | "aktivitaet" | "partner-rollen" | "partner-aktivitaet" | "partner-form";
 type Portal = "firma" | "partner";
 
-const ALL_TABS: Tab[] = ["integrationen", "firma-stammdaten", "team", "rollen", "aktivitaet", "partner", "partner-rollen", "partner-aktivitaet", "partner-form"];
+const ALL_TABS: Tab[] = ["integrationen", "firma-stammdaten", "team", "rollen", "aktivitaet", "partner-rollen", "partner-aktivitaet", "partner-form"];
 
 // Welcher Haupt-Tab gehoert welcher Portal-Gruppe. Beim Wechsel des
 // Haupt-Tabs springen wir automatisch auf den ersten Sub-Tab dieser
 // Gruppe (siehe selectPortal).
+// Die Partner-Kontaktliste selbst lebt seit dem Sidebar-Rebuild
+// (Audit-Umsetzung P1) unter /partner — dieser Portal-Bereich enthaelt
+// nur noch Rollen/Anfrage-Form/Aktivitaet des Partner-Namespaces.
 const PORTAL_OF: Record<Tab, Portal> = {
   team: "firma",
   rollen: "firma",
   aktivitaet: "firma",
   integrationen: "firma",
   "firma-stammdaten": "firma",
-  partner: "partner",
   "partner-rollen": "partner",
   "partner-aktivitaet": "partner",
   "partner-form": "partner",
@@ -69,7 +70,7 @@ export default function EinstellungenPage() {
   // Haupt-Tab-Wechsel → ersten Sub-Tab dieser Portal-Gruppe oeffnen.
   function selectPortal(p: Portal) {
     if (PORTAL_OF[tab] === p) return;
-    selectTab(p === "firma" ? "team" : "partner");
+    selectTab(p === "firma" ? "team" : "partner-rollen");
   }
 
   const activePortal: Portal = PORTAL_OF[tab];
@@ -104,9 +105,10 @@ export default function EinstellungenPage() {
     { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
   ];
 
-  // Partnerportal-Sub-Tabs — Partner-Benutzerliste, Rollen, Aktivitaet.
+  // Partnerportal-Sub-Tabs — Rollen, Anfrage-Form, Aktivitaet.
+  // Die Partner-Kontaktliste selbst lebt seit dem Sidebar-Rebuild unter
+  // /partner (eigener Kontakte-Sidebar-Eintrag).
   const partnerTabs: { key: Tab; label: string; icon: React.ReactNode }[] = isAdmin ? [
-    { key: "partner" as Tab, label: "Partner", icon: <Building2 className="h-4 w-4" /> },
     { key: "partner-rollen" as Tab, label: "Rollen", icon: <Shield className="h-4 w-4" /> },
     { key: "partner-form" as Tab, label: "Anfrage-Form", icon: <FileText className="h-4 w-4" /> },
     { key: "partner-aktivitaet" as Tab, label: "Aktivität", icon: <Activity className="h-4 w-4" /> },
@@ -183,8 +185,6 @@ export default function EinstellungenPage() {
       {tab === "firma-stammdaten" && isAdmin && <FirmaTab isAdmin={isAdmin} />}
 
       {tab === "team" && isAdmin && <TeamTab />}
-
-      {tab === "partner" && isAdmin && <PartnerTab />}
 
       {tab === "rollen" && isAdmin && (
         <div className="space-y-6">

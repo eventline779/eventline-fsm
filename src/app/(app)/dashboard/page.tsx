@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase, CheckCircle2 } from "lucide-react";
+import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase } from "lucide-react";
 import { usePermissions } from "@/lib/use-permissions";
 import { OfficeAttendanceCard } from "@/components/dashboard/office-attendance-card";
 
@@ -55,11 +55,10 @@ interface OpenTicket {
 }
 
 interface PersonalStats {
-  hoursTotal: number;       // all-time
   hoursWeek: number;
   hoursWeekByDay: number[]; // [Mo, Di, Mi, Do, Fr, Sa, So]
   activeJobs: number;
-  completedTodosWeek: number;
+  openTodosToday: number;   // eigene offene Todos ohne oder mit Faelligkeit bis heute
 }
 
 interface UpcomingDay {
@@ -119,7 +118,13 @@ export default function HeutePage() {
       sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7);
       sevenDaysAhead.setHours(23, 59, 59, 999);
 
-      const [todoRes, ticketRes, entriesRes, totalEntriesRes, assignedJobsRes, leadJobsRes, doneTodosRes, upcomingRes] = await Promise.all([
+      // Fenster fuer "Offene Todos heute": alle offenen Todos ohne
+      // Faelligkeit ODER Faelligkeit <= heute (= ueberfaellig + heute
+      // faellig). Datum als lokales ISO (Europe/Zurich) bilden — sonst
+      // droht ein UTC-Offset-Fehler beim Vergleich.
+      const todayLocalIsoDate = startOfDay.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
+
+      const [todoRes, ticketRes, entriesRes, openTodosTodayRes, assignedJobsRes, leadJobsRes, upcomingRes] = await Promise.all([
         supabase
           .from("todos")
           .select("id, title, priority, due_date")
@@ -142,14 +147,16 @@ export default function HeutePage() {
           .eq("user_id", user.id)
           .not("clock_out", "is", null)
           .gte("clock_in", startOfWeek.toISOString()),
-        // Total-Stunden seit Eventline-Start (alle eigenen abgeschlossenen
-        // Stempel-Eintraege). Bei langjaehrigen Mitarbeitern viele Rows —
-        // bei Performance-Problemen spaeter via SQL-RPC mit SUM ersetzen.
+        // "Offene Todos heute" — Count aller offenen eigenen Todos, deren
+        // Faelligkeit heute oder in der Vergangenheit liegt (oder gar keine
+        // Faelligkeit gesetzt ist — die haben "kein Ablaufdatum" und
+        // gelten daher immer als "steht an"). Count-only, keine Rows.
         supabase
-          .from("time_entries")
-          .select("clock_in, clock_out")
-          .eq("user_id", user.id)
-          .not("clock_out", "is", null),
+          .from("todos")
+          .select("id", { count: "exact", head: true })
+          .eq("assigned_to", user.id)
+          .eq("status", "offen")
+          .or(`due_date.is.null,due_date.lte.${todayLocalIsoDate}`),
         // Aktive Auftraege via job_appointments (= Termine des Mitarbeiters).
         // Set dedupliziert weiter unten falls mehrere Termine pro Job.
         supabase
@@ -162,13 +169,6 @@ export default function HeutePage() {
           .select("id, status")
           .eq("project_lead_id", user.id)
           .neq("is_deleted", true),
-        // Erledigte eigene Todos diese Woche
-        supabase
-          .from("todos")
-          .select("id")
-          .eq("assigned_to", user.id)
-          .eq("status", "erledigt")
-          .gte("completed_at", startOfWeek.toISOString()),
         // Kommende 7 Tage — eigene Termine im Look-Ahead-Fenster
         supabase
           .from("job_appointments")
@@ -195,13 +195,6 @@ export default function HeutePage() {
         hoursByDay[dayIdx] += dur;
       }
 
-      // Total seit Eventline-Start
-      let hoursTotal = 0;
-      for (const e of (totalEntriesRes.data ?? []) as EntryRow[]) {
-        if (!e.clock_out) continue;
-        hoursTotal += (new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 3600000;
-      }
-
       // Aktive Auftraege = assigned + lead, Status nicht abgeschlossen/storniert,
       // dedupliziert (kann sein dass jemand assigned + lead auf demselben Job ist).
       const activeJobIds = new Set<string>();
@@ -220,11 +213,10 @@ export default function HeutePage() {
       }
 
       setStats({
-        hoursTotal,
         hoursWeek,
         hoursWeekByDay: hoursByDay,
         activeJobs: activeJobIds.size,
-        completedTodosWeek: (doneTodosRes.data ?? []).length,
+        openTodosToday: openTodosTodayRes.count ?? 0,
       });
 
       // Upcoming-Look-Ahead nach Datum gruppieren — 7 Day-Buckets, leere Tage
@@ -289,10 +281,11 @@ export default function HeutePage() {
           eh nichts). */}
       {can("anwesenheit:view") && <OfficeAttendanceCard />}
 
-      {/* Personal-Stats-Strip — Reihenfolge nach Zeit-Logik:
-          aktuelle Woche -> Pipeline -> Wochen-Produktivitaet -> Karriere-Total.
-          Mini-Sparkline auf "Diese Woche" zeigt Stunden-Verteilung Mo..So. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Personal-Stats-Strip — 3 KPIs im "was ist heute los"-Fokus.
+          Reihenfolge: Zeit-Fortschritt (Diese Woche mit Sparkline Mo..So),
+          Pipeline (Aktive Auftraege), Priorisiertes To-Do (Offene Todos
+          heute — Todos ohne Faelligkeit oder mit Faelligkeit bis heute). */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           label="Diese Woche"
           value={loading ? "—" : formatHoursShort(stats?.hoursWeek ?? 0)}
@@ -307,18 +300,11 @@ export default function HeutePage() {
           accent="red"
         />
         <StatCard
-          label="Erledigt diese Woche"
-          value={loading ? "—" : (stats?.completedTodosWeek ?? 0).toString()}
-          icon={CheckCircle2}
-          accent="green"
-          sub="Todos"
-        />
-        <StatCard
-          label="Total gestempelt"
-          value={loading ? "—" : formatHoursShort(stats?.hoursTotal ?? 0)}
-          icon={Clock}
-          accent="teal"
-          sub="seit Beginn"
+          label="Offene Todos heute"
+          value={loading ? "—" : (stats?.openTodosToday ?? 0).toString()}
+          icon={CheckSquare}
+          accent="amber"
+          sub="fällig oder überfällig"
         />
       </div>
 
@@ -422,6 +408,7 @@ const ACCENT_CLASSES = {
   red: { icon: "text-red-600 dark:text-red-400", bg: "rgb(220,38,38)" },
   green: { icon: "text-green-600 dark:text-green-400", bg: "rgb(34,197,94)" },
   blue: { icon: "text-blue-600 dark:text-blue-400", bg: "rgb(37,99,235)" },
+  amber: { icon: "text-amber-600 dark:text-amber-400", bg: "rgb(245,158,11)" },
 } as const;
 
 interface StatCardProps {

@@ -25,11 +25,11 @@
  * Schichten den Kontext des Auftrags hat.
  */
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays } from "lucide-react";
 import { logError } from "@/lib/log";
 import type { BvgPersonForecast, CalendarItem, CalendarShift, CalendarTimeOff, CalendarView, ItemType } from "@/components/kalender/types";
 import { calculateForecast, monthRange, forecastStatus } from "@/lib/bvg-forecast";
@@ -100,6 +100,26 @@ export default function KalenderPage() {
   // Edit/Delete-Modal. Auftrag-bezogene Termine fuehren weiter zur
   // Auftrag-Detail-Page (existing Link-behaviour in WeekView).
   const [editTerminId, setEditTerminId] = useState<string | null>(null);
+  // iCal-Feed-Popover: Icon-Button oben rechts oeffnet ein Overlay mit dem
+  // IcalFeedBlock. Click-outside + Esc schliessen.
+  const [icalOpen, setIcalOpen] = useState(false);
+  const icalRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!icalOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (!icalRef.current) return;
+      if (!icalRef.current.contains(e.target as Node)) setIcalOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setIcalOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [icalOpen]);
   // BVG-Forecast pro Person fuer den aktuell sichtbaren Monat — wird in der
   // Wochenansicht als Pille neben dem Namen gerendert. Nur in der Woche
   // relevant (im Monat sieht man keine Person-Zeilen).
@@ -384,6 +404,37 @@ export default function KalenderPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* iCal-Feed als Icon-Button + Popover — vorher als Card unten
+              (nur sichtbar wenn man scrollte). Rechts vom Header damit
+              der Header knapp bleibt und der Abonnier-Flow trotzdem
+              einen Klick entfernt ist. */}
+          <div className="relative" ref={icalRef}>
+            <button
+              type="button"
+              onClick={() => setIcalOpen((v) => !v)}
+              className={`kasten ${icalOpen ? "kasten-active" : "kasten-muted"}`}
+              data-tooltip="Kalender abonnieren (iCal-Feed)"
+              data-tooltip-align="end"
+              aria-expanded={icalOpen}
+              aria-haspopup="dialog"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Abonnieren</span>
+            </button>
+            {icalOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,420px)]">
+                <IcalFeedBlock
+                  title="Mein Kalender abonnieren"
+                  description={
+                    <>
+                      Persönlicher iCal-Feed mit deinen Aufträgen + Terminen. Kopiere die URL und füge sie in Google
+                      Calendar / Apple Calendar / Outlook über <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
+                    </>
+                  }
+                />
+              </div>
+            )}
+          </div>
           {can("kalender:create") && (
             <button
               type="button"
@@ -482,19 +533,6 @@ export default function KalenderPage() {
 
         </CardContent>
       </Card>
-
-      {/* Persoenlicher iCal-Feed — jeder User kann hier seinen Token kopieren
-          und in Google/Apple/Outlook abonnieren. Vorher nur in /einstellungen,
-          aber Mitarbeiter ohne Settings-Zugriff hatten keinen Pfad dahin. */}
-      <IcalFeedBlock
-        title="Mein Kalender abonnieren"
-        description={
-          <>
-            Persönlicher iCal-Feed mit deinen Aufträgen + Terminen. Kopiere die URL und füge sie in Google
-            Calendar / Apple Calendar / Outlook über <span className="font-medium">&quot;Per URL hinzufügen&quot;</span> ein.
-          </>
-        }
-      />
 
       <NeuerTerminModal
         open={showNeuerTermin}

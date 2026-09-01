@@ -53,19 +53,15 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   // see-all / edit-all heben den Owner-Lock auf: sieht/bearbeitet
   // Todos aller Mitarbeiter (z.B. fuer Team-Leitung).
   { slug: "todos",         label: "Todos",         paths: ["/todos"],                                            actions: ["view", "create", "see-all", "edit-all"] },
-  // HR-Hub-Sammelseite (zeigt nur Karten — Sub-Pfade haben eigene Module).
-  { slug: "hr",            label: "HR-Hub",        paths: ["/hr"],                                               actions: ["view"] },
-  // Analytics laeuft NICHT als Modul — sie ist strikt admin-only via
-  // ADMIN_ONLY_PREFIXES (unten). Kein "analytics:view" hier, damit sie
-  // in der Rollen-Matrix gar nicht als konfigurierbar auftaucht.
+  // /hr ist strikt admin-only via ADMIN_ONLY_PREFIXES (unten) — kein
+  // "hr:view" hier, damit die Rolle in der Matrix gar nicht auftaucht.
   // Loehne — Pro-Mitarbeiter-Saetze (Brutto + Arbeitgeber-Anteil) pflegen.
   // Sensitives Modul: nur HR/Geschaeftsfuehrung. Mitarbeiter sehen ihre
   // eigene Brutto-Zahl via /einstellungen → Mein Konto (RPC, kein Modul-View).
   // KEINE eigene Route — die Lohntabelle ist Content im Loehne-Tab unter /hr,
-  // daher leere paths-Liste. Page-Gate uebernimmt 'hr:view'.
+  // daher leere paths-Liste. Page-Gate uebernimmt die admin-only-Regel.
   { slug: "lohn",          label: "Löhne",         paths: [],                                                    actions: ["manage"] },
-  // Stempelzeiten als eigenes Modul — User mit hr:view aber nicht
-  // stempelzeiten:view kann den HR-Hub sehen, aber nicht die Stempel-Liste.
+  // Stempelzeiten als eigenes Modul + eigener Sidebar-Bereich.
   // see-all / edit-all heben den Owner-Lock auf der time_entries-Tabelle
   // auf — fuer HR-Verantwortliche die alle Stempelzeiten korrigieren.
   { slug: "stempelzeiten", label: "Stempelzeiten", paths: ["/stempelzeiten"],                                    actions: ["view", "see-all", "edit-all"] },
@@ -110,9 +106,11 @@ const ALWAYS_ALLOWED_PREFIXES = ["/dashboard", "/mein-konto", "/ferien"];
 /** Pfade die strikt nur fuer role='admin' sind — Sidebar blendet sie fuer
  *  alle anderen aus, isPathAllowed liefert false (-> /dashboard-Redirect
  *  im (app)/layout). RLS sperrt die Daten zusaetzlich auf der DB-Seite.
- *  Analytics: sensible Firmen-Aggregate (Lohnsumme etc.), niemand ausser
- *  Admin darf das sehen — auch nicht via granularer Permission. */
-const ADMIN_ONLY_PREFIXES: string[] = ["/analytics"];
+ *  /hr: Löhne-Hub (Lohnsummen-Prognose + Monatsstunden + Lohnabrechnungen
+ *  + Mitarbeiter-Löhne + Standardwerte) — sensible Firmen-Aggregate,
+ *  zusätzlich TrustedDeviceGate. Analytics ist in die jeweilige Fach-
+ *  Seite gewandert (Löhne → /hr, Location-Overview → /locations). */
+const ADMIN_ONLY_PREFIXES: string[] = ["/hr"];
 
 /** Pfade die immer erreichbar sind, auch ohne Modul-View-Permission, weil
  *  sie via Verknuepfung aus einem anderen Modul aufgerufen werden (z.B.
@@ -134,6 +132,11 @@ function canSeeModule(slug: string, permissions: string[], role: string): boolea
 }
 
 export function isPathAllowed(pathname: string, permissions: string[], role: string): boolean {
+  // Sidebar-Items koennen Query-Strings enthalten (z.B. "/hr?tab=loehne").
+  // Fuer die Path-Match-Logik interessiert uns nur der reine Pfad, sonst
+  // faellt "/hr?tab=loehne" durch den admin-only-Check.
+  const qIdx = pathname.indexOf("?");
+  if (qIdx !== -1) pathname = pathname.slice(0, qIdx);
   // Admin-only-Pfade: explizit pruefen damit die Sidebar sie fuer Nicht-
   // Admins ausblendet (auch wenn role==admin sowieso true zurueckgibt).
   if (ADMIN_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) {

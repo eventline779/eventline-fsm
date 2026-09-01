@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { deleteRow } from "@/lib/db-mutations";
@@ -18,7 +18,7 @@ type ReportWithCreator = ServiceReport & {
 import {
   MapPin, User, Calendar, Clock, FileText, Plus, Upload, Camera,
   Check, CheckCircle, XCircle, Trash2, UserCheck, Download, Send, X, StickyNote, Pencil, AlertCircle, Inbox, ExternalLink, Eye, Briefcase,
-  Phone, Mail,
+  Phone, Mail, MoreVertical,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
@@ -91,6 +91,27 @@ export default function AuftragDetailPage() {
   const [partnerDecisionBusy, setPartnerDecisionBusy] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
+  // Overflow-Menu (Dreipunkt) — enthaelt destruktive Aktionen wie Stornieren,
+  // damit sie nicht neben dem Freigeben/Abschliessen-Primaerknopf visuell
+  // gleichwertig auftauchen. Click-outside + Esc schliessen.
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (!overflowRef.current) return;
+      if (!overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen]);
 
   const { confirm, ConfirmModalElement } = useConfirm();
 
@@ -517,20 +538,40 @@ export default function AuftragDetailPage() {
           </Link>
         )}
 
-        {/* Stornieren als Letztes — auftraege:edit-only */}
-        {can("auftraege:edit") && availableActions
-          .filter((a) => a.to === "storniert")
-          .map((a) => (
+        {/* Stornieren nicht mehr in der Hauptleiste — landet im Overflow-Menue
+            (Dreipunkt) damit die primaeren, konstruktiven Aktionen (Freigeben,
+            Abschliessen) visuell nicht mit destruktivem Rot konkurrieren. */}
+        {can("auftraege:edit") && availableActions.some((a) => a.to === "storniert") && (
+          <div className="relative" ref={overflowRef}>
             <button
-              key={a.to}
               type="button"
-              onClick={() => setCancelPhase("confirm")}
-              className="kasten kasten-red"
+              onClick={() => setOverflowOpen((v) => !v)}
+              className={`kasten ${overflowOpen ? "kasten-active" : "kasten-muted"}`}
+              data-tooltip="Weitere Aktionen"
+              data-tooltip-align="end"
+              aria-expanded={overflowOpen}
+              aria-haspopup="menu"
             >
-              {a.icon}
-              {a.label}
+              <MoreVertical className="h-3.5 w-3.5" />
             </button>
-          ))}
+            {overflowOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-[calc(100%+6px)] z-40 min-w-[180px] rounded-xl border border-border bg-card shadow-lg p-1"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setOverflowOpen(false); setCancelPhase("confirm"); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Stornieren
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stempel-Quick-Button — auch fuer Techniker ohne auftraege:edit
             verfuegbar (Stempelung gehoert zur Arbeitszeit-Erfassung). */}
@@ -547,6 +588,13 @@ export default function AuftragDetailPage() {
           {finishBlockReason} — Rapport kann jedoch schon jetzt vorbereitet werden.
         </p>
       )}
+
+      {/* Body-Cards: bei abgeschlossenen/stornierten Auftraegen visuell
+          zurueckgenommen (opacity + grayscale) — sie sind read-only und
+          sollen nicht mehr die volle Aufmerksamkeit auf sich ziehen.
+          Header + Aktionsleiste + Storno-Info bleiben davon unberuehrt,
+          weil sie den aktuellen Zustand kommunizieren. */}
+      <div className={isArchivedJob ? "space-y-6 opacity-80 grayscale" : "space-y-6"}>
 
       {/* Info */}
       <Card className="bg-card">
@@ -943,6 +991,8 @@ export default function AuftragDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      </div>
       {/* Partner-Anfrage ablehnen — Reason-Modal */}
       <Modal
         open={partnerRejectOpen}

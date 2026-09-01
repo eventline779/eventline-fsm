@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { usePermissions } from "@/lib/use-permissions";
+import { LocationOverview } from "@/components/analytics/location-overview";
+import { TrustedDeviceGate } from "@/components/trust/trusted-device-gate";
 
 // Map ist Leaflet + GeoJSON + Plugins — ~250kb-Chunk. Lazy laden damit der
 // First-Paint nicht darauf wartet.
@@ -52,7 +54,8 @@ type OrtItem = {
 type FormType = OrtType | null;
 
 export default function OrtePage() {
-  const { can } = usePermissions();
+  const { can, role } = usePermissions();
+  const isAdmin = role === "admin";
   const [items, setItems] = useState<OrtItem[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | OrtType>("all");
@@ -408,6 +411,16 @@ export default function OrtePage() {
             );
           })}
         </div>
+      )}
+
+      {/* Location-Overview — Aggregation pro Standort (Auftraege, Stunden,
+          Vollkosten). Admin-only + TrustedDeviceGate weil die zugrunde-
+          liegende RPC lohn:manage voraussetzt. War frueher unter
+          /analytics, ist aber Fach-Content der Locations-Seite. */}
+      {isAdmin && (
+        <TrustedDeviceGate>
+          <LocationOverview />
+        </TrustedDeviceGate>
       )}
     </div>
   );

@@ -132,7 +132,7 @@ export async function requirePermission(perm: string) {
 // =====================================================================
 //
 // Pattern:
-//   const auth = await requireTrustedDevice("hr:view");
+//   const auth = await requireTrustedDevice("lohn:manage");
 //   if (auth.error) return auth.error;
 //
 // Pruefkette:
