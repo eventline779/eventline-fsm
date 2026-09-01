@@ -309,6 +309,17 @@ export function OverviewTab({
         </Card>
       )}
 
+      {/* TODO (Audit Thema 2 / Bruecke 4): "Aus Vertrieb"-Section einbauen,
+          sobald jobs -> lead-Bezug in der DB existiert. Aktuell ist der
+          Bezug NUR umgekehrt gespeichert: vertrieb_contacts.notizen._details
+          .job_id zeigt auf den erstellten Auftrag; jobs hat weder lead_id
+          noch source_lead_id und jobs.notes ist text (kein jsonb) — also
+          keine belastbare Rueckwaerts-Auflaufung ohne Full-Table-Scan.
+          Naechster Schritt: Migration `alter table public.jobs add column
+          lead_id uuid references public.vertrieb_contacts(id) on delete
+          set null` + Setter in lead-editor.tsx, dann hier die collapsed
+          Section rendern (Kunden-Name, letzte 3 Notizen, Link
+          "/vertrieb?lead={id}"). */}
       <AppointmentsSection
         jobId={jobId}
         jobTitle={job?.title ?? null}

@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase } from "lucide-react";
+import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase, FileEdit } from "lucide-react";
 import { usePermissions } from "@/lib/use-permissions";
 import { OfficeAttendanceCard } from "@/components/dashboard/office-attendance-card";
 
@@ -52,6 +52,13 @@ interface OpenTicket {
   title: string;
   type: string;
   status: string;
+}
+
+interface RapportDraft {
+  id: string;
+  job_id: string;
+  updated_at: string;
+  job: { job_number: number | null; title: string; customer: { name: string } | null; location: { name: string } | null } | null;
 }
 
 interface PersonalStats {
@@ -90,6 +97,7 @@ export default function HeutePage() {
   const [tickets, setTickets] = useState<OpenTicket[]>([]);
   const [stats, setStats] = useState<PersonalStats | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingDay[]>([]);
+  const [rapportDrafts, setRapportDrafts] = useState<RapportDraft[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -124,7 +132,7 @@ export default function HeutePage() {
       // droht ein UTC-Offset-Fehler beim Vergleich.
       const todayLocalIsoDate = startOfDay.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
 
-      const [todoRes, ticketRes, entriesRes, openTodosTodayRes, assignedJobsRes, leadJobsRes, upcomingRes] = await Promise.all([
+      const [todoRes, ticketRes, entriesRes, openTodosTodayRes, assignedJobsRes, leadJobsRes, upcomingRes, draftsRes] = await Promise.all([
         supabase
           .from("todos")
           .select("id, title, priority, due_date")
@@ -177,6 +185,16 @@ export default function HeutePage() {
           .gte("start_time", startOfDay.toISOString())
           .lte("start_time", sevenDaysAhead.toISOString())
           .order("start_time"),
+        // Eigene Rapport-Entwuerfe — Bruecke zum Auftrag-Detail. RLS erlaubt
+        // dem User Sicht auf seine eigenen created_by-Rapporte; wir zeigen
+        // die letzten 5 offenen Entwuerfe.
+        supabase
+          .from("service_reports")
+          .select("id, job_id, updated_at, job:jobs(job_number, title, customer:customers(name), location:locations(name))")
+          .eq("created_by", user.id)
+          .eq("status", "entwurf")
+          .order("updated_at", { ascending: false })
+          .limit(5),
       ]);
 
       setTodos((todoRes.data ?? []) as OpenTodo[]);
@@ -249,6 +267,41 @@ export default function HeutePage() {
         });
       }
       setUpcoming(upcomingArr);
+
+      // Rapport-Entwuerfe — Supabase gibt bei !inner-loser joins die
+      // Relation als Array oder Object zurueck, wir normalisieren auf ein
+      // Objekt und filtern Rows deren Job in der Zwischenzeit geloescht
+      // wurde raus.
+      type DraftRow = {
+        id: string;
+        job_id: string;
+        updated_at: string;
+        job:
+          | { job_number: number | null; title: string; customer: { name: string } | { name: string }[] | null; location: { name: string } | { name: string }[] | null }
+          | { job_number: number | null; title: string; customer: { name: string } | { name: string }[] | null; location: { name: string } | { name: string }[] | null }[]
+          | null;
+      };
+      const draftsArr: RapportDraft[] = ((draftsRes.data ?? []) as DraftRow[])
+        .map((d) => {
+          const j = Array.isArray(d.job) ? d.job[0] ?? null : d.job;
+          if (!j) return null;
+          const cust = Array.isArray(j.customer) ? j.customer[0] ?? null : j.customer;
+          const loc = Array.isArray(j.location) ? j.location[0] ?? null : j.location;
+          return {
+            id: d.id,
+            job_id: d.job_id,
+            updated_at: d.updated_at,
+            job: {
+              job_number: j.job_number,
+              title: j.title,
+              customer: cust,
+              location: loc,
+            },
+          } as RapportDraft;
+        })
+        .filter((d): d is RapportDraft => d !== null);
+      setRapportDrafts(draftsArr);
+
       setLoading(false);
     })();
   }, [supabase]);
@@ -310,6 +363,11 @@ export default function HeutePage() {
 
       {/* Kommende 7 Tage — Look-Ahead-Agenda fuer alle User */}
       {!loading && <UpcomingCard days={upcoming} />}
+
+      {/* Meine Rapport-Entwuerfe — Bruecke Dashboard → Auftrag-Rapport-Tab.
+          Nur gerendert wenn tatsaechlich Entwuerfe da sind, damit sie keine
+          leere Card produziert. */}
+      {!loading && rapportDrafts.length > 0 && <RapportDraftsCard drafts={rapportDrafts} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Offene Todos */}
@@ -524,6 +582,64 @@ function UpcomingCard({ days }: { days: UpcomingDay[] }) {
             ))}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =====================================================================
+// RapportDraftsCard — offene eigene Rapport-Entwuerfe
+// Bruecke zum Auftrag-Detail: Klick oeffnet /auftraege/[id]?tab=rapport&openDraft=1
+// wodurch das RapportFormModal automatisch mit dem Entwurf aufgeht.
+// =====================================================================
+
+function formatRelativeShort(iso: string): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMin = Math.round((now - then) / 60000);
+  if (diffMin < 1) return "gerade eben";
+  if (diffMin < 60) return `vor ${diffMin} Min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `vor ${diffH} Std`;
+  const diffD = Math.round(diffH / 24);
+  if (diffD < 30) return `vor ${diffD} Tag${diffD === 1 ? "" : "en"}`;
+  return new Date(iso).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit" });
+}
+
+function RapportDraftsCard({ drafts }: { drafts: RapportDraft[] }) {
+  return (
+    <Card className="bg-card">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileEdit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <h2 className="font-semibold text-sm">Meine Rapport-Entwürfe</h2>
+            <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+              {drafts.length}
+            </span>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {drafts.map((d) => {
+            const nr = d.job?.job_number ? `INT-${d.job.job_number}` : "INT-…";
+            const label = d.job?.customer?.name ?? d.job?.location?.name ?? d.job?.title ?? "";
+            return (
+              <Link
+                key={d.id}
+                href={`/auftraege/${d.job_id}?tab=rapport&openDraft=1`}
+                className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-md bg-foreground/[0.02] dark:bg-foreground/[0.04] hover:bg-foreground/[0.05] dark:hover:bg-foreground/[0.08] transition-colors min-w-0"
+              >
+                <div className="min-w-0 flex-1 flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-semibold text-muted-foreground shrink-0">{nr}</span>
+                  <p className="text-sm truncate">{label}</p>
+                </div>
+                <span className="text-[11px] text-muted-foreground shrink-0">
+                  {formatRelativeShort(d.updated_at)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );

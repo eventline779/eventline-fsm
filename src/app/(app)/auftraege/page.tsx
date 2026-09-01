@@ -35,7 +35,7 @@ const ACTIVE_PAGE_SIZE = 30;
 // Location wird mit dem Verwaltungs-Kunden gejoint, sodass Standort-Auftraege
 // (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
 // Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
-const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, appointments:job_appointments(id, start_time, assigned_to)";
+const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, appointments:job_appointments(id, start_time, assigned_to), service_reports(status)";
 import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
@@ -617,6 +617,11 @@ export default function AuftraegePage() {
             const terminUnassigned = isActive && hasAppointment && !hasAssignedAppointment && job.status !== "entwurf" && !isAnfrage;
             const allGood = isActive && hasAppointment && hasAssignedAppointment && job.status !== "entwurf" && !isAnfrage;
             const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
+            // "Rapport-Entwurf"-Pille: nur wenn ein offener Entwurf existiert
+            // und der Auftrag noch nicht abgeschlossen ist (Entwurf auf einem
+            // abgeschlossenen Auftrag ist unmoeglich per DB-Trigger, aber wir
+            // filtern trotzdem defensiv).
+            const hasRapportDraft = isActive && !!job.service_reports?.some((r) => r.status === "entwurf");
             const dateText = job.start_date
               ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
                 + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
@@ -725,6 +730,14 @@ export default function AuftraegePage() {
                           Keine Rechnung
                         </span>
                       )}
+                      {hasRapportDraft && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                          data-tooltip="Es existiert ein Rapport-Entwurf für diesen Auftrag"
+                        >
+                          Rapport-Entwurf
+                        </span>
+                      )}
                     </div>
                   </div>
                   {isAnfrage && (
@@ -794,6 +807,14 @@ export default function AuftraegePage() {
                     {job.was_anfrage && job.status !== "anfrage" && (
                       <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 shrink-0">
                         Vermietung
+                      </span>
+                    )}
+                    {hasRapportDraft && (
+                      <span
+                        className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 shrink-0"
+                        data-tooltip="Es existiert ein Rapport-Entwurf für diesen Auftrag"
+                      >
+                        Rapport-Entwurf
                       </span>
                     )}
                   </div>

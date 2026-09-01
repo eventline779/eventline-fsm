@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { validateFileList } from "@/lib/file-upload";
 import { Label } from "@/components/ui/label";
@@ -67,6 +68,7 @@ interface Props {
 
 export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, finishBlockReason, onBeforeFinalSubmit, isMaintenance = false }: Props) {
   const supabase = createClient();
+  const router = useRouter();
   const { confirm, ConfirmModalElement } = useConfirm();
   const { role } = usePermissions();
   const isAdmin = role === "admin";
@@ -659,6 +661,18 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
     setSaving(null);
     onCompleted();
     onClose();
+
+    // Bruecke Rapport -> Abrechnung: sobald der Auftrag abgeschlossen ist,
+    // liegt er in der Abrechnungs-Warteschlange. Wir zeigen einen Toast mit
+    // Direkt-Sprung dorthin — die Zielseite scrollt die Karte in View und
+    // flasht sie kurz auf.
+    toast.success("Rapport abgeschlossen", {
+      action: {
+        label: "Zur Rechnung",
+        onClick: () => router.push(`/abrechnung?highlight=${job.id}`),
+      },
+      duration: 8000,
+    });
   }
 
   const isReadOnly = draftStatus === "abgeschlossen";

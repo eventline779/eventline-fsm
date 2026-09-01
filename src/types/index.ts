@@ -212,6 +212,8 @@ export type JobWithRelations = Omit<Job, "customer" | "location" | "room" | "app
   location: (Pick<Location, "id" | "name"> & { customer: LocationAdminCustomer | null }) | null;
   room: Pick<Room, "id" | "name"> | null;
   appointments?: Pick<JobAppointment, "id" | "start_time" | "assigned_to">[] | null;
+  /** Nur Status — reicht fuer die "Rapport-Entwurf"-Pille auf der Liste. */
+  service_reports?: { status: string }[] | null;
 };
 
 /** Job + reichere Joins fuer die Auftrags-Detail-Seite. */

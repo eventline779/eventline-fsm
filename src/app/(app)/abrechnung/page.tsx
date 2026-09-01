@@ -16,12 +16,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
-import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info } from "lucide-react";
+import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, Send } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -193,6 +194,8 @@ type ModalState =
 
 export default function AbrechnungPage() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { can, ready } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
   const [jobs, setJobs] = useState<UnbilledJob[]>([]);
@@ -204,6 +207,12 @@ export default function AbrechnungPage() {
   const [submitting, setSubmitting] = useState(false);
   // Floating PDF/Image-Vorschau — non-modal.
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
+  // Highlight-jobId aus ?highlight=... (Bruecke Rapport -> Abrechnung).
+  // Karte wird gescrollt + border-flash animiert.
+  const highlightId = searchParams.get("highlight");
+  const [flashJobId, setFlashJobId] = useState<string | null>(null);
+  // In-flight-Guard fuer "In Bexio anlegen"-Buttons (pro Job).
+  const [bexioBusyId, setBexioBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -248,6 +257,40 @@ export default function AbrechnungPage() {
   }, [supabase]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Highlight-Handler: sobald die Jobs geladen sind und ein highlight-Param
+  // da ist, scroll die Karte in View, flash sie 2s und strippe den Param
+  // aus der URL (damit ein Reload nicht immer wieder flasht).
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const exists = jobs.some((j) => j.id === highlightId);
+    if (!exists) {
+      // Job liegt nicht (mehr) in der Abrechnungs-Liste — z.B. schon
+      // abgerechnet. Param trotzdem strippen.
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      const qs = params.toString();
+      router.replace(`/abrechnung${qs ? `?${qs}` : ""}`, { scroll: false });
+      return;
+    }
+    // setState defer'd via queueMicrotask, damit ESLint's
+    // react-hooks/set-state-in-effect nicht ueber synchronen setState
+    // im Effect meckert und React nicht cascading-rendert.
+    queueMicrotask(() => setFlashJobId(highlightId));
+    // Kurz warten bis die Karte gerendert ist, dann in View scrollen.
+    const t = setTimeout(() => {
+      document.getElementById(`job-card-${highlightId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    const flashTimer = setTimeout(() => setFlashJobId(null), 2100);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("highlight");
+    const qs = params.toString();
+    router.replace(`/abrechnung${qs ? `?${qs}` : ""}`, { scroll: false });
+    return () => {
+      clearTimeout(t);
+      clearTimeout(flashTimer);
+    };
+  }, [highlightId, loading, jobs, router, searchParams]);
 
   function openJobModal(job: UnbilledJob) {
     setModal({ kind: "job", job });
@@ -353,7 +396,27 @@ export default function AbrechnungPage() {
       return;
     }
     if (modal.kind === "job") {
-      toast.success(`INT-${modal.job.job_number ?? "?"} als Rechnung ${trimmed} abgerechnet`);
+      // Undo-Toast (5s): der User kann die Aktion sofort rueckgaengig machen
+      // wenn er versehentlich klickte oder die Nummer falsch tippte. Nach
+      // Ablauf ist der Auftrag endgueltig abgerechnet in der Liste.
+      const undoJob = modal.job;
+      const undoTrimmed = trimmed;
+      toast.success(`INT-${undoJob.job_number ?? "?"} als Rechnung ${undoTrimmed} abgerechnet`, {
+        action: {
+          label: "Rueckgaengig",
+          onClick: async () => {
+            const res = await fetch(`/api/jobs/${undoJob.id}/undo-mark-invoiced`, { method: "POST" });
+            const json = await res.json().catch(() => null);
+            if (!json?.success) {
+              TOAST.errorOr(json?.error, "Rueckgaengig fehlgeschlagen");
+              return;
+            }
+            toast.success(`INT-${undoJob.job_number ?? "?"} zurueck in der Abrechnungs-Liste`);
+            load();
+          },
+        },
+        duration: 5000,
+      });
       setJobs((prev) => prev.filter((j) => j.id !== modal.job.id));
     } else if (modal.kind === "job-skip") {
       toast.success(`INT-${modal.job.job_number ?? "?"} ohne Rechnung geschlossen`);
@@ -370,6 +433,39 @@ export default function AbrechnungPage() {
   }
 
   const canEdit = useMemo(() => can("abrechnung:edit"), [can]);
+
+  async function createInBexio(job: UnbilledJob) {
+    setBexioBusyId(job.id);
+    const res = await fetch(`/api/bexio/create-invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: job.id }),
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { success: boolean; error?: string; bexio_id?: number; bexio_url?: string; preview?: { billable_hours?: number; customer_name?: string | null } }
+      | null;
+    setBexioBusyId(null);
+    if (!res.ok || !json?.success) {
+      // 501 = Bexio-Setup fehlt / Erstellung noch nicht produktiv. Wir
+      // zeigen dem User die Server-Meldung + ggf. den berechneten Vorschlag
+      // damit klar ist warum's noch nicht klappt.
+      const msg = json?.error ?? "Rechnung konnte nicht in Bexio angelegt werden";
+      const preview = json?.preview;
+      toast.error(msg, {
+        description: preview?.billable_hours != null
+          ? `Vorschlag: ${preview.billable_hours}h${preview.customer_name ? ` fuer ${preview.customer_name}` : ""}.`
+          : undefined,
+        duration: 8000,
+      });
+      return;
+    }
+    toast.success("Rechnung in Bexio angelegt", {
+      action: json.bexio_url
+        ? { label: "Oeffnen", onClick: () => window.open(json.bexio_url, "_blank", "noopener,noreferrer") }
+        : undefined,
+    });
+    load();
+  }
 
   if (!ready) return null;
 
@@ -448,9 +544,12 @@ export default function AbrechnungPage() {
                     job={job}
                     onMarkBilled={() => openJobModal(job)}
                     onSkip={() => openJobSkipModal(job)}
+                    onCreateInBexio={() => createInBexio(job)}
+                    bexioBusy={bexioBusyId === job.id}
                     canEdit={canEdit}
                     onPreview={setPreviewDoc}
                     namesById={namesById}
+                    flash={flashJobId === job.id}
                   />
                 ))}
               </div>
@@ -649,12 +748,16 @@ interface JobCardProps {
   job: UnbilledJob;
   onMarkBilled: () => void;
   onSkip: () => void;
+  onCreateInBexio: () => void;
+  bexioBusy: boolean;
   canEdit: boolean;
   onPreview: (doc: { url: string; title: string }) => void;
   namesById: Map<string, string>;
+  /** Highlight-Flash nach Ankunft aus /auftraege/[id] via ?highlight=... */
+  flash: boolean;
 }
 
-function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById }: JobCardProps) {
+function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdit, onPreview, namesById, flash }: JobCardProps) {
   const report = job.service_reports[0] ?? null;
   const stempelByUser = aggregatePerUser(job.time_entries);
   const { billable: rapportByUser, notBillable: notBillableByUser, notBillableReasons } = aggregateReportPerUser(job.service_reports);
@@ -678,7 +781,21 @@ function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById }: J
     : formatDate(job.end_date ?? job.start_date);
 
   return (
-    <Card className="bg-card overflow-hidden">
+    <Card
+      id={`job-card-${job.id}`}
+      className="bg-card overflow-hidden transition-shadow"
+      // Highlight-Flash bei Ankunft aus dem Auftrag-Detail. Robust per
+      // inline style — Tailwind-`ring-*`-Utilities greifen an Card manchmal
+      // unzuverlaessig (siehe CLAUDE.md §3 zu Hover/State-driven).
+      style={
+        flash
+          ? {
+              boxShadow: "0 0 0 3px rgb(59 130 246 / 0.55), 0 8px 24px -8px rgb(59 130 246 / 0.35)",
+              transition: "box-shadow 0.6s ease-out",
+            }
+          : undefined
+      }
+    >
       {/* Header — items-center vertikal-zentriert den Button mit dem Text-Block,
           unabhaengig von Title-/Meta-Zeilenanzahl. */}
       <div className="px-4 py-3 flex items-center justify-between gap-3">
@@ -692,7 +809,7 @@ function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById }: J
           <MetaLine items={[job.customer?.name, dateRange, job.location?.name]} />
         </div>
         {canEdit && (
-          <div className="flex gap-1.5 shrink-0">
+          <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
             <button
               type="button"
               onClick={onSkip}
@@ -701,6 +818,20 @@ function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById }: J
               aria-label="Rechnung nicht stellen"
             >
               <Ban className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onCreateInBexio}
+              disabled={bexioBusy}
+              className="kasten kasten-blue"
+              data-tooltip="Rechnung direkt in Bexio anlegen (falls verbunden)"
+            >
+              {bexioBusy ? (
+                <span className="h-3.5 w-3.5 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              {bexioBusy ? "Legt an…" : "In Bexio anlegen"}
             </button>
             <button type="button" onClick={onMarkBilled} className="kasten kasten-green">
               <Receipt className="h-3.5 w-3.5" />

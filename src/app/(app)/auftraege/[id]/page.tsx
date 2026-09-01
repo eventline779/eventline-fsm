@@ -96,6 +96,21 @@ export default function AuftragDetailPage() {
     }, 100);
   }, [autoOpenAppt, jobId, router, searchParams]);
 
+  // Auto-open Rapport-Modal via ?openDraft=1 (Dashboard-Bruecke). Weiterleitet
+  // den User direkt in seinen offenen Rapport-Entwurf; Param wird gestrippt
+  // damit ein Reload das Modal nicht immer wieder aufmacht. setState via
+  // queueMicrotask, damit React nicht in eine cascading-render-Runde faellt
+  // (siehe react-hooks/set-state-in-effect).
+  const autoOpenDraft = searchParams.get("openDraft") === "1";
+  useEffect(() => {
+    if (!autoOpenDraft) return;
+    queueMicrotask(() => setShowRapportModal(true));
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("openDraft");
+    const qs = params.toString();
+    router.replace(`/auftraege/${jobId}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [autoOpenDraft, jobId, router, searchParams]);
+
   // ─── Tab-Auswahl (URL-State + Rollen-Default) ──────────────────
   const urlTab = searchParams.get("tab") as TabKey | null;
   const isValidTab = urlTab === "uebersicht" || urlTab === "rapport" || urlTab === "dokumente";
