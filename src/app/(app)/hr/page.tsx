@@ -163,13 +163,23 @@ export default function HRPage() {
               SUVA / BVG-Meldung. */}
           <LohnsummenPrognose />
 
-          <TabsNav
-            tabs={loehneSubTabs}
-            active={subTab}
-            onChange={(k) => selectSubTab(k as LoehneSubTab)}
-            className="mt-6"
-            ariaLabel="Löhne-Sub-Bereiche"
-          />
+          {/* Loehne-Sub-Tabs: Kasten-Toggle-Style (nicht Underline).
+              Muster wie main-Einstellungen: Underline nur fuer TOP-Nav
+              (Portale/Sektionen), Kasten fuer Sub-Nav innerhalb einer
+              Sektion. */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {loehneSubTabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => selectSubTab(t.key)}
+                className={subTab === t.key ? "kasten-active" : "kasten-toggle-off"}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
 
           <div className="pt-2">
             {subTab === "abrechnung" && <MonatsstundenTable />}
