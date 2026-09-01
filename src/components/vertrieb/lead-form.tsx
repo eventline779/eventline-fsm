@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { X, Check, ArrowRight, AlertTriangle, Mail, Phone, Calendar, Filter, Plus, Trash2, PartyPopper, Building2, Users, RotateCcw, Sparkles } from "lucide-react";
 import type { VertriebContact, VertriebStatus, VertriebPriority } from "@/types";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, KATEGORIE_OPTIONS, STEPS, BEDARF_BEREICHE, type VertriebFormState } from "@/app/(app)/vertrieb/constants";
+import { SearchableSelect } from "@/components/searchable-select";
 
 interface Props {
   // State
@@ -374,10 +375,15 @@ export function LeadForm({
               {kundenMode === "bestehend" && (
                 <div>
                   <label className="text-xs font-medium">Kunde auswählen *</label>
-                  <select value={selectedCustomerId} onChange={(e) => onSelectExistingCustomer(e.target.value)} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-card" required>
-                    <option value="">— Kunde wählen —</option>
-                    {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div className="mt-1">
+                    <SearchableSelect
+                      value={selectedCustomerId}
+                      onChange={(v) => onSelectExistingCustomer(v)}
+                      items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                      placeholder="— Kunde waehlen —"
+                      required
+                    />
+                  </div>
                   {selectedCustomerId && (() => {
                     const c = customers.find((x) => x.id === selectedCustomerId);
                     if (!c) return null;
@@ -429,15 +435,25 @@ export function LeadForm({
             </div>
             <div>
               <label className="text-xs font-medium">Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as VertriebStatus })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
+              <div className="mt-1">
+                <SearchableSelect
+                  value={form.status}
+                  onChange={(v) => setForm({ ...form, status: v as VertriebStatus })}
+                  items={STATUS_OPTIONS.map((s) => ({ id: s.value, label: s.label }))}
+                  clearable={false}
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium">Priorität</label>
-              <select value={form.prioritaet} onChange={(e) => setForm({ ...form, prioritaet: e.target.value as VertriebPriority })} className="mt-1 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                {PRIORITY_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+              <div className="mt-1">
+                <SearchableSelect
+                  value={form.prioritaet}
+                  onChange={(v) => setForm({ ...form, prioritaet: v as VertriebPriority })}
+                  items={PRIORITY_OPTIONS.map((p) => ({ id: p.value, label: p.label }))}
+                  clearable={false}
+                />
+              </div>
             </div>
           </div>
 

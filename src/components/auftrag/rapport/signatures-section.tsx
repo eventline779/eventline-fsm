@@ -8,6 +8,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SignaturePad } from "@/components/signature-pad";
+import { SearchableSelect } from "@/components/searchable-select";
 import type { ProfileOption } from "./types";
 
 interface Props {
@@ -53,20 +54,23 @@ export function SignaturesSection({
       <div>
         <div className="mb-2">
           <Label>Service-Techniker</Label>
-          <select
-            value={technicianId}
-            onChange={(e) => {
-              const sel = profiles.find((p) => p.id === e.target.value);
-              onTechnicianChange(e.target.value, sel?.full_name ?? "");
-            }}
-            disabled={isReadOnly}
-            className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-          >
-            <option value="">Techniker auswählen…</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>{p.full_name}</option>
-            ))}
-          </select>
+          <div className="mt-1.5">
+            {isReadOnly ? (
+              <div className="h-9 px-3 text-sm rounded-lg border bg-muted/40 flex items-center opacity-60">
+                {profiles.find((p) => p.id === technicianId)?.full_name ?? "—"}
+              </div>
+            ) : (
+              <SearchableSelect
+                value={technicianId}
+                onChange={(v) => {
+                  const sel = profiles.find((p) => p.id === v);
+                  onTechnicianChange(v, sel?.full_name ?? "");
+                }}
+                items={profiles.map((p) => ({ id: p.id, label: p.full_name }))}
+                placeholder="Techniker auswaehlen…"
+              />
+            )}
+          </div>
         </div>
         <SignaturePad label="Unterschrift Techniker" onSave={onTechSignature} savedUrl={techSavedUrl} />
       </div>

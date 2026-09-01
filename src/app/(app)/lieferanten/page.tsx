@@ -22,6 +22,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Truck } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
 
 // Color-Konvention: lila ist app-weit IT-Tickets, gruen ist Stempel.
 // Lieferanten-Typen vermeiden diese beiden Farben damit es nicht visuell
@@ -364,20 +365,18 @@ export default function LieferantenPage() {
             </div>
             <div>
               <Label htmlFor="type">Kategorie</Label>
-              <select
-                id="type"
-                value={form.type}
-                onChange={(e) =>
-                  setForm({ ...form, type: e.target.value as LieferantType })
-                }
-                className="mt-1.5 w-full h-9 rounded-xl border bg-background px-3 text-sm"
-              >
-                {(Object.keys(LIEFERANT_TYPES) as LieferantType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {LIEFERANT_TYPES[t].label}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1.5">
+                <SearchableSelect
+                  id="type"
+                  value={form.type}
+                  onChange={(v) => setForm({ ...form, type: v as LieferantType })}
+                  items={(Object.keys(LIEFERANT_TYPES) as LieferantType[]).map((t) => ({
+                    id: t,
+                    label: LIEFERANT_TYPES[t].label,
+                  }))}
+                  clearable={false}
+                />
+              </div>
             </div>
           </div>
 

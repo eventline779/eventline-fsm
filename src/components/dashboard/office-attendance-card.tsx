@@ -399,6 +399,11 @@ function TimeRangeModal({ dateIso, current, onClose, onSave, onDelete }: TimeRan
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">{dateLabel}</p>
 
+        {/* Ausnahme zur Regel „SearchableSelect statt <select>": fixe kleine
+            0-24-Auswahl mit disabled-Semantik pro Option (Bis > Von). Ein
+            Combobox waere hier UX-schwerer als noetig, und die Combobox
+            unterstuetzt kein per-option disabled. Native <select> ist
+            hier robuster. */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Von</p>

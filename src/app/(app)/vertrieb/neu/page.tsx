@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Building2, PartyPopper, Plus, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { toast } from "sonner";
 import { BEDARF_BEREICHE } from "@/app/(app)/vertrieb/constants";
+import { SearchableSelect } from "@/components/searchable-select";
 import type { VertriebKategorie } from "@/types";
 
 interface Customer {
@@ -237,14 +238,12 @@ export default function NeuerLeadPage() {
             {customers.length > 0 && (
               <div>
                 <SectionLabel>Bestandskunde übernehmen?</SectionLabel>
-                <select
+                <SearchableSelect
                   value={draft.existing_customer_id}
-                  onChange={(e) => pickExistingCustomer(e.target.value)}
-                  className="w-full h-9 px-3 text-sm rounded-lg border border-border bg-background"
-                >
-                  <option value="">— Neuer Kontakt —</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                  onChange={(v) => pickExistingCustomer(v)}
+                  items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                  placeholder="— Neuer Kontakt —"
+                />
               </div>
             )}
 

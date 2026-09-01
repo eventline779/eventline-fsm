@@ -2,6 +2,14 @@
 
 import { Input } from "@/components/ui/input";
 import { Check } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
+
+const PRIORITY_OPTIONS = [
+  { id: "niedrig", label: "Niedrig" },
+  { id: "normal", label: "Normal" },
+  { id: "hoch", label: "Hoch" },
+  { id: "dringend", label: "Dringend" },
+];
 
 interface Props {
   auftragForm: { title: string; priority: string; start_date: string; end_date: string; location_id: string };
@@ -33,19 +41,25 @@ export function AuftragModalBody({ auftragForm, setAuftragForm, locations, onCre
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-sm font-medium">Priorität</label>
-          <select value={auftragForm.priority} onChange={(e) => setAuftragForm({ ...auftragForm, priority: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-            <option value="niedrig">Niedrig</option>
-            <option value="normal">Normal</option>
-            <option value="hoch">Hoch</option>
-            <option value="dringend">Dringend</option>
-          </select>
+          <div className="mt-1.5">
+            <SearchableSelect
+              value={auftragForm.priority}
+              onChange={(v) => setAuftragForm({ ...auftragForm, priority: v })}
+              items={PRIORITY_OPTIONS}
+              clearable={false}
+            />
+          </div>
         </div>
         <div>
           <label className="text-sm font-medium">Location</label>
-          <select value={auftragForm.location_id} onChange={(e) => setAuftragForm({ ...auftragForm, location_id: e.target.value })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-            <option value="">— Keine —</option>
-            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+          <div className="mt-1.5">
+            <SearchableSelect
+              value={auftragForm.location_id}
+              onChange={(v) => setAuftragForm({ ...auftragForm, location_id: v })}
+              items={locations.map((l) => ({ id: l.id, label: l.name }))}
+              placeholder="— Keine —"
+            />
+          </div>
         </div>
       </div>
       <p className="text-[11px] text-muted-foreground">Nach Erstellung wirst du zur Auftrags-Seite weitergeleitet, wo du den Schichtplan machen kannst.</p>

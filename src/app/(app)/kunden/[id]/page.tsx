@@ -19,6 +19,7 @@ import { AddressAutocomplete, type ParsedAddress } from "@/components/address-au
 import { Modal } from "@/components/ui/modal";
 import { BackButton } from "@/components/ui/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SearchableSelect } from "@/components/searchable-select";
 import Link from "next/link";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -343,9 +344,14 @@ export default function KundenDetailPage() {
                 <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1.5 bg-gray-50" required /></div>
                 <div>
                   <Label>Typ</Label>
-                  <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as CustomerType })} className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50">
-                    {Object.entries(CUSTOMER_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+                  <div className="mt-1.5">
+                    <SearchableSelect
+                      value={form.type}
+                      onChange={(v) => setForm({ ...form, type: v as CustomerType })}
+                      items={Object.entries(CUSTOMER_TYPES).map(([k, v]) => ({ id: k, label: v }))}
+                      clearable={false}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -370,15 +376,14 @@ export default function KundenDetailPage() {
               </div>
               <div>
                 <Label>Land</Label>
-                <select
-                  value={form.address_country}
-                  onChange={(e) => setForm({ ...form, address_country: e.target.value })}
-                  className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                >
-                  {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+                <div className="mt-1.5">
+                  <SearchableSelect
+                    value={form.address_country}
+                    onChange={(v) => setForm({ ...form, address_country: v })}
+                    items={COUNTRY_OPTIONS.map((c) => ({ id: c.code, label: c.label }))}
+                    clearable={false}
+                  />
+                </div>
               </div>
               <div><Label>Notizen</Label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
               <button

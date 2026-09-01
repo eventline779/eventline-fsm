@@ -12,6 +12,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
+import { SearchableSelect } from "@/components/searchable-select";
 import { Loading } from "@/components/ui/spinner";
 
 // Land-Optionen — mehr als die Nachbarn macht aktuell keinen Sinn,
@@ -275,16 +276,15 @@ function NeuerKundeContent() {
             </div>
             <div>
               <Label htmlFor="country">Land</Label>
-              <select
-                id="country"
-                value={form.address_country}
-                onChange={(e) => update("address_country", e.target.value)}
-                className="mt-1.5 w-full h-9 px-3 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-              >
-                {COUNTRY_OPTIONS.map((c) => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
-                ))}
-              </select>
+              <div className="mt-1.5">
+                <SearchableSelect
+                  id="country"
+                  value={form.address_country}
+                  onChange={(v) => update("address_country", v)}
+                  items={COUNTRY_OPTIONS.map((c) => ({ id: c.code, label: c.label }))}
+                  clearable={false}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

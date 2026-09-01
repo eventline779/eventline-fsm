@@ -16,6 +16,7 @@ import {
 import { Loading } from "@/components/ui/spinner";
 import { BackButton } from "@/components/ui/back-button";
 import { usePermissions } from "@/lib/use-permissions";
+import { SearchableSelect } from "@/components/searchable-select";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { useConfirm } from "@/components/ui/use-confirm";
@@ -432,14 +433,15 @@ export default function StandortDetailPage() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <select
-                onChange={(e) => { if (e.target.value) linkCustomer(e.target.value); }}
-                className="flex-1 h-9 px-3 text-sm rounded-lg border border-border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                defaultValue=""
-              >
-                <option value="">Kunde auswählen...</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <div className="flex-1">
+                <SearchableSelect
+                  value=""
+                  onChange={(v) => { if (v) linkCustomer(v); }}
+                  items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                  placeholder="Kunde auswaehlen..."
+                  clearable={false}
+                />
+              </div>
             </div>
           )}
         </CardContent>

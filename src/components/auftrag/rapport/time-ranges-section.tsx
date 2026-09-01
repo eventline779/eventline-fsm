@@ -8,6 +8,7 @@
 import { Trash2, Plus, Ban, CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { usePrompt } from "@/components/ui/use-prompt";
+import { SearchableSelect } from "@/components/searchable-select";
 import type { TimeRange, ProfileOption } from "./types";
 
 interface Props {
@@ -167,18 +168,21 @@ export function TimeRangesSection({ timeRanges, profiles, isReadOnly, onChange }
             </div>
             <div id={`time-range-${i}-technician`} className="min-w-0">
               <label className="text-[11px] font-medium text-muted-foreground">Techniker *</label>
-              <select
-                value={tr.technician_id}
-                onChange={(e) => updateRange(i, "technician_id", e.target.value)}
-                disabled={isReadOnly}
-                required
-                className="mt-1 w-full h-9 px-2 text-xs rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-              >
-                <option value="">Auswählen…</option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.full_name}</option>
-                ))}
-              </select>
+              <div className="mt-1">
+                {isReadOnly ? (
+                  <div className="h-9 px-3 text-xs rounded-lg border bg-muted/40 flex items-center opacity-60">
+                    {profiles.find((p) => p.id === tr.technician_id)?.full_name ?? "—"}
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    value={tr.technician_id}
+                    onChange={(v) => updateRange(i, "technician_id", v)}
+                    items={profiles.map((p) => ({ id: p.id, label: p.full_name }))}
+                    placeholder="Auswaehlen…"
+                    required
+                  />
+                )}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
