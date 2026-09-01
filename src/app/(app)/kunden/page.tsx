@@ -25,6 +25,7 @@ import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Plus, Search, Building2, User, Globe, Users, Trash2, X, ChevronDown, RefreshCw, Archive, ArchiveRestore,
 } from "lucide-react";
@@ -391,20 +392,26 @@ export default function KundenPage() {
           ))}
         </div>
       ) : customers.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card py-16 text-center">
-          <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <Users className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h3 className="font-semibold text-lg">
-            {hasFilter ? "Keine Treffer" : showArchive ? "Archiv ist leer" : "Noch keine Kunden"}
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {hasFilter
-              ? "Andere Suche oder Filter zurücksetzen."
-              : showArchive
-                ? "Es sind keine Kunden archiviert."
-                : "Lege deinen ersten Kunden an."}
-          </p>
+        <div className="rounded-xl border border-dashed bg-card">
+          <EmptyState
+            icon={Users}
+            title={hasFilter ? "Keine Treffer" : showArchive ? "Archiv ist leer" : "Noch keine Kunden"}
+            description={
+              hasFilter
+                ? "Andere Suche oder Filter zurücksetzen."
+                : showArchive
+                  ? "Es sind keine Kunden archiviert."
+                  : "Lege deinen ersten Kunden an."
+            }
+            action={
+              !hasFilter && !showArchive ? (
+                <Link href="/kunden/neu" className="kasten kasten-blue inline-flex items-center gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  Kunde anlegen
+                </Link>
+              ) : undefined
+            }
+          />
         </div>
       ) : (
         <div className="rounded-xl border bg-card overflow-hidden">

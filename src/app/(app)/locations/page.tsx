@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 import { usePermissions } from "@/lib/use-permissions";
 import { LocationOverview } from "@/components/analytics/location-overview";
 import { TrustedDeviceGate } from "@/components/trust/trusted-device-gate";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // Map ist Leaflet + GeoJSON + Plugins — ~250kb-Chunk. Lazy laden damit der
 // First-Paint nicht darauf wartet.
@@ -346,18 +347,16 @@ export default function OrtePage() {
         </div>
       ) : filtered.length === 0 ? (
         <Card className="border-dashed bg-card">
-          <CardContent className="py-16 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-              <Building className="h-7 w-7 text-gray-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 text-lg">
-              {search || filterType !== "all" ? "Keine Ergebnisse" : "Noch keine Locations"}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {search || filterType !== "all"
-                ? "Andere Suche oder Filter zurücksetzen."
-                : "Erfasse deine erste Verwaltung oder einen Raum."}
-            </p>
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Building}
+              title={search || filterType !== "all" ? "Keine Ergebnisse" : "Noch keine Locations"}
+              description={
+                search || filterType !== "all"
+                  ? "Andere Suche oder Filter zuruecksetzen."
+                  : "Erfasse deine erste Verwaltung oder einen Raum."
+              }
+            />
           </CardContent>
         </Card>
       ) : (

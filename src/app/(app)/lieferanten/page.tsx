@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Truck } from "lucide-react";
 
 // Color-Konvention: lila ist app-weit IT-Tickets, gruen ist Stempel.
 // Lieferanten-Typen vermeiden diese beiden Farben damit es nicht visuell
@@ -224,21 +226,24 @@ export default function LieferantenPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            {lieferanten.length === 0
-              ? "Noch keine Lieferanten angelegt."
-              : "Keine Lieferanten für diese Filter gefunden."}
-          </p>
-          {lieferanten.length === 0 && can("lieferanten:create") && (
-            <button
-              type="button"
-              onClick={openNew}
-              className="mt-4 kasten kasten-red"
-            >
-              Ersten Lieferanten anlegen
-            </button>
-          )}
+        <div className="rounded-xl border border-dashed">
+          <EmptyState
+            icon={Truck}
+            title={lieferanten.length === 0 ? "Noch keine Lieferanten" : "Keine Treffer"}
+            description={
+              lieferanten.length === 0
+                ? "Lege deinen ersten Lieferanten an, um Rechnungen und Kontakte zentral zu verwalten."
+                : "Andere Suche oder Filter zuruecksetzen."
+            }
+            action={
+              lieferanten.length === 0 && can("lieferanten:create") ? (
+                <button type="button" onClick={openNew} className="kasten kasten-red inline-flex items-center gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  Ersten Lieferanten anlegen
+                </button>
+              ) : undefined
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

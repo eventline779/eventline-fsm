@@ -12,7 +12,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { usePermissions } from "@/lib/use-permissions";
 import { Loading } from "@/components/ui/spinner";
-import { Plus, Archive } from "lucide-react";
+import { Plus, Archive, FolderKanban } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   formatHours, progressPct, progressColorClass, PROJECT_STATUS_LABEL,
   PROJECT_ARCHIVE_STATUSES, formatProjectNumber,
@@ -165,15 +166,26 @@ export default function ProjektePage() {
       {rows === null ? (
         <Loading />
       ) : visibleRows.length === 0 ? (
-        <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          {rows.length === 0 ? "Noch keine Projekte." : showArchive ? "Noch keine archivierten Projekte." : "Keine aktiven Projekte."}
-          {rows.length === 0 && (
-            <div className="mt-4">
-              <Link href="/projekte/neu" className="kasten kasten-blue inline-flex">
-                <Plus className="h-3.5 w-3.5" /> Erstes Projekt anlegen
-              </Link>
-            </div>
-          )}
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={FolderKanban}
+            title={rows.length === 0 ? "Noch keine Projekte" : showArchive ? "Archiv ist leer" : "Keine aktiven Projekte"}
+            description={
+              rows.length === 0
+                ? "Ein Projekt bundelt mehrere Auftraege, ein Budget und einen Zielrahmen."
+                : showArchive
+                  ? "Noch keine archivierten Projekte."
+                  : "Alle aktiven Projekte sind abgeschlossen — schau ins Archiv."
+            }
+            action={
+              rows.length === 0 ? (
+                <Link href="/projekte/neu" className="kasten kasten-blue inline-flex items-center gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  Erstes Projekt anlegen
+                </Link>
+              ) : undefined
+            }
+          />
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

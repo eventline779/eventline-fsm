@@ -18,6 +18,7 @@ import { JobNumber } from "@/components/job-number";
 import { AddressAutocomplete, type ParsedAddress } from "@/components/address-autocomplete";
 import { Modal } from "@/components/ui/modal";
 import { BackButton } from "@/components/ui/back-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -451,15 +452,19 @@ export default function KundenDetailPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {sortedJobs.length === 0 ? (
-            <div className="py-4 text-center space-y-3">
-              <p className="text-sm text-muted-foreground">Keine Aufträge für diesen Kunden.</p>
-              {can("auftraege:create") && (
-                <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue inline-flex">
-                  <Plus className="h-3.5 w-3.5" />
-                  Ersten Auftrag anlegen
-                </Link>
-              )}
-            </div>
+            <EmptyState
+              icon={ClipboardList}
+              title="Noch keine Auftraege"
+              description="Auftraege fuer diesen Kunden erscheinen hier."
+              action={
+                can("auftraege:create") ? (
+                  <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue inline-flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
+                    Ersten Auftrag anlegen
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : (
             <>
               {(showAllJobs ? sortedJobs : sortedJobs.slice(0, 2)).map((j) => (

@@ -12,6 +12,7 @@
 import { FileText, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { HoursAuditCard } from "@/components/auftrag/hours-audit-card";
 import type { ServiceReport } from "@/types";
 
@@ -46,10 +47,11 @@ export function RapportTab({ reports, isAdmin, audit }: Props) {
         </CardHeader>
         <CardContent>
           {reports.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              Noch keine Rapporte fuer diesen Auftrag. Rapport wird beim &quot;Abschliessen&quot; im Sticky-Header
-              erstellt.
-            </p>
+            <EmptyState
+              icon={FileText}
+              title="Noch keine Rapporte"
+              description={"Rapport wird beim „Abschliessen“-Button im Sticky-Header erstellt."}
+            />
           ) : (
             <div className="space-y-2">
               {reports.map((r) => (

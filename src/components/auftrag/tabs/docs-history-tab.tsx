@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import { Upload, Camera, FileText, Trash2, Eye, Download, XCircle } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -191,9 +192,11 @@ export function DocsHistoryTab({
         </CardHeader>
         <CardContent>
           {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              Keine Dokumente. Klicke auf &quot;Hochladen&quot; um PDFs/Dateien anzuhängen.
-            </p>
+            <EmptyState
+              icon={FileText}
+              title="Noch keine Dokumente"
+              description={"Ziehe PDFs oder Bilder hier rein oder nutze „Hochladen“."}
+            />
           ) : (
             <div className="space-y-2">
               {documents.map((doc) => {

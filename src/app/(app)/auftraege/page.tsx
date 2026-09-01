@@ -28,6 +28,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
 import { WarningCard } from "@/components/ui/warning-card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // Kleinere Page-Size = "Mehr laden" wird sichtbar, schnellerer initial-Load.
 // Beide Listen jetzt server-seitig nach start_date sortiert damit Pagination
@@ -613,43 +614,43 @@ export default function AuftraegePage() {
           const hasFilter = !!searchNumber || !!searchTitle || filterStatus !== "all" || filterLocation !== "all";
           return (
             <Card className="border-dashed bg-card">
-              <CardContent className="py-16 text-center">
-                <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                  <ClipboardList className="h-7 w-7 text-gray-400" />
-                </div>
-                <h3 className="font-semibold text-gray-900 text-lg">
-                  {hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Aufträge"}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {hasFilter
-                    ? `${totalForSource} Auftrag${totalForSource === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
-                    : "Erstelle deinen ersten Auftrag."}
-                </p>
-                {hasFilter ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchNumber("");
-                      setSearchTitle("");
-                      setFilterStatus("all");
-                      setFilterLocation("all");
-                    }}
-                    className="kasten kasten-muted mt-5"
-                  >
-                    Filter zurücksetzen
-                  </button>
-                ) : (
-                  <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
-                    <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
-                      <Plus className="h-3.5 w-3.5" />
-                      Neuer Vermietentwurf
-                    </Link>
-                    <Link href="/auftraege/neu" className="kasten kasten-blue">
-                      <Plus className="h-3.5 w-3.5" />
-                      Neuer Auftrag
-                    </Link>
-                  </div>
-                )}
+              <CardContent className="p-0">
+                <EmptyState
+                  icon={ClipboardList}
+                  title={hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Auftraege"}
+                  description={
+                    hasFilter
+                      ? `${totalForSource} Auftrag${totalForSource === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`
+                      : "Erstelle deinen ersten Auftrag."
+                  }
+                  action={
+                    hasFilter ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchNumber("");
+                          setSearchTitle("");
+                          setFilterStatus("all");
+                          setFilterLocation("all");
+                        }}
+                        className="kasten kasten-muted"
+                      >
+                        Filter zuruecksetzen
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
+                          <Plus className="h-3.5 w-3.5" />
+                          Neuer Vermietentwurf
+                        </Link>
+                        <Link href="/auftraege/neu" className="kasten kasten-blue">
+                          <Plus className="h-3.5 w-3.5" />
+                          Neuer Auftrag
+                        </Link>
+                      </div>
+                    )
+                  }
+                />
               </CardContent>
             </Card>
           );
