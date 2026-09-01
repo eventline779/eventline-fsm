@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PROJECT_STATUS_LABEL, formatProjectNumber, progressPct } from "@/lib/projekte-format";
-import { cn } from "@/lib/utils";
+import { TabsNav } from "@/components/ui/tabs-nav";
 import { OverviewTab } from "@/components/projekt/tabs/overview-tab";
 import { ZeitTab } from "@/components/projekt/tabs/zeit-tab";
 import { DocsHistoryTab } from "@/components/projekt/tabs/docs-history-tab";
@@ -348,27 +348,13 @@ export default function ProjektDetailPage() {
         </div>
 
         {/* Tab-Nav */}
-        <nav className="mt-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tt) => {
-            const active = tab === tt.key;
-            return (
-              <button
-                key={tt.key}
-                type="button"
-                onClick={() => selectTab(tt.key)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 -mb-px text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  active
-                    ? "border-red-500 text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
-                )}
-              >
-                {tt.icon}
-                {tt.label}
-              </button>
-            );
-          })}
-        </nav>
+        <TabsNav
+          tabs={tabs}
+          active={tab}
+          onChange={(k) => selectTab(k as Tab)}
+          className="mt-2 border-0"
+          ariaLabel="Projekt-Bereiche"
+        />
       </div>
 
       {/* Tab-Inhalt */}

@@ -34,6 +34,7 @@ import { AktivitaetTab } from "@/components/einstellungen/aktivitaet-tab";
 import { PartnerFormTab } from "@/components/einstellungen/partner-form-tab";
 import { FirmaTab } from "@/components/einstellungen/firma-tab";
 import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
+import { TabsNav } from "@/components/ui/tabs-nav";
 
 // Die 5 flachen Tabs. Reihenfolge = links→rechts in der Nav.
 type Tab = "firma" | "team" | "anfrage-form" | "integrationen" | "aktivitaet";
@@ -126,23 +127,15 @@ export default function EinstellungenPage() {
         <BuildInfoBadge />
       </div>
 
-      {/* Flache Tab-Nav — kasten-Toggle-Stil wie anderswo in der App.
-          Horizontal scrollbar auf Mobile (flex-wrap wuerde die Tab-Reihe
-          umbrechen — bewusst NICHT verwendet, damit die Nav-Zeile eine
-          Zeile bleibt und den Content-Bereich nicht in die Hoehe drueckt). */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {navTabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => selectTab(t.key)}
-            className={`${tab === t.key ? "kasten-active" : "kasten-toggle-off"} whitespace-nowrap shrink-0`}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Flache Tab-Nav — Underline-Style (kanonisches Nav-Tab-Muster, siehe
+          TabsNav-Kommentar). Horizontal scrollbar auf Mobile bleibt erhalten
+          weil TabsNav intern overflow-x-auto + whitespace-nowrap setzt. */}
+      <TabsNav
+        tabs={navTabs}
+        active={tab}
+        onChange={(k) => selectTab(k as Tab)}
+        ariaLabel="Einstellungs-Bereiche"
+      />
 
       {tab === "firma" && isAdmin && <FirmaTab isAdmin={isAdmin} />}
 

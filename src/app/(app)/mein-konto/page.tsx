@@ -21,12 +21,12 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { User, Bell, FileText, Calendar } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
 import { MeinKontoCard } from "@/components/einstellungen/mein-konto-card";
 import { BenachrichtigungenTab } from "@/components/einstellungen/benachrichtigungen-tab";
 import { LohnausweiseList } from "@/components/hr/lohnausweise-list";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
+import { TabsNav } from "@/components/ui/tabs-nav";
 
 type Tab = "profil" | "benachrichtigungen" | "dokumente" | "kalender";
 const ALL_TABS: Tab[] = ["profil", "benachrichtigungen", "dokumente", "kalender"];
@@ -75,27 +75,12 @@ export default function MeinKontoPage() {
         </p>
       </div>
 
-      <nav className="border-b flex gap-1 overflow-x-auto">
-        {tabs.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => selectTab(t.key)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2.5 -mb-px text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                active
-                  ? "border-red-500 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
-              )}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
+      <TabsNav
+        tabs={tabs}
+        active={tab}
+        onChange={(k) => selectTab(k as Tab)}
+        ariaLabel="Konto-Bereiche"
+      />
 
       {tab === "profil" && (
         <div className="max-w-3xl mx-auto">

@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/logo";
 import { Spinner } from "@/components/ui/spinner";
 import { Toaster } from "@/components/ui/sonner";
+import { TabsNav } from "@/components/ui/tabs-nav";
 import { useTheme } from "next-themes";
 import { useEnterAsTab } from "@/lib/use-enter-as-tab";
 import { useScrollRestoration } from "@/lib/use-scroll-restoration";
-import { Sun, Moon, LogOut, FileText, Calendar, Shield, User } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Sun, Moon, LogOut, FileText, Calendar, User } from "lucide-react";
 import { DatenschutzAcceptModal } from "@/components/datenschutz-accept-modal";
 import { DATENSCHUTZ_VERSION } from "@/lib/datenschutz";
 
@@ -111,10 +110,16 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
   }
 
   const tabs = [
-    { href: "/partner/anfragen", label: "Meine Anfragen", icon: FileText },
-    { href: "/partner/belegungsplan", label: "Belegungsplan", icon: Calendar },
-    { href: "/partner/konto", label: "Mein Konto", icon: User },
+    { key: "/partner/anfragen",      href: "/partner/anfragen",      label: "Meine Anfragen", icon: <FileText className="h-4 w-4" /> },
+    { key: "/partner/belegungsplan", href: "/partner/belegungsplan", label: "Belegungsplan",  icon: <Calendar className="h-4 w-4" /> },
+    { key: "/partner/konto",         href: "/partner/konto",         label: "Mein Konto",     icon: <User className="h-4 w-4" /> },
   ];
+
+  // Aktiver Tab = laengster href-Prefix des pathname. Verhindert Fehl-Matches
+  // zwischen /partner/anfragen und /partner/anfragen/[id].
+  const activeTab =
+    tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + "/"))?.key
+    ?? tabs[0].key;
 
   // Akzeptanz noch ausstehend → Modal zwingend. User kann das Portal
   // erst nutzen wenn er aktuelle Version bestaetigt hat. Re-Akzeptanz
@@ -160,27 +165,14 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
             </button>
           </div>
         </div>
-        <nav className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 -mb-px">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = pathname === tab.href || pathname.startsWith(tab.href + "/");
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
-                  isActive
-                    ? "border-red-500 text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <TabsNav
+            tabs={tabs}
+            active={activeTab}
+            className="border-0"
+            ariaLabel="Partner-Portal-Navigation"
+          />
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">

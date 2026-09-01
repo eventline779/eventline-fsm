@@ -32,7 +32,7 @@ import {
   CheckCircle2, ChevronRight,
 } from "lucide-react";
 import { usePermissions } from "@/lib/use-permissions";
-import { cn } from "@/lib/utils";
+import { TabsNav } from "@/components/ui/tabs-nav";
 import { TrustedDeviceGate } from "@/components/trust/trusted-device-gate";
 import { StempelzeitenView } from "@/components/stempelzeiten/stempelzeiten-view";
 import { TicketsView } from "@/components/tickets/tickets-view";
@@ -131,24 +131,15 @@ export default function HRPage() {
         </div>
       )}
 
-      {/* Top-Level-Tab-Nav — kompakt, horizontal scrollable auf Mobile.
-          kasten-active/kasten-toggle-off wie im Rest der App. */}
-      <nav className="flex gap-2 flex-wrap overflow-x-auto -mx-1 px-1">
-        {visibleTabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => selectTab(t.key)}
-            className={cn(
-              "shrink-0",
-              activeTab === t.key ? "kasten-active" : "kasten-toggle-off",
-            )}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      {/* Top-Level-Tab-Nav — Underline-Style (kanonisches Nav-Tab-Muster,
+          siehe TabsNav-Kommentar). NAVIGATION zwischen unterschiedlichen
+          Sektionen, deshalb Underline und NICHT Kasten-Toggle. */}
+      <TabsNav
+        tabs={visibleTabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
+        active={activeTab}
+        onChange={(k) => selectTab(k as Tab)}
+        ariaLabel="HR-Bereiche"
+      />
 
       {activeTab === "uebersicht" && (
         <HRUebersicht isAdmin={isAdmin} onGoto={selectTab} />
@@ -172,27 +163,13 @@ export default function HRPage() {
               SUVA / BVG-Meldung. */}
           <LohnsummenPrognose />
 
-          <nav className="flex gap-1 flex-wrap text-xs mt-6">
-            {loehneSubTabs.map((s) => {
-              const active = subTab === s.key;
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => selectSubTab(s.key)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors",
-                    active
-                      ? "border-red-500 bg-red-500/10 text-red-700 dark:text-red-300"
-                      : "border-border bg-card hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06]",
-                  )}
-                >
-                  {s.icon}
-                  {s.label}
-                </button>
-              );
-            })}
-          </nav>
+          <TabsNav
+            tabs={loehneSubTabs}
+            active={subTab}
+            onChange={(k) => selectSubTab(k as LoehneSubTab)}
+            className="mt-6"
+            ariaLabel="Löhne-Sub-Bereiche"
+          />
 
           <div className="pt-2">
             {subTab === "abrechnung" && <MonatsstundenTable />}

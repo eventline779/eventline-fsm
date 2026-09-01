@@ -25,8 +25,8 @@ import {
 import { BackButton } from "@/components/ui/back-button";
 import { JobNumber } from "@/components/job-number";
 import { JobStempelButton } from "@/components/stempel/job-stempel-button";
+import { TabsNav } from "@/components/ui/tabs-nav";
 import { JOB_STATUS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 import type { JobDetailWithRelations, JobStatus } from "@/types";
 
 export type TabKey = "uebersicht" | "rapport" | "dokumente";
@@ -248,24 +248,13 @@ export function AuftragStickyHeader({
       )}
 
       {/* Tab-Nav */}
-      <nav className="flex gap-1 flex-wrap text-xs mt-3" role="tablist">
-        {tabs.map((t) => {
-          const active = activeTab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onSelectTab(t.key)}
-              className={cn(active ? "kasten kasten-active" : "kasten kasten-toggle-off")}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
+      <TabsNav
+        tabs={tabs}
+        active={activeTab}
+        onChange={(k) => onSelectTab(k as TabKey)}
+        className="mt-3 border-0"
+        ariaLabel="Auftrag-Bereiche"
+      />
     </div>
   );
 }
