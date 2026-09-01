@@ -1,0 +1,267 @@
+"use client";
+
+/**
+ * Auftrag-Detail: Sticky-Header (Nummer/Titel/Badges/Meta/Aktionen/Tab-Nav).
+ *
+ * Sitzt oben in der Detail-Seite und bleibt beim Scrollen an der oberen
+ * Kante des #app-scroll-Wrappers stehen. Alle Zustands-Actions (Freigeben,
+ * Abschliessen, Bearbeiten, Stornieren, Stempeln) und der Tab-Wechsel
+ * spielen sich hier ab.
+ */
+
+import { useEffect, useRef } from "react";
+import Link from "next/link";
+import {
+  MapPin,
+  User,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Inbox,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
+import { JobNumber } from "@/components/job-number";
+import { JobStempelButton } from "@/components/stempel/job-stempel-button";
+import { JOB_STATUS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import type { JobDetailWithRelations, JobStatus } from "@/types";
+
+export type TabKey = "uebersicht" | "rapport" | "dokumente";
+
+type StatusAction = {
+  from: JobStatus[];
+  to: JobStatus;
+  label: string;
+  icon: React.ReactNode;
+  variant: "primary" | "outline" | "destructive";
+};
+
+type Tab = { key: TabKey; label: string; icon: React.ReactNode };
+
+type Props = {
+  jobId: string;
+  job: JobDetailWithRelations;
+  canEdit: boolean;
+  availableActions: StatusAction[];
+  onStatusAction: (to: JobStatus) => void | Promise<void>;
+  onOpenCancel: () => void;
+  overflowOpen: boolean;
+  setOverflowOpen: (v: boolean) => void;
+  canFinish: boolean;
+  finishBlockReason: string;
+  tabs: Tab[];
+  activeTab: TabKey;
+  onSelectTab: (t: TabKey) => void;
+};
+
+export function AuftragStickyHeader({
+  jobId,
+  job,
+  canEdit,
+  availableActions,
+  onStatusAction,
+  onOpenCancel,
+  overflowOpen,
+  setOverflowOpen,
+  canFinish,
+  finishBlockReason,
+  tabs,
+  activeTab,
+  onSelectTab,
+}: Props) {
+  const overflowRef = useRef<HTMLDivElement | null>(null);
+
+  // Overflow-Menu schliessen bei Klick ausserhalb / Esc.
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (!overflowRef.current) return;
+      if (!overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen, setOverflowOpen]);
+
+  const customer = job.customer ?? job.location?.customer ?? undefined;
+  const location = job.location ?? undefined;
+  const room = job.room ?? undefined;
+  const isDringend = job.priority === "dringend";
+
+  const eventDateLabel = job.start_date
+    ? `${new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}${
+        job.end_date && job.end_date !== job.start_date
+          ? ` – ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}`
+          : ""
+      }`
+    : "";
+  const locationLabel = location?.name ?? room?.name ?? job.external_address ?? "";
+
+  return (
+    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b -mx-4 md:-mx-10 px-4 md:px-10 pt-1 pb-3 mb-6">
+      <div className="flex items-start gap-3">
+        <BackButton fallbackHref="/auftraege" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <JobNumber number={job.job_number} size="md" />
+            {job.status !== "offen" && (
+              <span
+                className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ${JOB_STATUS[job.status].color}`}
+              >
+                {JOB_STATUS[job.status].label}
+              </span>
+            )}
+            {isDringend && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                <AlertCircle className="h-3 w-3" />
+                Dringend
+              </span>
+            )}
+            {job.was_anfrage && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
+                data-tooltip="Aus einem Vermietentwurf entstanden"
+              >
+                <Inbox className="h-3 w-3" />
+                Vermietentwurf
+              </span>
+            )}
+          </div>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate mt-0.5">{job.title}</h1>
+          {(customer?.name || locationLabel || eventDateLabel) && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
+              {customer?.name && (
+                <span className="inline-flex items-center gap-1 min-w-0">
+                  <User className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{customer.name}</span>
+                </span>
+              )}
+              {locationLabel && (
+                <span className="inline-flex items-center gap-1 min-w-0">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{locationLabel}</span>
+                </span>
+              )}
+              {eventDateLabel && (
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="h-3 w-3 shrink-0" />
+                  <span className="tabular-nums">{eventDateLabel}</span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Aktions-Bar */}
+      <div className="flex flex-wrap gap-2 mt-3">
+        {availableActions
+          .filter((a) => a.to !== "storniert")
+          .filter((a) => a.to === "abgeschlossen" || canEdit)
+          .map((a) => {
+            const isFinish = a.to === "abgeschlossen";
+            const isPrimary = a.variant === "primary";
+            const tone = isFinish ? "kasten-green" : isPrimary ? "kasten-red" : "kasten-muted";
+            const isRelease = a.to === "offen";
+            const releaseBlocked = isRelease && (!job.start_date || !job.end_date);
+            return (
+              <button
+                key={a.to}
+                type="button"
+                onClick={() => onStatusAction(a.to)}
+                disabled={releaseBlocked}
+                data-tooltip={releaseBlocked ? "Bitte erst Datum im Bearbeiten-Modus setzen" : undefined}
+                className={`kasten ${tone}`}
+              >
+                {a.icon}
+                {a.label}
+              </button>
+            );
+          })}
+
+        {job.status === "entwurf" && canEdit && (
+          <Link href={`/auftraege/${jobId}/bearbeiten`} className="kasten kasten-purple">
+            <Pencil className="h-3.5 w-3.5" />
+            Bearbeiten
+          </Link>
+        )}
+
+        {canEdit && availableActions.some((a) => a.to === "storniert") && (
+          <div className="relative" ref={overflowRef}>
+            <button
+              type="button"
+              onClick={() => setOverflowOpen(!overflowOpen)}
+              className={`kasten ${overflowOpen ? "kasten-active" : "kasten-muted"}`}
+              data-tooltip="Weitere Aktionen"
+              data-tooltip-align="end"
+              aria-expanded={overflowOpen}
+              aria-haspopup="menu"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+            {overflowOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-[calc(100%+6px)] z-40 min-w-[180px] rounded-xl border border-border bg-card shadow-lg p-1"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    onOpenCancel();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Stornieren
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(job.status === "offen" || job.status === "anfrage" || job.status === "entwurf") && (
+          <JobStempelButton jobId={jobId} jobNumber={job.job_number} />
+        )}
+      </div>
+
+      {/* End-Date-Hint */}
+      {!canFinish && job.status === "offen" && finishBlockReason && (
+        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+          <AlertCircle className="h-3 w-3" />
+          {finishBlockReason} — Rapport kann jedoch schon jetzt vorbereitet werden.
+        </p>
+      )}
+
+      {/* Tab-Nav */}
+      <nav className="flex gap-1 flex-wrap text-xs mt-3" role="tablist">
+        {tabs.map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelectTab(t.key)}
+              className={cn(active ? "kasten kasten-active" : "kasten kasten-toggle-off")}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}

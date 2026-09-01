@@ -1,0 +1,306 @@
+"use client";
+
+/**
+ * Auftrag-Detail: Tab "Dokumente & Historie".
+ *
+ * Vereint alle nicht-operativen Inhalte: Dokument-Upload/Vorschau/Download,
+ * Partner-Antworten (Custom-Fields aus dem Location-Formular) und die
+ * Storno-Section (nur bei storniertem Auftrag).
+ *
+ * Alle Storage-/DB-Interaktionen (Upload / Delete / Signed-URL / Preview)
+ * leben hier — der Parent uebergibt nur die geladenen Dokumente + einen
+ * onReload-Callback fuers Nachladen.
+ */
+
+import { useState } from "react";
+import { Upload, Camera, FileText, Trash2, Eye, Download, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PartnerFormAnswersCard } from "@/components/auftrag/partner-form-answers-card";
+import { PdfPopup } from "@/components/pdf-popup";
+import { createClient } from "@/lib/supabase/client";
+import { deleteRow } from "@/lib/db-mutations";
+import { validateFileList } from "@/lib/file-upload";
+import { TOAST } from "@/lib/messages";
+import { useConfirm } from "@/components/ui/use-confirm";
+import type { Document as DocType, JobDetailWithRelations } from "@/types";
+
+type Props = {
+  jobId: string;
+  job: JobDetailWithRelations;
+  documents: DocType[];
+  isArchivedJob: boolean;
+  onReload: () => void;
+  onDocumentsChange: (fn: (prev: DocType[]) => DocType[]) => void;
+};
+
+// Mail-Anhaenge aus dem Vermietentwurf sind nicht loeschbar — sie
+// dokumentieren, was an den Kunden ging.
+function isMailDoc(storagePath: string) {
+  return storagePath.startsWith("vermietentwurf/");
+}
+
+export function DocsHistoryTab({
+  jobId,
+  job,
+  documents,
+  isArchivedJob,
+  onReload,
+  onDocumentsChange,
+}: Props) {
+  const supabase = createClient();
+  const { confirm, ConfirmModalElement } = useConfirm();
+  const [uploading, setUploading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!validateFileList(files)) return;
+    setUploading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setUploading(false);
+      return;
+    }
+    for (const file of Array.from(files)) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `jobs/${jobId}/${Date.now()}_${safeName}`;
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("path", path);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const json = await res.json();
+        if (!json.success) {
+          TOAST.uploadError(json.error);
+          continue;
+        }
+        await supabase.from("documents").insert({
+          name: file.name,
+          storage_path: path,
+          file_size: file.size,
+          mime_type: file.type,
+          job_id: jobId,
+          uploaded_by: user.id,
+        });
+      } catch (err) {
+        TOAST.uploadError(err instanceof Error ? err.message : "Netzwerkfehler");
+        continue;
+      }
+    }
+    toast.success("Datei(en) hochgeladen");
+    onReload();
+    setUploading(false);
+    e.target.value = "";
+  }
+
+  async function deleteDoc(docId: string, storagePath: string, name: string) {
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${name}" wird unwiderruflich entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
+    await supabase.storage.from("documents").remove([storagePath]);
+    const result = await deleteRow("documents", docId);
+    if (!result.ok) {
+      TOAST.deleteError(result.error);
+      return;
+    }
+    onDocumentsChange((prev) => prev.filter((d) => d.id !== docId));
+    toast.success("Dokument gelöscht");
+  }
+
+  async function openSigned(storagePath: string): Promise<string | null> {
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(storagePath, 3600);
+    if (error || !data?.signedUrl) {
+      toast.error(
+        "Datei nicht verfügbar — eventuell aus altem Bestand vor 6.5.2026, im alten Storage zu finden",
+      );
+      return null;
+    }
+    return data.signedUrl;
+  }
+
+  async function previewDocument(storagePath: string, name: string) {
+    const url = await openSigned(storagePath);
+    if (!url) return;
+    setPreviewDoc({ url, title: name });
+  }
+
+  async function downloadDocument(storagePath: string, name: string) {
+    const url = await openSigned(storagePath);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Dokumente / PDFs */}
+      <Card className="bg-card">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Dokumente ({documents.length})
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              id="jobFileUpload"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <input
+              type="file"
+              id="jobPhotoUpload"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="md:hidden"
+              onClick={() => document.getElementById("jobPhotoUpload")?.click()}
+              disabled={uploading}
+            >
+              <Camera className="h-4 w-4 mr-1" />
+              Foto
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => document.getElementById("jobFileUpload")?.click()}
+              disabled={uploading}
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              {uploading ? "Lädt…" : "Hochladen"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              Keine Dokumente. Klicke auf &quot;Hochladen&quot; um PDFs/Dateien anzuhängen.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => {
+                const fromMail = isMailDoc(doc.storage_path);
+                return (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {doc.file_size ? (doc.file_size / 1024).toFixed(0) + " KB" : ""} ·{" "}
+                          {new Date(doc.created_at).toLocaleDateString("de-CH", {
+                            timeZone: "Europe/Zurich",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
+                        className={`kasten kasten-red ${fromMail || isArchivedJob ? "invisible pointer-events-none" : ""}`}
+                        data-tooltip="Löschen"
+                        aria-hidden={fromMail || isArchivedJob || undefined}
+                        tabIndex={fromMail || isArchivedJob ? -1 : undefined}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => previewDocument(doc.storage_path, doc.name)}
+                        className="kasten kasten-blue"
+                        data-tooltip="Vorschau"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadDocument(doc.storage_path, doc.name)}
+                        className="kasten kasten-muted"
+                        data-tooltip="Herunterladen"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Partner-Custom-Felder */}
+      <PartnerFormAnswersCard
+        formAnswers={job.form_answers}
+        formSchemaSnapshot={job.form_schema_snapshot}
+        locationId={job.location_id}
+      />
+
+      {/* Storno-Info — nur sichtbar wenn storniert */}
+      {job.status === "storniert" && (job.cancelled_at || job.cancellation_reason) && (
+        <Card className="bg-card border-destructive/30">
+          <CardContent className="p-5 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <XCircle className="h-4 w-4" />
+              Storniert
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {job.cancelled_by_profile?.full_name && (
+                <>
+                  von{" "}
+                  <span className="font-medium text-foreground">
+                    {job.cancelled_by_profile.full_name}
+                  </span>
+                </>
+              )}
+              {job.cancelled_at && (
+                <>
+                  {" "}
+                  am{" "}
+                  <span className="font-medium text-foreground">
+                    {new Date(job.cancelled_at).toLocaleDateString("de-CH", {
+                      timeZone: "Europe/Zurich",
+                    })}
+                  </span>
+                </>
+              )}
+            </div>
+            {job.cancellation_reason && (
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-1">Grund</p>
+                <p className="text-sm whitespace-pre-wrap">{job.cancellation_reason}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {ConfirmModalElement}
+      {previewDoc && (
+        <PdfPopup url={previewDoc.url} title={previewDoc.title} onClose={() => setPreviewDoc(null)} />
+      )}
+    </div>
+  );
+}
