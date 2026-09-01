@@ -113,7 +113,7 @@ export function TabsNav({
         const classes = cn(
           "inline-flex items-center gap-2 px-3 py-2.5 -mb-px text-sm font-medium border-b-2 transition-colors whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm",
           isActive
-            ? "border-red-500 text-foreground"
+            ? "border-foreground text-foreground"
             : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
           tabClassName,
         );
@@ -126,7 +126,7 @@ export function TabsNav({
                 className={cn(
                   "ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-semibold tabular-nums",
                   isActive
-                    ? "bg-red-500/15 text-red-700 dark:bg-red-500/25 dark:text-red-300"
+                    ? "bg-foreground/[0.12] text-foreground"
                     : "bg-foreground/[0.08] text-muted-foreground",
                 )}
               >
