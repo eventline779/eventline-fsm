@@ -1,16 +1,31 @@
 "use client";
 
 /**
- * Einstellungen-Page — Tabs: Team, Rollen, Aktivitaet (admin-only),
- * Integrationen. Backup-Tab raus: nightly Backup laeuft vom Ugreen-NAS
- * gepullt.
+ * Einstellungen-Page — flache 5-Tab-Struktur (Audit-Umsetzung).
+ *
+ * Vorher: 2-Ebenen-Portal-Wueste (Firmenportal | Partnerportal x je 3-5
+ * Sub-Tabs). Non-Admin sah nur „Integrationen" tief eingegraben.
+ *
+ * Jetzt: EINE horizontale Tab-Reihe, 5 Kategorien:
+ *   1. Firma           — Stammdaten (Adresse, IBAN, UID)
+ *   2. Team & Rollen   — Mitarbeiter oben, Rollen-Matrix (Firma + Partner) darunter
+ *   3. Anfrage-Form    — Partner-Anfrage-Template (Block-Builder)
+ *   4. Integrationen   — Resend, Bexio, Cron, Kalender-Feed etc.
+ *   5. Aktivitaet      — Session-Log, filterbar via Segment [Alle | Firma | Partner]
+ *
+ * Non-Admin sieht nur „Integrationen" (dort haengt sein persoenliches
+ * Bexio-/Kalender-Setup) und wird beim Landen dorthin umgeleitet.
+ *
+ * URL-Persistenz via ?tab=... (history.replaceState). Legacy-Tabkeys aus
+ * der Portal-Aera (partner-rollen / firma-stammdaten etc.) werden auf die
+ * neuen 5 Tabs gemappt, damit alte Deep-Links weiter funktionieren
+ * (z.B. Bexio-OAuth-Callback → ?tab=integrationen, Lohn-Nachtrag-Link → ?tab=team).
  */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plug, Users, Shield, Activity, Building2, Handshake, FileText } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plug, Users, Activity, Building2, FileText } from "lucide-react";
 import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
 import { TeamTab } from "@/components/einstellungen/team-tab";
 import { RollenTab } from "@/components/einstellungen/rollen-tab";
@@ -20,44 +35,46 @@ import { PartnerFormTab } from "@/components/einstellungen/partner-form-tab";
 import { FirmaTab } from "@/components/einstellungen/firma-tab";
 import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
 
-type Tab = "integrationen" | "firma-stammdaten" | "team" | "rollen" | "aktivitaet" | "partner-rollen" | "partner-aktivitaet" | "partner-form";
-type Portal = "firma" | "partner";
+// Die 5 flachen Tabs. Reihenfolge = links→rechts in der Nav.
+type Tab = "firma" | "team" | "anfrage-form" | "integrationen" | "aktivitaet";
+const ALL_TABS: Tab[] = ["firma", "team", "anfrage-form", "integrationen", "aktivitaet"];
 
-const ALL_TABS: Tab[] = ["integrationen", "firma-stammdaten", "team", "rollen", "aktivitaet", "partner-rollen", "partner-aktivitaet", "partner-form"];
-
-// Welcher Haupt-Tab gehoert welcher Portal-Gruppe. Beim Wechsel des
-// Haupt-Tabs springen wir automatisch auf den ersten Sub-Tab dieser
-// Gruppe (siehe selectPortal).
-// Die Partner-Kontaktliste selbst lebt seit dem Sidebar-Rebuild
-// (Audit-Umsetzung P1) unter /partner — dieser Portal-Bereich enthaelt
-// nur noch Rollen/Anfrage-Form/Aktivitaet des Partner-Namespaces.
-const PORTAL_OF: Record<Tab, Portal> = {
-  team: "firma",
-  rollen: "firma",
-  aktivitaet: "firma",
-  integrationen: "firma",
+// Legacy-Mapping: alte Portal-Tabkeys → neue flache Tabkeys. Deckt
+// bestehende Deep-Links ab (Bexio-Callback, interne Hinweise wie
+// „nachpflegen unter Einstellungen → Team").
+const LEGACY_TAB_MAP: Record<string, Tab> = {
   "firma-stammdaten": "firma",
-  "partner-rollen": "partner",
-  "partner-aktivitaet": "partner",
-  "partner-form": "partner",
+  team: "team",
+  rollen: "team",
+  "partner-rollen": "team",
+  "partner-form": "anfrage-form",
+  aktivitaet: "aktivitaet",
+  "partner-aktivitaet": "aktivitaet",
+  integrationen: "integrationen",
 };
+
+function resolveTab(raw: string | null): Tab | null {
+  if (!raw) return null;
+  if ((ALL_TABS as string[]).includes(raw)) return raw as Tab;
+  return LEGACY_TAB_MAP[raw] ?? null;
+}
+
+// Aktivitaets-Filter (Segment-Toggle in der Aktivitaet-Sektion).
+type AktivScope = "all" | "firma" | "partner";
 
 export default function EinstellungenPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
-  const urlTab = searchParams.get("tab") as Tab | null;
-  // Default = "team" weil das der erste sichtbare Tab fuer Admin ist
-  // (Reihenfolge: Team → Rollen → Integrationen). Fuer Non-Admin wird
-  // unten via useEffect auf "integrationen" umgeleitet sobald der
-  // Admin-Status geladen ist.
-  const [tab, setTab] = useState<Tab>(urlTab && ALL_TABS.includes(urlTab) ? urlTab : "team");
+  const urlTab = resolveTab(searchParams.get("tab"));
+  // Default = "firma" (erster Admin-Tab). Non-Admin wird via useEffect
+  // auf „integrationen" umgeleitet sobald der Admin-Status geladen ist.
+  const [tab, setTab] = useState<Tab>(urlTab ?? "firma");
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [aktivScope, setAktivScope] = useState<AktivScope>("all");
 
   // Tab-Wechsel: state = sofortige UI-Quelle, URL parallel updaten via
-  // History-API damit Hard-Reload den gleichen Tab zeigt. Wir umgehen
-  // den Next-Router (router.replace mit Query-Only-Update triggerte in
-  // Next 16 weder re-render noch URL-Update zuverlaessig). History.API
-  // ist garantiert synchron + ohne Navigation.
+  // History-API (Next.js router.replace triggerte in Next 16 unzuverlaessig
+  // fuer reine Query-Aenderungen).
   function selectTab(t: Tab) {
     setTab(t);
     if (typeof window !== "undefined") {
@@ -66,14 +83,6 @@ export default function EinstellungenPage() {
       window.history.replaceState({}, "", url.toString());
     }
   }
-
-  // Haupt-Tab-Wechsel → ersten Sub-Tab dieser Portal-Gruppe oeffnen.
-  function selectPortal(p: Portal) {
-    if (PORTAL_OF[tab] === p) return;
-    selectTab(p === "firma" ? "team" : "partner-rollen");
-  }
-
-  const activePortal: Portal = PORTAL_OF[tab];
 
   useEffect(() => {
     (async () => {
@@ -85,42 +94,30 @@ export default function EinstellungenPage() {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       const admin = profile?.role === "admin";
       setIsAdmin(admin);
-      // Non-Admin auf einem Admin-only-Tab -> Integrationen.
-      // Benachrichtigungen + Mein-Konto wanderten in /mein-konto.
+      // Non-Admin auf einem Admin-only-Tab → Integrationen.
       if (!admin && tab !== "integrationen") {
         selectTab("integrationen");
       }
     })();
   }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Firmenportal-Sub-Tabs (admin sieht Team/Rollen/Aktivitaet/Integrationen,
-  // Non-Admin nur Integrationen — siehe useEffect-Redirect oben).
-  const firmaTabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  // Nav-Definition — nur Integrationen sieht auch der Non-Admin.
+  const navTabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     ...(isAdmin ? [
-      { key: "firma-stammdaten" as Tab, label: "Firma", icon: <Building2 className="h-4 w-4" /> },
-      { key: "team" as Tab, label: "Team", icon: <Users className="h-4 w-4" /> },
-      { key: "rollen" as Tab, label: "Rollen", icon: <Shield className="h-4 w-4" /> },
-      { key: "aktivitaet" as Tab, label: "Aktivität", icon: <Activity className="h-4 w-4" /> },
+      { key: "firma" as Tab, label: "Firma", icon: <Building2 className="h-4 w-4" /> },
+      { key: "team" as Tab, label: "Team & Rollen", icon: <Users className="h-4 w-4" /> },
+      { key: "anfrage-form" as Tab, label: "Anfrage-Formular", icon: <FileText className="h-4 w-4" /> },
     ] : []),
     { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
+    ...(isAdmin ? [
+      { key: "aktivitaet" as Tab, label: "Aktivität", icon: <Activity className="h-4 w-4" /> },
+    ] : []),
   ];
-
-  // Partnerportal-Sub-Tabs — Rollen, Anfrage-Form, Aktivitaet.
-  // Die Partner-Kontaktliste selbst lebt seit dem Sidebar-Rebuild unter
-  // /partner (eigener Kontakte-Sidebar-Eintrag).
-  const partnerTabs: { key: Tab; label: string; icon: React.ReactNode }[] = isAdmin ? [
-    { key: "partner-rollen" as Tab, label: "Rollen", icon: <Shield className="h-4 w-4" /> },
-    { key: "partner-form" as Tab, label: "Anfrage-Form", icon: <FileText className="h-4 w-4" /> },
-    { key: "partner-aktivitaet" as Tab, label: "Aktivität", icon: <Activity className="h-4 w-4" /> },
-  ] : [];
-
-  const subTabs = activePortal === "firma" ? firmaTabs : partnerTabs;
 
   return (
     <div className="space-y-6">
-      {/* Header — gleiche Struktur wie /auftraege etc. (h1 + Subtitle-Spacer
-          fuer konsistente Hoehe app-weit). Rechts oben das Build-Info-
-          Fun-Fact-Widget (Version, LOC, Wort-Count). */}
+      {/* Header — konsistent mit /auftraege etc. (h1 + Subtitle-Spacer),
+          rechts oben das Build-Info-Fun-Fact-Widget. */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Einstellungen</h1>
@@ -129,52 +126,62 @@ export default function EinstellungenPage() {
         <BuildInfoBadge />
       </div>
 
-      {/* Haupt-Tabs (Underline-Style à la Partner-Portal-Layout) + Sub-Tabs
-          (kasten-Toggle-Stil) bilden eine visuelle Einheit — Haupt-Tab trennt
-          die beiden Mitarbeiter-Kreise (Eventline-intern vs Locationspartner
-          mit eigener Rollen-Hierarchie), Sub-Tab zeigt die jeweilige Section. */}
-      <div className="space-y-4">
-        {isAdmin && (
-          <nav className="border-b flex gap-1">
-            {([
-              { key: "firma" as Portal, label: "Firmenportal", icon: <Building2 className="h-4 w-4" /> },
-              { key: "partner" as Portal, label: "Partnerportal", icon: <Handshake className="h-4 w-4" /> },
-            ]).map((p) => {
-              const active = activePortal === p.key;
-              return (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => selectPortal(p.key)}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 -mb-px text-sm font-medium border-b-2 transition-colors",
-                    active
-                      ? "border-red-500 text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
-                  )}
-                >
-                  {p.icon}
-                  {p.label}
-                </button>
-              );
-            })}
-          </nav>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {subTabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => selectTab(t.key)}
-              className={tab === t.key ? "kasten-active" : "kasten-toggle-off"}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
-        </div>
+      {/* Flache Tab-Nav — kasten-Toggle-Stil wie anderswo in der App.
+          Horizontal scrollbar auf Mobile (flex-wrap wuerde die Tab-Reihe
+          umbrechen — bewusst NICHT verwendet, damit die Nav-Zeile eine
+          Zeile bleibt und den Content-Bereich nicht in die Hoehe drueckt). */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {navTabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => selectTab(t.key)}
+            className={`${tab === t.key ? "kasten-active" : "kasten-toggle-off"} whitespace-nowrap shrink-0`}
+          >
+            {t.icon}
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {tab === "firma" && isAdmin && <FirmaTab isAdmin={isAdmin} />}
+
+      {tab === "team" && isAdmin && (
+        <div className="space-y-8">
+          {/* Sub-Sektion 1: Mitarbeiter-Verwaltung */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Mitarbeiter</h2>
+              <p className="text-sm text-muted-foreground">Team-Mitglieder anlegen, deaktivieren und Rolle zuweisen.</p>
+            </div>
+            <TeamTab />
+          </section>
+
+          {/* Sub-Sektion 2: Firmen-Rollen (Rollen-Matrix fuer alles ausser Partner) */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Firmen-Rollen</h2>
+              <p className="text-sm text-muted-foreground">Rechte pro Rolle im Firmenkontext (Team-Mitglieder, Techniker etc.).</p>
+            </div>
+            <RollenTab scope="firma" />
+          </section>
+
+          {/* Sub-Sektion 3: Partner-Rollen (Locationspartner mit eigener Modul-Welt) */}
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Partner-Rollen</h2>
+              <p className="text-sm text-muted-foreground">Rechte fuer Locationspartner (eigener Modul-Katalog, getrennt von Firmenrechten).</p>
+            </div>
+            <RollenTab scope="partner" />
+          </section>
+
+          {/* Audit-Log fuer Permission-Aenderungen — historisch immer neben
+              den Rollen im gleichen Tab. */}
+          <PermissionAuditLogCard />
+        </div>
+      )}
+
+      {tab === "anfrage-form" && isAdmin && <PartnerFormTab />}
 
       {tab === "integrationen" && (
         <div className="space-y-6">
@@ -182,24 +189,28 @@ export default function EinstellungenPage() {
         </div>
       )}
 
-      {tab === "firma-stammdaten" && isAdmin && <FirmaTab isAdmin={isAdmin} />}
-
-      {tab === "team" && isAdmin && <TeamTab />}
-
-      {tab === "rollen" && isAdmin && (
-        <div className="space-y-6">
-          <RollenTab scope="firma" />
-          <PermissionAuditLogCard />
+      {tab === "aktivitaet" && isAdmin && (
+        <div className="space-y-4">
+          {/* Segment-Toggle: filtert die Session-Liste nach Firma/Partner/Alle. */}
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { key: "all" as AktivScope, label: "Alle" },
+              { key: "firma" as AktivScope, label: "Firma" },
+              { key: "partner" as AktivScope, label: "Partner" },
+            ]).map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setAktivScope(s.key)}
+                className={aktivScope === s.key ? "kasten-active" : "kasten-toggle-off"}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <AktivitaetTab key={aktivScope} scope={aktivScope} />
         </div>
       )}
-
-      {tab === "partner-rollen" && isAdmin && <RollenTab scope="partner" />}
-
-      {tab === "partner-form" && isAdmin && <PartnerFormTab />}
-
-      {tab === "aktivitaet" && isAdmin && <AktivitaetTab scope="firma" />}
-
-      {tab === "partner-aktivitaet" && isAdmin && <AktivitaetTab scope="partner" />}
     </div>
   );
 }

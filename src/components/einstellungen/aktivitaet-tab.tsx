@@ -98,12 +98,14 @@ function endReasonColor(reason: UserSession["end_reason"]): string {
 }
 
 interface AktivitaetTabProps {
-  /** "firma" = alle Profile ausser partner, "partner" = nur partner.
-      Default "firma". Steuert welche User-Sessions sichtbar sind. */
-  scope?: "firma" | "partner";
+  /** "firma" = alle Profile ausser partner, "partner" = nur partner,
+      "all" = beide. Default "all" seit Flach-Rebuild — die Trennung
+      passiert jetzt via Segment-Toggle in der Page, nicht mehr via
+      separaten Tab pro Portal. */
+  scope?: "firma" | "partner" | "all";
 }
 
-export function AktivitaetTab({ scope = "firma" }: AktivitaetTabProps = {}) {
+export function AktivitaetTab({ scope = "all" }: AktivitaetTabProps = {}) {
   const supabase = createClient();
   const [users, setUsers] = useState<UserStats[]>([]);
   const [allSessions, setAllSessions] = useState<UserSession[]>([]);
@@ -115,16 +117,15 @@ export function AktivitaetTab({ scope = "firma" }: AktivitaetTabProps = {}) {
 
     const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
-    // scope=firma → alle ausser partner; scope=partner → nur partner.
-    // Die beiden Aktivitaets-Tabs sind in /einstellungen pro Haupt-Tab
-    // getrennt; Partner-Sessions tauchen nicht in der Firmen-Ansicht auf
-    // und umgekehrt.
+    // scope=firma → alle ausser partner; scope=partner → nur partner;
+    // scope=all → keine Filterung (Default seit dem Flach-Rebuild von
+    // /einstellungen — Firma/Partner-Toggle sitzt jetzt in der Page).
     let profilesQuery = supabase
       .from("profiles")
       .select("id, full_name, email, role, is_active");
     if (scope === "partner") {
       profilesQuery = profilesQuery.eq("role", "partner");
-    } else {
+    } else if (scope === "firma") {
       profilesQuery = profilesQuery.neq("role", "partner");
     }
     const [profilesRes, sessionsRes] = await Promise.all([
