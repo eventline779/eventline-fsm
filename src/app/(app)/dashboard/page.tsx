@@ -21,9 +21,13 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase, FileEdit } from "lucide-react";
+import {
+  Calendar, CheckSquare, Ticket, ArrowRight, AlertCircle, Clock, Briefcase, FileEdit,
+  Sparkles, Users, Receipt, PenLine, PlaneTakeoff, Wallet, ClockAlert, FilePlus,
+} from "lucide-react";
 import { usePermissions } from "@/lib/use-permissions";
 import { OfficeAttendanceCard } from "@/components/dashboard/office-attendance-card";
+import { NextActionsList, type NextAction } from "@/components/ui/next-action";
 
 function greetingForHour(h: number): string {
   if (h < 12) return "Guten Morgen";
@@ -90,7 +94,7 @@ function formatHoursShort(h: number): string {
 
 export default function HeutePage() {
   const supabase = createClient();
-  const { profile, can } = usePermissions();
+  const { profile, can, role } = usePermissions();
   void profile; // profile fuer kuenftige Erweiterungen — Name wird via own-fetch geholt
   const [userName, setUserName] = useState("");
   const [todos, setTodos] = useState<OpenTodo[]>([]);
@@ -98,6 +102,7 @@ export default function HeutePage() {
   const [stats, setStats] = useState<PersonalStats | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingDay[]>([]);
   const [rapportDrafts, setRapportDrafts] = useState<RapportDraft[]>([]);
+  const [nextActions, setNextActions] = useState<NextAction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -306,6 +311,28 @@ export default function HeutePage() {
     })();
   }, [supabase]);
 
+  // ─── Naechste-Aktion-Widget — auto-abgeleitete Handlungs-Vorschlaege
+  // Statt statische CTAs zeigt der Top-Slot dynamisch was gerade zu tun
+  // ist (Rapport fortsetzen, Ferien-Antraege pruefen, Rechnung stellen,
+  // Personal zuteilen etc.). Rollen-abhaengig. Ein zusaetzlicher Effect
+  // damit die ersten Widgets (Termine/KPIs) nicht auf 5-10 Zusatz-Queries
+  // warten. Re-run wenn Rolle wechselt — z.B. nach Auth-Refresh.
+  useEffect(() => {
+    if (!role) return; // Rolle noch nicht geladen — nichts derivieren
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const actions = await deriveDashboardNextActions(supabase, user.id, role);
+      if (!cancelled) setNextActions(actions);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, role]);
+
   const greeting = greetingForHour(new Date().getHours());
 
   function formatDate(iso: string): string {
@@ -328,6 +355,21 @@ export default function HeutePage() {
           })}
         </p>
       </div>
+
+      {/* Deine naechsten Aktionen — auto-abgeleitete Handlungs-Vorschlaege
+          aus dem DB-Zustand (Rapport-Entwuerfe, offene Stempelungen, Termine
+          heute, Personal-Zuteilung, Rechnungen, Ferien-Genehmigungen, Lohn-
+          Setup). Ganz oben damit der User nach dem Login ZUERST sieht, was
+          zu tun ist — nicht was gestern war. */}
+      <NextActionsList
+        title="Deine nächsten Aktionen"
+        titleIcon={Sparkles}
+        actions={nextActions}
+        loading={loading}
+        onShowMore={nextActions.length > 5 ? () => { window.location.href = "/todos"; } : undefined}
+        emptyLabel="Nichts anstehend — alles im Lot"
+        emptySublabel="Du hast keine offenen Handlungen. Zeit für einen Espresso."
+      />
 
       {/* Office-Anwesenheit — Wochen-Grid wer wann im Büro ist. Nur
           gerendert wenn User die Permission hat (sonst RLS liefert
@@ -644,4 +686,375 @@ function RapportDraftsCard({ drafts }: { drafts: RapportDraft[] }) {
     </Card>
   );
 }
+
+// =====================================================================
+// deriveDashboardNextActions — rollen-abhaengige "was jetzt?"-Aktionen
+// =====================================================================
+//
+// Bundelt 5-10 Supabase-Queries via Promise.all und mappt die Ergebnisse
+// auf NextAction-Objekte. Reihenfolge in der Liste = Prioritaet.
+// Rollen:
+//   admin / teamleiter → operative Steuerungs-Aktionen
+//   techniker / mitarbeiter → arbeits-Aktionen (Termin heute, Signatur)
+//   alle → Rapport-Entwuerfe, offene Stempelung, heute Termin ohne Rapport
+//
+// Die Regeln sind bewusst konservativ formuliert (schwelle >2 Tage, >7 Tage,
+// >6 Monate) damit die Liste nicht taeglich mit trivialen Vorschlaegen
+// vollgemuellt wird.
+
+type SupabaseClient = ReturnType<typeof createClient>;
+
+async function deriveDashboardNextActions(
+  supabase: SupabaseClient,
+  userId: string,
+  role: string,
+): Promise<NextAction[]> {
+  const isLead = role === "admin" || role === "teamleiter";
+  const isField = role === "techniker" || role === "mitarbeiter";
+
+  const now = Date.now();
+  const twoDaysAgoISO = new Date(now - 2 * 24 * 3600 * 1000).toISOString();
+  const sevenDaysAgoISO = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
+  const twentyFourHAgoISO = new Date(now - 24 * 3600 * 1000).toISOString();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startTodayISO = today.toISOString();
+  const endTodayISO = new Date(today.getTime() + 24 * 3600 * 1000).toISOString();
+  const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
+  const startTomorrowISO = tomorrow.toISOString();
+  const endTomorrowISO = new Date(tomorrow.getTime() + 24 * 3600 * 1000).toISOString();
+  const todayLocalIso = today.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
+  const tomorrowLocalIso = new Date(today.getTime() + 24 * 3600 * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" });
+
+  // ─── Parallel-Queries ───────────────────────────────────────────
+  const [
+    oldDraftsRes,
+    openStempelRes,
+    todayApptsRes,
+    tomorrowApptsRes,
+    tomorrowJobsAdminRes,
+    unbilledJobsRes,
+    pendingVacationsRes,
+    missingSigRes,
+  ] = await Promise.all([
+    // Rapport-Entwuerfe seit >2 Tagen (eigene).
+    supabase
+      .from("service_reports")
+      .select("id, job_id, updated_at, job:jobs(job_number, title, customer:customers(name), location:locations(name))")
+      .eq("created_by", userId)
+      .eq("status", "entwurf")
+      .lt("updated_at", twoDaysAgoISO)
+      .order("updated_at", { ascending: true })
+      .limit(3),
+    // Offene Stempelungen des Users: clock_out=NULL und clock_in >24h alt.
+    // (Anstelle "nicht abgesegnet" — die App hat kein Approval-Feld.)
+    supabase
+      .from("time_entries")
+      .select("id, clock_in, job:jobs(id, job_number, title)")
+      .eq("user_id", userId)
+      .is("clock_out", null)
+      .lt("clock_in", twentyFourHAgoISO)
+      .order("clock_in", { ascending: true })
+      .limit(2),
+    // Heute-Termine des Users. Fuer "kein Rapport begonnen" gleichen wir
+    // clientseitig ab (siehe unten).
+    supabase
+      .from("job_appointments")
+      .select("id, start_time, job:jobs!inner(id, job_number, title, is_deleted, status)")
+      .eq("assigned_to", userId)
+      .gte("start_time", startTodayISO)
+      .lt("start_time", endTodayISO),
+    // Morgen-Termine des Users (fuer Techniker-Rolle als "Termin morgen"-Hinweis).
+    supabase
+      .from("job_appointments")
+      .select("id, start_time, title, job:jobs!inner(id, job_number, title, is_deleted)")
+      .eq("assigned_to", userId)
+      .gte("start_time", startTomorrowISO)
+      .lt("start_time", endTomorrowISO)
+      .order("start_time")
+      .limit(3),
+    // Admin/Teamleiter: Auftraege die morgen starten und noch keine
+    // Termine (bzw. keine Zuteilungen) haben. Wir laden die morgen-startenden
+    // und mappen clientseitig ab wieviele appointments/assignments es gibt.
+    isLead
+      ? supabase
+          .from("jobs")
+          .select("id, job_number, title, start_date, customer:customers(name), appointments:job_appointments(id, assigned_to)")
+          .eq("status", "offen")
+          .eq("is_deleted", false)
+          .eq("start_date", tomorrowLocalIso)
+          .limit(20)
+      : Promise.resolve({ data: [] as JobsWithApptRow[] }),
+    // Admin/Teamleiter: Auftraege abgeschlossen seit >7 Tagen ohne Rechnung.
+    isLead
+      ? supabase
+          .from("jobs")
+          .select("id, job_number, title, end_date, updated_at")
+          .eq("status", "abgeschlossen")
+          .eq("is_deleted", false)
+          .is("invoiced_at", null)
+          .is("invoice_skipped_at", null)
+          .lt("updated_at", sevenDaysAgoISO)
+          .order("updated_at", { ascending: true })
+          .limit(5)
+      : Promise.resolve({ data: [] as UnbilledJobRow[] }),
+    // Admin/Teamleiter: offene Ferien-Antraege.
+    isLead
+      ? supabase
+          .from("time_off")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "beantragt")
+      : Promise.resolve({ count: 0 }),
+    // Techniker/Mitarbeiter: eigene abgeschlossene Rapporte ohne Techniker-Signatur.
+    isField
+      ? supabase
+          .from("service_reports")
+          .select("id, job_id, job:jobs(job_number, title)")
+          .eq("created_by", userId)
+          .eq("status", "abgeschlossen")
+          .is("technician_signature_url", null)
+          .order("updated_at", { ascending: false })
+          .limit(3)
+      : Promise.resolve({ data: [] as MissingSigRow[] }),
+  ]);
+
+  // ─── Zweite Welle — Mitarbeiter ohne hinterlegten aktuellen Lohn.
+  // Wir laden alle aktiven Nicht-Partner-Profiles und die aktiven
+  // compensation-Rows (effective_to IS NULL) — der Diff sind die
+  // Mitarbeiter ohne Lohn. RLS: employee_compensation ist auf lohn:manage
+  // + admin begrenzt; bei Access-Denied liefert der Query [] und die
+  // Regel liefert schlicht keinen Vorschlag (kein Alert-Muell fuer
+  // User ohne Lohn-Recht). Wir feuern beide Queries parallel damit die
+  // Widget-Latenz nicht zwei Round-Trips braucht.
+  let missingLohn: { profile_id: string; full_name: string }[] = [];
+  if (isLead) {
+    const [profilesRes, compRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("is_active", true)
+        .neq("role", "partner"),
+      supabase
+        .from("employee_compensation")
+        .select("profile_id")
+        .is("effective_to", null),
+    ]);
+    const withComp = new Set(
+      ((compRes.data ?? []) as { profile_id: string }[]).map((r) => r.profile_id),
+    );
+    missingLohn = ((profilesRes.data ?? []) as { id: string; full_name: string }[])
+      .filter((p) => !withComp.has(p.id))
+      .map((p) => ({ profile_id: p.id, full_name: p.full_name }));
+  }
+
+  // ─── Termine heute die noch keinen Rapport haben ─────────────────
+  // Wir laden die service_reports der Jobs die heute Termin haben,
+  // um clientseitig abzugleichen (spart eine Cross-Join-Query).
+  type ApptTodayRow = {
+    id: string;
+    start_time: string;
+    job: { id: string; job_number: number | null; title: string; is_deleted: boolean; status: string } | { id: string; job_number: number | null; title: string; is_deleted: boolean; status: string }[] | null;
+  };
+  const todayApptRows = (todayApptsRes.data ?? []) as ApptTodayRow[];
+  const todayJobIds = new Set<string>();
+  const todayApptsByJob = new Map<string, { start: string; number: number | null; title: string }>();
+  for (const a of todayApptRows) {
+    const j = Array.isArray(a.job) ? a.job[0] : a.job;
+    if (!j || j.is_deleted || j.status !== "offen") continue;
+    if (!todayApptsByJob.has(j.id)) {
+      todayApptsByJob.set(j.id, { start: a.start_time, number: j.job_number, title: j.title });
+      todayJobIds.add(j.id);
+    }
+  }
+  let jobsWithReports = new Set<string>();
+  if (todayJobIds.size > 0) {
+    const { data: repRows } = await supabase
+      .from("service_reports")
+      .select("job_id")
+      .in("job_id", Array.from(todayJobIds));
+    jobsWithReports = new Set((repRows ?? []).map((r: { job_id: string }) => r.job_id));
+  }
+
+  // ─── Mapping in NextAction-Objekte ───────────────────────────────
+  const actions: NextAction[] = [];
+
+  // 1. Danger-Level: Offene Stempelung (ueberfaellig — der Nutzer stempelt
+  //    immer noch ein Ding).
+  type OpenStempelRow = { id: string; clock_in: string; job: { id: string; job_number: number | null; title: string } | { id: string; job_number: number | null; title: string }[] | null };
+  for (const t of ((openStempelRes.data ?? []) as OpenStempelRow[])) {
+    const j = Array.isArray(t.job) ? t.job[0] : t.job;
+    const nr = j?.job_number ? `INT-${j.job_number}` : null;
+    const hoursOpen = Math.round((now - Date.parse(t.clock_in)) / 3600000);
+    actions.push({
+      key: `stempel-open-${t.id}`,
+      icon: ClockAlert,
+      label: "Offene Stempelung schließen",
+      subtitle: `Seit ${hoursOpen}h offen${nr ? ` · ${nr}` : ""}`,
+      severity: "danger",
+      href: "/stempelzeiten",
+    });
+  }
+
+  // 2. Heute Termin ohne Rapport → Rapport starten
+  for (const jobId of todayJobIds) {
+    if (jobsWithReports.has(jobId)) continue;
+    const meta = todayApptsByJob.get(jobId)!;
+    const nr = meta.number ? `INT-${meta.number}` : "INT-…";
+    const timeStr = new Date(meta.start).toLocaleTimeString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" });
+    actions.push({
+      key: `today-rapport-${jobId}`,
+      icon: FilePlus,
+      label: `Rapport starten für ${nr}`,
+      subtitle: `Heute ${timeStr} · ${meta.title}`,
+      severity: "warn",
+      href: `/auftraege/${jobId}?tab=rapport`,
+    });
+  }
+
+  // 3. Rapport-Entwuerfe seit >2 Tagen fortsetzen
+  type DraftRow = {
+    id: string;
+    job_id: string;
+    updated_at: string;
+    job: { job_number: number | null; title: string; customer: { name: string } | { name: string }[] | null; location: { name: string } | { name: string }[] | null }
+      | { job_number: number | null; title: string; customer: { name: string } | { name: string }[] | null; location: { name: string } | { name: string }[] | null }[]
+      | null;
+  };
+  for (const d of ((oldDraftsRes.data ?? []) as DraftRow[])) {
+    const j = Array.isArray(d.job) ? d.job[0] : d.job;
+    if (!j) continue;
+    const cust = Array.isArray(j.customer) ? j.customer[0] : j.customer;
+    const loc = Array.isArray(j.location) ? j.location[0] : j.location;
+    const nr = j.job_number ? `INT-${j.job_number}` : "INT-…";
+    const days = Math.floor((now - Date.parse(d.updated_at)) / (24 * 3600 * 1000));
+    actions.push({
+      key: `draft-old-${d.id}`,
+      icon: PenLine,
+      label: `Rapport in ${nr} fortsetzen`,
+      subtitle: `Entwurf seit ${days} Tagen · ${cust?.name ?? loc?.name ?? j.title}`,
+      severity: "warn",
+      href: `/auftraege/${d.job_id}?tab=rapport&openDraft=1`,
+    });
+  }
+
+  // 4. Admin/Teamleiter: Morgen-Auftraege ohne Personal.
+  type JobsWithApptRow = {
+    id: string;
+    job_number: number | null;
+    title: string;
+    start_date: string;
+    customer: { name: string } | { name: string }[] | null;
+    appointments: { id: string; assigned_to: string | null }[] | null;
+  };
+  for (const j of ((tomorrowJobsAdminRes.data ?? []) as JobsWithApptRow[])) {
+    const appts = j.appointments ?? [];
+    const noAppts = appts.length === 0;
+    const noAssignments = appts.every((a) => !a.assigned_to);
+    if (!noAppts && !noAssignments) continue; // alles sauber zugeteilt
+    const cust = Array.isArray(j.customer) ? j.customer[0] : j.customer;
+    const nr = j.job_number ? `INT-${j.job_number}` : "INT-…";
+    actions.push({
+      key: `tomorrow-personal-${j.id}`,
+      icon: Users,
+      label: noAppts ? `Termine anlegen für ${nr}` : `Personal zuteilen für ${nr}`,
+      subtitle: `Morgen · ${cust?.name ?? j.title}`,
+      severity: "danger",
+      href: `/auftraege/${j.id}?tab=uebersicht${noAppts ? "&termin=neu" : ""}`,
+    });
+  }
+
+  // 5. Admin/Teamleiter: Auftraege abgeschlossen seit >7 Tagen ohne Rechnung.
+  type UnbilledJobRow = { id: string; job_number: number | null; title: string; end_date: string | null; updated_at: string };
+  for (const j of ((unbilledJobsRes.data ?? []) as UnbilledJobRow[])) {
+    const nr = j.job_number ? `INT-${j.job_number}` : "INT-…";
+    const days = Math.floor((now - Date.parse(j.updated_at)) / (24 * 3600 * 1000));
+    actions.push({
+      key: `unbilled-${j.id}`,
+      icon: Receipt,
+      label: `Rechnung für ${nr} stellen`,
+      subtitle: `Abgeschlossen vor ${days} Tagen · ${j.title}`,
+      severity: "warn",
+      href: `/abrechnung?job=${j.id}`,
+    });
+  }
+
+  // 6. Admin/Teamleiter: Ferien-Antraege warten (nur EINE Zeile, gebuendelt).
+  const pendingVacationCount = pendingVacationsRes.count ?? 0;
+  if (pendingVacationCount > 0) {
+    actions.push({
+      key: "vacations-pending",
+      icon: PlaneTakeoff,
+      label: pendingVacationCount === 1
+        ? "1 Ferienantrag prüfen"
+        : `${pendingVacationCount} Ferienanträge prüfen`,
+      subtitle: "Warten auf Genehmigung",
+      severity: "warn",
+      href: "/hr?tab=ferien",
+    });
+  }
+
+  // 7. Admin/Teamleiter: Mitarbeiter ohne hinterlegten Lohn (max 3).
+  for (const m of missingLohn.slice(0, 3)) {
+    actions.push({
+      key: `lohn-missing-${m.profile_id}`,
+      icon: Wallet,
+      label: `Lohn für ${m.full_name} setzen`,
+      subtitle: "Kein Brutto-Stundenlohn hinterlegt",
+      severity: "info",
+      href: "/hr?tab=loehne",
+    });
+  }
+
+  // 8. Techniker/Mitarbeiter: Termin morgen → Vorbereitungshinweis.
+  type TomorrowRow = { id: string; start_time: string; title: string; job: { id: string; job_number: number | null; title: string; is_deleted: boolean } | { id: string; job_number: number | null; title: string; is_deleted: boolean }[] | null };
+  for (const a of ((tomorrowApptsRes.data ?? []) as TomorrowRow[])) {
+    const j = Array.isArray(a.job) ? a.job[0] : a.job;
+    if (!j || j.is_deleted) continue;
+    const nr = j.job_number ? `INT-${j.job_number}` : "INT-…";
+    const time = new Date(a.start_time).toLocaleTimeString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" });
+    actions.push({
+      key: `tomorrow-appt-${a.id}`,
+      icon: Calendar,
+      label: `Termin morgen um ${time} · ${nr}`,
+      subtitle: a.title || j.title,
+      severity: "info",
+      href: `/auftraege/${j.id}`,
+    });
+  }
+
+  // 9. Techniker/Mitarbeiter: fehlende Signatur bei eigenem Rapport.
+  type MissingSigRow = { id: string; job_id: string; job: { job_number: number | null; title: string } | { job_number: number | null; title: string }[] | null };
+  for (const r of ((missingSigRes.data ?? []) as MissingSigRow[])) {
+    const j = Array.isArray(r.job) ? r.job[0] : r.job;
+    const nr = j?.job_number ? `INT-${j.job_number}` : "INT-…";
+    actions.push({
+      key: `sig-missing-${r.id}`,
+      icon: PenLine,
+      label: `Signatur nachtragen in ${nr}`,
+      subtitle: "Rapport abgeschlossen, deine Unterschrift fehlt",
+      severity: "warn",
+      href: `/auftraege/${r.job_id}?tab=rapport`,
+    });
+  }
+
+  // Sortierung nach Severity (danger → warn → info) fuer visuellen Fokus.
+  const severityOrder: Record<NextAction["severity"], number> = { danger: 0, warn: 1, info: 2 };
+  actions.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+  return actions;
+}
+
+// Type-Hints fuer die deriveDashboardNextActions Row-Shapes — nur damit
+// TypeScript in Promise.all die Zweige gleich typisieren kann.
+type JobsWithApptRow = {
+  id: string;
+  job_number: number | null;
+  title: string;
+  start_date: string;
+  customer: { name: string } | { name: string }[] | null;
+  appointments: { id: string; assigned_to: string | null }[] | null;
+};
+type UnbilledJobRow = { id: string; job_number: number | null; title: string; end_date: string | null; updated_at: string };
+type MissingSigRow = { id: string; job_id: string; job: { job_number: number | null; title: string } | { job_number: number | null; title: string }[] | null };
 

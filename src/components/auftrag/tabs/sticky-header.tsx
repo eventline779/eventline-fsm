@@ -9,7 +9,7 @@
  * spielen sich hier ab.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import {
   MapPin,
@@ -55,6 +55,10 @@ type Props = {
   tabs: Tab[];
   activeTab: TabKey;
   onSelectTab: (t: TabKey) => void;
+  /** Auto-abgeleiteter "was jetzt?"-Chip — die Detail-Page erzeugt ihn
+   *  ueber <AuftragNextActionChip> und reicht ihn hier durch, damit der
+   *  Header keine Modal-/Status-Callbacks kennen muss. */
+  nextActionChip?: ReactNode;
 };
 
 export function AuftragStickyHeader({
@@ -71,6 +75,7 @@ export function AuftragStickyHeader({
   tabs,
   activeTab,
   onSelectTab,
+  nextActionChip,
 }: Props) {
   const overflowRef = useRef<HTMLDivElement | null>(null);
 
@@ -135,6 +140,11 @@ export function AuftragStickyHeader({
                 Vermietentwurf
               </span>
             )}
+            {/* Auto-abgeleiteter "was jetzt?"-Chip — Klick fuehrt direkt
+                zur naechsten sinnvollen Aktion (Termine anlegen, Personal
+                zuteilen, Rapport starten, Rechnung stellen etc.). Rendert
+                null wenn nichts ansteht (z.B. sauberer abgerechneter Job). */}
+            {nextActionChip}
           </div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate mt-0.5">{job.title}</h1>
           {(customer?.name || locationLabel || eventDateLabel) && (

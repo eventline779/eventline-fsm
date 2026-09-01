@@ -11,6 +11,7 @@ import type { Customer, Job, CustomerType } from "@/types";
 import {
   Save, Building2, User, Globe, Mail, Phone, MapPin, Flag,
   ClipboardList, Trash2, Archive, ArchiveRestore, StickyNote, ChevronDown, Plus,
+  PhoneCall, FilePlus,
 } from "lucide-react";
 import { BexioButton } from "@/components/bexio-button";
 import { Loading } from "@/components/ui/spinner";
@@ -20,6 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import { BackButton } from "@/components/ui/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchableSelect } from "@/components/searchable-select";
+import { NextActionInline, type NextAction } from "@/components/ui/next-action";
 import Link from "next/link";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -49,6 +51,9 @@ export default function KundenDetailPage() {
   // entfaltet die volle Liste. Spiegelt das "Mehr laden"-Pattern aus
   // /auftraege, nur client-seitig (Daten sind schon da).
   const [showAllJobs, setShowAllJobs] = useState(false);
+  // Follow-up-Chip als State — die Ableitung braucht Date.now() (impure),
+  // deshalb rechnen wir sie in einem useEffect und speichern das Resultat.
+  const [followUpAction, setFollowUpAction] = useState<NextAction | null>(null);
 
   // Sortierung wie auf /auftraege, plus: stornierte Auftraege landen ans
   // absolute Ende (unabhaengig vom Datum) — sie sind nicht relevant fuer
@@ -105,6 +110,54 @@ export default function KundenDetailPage() {
   }
 
   useEffect(() => { loadData(); }, [id]);
+
+  // Follow-up-Action ableiten sobald Kunde+Jobs geladen sind. Wir rechnen
+  // hier in einem useEffect statt inline im Render, weil Date.now() nach
+  // Reacts purity-Regel im Render verboten ist. Zweitrangig: das Resultat
+  // aendert sich nur wenn Kunde oder Job-Liste sich aendert — nicht bei
+  // jedem Render.
+  const canCreateJobs = can("auftraege:create");
+  useEffect(() => {
+    if (!customer) { setFollowUpAction(null); return; }
+    if (customer.archived_at) { setFollowUpAction(null); return; }
+    if (!canCreateJobs) { setFollowUpAction(null); return; }
+    const nonCancelled = jobs.filter((j) => j.status !== "storniert");
+    if (nonCancelled.length === 0) {
+      setFollowUpAction({
+        key: `customer-${customer.id}-first-job`,
+        icon: FilePlus,
+        label: "Ersten Auftrag anlegen",
+        subtitle: "Dieser Kunde hat noch keinen Auftrag",
+        severity: "info",
+        href: `/auftraege/neu?customer_id=${customer.id}`,
+      });
+      return;
+    }
+    let newestMs = 0;
+    for (const j of nonCancelled) {
+      const ref = j.end_date
+        ? new Date(j.end_date).getTime()
+        : j.start_date
+          ? new Date(j.start_date).getTime()
+          : new Date(j.created_at).getTime();
+      if (ref > newestMs) newestMs = ref;
+    }
+    const nowMs = Date.now();
+    const sixMonthsAgo = nowMs - 6 * 30 * 24 * 3600 * 1000;
+    if (newestMs > 0 && newestMs < sixMonthsAgo) {
+      const months = Math.floor((nowMs - newestMs) / (30 * 24 * 3600 * 1000));
+      setFollowUpAction({
+        key: `customer-${customer.id}-followup`,
+        icon: PhoneCall,
+        label: "Follow-up: Kontakt aufnehmen?",
+        subtitle: `Letzter Auftrag vor ${months} Monaten`,
+        severity: "warn",
+        href: `/auftraege/neu?customer_id=${customer.id}`,
+      });
+      return;
+    }
+    setFollowUpAction(null);
+  }, [customer, jobs, canCreateJobs]);
 
   async function loadData() {
     const [custRes, jobsRes, docsRes, locsRes, rrRes] = await Promise.all([
@@ -222,6 +275,7 @@ export default function KundenDetailPage() {
 
   const typeIcon = customer.type === "company" ? <Building2 className="h-5 w-5" /> : customer.type === "individual" ? <User className="h-5 w-5" /> : <Globe className="h-5 w-5" />;
 
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
@@ -333,6 +387,15 @@ export default function KundenDetailPage() {
           </button>
         </div>
       </Modal>
+
+      {/* Follow-up-Hint — auto-abgeleitet aus Auftrags-Historie. Zeigt sich
+          nur wenn ein Follow-up wirklich faellig ist oder noch nie ein
+          Auftrag angelegt wurde. Klein, sitzt unter dem Kundenkopf. */}
+      {followUpAction && (
+        <div className="flex justify-start">
+          <NextActionInline action={followUpAction} />
+        </div>
+      )}
 
       {/* Kundendaten */}
       <Card className="bg-card">

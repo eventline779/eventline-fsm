@@ -35,6 +35,7 @@ import { Loading } from "@/components/ui/spinner";
 import { usePermissions } from "@/lib/use-permissions";
 
 import { AuftragStickyHeader, type TabKey } from "@/components/auftrag/tabs/sticky-header";
+import { AuftragNextActionChip } from "@/components/auftrag/next-action-chip";
 import { AuftragModals } from "@/components/auftrag/tabs/auftrag-modals";
 import { PartnerAnfrageBanner } from "@/components/auftrag/tabs/partner-anfrage-banner";
 import { OverviewTab } from "@/components/auftrag/tabs/overview-tab";
@@ -74,6 +75,17 @@ export default function AuftragDetailPage() {
   } = useAuftragData(jobId);
 
   const [showRapportModal, setShowRapportModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Aktueller User — benoetigt fuer die NextAction-Chip-Regeln
+  // ("Rapport fortsetzen" nur wenn ownDraft, "Rapport starten" nur wenn
+  // heute assigned). Bewusst separat vom Permissions-Hook: der liefert
+  // Rolle+Rechte, nicht die auth-User-ID.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
+  }, [supabase]);
+
   const [cancelPhase, setCancelPhase] = useState<"closed" | "confirm" | "reason">("closed");
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
@@ -288,6 +300,18 @@ export default function AuftragDetailPage() {
         tabs={tabs}
         activeTab={activeTab}
         onSelectTab={selectTab}
+        nextActionChip={
+          <AuftragNextActionChip
+            jobId={jobId}
+            job={job}
+            appointments={appointments}
+            reports={reports.map((r) => ({ id: r.id, status: r.status, created_by: r.created_by }))}
+            currentUserId={currentUserId}
+            onOpenRapport={() => setShowRapportModal(true)}
+            onRelease={() => updateStatus("offen")}
+            onFinish={() => setShowRapportModal(true)}
+          />
+        }
       />
 
       {job.status === "partner_anfrage" && can("auftraege:edit") && (
