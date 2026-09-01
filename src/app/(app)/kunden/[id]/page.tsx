@@ -383,7 +383,7 @@ export default function KundenDetailPage() {
               <button
                 type="button"
                 onClick={handleSave}
-                className="kasten kasten-red"
+                className="kasten kasten-blue"
               >
                 <Save className="h-3.5 w-3.5" />Speichern
               </button>
@@ -443,7 +443,7 @@ export default function KundenDetailPage() {
           {/* Direkt-Pfad: Auftrag fuer DIESEN Kunden anlegen — vorher musste
               der User zur globalen /auftraege/neu und Kunden manuell suchen. */}
           {can("auftraege:create") && (
-            <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red">
+            <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue">
               <Plus className="h-3.5 w-3.5" />
               Auftrag
             </Link>
@@ -454,7 +454,7 @@ export default function KundenDetailPage() {
             <div className="py-4 text-center space-y-3">
               <p className="text-sm text-muted-foreground">Keine Aufträge für diesen Kunden.</p>
               {can("auftraege:create") && (
-                <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red inline-flex">
+                <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue inline-flex">
                   <Plus className="h-3.5 w-3.5" />
                   Ersten Auftrag anlegen
                 </Link>

@@ -156,7 +156,7 @@ export default function ProjektePage() {
             <span className="hidden sm:inline">{showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}</span>
             <span className="sm:hidden">{showArchive ? "Aktiv" : `Archiv (${archiveCount})`}</span>
           </button>
-          <Link href="/projekte/neu" className="kasten kasten-red">
+          <Link href="/projekte/neu" className="kasten kasten-blue">
             <Plus className="h-3.5 w-3.5" /> Neues Projekt
           </Link>
         </div>
@@ -169,7 +169,7 @@ export default function ProjektePage() {
           {rows.length === 0 ? "Noch keine Projekte." : showArchive ? "Noch keine archivierten Projekte." : "Keine aktiven Projekte."}
           {rows.length === 0 && (
             <div className="mt-4">
-              <Link href="/projekte/neu" className="kasten kasten-red inline-flex">
+              <Link href="/projekte/neu" className="kasten kasten-blue inline-flex">
                 <Plus className="h-3.5 w-3.5" /> Erstes Projekt anlegen
               </Link>
             </div>
@@ -205,10 +205,15 @@ function ProjectCard({ p }: { p: ProjectRow }) {
     storniert:     "border-gray-300/60 dark:border-gray-500/25",
   };
 
+  // Storniert/Abgeschlossen/Abgelehnt (Audit Thema 5, Regel 3): visuell
+  // zurueckgenommen (opacity-70), damit aktive Projekte in der Liste
+  // sofort vor dem Auge bleiben. Aktive Stempler ueberschreiben den Effekt.
+  const isArchivedCard = ["abgeschlossen", "storniert", "abgelehnt"].includes(p.status) && !hasStampers;
   return (
     <div className={cn(
       "card-hover group relative flex flex-col gap-2 rounded-xl border bg-card p-3",
       statusBorderClass[p.status] ?? "",
+      isArchivedCard && "opacity-70",
       // Aktive Stempler bekommen die "Aktiv"-Behandlung analog conceptline:
       // kräftiger accent-Border + Ring + zarter Background-Tint.
       hasStampers && "!border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.07]",

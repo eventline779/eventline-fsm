@@ -70,145 +70,145 @@ export function OverviewTab({
   const mapsUrl = mapsQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}` : "";
   const projectLead = job.project_lead;
 
+  // Info-Card (Audit Thema 5, Regel 5): 2-spaltiges Layout.
+  //   Links  = WER   (Kunde + Kundenadresse + Veranstalter-Kontakt)
+  //   Rechts = WO+WANN (Standort/Raum/Adresse + Event-Datum + EIN
+  //                     Maps-Button; MapPin nur EINMAL rendern).
+  // Vorher hatten wir bis zu fuenf MapPin-Icons pro Karte (Kundenadresse,
+  // Standort, Standort-Adresse, Raum, Raum-Adresse, externe Adresse).
+  const placeName = location?.name ?? room?.name ?? job.external_address ?? null;
+  const placeLabel = location ? "Standort" : room ? "Raum" : "Ort";
+  const placeAddress = locationAddress || roomAddress || (location || room ? "" : job.external_address ?? "");
+
   return (
     <div className="space-y-6">
       {/* Info */}
       <Card className="bg-card">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-0.5 text-sm">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium">Kunde:</span>
-                <span className="truncate">{customer?.name ?? "—"}</span>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {/* Spalte WER — Kunde + Adresse + Veranstalter-Kontakt */}
+            <div className="space-y-1.5 min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Wer
+              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium">Kunde:</span>
+                    <span className="truncate">{customer?.name ?? "—"}</span>
+                  </div>
+                  {customerAddress && (
+                    <div className="text-xs text-muted-foreground pl-6 truncate">
+                      {customerAddress}
+                    </div>
+                  )}
+                </div>
+                {job.customer?.id && (
+                  <div className="shrink-0">
+                    <BexioButton
+                      customerId={job.customer.id}
+                      bexioContactId={job.customer.bexio_contact_id ?? null}
+                      onLinked={onReload}
+                    />
+                  </div>
+                )}
               </div>
-              {customerAddress && (
+              {projectLead && (
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="truncate">{customerAddress}</span>
+                  <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">Projektleiter:</span>
+                  <span className="truncate">{projectLead.full_name}</span>
+                </div>
+              )}
+              {(job.contact_person || job.contact_phone || job.contact_email) && (
+                <div className="pt-2 mt-1 border-t space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Veranstalter-Kontakt
+                  </p>
+                  {job.contact_person && (
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="truncate">{job.contact_person}</span>
+                    </div>
+                  )}
+                  {job.contact_phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a
+                        href={`tel:${job.contact_phone.replace(/\s+/g, "")}`}
+                        className="hover:underline tabular-nums truncate"
+                      >
+                        {job.contact_phone}
+                      </a>
+                    </div>
+                  )}
+                  {job.contact_email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a href={`mailto:${job.contact_email}`} className="hover:underline truncate">
+                        {job.contact_email}
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {job.customer?.id && (
-                <BexioButton
-                  customerId={job.customer.id}
-                  bexioContactId={job.customer.bexio_contact_id ?? null}
-                  onLinked={onReload}
-                />
+
+            {/* Spalte WO+WANN — Ort + Datum + EIN Maps-Button.
+                MapPin wird hier genau einmal gerendert (fuer die Ort-Zeile),
+                der Maps-Button traegt das Icon in sich. */}
+            <div className="space-y-1.5 min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Wo &amp; Wann
+              </p>
+              {placeName ? (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium">{placeLabel}:</span>
+                      <span className="truncate">{placeName}</span>
+                    </div>
+                    {placeAddress && (
+                      <div className="text-xs text-muted-foreground pl-6 truncate">
+                        {placeAddress}
+                      </div>
+                    )}
+                  </div>
+                  {mapsUrl && (
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="kasten kasten-blue shrink-0"
+                      data-tooltip="In Google Maps oeffnen"
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      Maps
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="text-muted-foreground italic">Kein Standort hinterlegt</div>
               )}
-              {!location && mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="kasten kasten-blue">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Google Maps
-                </a>
+              {job.start_date && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">Event-Datum:</span>
+                  <span className="tabular-nums">
+                    {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
+                    {job.end_date && job.end_date !== job.start_date
+                      ? ` – ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}`
+                      : ""}
+                  </span>
+                </div>
               )}
             </div>
           </div>
-          {location && (
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-medium">Standort:</span>
-                  <span className="truncate">{location.name}</span>
-                </div>
-                {locationAddress && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">{locationAddress}</span>
-                  </div>
-                )}
-              </div>
-              {mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="kasten kasten-blue shrink-0">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Google Maps
-                </a>
-              )}
-            </div>
-          )}
-          {!location && room && (
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-medium">Raum:</span>
-                  <span className="truncate">{room.name}</span>
-                </div>
-                {roomAddress && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">{roomAddress}</span>
-                  </div>
-                )}
-              </div>
-              {mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="kasten kasten-blue shrink-0">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Google Maps
-                </a>
-              )}
-            </div>
-          )}
-          {!location && !room && job.external_address && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-medium">Ort:</span>
-              <span className="truncate">{job.external_address}</span>
-            </div>
-          )}
-          {projectLead && (
-            <div className="flex items-center gap-2 text-sm">
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Projektleiter:</span> {projectLead.full_name}
-            </div>
-          )}
-          {job.start_date && (
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Event-Datum:</span>{" "}
-              {new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}{" "}
-              {job.end_date && job.end_date !== job.start_date
-                ? `– ${new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}`
-                : ""}
-            </div>
-          )}
-          {(job.contact_person || job.contact_phone || job.contact_email) && (
-            <div className="pt-2 border-t space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Veranstalter-Kontakt
-              </p>
-              {job.contact_person && (
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span>{job.contact_person}</span>
-                </div>
-              )}
-              {job.contact_phone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <a
-                    href={`tel:${job.contact_phone.replace(/\s+/g, "")}`}
-                    className="hover:underline tabular-nums"
-                  >
-                    {job.contact_phone}
-                  </a>
-                </div>
-              )}
-              {job.contact_email && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <a href={`mailto:${job.contact_email}`} className="hover:underline truncate">
-                    {job.contact_email}
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
           {job.description && (
-            <div className="pt-2 border-t">
-              <p className="text-sm text-muted-foreground">{job.description}</p>
+            <div className="pt-3 mt-3 border-t">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{job.description}</p>
             </div>
           )}
         </CardContent>

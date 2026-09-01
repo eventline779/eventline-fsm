@@ -20,7 +20,7 @@
  * jetzt genau einmal, im Historie-Tab.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +30,7 @@ import { Loading } from "@/components/ui/spinner";
 import { useConfirm } from "@/components/ui/use-confirm";
 import {
   CheckCircle2, XCircle, Loader2, Trash2, Edit3, Ban, ArrowLeft, ArrowRight,
-  Send, LayoutGrid, Clock, FolderOpen,
+  Send, LayoutGrid, Clock, FolderOpen, MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PROJECT_STATUS_LABEL, formatProjectNumber, progressPct } from "@/lib/projekte-format";
@@ -73,6 +73,26 @@ export default function ProjektDetailPage() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState<Appointment | "new" | null>(null);
   const [notesModalAppt, setNotesModalAppt] = useState<Appointment | null>(null);
+  // Overflow-Menu fuer destruktive Aktionen (Stornieren). Halten wir hier
+  // damit Klick-ausserhalb + Esc-close in einem Effect gebuendelt sind.
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (!overflowRef.current) return;
+      if (!overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen]);
 
   // Tab-State: URL zuerst, sonst Default per Rolle. Rollen-Default greift
   // erst wenn `role` gesetzt ist -- sonst gewinnt kurz "zeit" fuer Admins.
@@ -396,7 +416,14 @@ export default function ProjektDetailPage() {
         />
       )}
 
-      {/* Sticky Action-Bar unten */}
+      {/* Sticky Action-Bar unten.
+          Visuelle Grammatik (Audit Thema 5, Regel 1):
+          - EINE Primaer-Aktion pro Screen (kasten-blue/-green).
+          - Positive Aktionen wie Einreichen/Genehmigen/Abschliessen sind
+            blau bzw. gruen; rot ausschliesslich fuer echte destruktive
+            Aktionen (Ablehnen einer Genehmigungsanfrage, Stornieren).
+          - Stornieren wandert in ein Overflow-Menu (MoreVertical), sonst
+            liegen zwei rote Buttons parallel zu einer positiven Aktion. */}
       {(canApprove || canClose || canCancel || canSubmitDraft) && (
         <div className="sticky bottom-2 z-10 bg-card border rounded-xl p-2 flex gap-2 flex-wrap shadow-sm">
           <div className="text-[10px] text-muted-foreground/70 self-center px-1">Aktionen:</div>
@@ -408,7 +435,7 @@ export default function ProjektDetailPage() {
                 toast.success("Zur Genehmigung eingereicht");
                 load();
               }}
-              className="kasten kasten-red"
+              className="kasten kasten-blue"
             >
               <Send className="h-3.5 w-3.5" /> Einreichen
             </button>
@@ -434,9 +461,38 @@ export default function ProjektDetailPage() {
             </>
           )}
           {canCancel && (
-            <button onClick={() => setCancelOpen(true)} className="kasten kasten-red ml-auto">
-              <Ban className="h-3.5 w-3.5" /> Stornieren
-            </button>
+            <div className="relative ml-auto" ref={overflowRef}>
+              <button
+                type="button"
+                onClick={() => setOverflowOpen(!overflowOpen)}
+                className={`kasten ${overflowOpen ? "kasten-active" : "kasten-muted"}`}
+                data-tooltip="Weitere Aktionen"
+                data-tooltip-align="end"
+                aria-expanded={overflowOpen}
+                aria-haspopup="menu"
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </button>
+              {overflowOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 bottom-[calc(100%+6px)] z-40 min-w-[180px] rounded-xl border border-border bg-card shadow-lg p-1"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOverflowOpen(false);
+                      setCancelOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <Ban className="h-4 w-4" />
+                    Stornieren
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
+import { WarningCard } from "@/components/ui/warning-card";
 
 // Kleinere Page-Size = "Mehr laden" wird sichtbar, schnellerer initial-Load.
 // Beide Listen jetzt server-seitig nach start_date sortiert damit Pagination
@@ -36,7 +38,6 @@ const ACTIVE_PAGE_SIZE = 30;
 // (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
 // Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
 const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, appointments:job_appointments(id, start_time, assigned_to), service_reports(status)";
-import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
 import { SendStepModal } from "@/components/send-step-modal";
@@ -84,7 +85,36 @@ export default function AuftraegePage() {
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
   const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as "all" | "scala" | "barakuba" | "bau3" | "sonstige" | null) || "all" : "all");
-  const [showArchive, setShowArchive] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-archive") === "true" : false);
+  // Segment-Toggle (Audit Thema 5, Regel 4). Drei disjunkte Ansichten:
+  //   anfragen: Vermietentwuerfe / Entwuerfe / Partner-Anfragen (Pipeline)
+  //   aktiv:    freigegebene Auftraege (status=offen)
+  //   archiv:   abgeschlossen + storniert
+  // Zustand lebt in ?segment=... (URL-persist + teilbar) mit localStorage-
+  // Fallback fuer die naechste Session; Default=aktiv.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  type Segment = "anfragen" | "aktiv" | "archiv";
+  function resolveInitialSegment(): Segment {
+    if (typeof window === "undefined") return "aktiv";
+    const fromUrl = searchParams.get("segment");
+    if (fromUrl === "anfragen" || fromUrl === "aktiv" || fromUrl === "archiv") return fromUrl;
+    const fromLs = localStorage.getItem("auftraege-segment");
+    if (fromLs === "anfragen" || fromLs === "aktiv" || fromLs === "archiv") return fromLs;
+    // Kompatibilitaet: alter localStorage-Key "auftraege-archive"=true → archiv.
+    if (localStorage.getItem("auftraege-archive") === "true") return "archiv";
+    return "aktiv";
+  }
+  const [segment, setSegment] = useState<Segment>(resolveInitialSegment);
+  const showArchive = segment === "archiv";
+  function selectSegment(next: Segment) {
+    setSegment(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("auftraege-segment", next);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("segment", next);
+      router.replace(`/auftraege?${params.toString()}`, { scroll: false });
+    }
+  }
   // Rapport-ZIP-Download im Archiv
   const [showRapportExport, setShowRapportExport] = useState(false);
   const [exportFrom, setExportFrom] = useState<string>("");
@@ -98,7 +128,6 @@ export default function AuftraegePage() {
   // mit unklarer Endposition. Disabled solange der eine Call lauft.
   const [advancingId, setAdvancingId] = useState<string | null>(null);
   const supabase = createClient();
-  const router = useRouter();
 
   // Race-Guard fuer Archive-Queries (alte Antworten verwerfen, wenn neuere unterwegs sind)
   const archiveQueryIdRef = useRef(0);
@@ -110,9 +139,8 @@ export default function AuftraegePage() {
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-title", searchTitle); }, [searchTitle]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-status", filterStatus); }, [filterStatus]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
-  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-archive", String(showArchive)); }, [showArchive]);
-
-  // Active + Counts + Profiles: filter-unabhaengig, wird bei Mount und Invalidate geladen.
+  // Active + Counts + Profiles: filter-unabhaengig, wird bei Mount, Segment-
+  // Wechsel und Invalidate neu geladen.
   // Archive: filter-abhaengig, eigener Effect mit Debounce (siehe weiter unten).
   useEffect(() => {
     loadActiveAndCounts();
@@ -124,7 +152,7 @@ export default function AuftraegePage() {
     window.addEventListener("jobs:invalidate", handler);
     return () => window.removeEventListener("jobs:invalidate", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showArchive]);
+  }, [segment]);
 
   // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber.
   // Bei Warte-Schritten (2, 4) direkter UPDATE.
@@ -203,11 +231,17 @@ export default function AuftraegePage() {
       .from("jobs")
       .select(JOBS_SELECT)
       .neq("is_deleted", true)
-      .or(cancelledFilter)
-      // partner_entwurf raus: Partner-Entwuerfe (vor dem Absenden) gehoeren
-      // nur ins Partnerportal — EVENTLINE sieht sie erst wenn der Partner
-      // den Status zu partner_anfrage promoted.
-      .not("status", "in", '("abgeschlossen","storniert","partner_entwurf")');
+      .or(cancelledFilter);
+    // Segment-Filter (Audit Thema 5, Regel 4):
+    //   anfragen: Vermietentwurf/Entwurf/Partner-Anfrage (Pipeline)
+    //   aktiv:    freigegebene Auftraege (offen)
+    // Archiv-Segment nutzt den separaten buildArchiveQuery.
+    if (segment === "anfragen") {
+      q = q.in("status", ["anfrage", "entwurf", "partner_anfrage"]);
+    } else {
+      // aktiv (partner_entwurf gehoert nur ins Partnerportal)
+      q = q.eq("status", "offen");
+    }
     if (cursor !== null) {
       // Composite-cursor: (start_date > c.start) OR (start_date = c.start AND id > c.id).
       // start_date null = Entwuerfe ohne Datum — kommen zuletzt (NULLS LAST).
@@ -221,7 +255,7 @@ export default function AuftraegePage() {
       .order("start_date", { ascending: true, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(ACTIVE_PAGE_SIZE + 1);
-  }, [supabase]);
+  }, [supabase, segment]);
 
   async function loadActiveAndCounts() {
     const [activeRes, profRes, freshCounts] = await Promise.all([
@@ -342,7 +376,11 @@ export default function AuftraegePage() {
     : hasSearchTerm
       ? [...activeJobs, ...archiveJobs.filter((a) => !activeJobs.some((b) => b.id === a.id))]
       : activeJobs;
-  const totalForSource = showArchive ? counts.abgeschlossen + counts.storniert : counts.anfrage + counts.offen + counts.entwurf;
+  const totalForSource = segment === "archiv"
+    ? counts.abgeschlossen + counts.storniert
+    : segment === "anfragen"
+      ? counts.anfrage + counts.entwurf
+      : counts.offen;
   const filtered = sourceJobs.filter((j) => {
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
@@ -378,23 +416,55 @@ export default function AuftraegePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{showArchive ? "Operations Archiv" : "Operations"}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {segment === "archiv" ? "Operations Archiv" : segment === "anfragen" ? "Anfragen" : "Operations"}
+          </h1>
           {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
               identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
               auf gleicher Linie sitzen wie auf den anderen Seiten. */}
           <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
-        {/* Action-Buttons: auf Mobile Icon-only fuer die "+ Neu"-Aktionen
-            damit alle drei Buttons in eine Zeile passen. Desktop bleibt
-            beschriftet. Archiv hat seinen Count im Label, auch auf Mobile
-            sichtbar. */}
+        {/* Action-Buttons — Segment-Toggle links, dann kontext-spezifische
+            Aktionen. Visuelle Grammatik (Audit Thema 5, Regel 1):
+            "Neuer Auftrag" ist positive Primaeraktion → kasten-blue,
+            nicht kasten-red (rot bleibt destruktiven Aktionen vorbehalten). */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setShowArchive(!showArchive)} className={showArchive ? "kasten-active" : "kasten-toggle-off"}>
-            <Archive className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{showArchive ? "Aktive anzeigen" : `Archiv (${counts.abgeschlossen + counts.storniert})`}</span>
-            <span className="sm:hidden">{showArchive ? "Aktiv" : `Archiv (${counts.abgeschlossen + counts.storniert})`}</span>
-          </button>
-          {showArchive && can("auftraege:see-all") && (
+          {/* Segment-Toggle [Anfragen · Aktiv · Archiv] (Audit Thema 5,
+              Regel 4). Zaehler kommen aus der counts-View, entkoppelt vom
+              geladenen State. */}
+          <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Auftragssegment">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={segment === "anfragen"}
+              onClick={() => selectSegment("anfragen")}
+              className={segment === "anfragen" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
+            >
+              <Send className="h-3.5 w-3.5" />
+              Anfragen ({counts.anfrage + counts.entwurf})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={segment === "aktiv"}
+              onClick={() => selectSegment("aktiv")}
+              className={segment === "aktiv" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              Aktiv ({counts.offen})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={segment === "archiv"}
+              onClick={() => selectSegment("archiv")}
+              className={segment === "archiv" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archiv ({counts.abgeschlossen + counts.storniert})
+            </button>
+          </div>
+          {segment === "archiv" && can("auftraege:see-all") && (
             <button
               onClick={() => {
                 // Default-Range: ganzes letztes Monat (häufigster Buchhaltungs-Use-Case).
@@ -416,14 +486,14 @@ export default function AuftraegePage() {
               <span className="hidden sm:inline">Rapporte-ZIP</span>
             </button>
           )}
-          {!showArchive && can("auftraege:create") && (
+          {segment !== "archiv" && can("auftraege:create") && (
             <>
               <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple" data-tooltip="Neuer Vermietentwurf">
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Neuer Vermietentwurf</span>
                 <span className="sm:hidden">Vermietung</span>
               </Link>
-              <Link href="/auftraege/neu" className="kasten kasten-red" data-tooltip="Neuer Auftrag">
+              <Link href="/auftraege/neu" className="kasten kasten-blue" data-tooltip="Neuer Auftrag">
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Neuer Auftrag</span>
                 <span className="sm:hidden">Auftrag</span>
@@ -574,7 +644,7 @@ export default function AuftraegePage() {
                       <Plus className="h-3.5 w-3.5" />
                       Neuer Vermietentwurf
                     </Link>
-                    <Link href="/auftraege/neu" className="kasten kasten-red">
+                    <Link href="/auftraege/neu" className="kasten kasten-blue">
                       <Plus className="h-3.5 w-3.5" />
                       Neuer Auftrag
                     </Link>
@@ -673,6 +743,18 @@ export default function AuftraegePage() {
             }
 
 
+            // Warnings (Audit Thema 5, Regel 2): "Kein Termin" /
+            // "Termin nicht zugewiesen" wandern aus der Inline-Textzeile in
+            // einen WarningCard-Wrapper (3px amber Left-Border + Info-Icon
+            // mit Tooltip oben rechts). Die textuelle Info-Zeile darunter
+            // wird entsprechend nicht mehr gerendert.
+            const warnings: { label: string }[] = [];
+            if (noTermin) warnings.push({ label: "Kein Termin geplant" });
+            else if (terminUnassigned) warnings.push({ label: "Termin nicht zugewiesen" });
+            // Storniert/Abgeschlossen (Audit Thema 5, Regel 3): abgeschlossene
+            // und stornierte Karten laufen im Archiv-Segment; wir setzen
+            // opacity-70 damit sie visuell zurueckgenommen wirken.
+            const isDoneOrCancelled = job.status === "abgeschlossen" || job.status === "storniert";
             return (
             <div key={job.id}>
               {showDivider && (
@@ -682,10 +764,11 @@ export default function AuftraegePage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
+            <WarningCard warnings={warnings}>
             <Link href={detailHref} className="block group">
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
                 job.status === "entwurf" ? "border-dashed opacity-80" : ""
-              }`}>
+              } ${isDoneOrCancelled ? "opacity-70" : ""}`}>
                 {/* Mobile-Variante: 2-Zeilen-Stack damit nichts horizontal
                     rausragt. Zeile 1: Nr | Titel | Action-Icon.
                     Zeile 2: Kunde · Datum + Status-Tags + ggf. Rechnungs-Pille
@@ -871,16 +954,10 @@ export default function AuftraegePage() {
                           Manuell in Details bestätigen
                         </span>
                       )}
-                      {!isAnfrage && noTermin && (
-                        <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
-                          Kein Termin geplant
-                        </span>
-                      )}
-                      {!isAnfrage && terminUnassigned && (
-                        <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">
-                          Termin nicht zugewiesen
-                        </span>
-                      )}
+                      {/* Termin-Warnungen ("Kein Termin", "Nicht zugewiesen")
+                          werden ab Audit Thema 5 Regel 2 als WarningCard-
+                          Border oben angezeigt — die Textzeile hier wuerde
+                          die Warnung ein zweites Mal rendern. */}
                       {renderActionIcon("sm")}
                     </div>
                     {isAnfrage && (
@@ -890,6 +967,7 @@ export default function AuftraegePage() {
                 </div>
               </Card>
             </Link>
+            </WarningCard>
             </div>
             );
           })}
@@ -1006,7 +1084,7 @@ export default function AuftraegePage() {
                 }
               }}
               disabled={exportInProgress}
-              className="kasten kasten-red flex-1"
+              className="kasten kasten-blue flex-1"
             >
               <Download className="h-3.5 w-3.5" />
               {exportInProgress ? "Generiere…" : "Download"}

@@ -15,14 +15,14 @@
  * fuer beide Buttons.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
-import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, Send } from "lucide-react";
+import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, Send, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -809,35 +809,17 @@ function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdi
           <MetaLine items={[job.customer?.name, dateRange, job.location?.name]} />
         </div>
         {canEdit && (
-          <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-            <button
-              type="button"
-              onClick={onSkip}
-              className="kasten kasten-red"
-              data-tooltip="Keine Rechnung stellen (mit Begründung)"
-              aria-label="Rechnung nicht stellen"
-            >
-              <Ban className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={onCreateInBexio}
-              disabled={bexioBusy}
-              className="kasten kasten-blue"
-              data-tooltip="Rechnung direkt in Bexio anlegen (falls verbunden)"
-            >
-              {bexioBusy ? (
-                <span className="h-3.5 w-3.5 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-              {bexioBusy ? "Legt an…" : "In Bexio anlegen"}
-            </button>
-            <button type="button" onClick={onMarkBilled} className="kasten kasten-green">
-              <Receipt className="h-3.5 w-3.5" />
-              Rechnung gestellt
-            </button>
-          </div>
+          // Visuelle Grammatik (Audit Thema 5, Regel 1): EINE Primaer-
+          // Aktion pro Card. "In Bexio anlegen" ist der Happy-Path
+          // (blau/primary), "Rechnung gestellt" bleibt als sekundaere
+          // manuelle Alternative (muted). Skip liegt im Overflow-Menu
+          // damit die Karte visuell ruhig bleibt.
+          <JobCardActions
+            onSkip={onSkip}
+            onCreateInBexio={onCreateInBexio}
+            onMarkBilled={onMarkBilled}
+            bexioBusy={bexioBusy}
+          />
         )}
       </div>
 
@@ -971,6 +953,100 @@ function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdi
         </div>
       </div>
     </Card>
+  );
+}
+
+/** JobCardActions — Rechte Header-Aktionen der JobCard.
+ *  Primaerer Happy-Path: "In Bexio anlegen" (kasten-blue).
+ *  Sekundaer: "Rechnung gestellt" (kasten-muted, manuell).
+ *  Destruktiv/negativ: "Keine Rechnung stellen" im Overflow-Menu. */
+function JobCardActions({
+  onSkip,
+  onCreateInBexio,
+  onMarkBilled,
+  bexioBusy,
+}: {
+  onSkip: () => void;
+  onCreateInBexio: () => void;
+  onMarkBilled: () => void;
+  bexioBusy: boolean;
+}) {
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (!overflowRef.current) return;
+      if (!overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen]);
+  return (
+    <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+      <button
+        type="button"
+        onClick={onMarkBilled}
+        className="kasten kasten-muted"
+        data-tooltip="Rechnung wurde ausserhalb Bexio gestellt — nur als abgerechnet markieren"
+      >
+        <Receipt className="h-3.5 w-3.5" />
+        Rechnung gestellt
+      </button>
+      <button
+        type="button"
+        onClick={onCreateInBexio}
+        disabled={bexioBusy}
+        className="kasten kasten-blue"
+        data-tooltip="Rechnung direkt in Bexio anlegen (falls verbunden)"
+      >
+        {bexioBusy ? (
+          <span className="h-3.5 w-3.5 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Send className="h-3.5 w-3.5" />
+        )}
+        {bexioBusy ? "Legt an…" : "In Bexio anlegen"}
+      </button>
+      <div className="relative" ref={overflowRef}>
+        <button
+          type="button"
+          onClick={() => setOverflowOpen(!overflowOpen)}
+          className={`kasten ${overflowOpen ? "kasten-active" : "kasten-muted"}`}
+          data-tooltip="Weitere Aktionen"
+          data-tooltip-align="end"
+          aria-expanded={overflowOpen}
+          aria-haspopup="menu"
+        >
+          <MoreVertical className="h-3.5 w-3.5" />
+        </button>
+        {overflowOpen && (
+          <div
+            role="menu"
+            className="absolute right-0 top-[calc(100%+6px)] z-40 min-w-[220px] rounded-xl border border-border bg-card shadow-lg p-1"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOverflowOpen(false);
+                onSkip();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              <Ban className="h-4 w-4" />
+              Keine Rechnung stellen
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

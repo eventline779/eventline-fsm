@@ -168,9 +168,13 @@ export function AuftragStickyHeader({
           .filter((a) => a.to !== "storniert")
           .filter((a) => a.to === "abgeschlossen" || canEdit)
           .map((a) => {
+            // Visuelle Grammatik: EINE Primaer-Aktion pro Screen (Audit
+            // Thema 5, Regel 1). Rot ist reserviert fuer destruktive
+            // Aktionen (Stornieren, Loeschen). Positive Primaerer wie
+            // Freigeben/Abschliessen sind blau bzw. gruen.
             const isFinish = a.to === "abgeschlossen";
             const isPrimary = a.variant === "primary";
-            const tone = isFinish ? "kasten-green" : isPrimary ? "kasten-red" : "kasten-muted";
+            const tone = isFinish ? "kasten-green" : isPrimary ? "kasten-blue" : "kasten-muted";
             const isRelease = a.to === "offen";
             const releaseBlocked = isRelease && (!job.start_date || !job.end_date);
             return (

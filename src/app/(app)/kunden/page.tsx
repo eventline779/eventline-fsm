@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
 import { Modal } from "@/components/ui/modal";
+import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
 // flag-icons CSS ist ~80kb — lazy laden damit /kunden zuerst rendert.
@@ -296,7 +297,7 @@ export default function KundenPage() {
             {showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}
           </button>
           {!showArchive && can("kunden:create") && (
-            <Link href="/kunden/neu" className="kasten kasten-red">
+            <Link href="/kunden/neu" className="kasten kasten-blue">
               <Plus className="h-3.5 w-3.5" />
               Neuer Kunde
             </Link>
@@ -445,8 +446,16 @@ export default function KundenPage() {
               const actionAllowed = action.kind === "delete"
                 ? can("kunden:delete")
                 : can("kunden:archive");
+              // Archiviert (Audit Thema 5, Regel 3): opacity-70 damit
+              // archivierte Zeilen visuell zurueckgenommen sind. Wir
+              // stellen das auf der Zeile ein, nicht auf dem Link, damit
+              // Trennstrich + Hover-Rahmen im gleichen Ton mit-fadesd.
+              const isArchivedRow = !!c.archived_at;
               return (
-                <div key={c.id} className="group relative after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-px after:bg-foreground/10 dark:after:bg-foreground/15 last:after:hidden">
+                <div key={c.id} className={cn(
+                  "group relative after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-px after:bg-foreground/10 dark:after:bg-foreground/15 last:after:hidden",
+                  isArchivedRow && "opacity-70",
+                )}>
                   <div className="kunden-row hidden md:grid grid-cols-[88px_1fr_240px_140px_120px_36px] gap-4 items-center px-2.5 py-2 rounded-lg">
                     <span className="font-mono text-xs">
                       {c.bexio_nr ? (
