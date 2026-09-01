@@ -122,11 +122,15 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// Sidebar-Struktur nach dem Audit-Rebuild (2026-08): flache Top-Level-
-// Einträge statt tiefer HR-Hub-Verschachtelung. Stempelzeiten/Tickets/
-// Ferien sind eigene Sidebar-Bereiche geworden — /hr ist damit nur noch
-// die admin-only Löhne-Seite (LohnsummenPrognose + Monatsstunden +
-// Lohn-Dokumente + Mitarbeiter-Löhne + Standardwerte).
+// Sidebar-Struktur nach Audit-Rebuild + Rueck-Konsolidierung (2026-09):
+// HR wieder als EINE Sidebar-Position (/hr) mit Tab-Hub innen —
+// Stempelzeiten / Tickets / Ferien / Löhne sind Tabs, nicht eigene
+// Sidebar-Bereiche. Grund: 3 einzelne Sidebar-Eintraege haben die
+// "HR-Zeug ist beisammen"-Wahrnehmung zerschossen und Mitarbeiter mussten
+// mehrere Bereiche durchklicken; ein Hub mit kompakten Tabs (nicht wieder
+// mit Riesen-Card-Buttons wie die Ur-Zwischenseite) haelt alles zusammen.
+// Deep-Links auf /stempelzeiten, /tickets, /ferien funktionieren weiter
+// (duenne Wrapper).
 // Partner-Kontakte leben eigenständig unter /partner (vorher in
 // /einstellungen versteckt).
 export const NAV_GROUPS: NavGroup[] = [
@@ -136,14 +140,16 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard", mobile: true },
       { href: "/todos", label: "Todos", icon: "CheckSquare", mobile: true },
       { href: "/kalender", label: "Kalender", icon: "Calendar", mobile: true },
-    ],
-  },
-  {
-    label: "Mein Arbeitstag",
-    items: [
-      { href: "/stempelzeiten", label: "Stempelzeiten", icon: "Clock" },
-      { href: "/tickets", label: "Tickets", icon: "TicketCheck" },
-      { href: "/ferien", label: "Ferien", icon: "Palmtree" },
+      // HR als Hub: enthält Übersicht + Stempelzeiten + Tickets + Ferien
+      // (+ Löhne fuer Admin auf trusted device). matchPrefixes damit die
+      // Detail-Deep-Links (/stempelzeiten, /tickets/[id], /ferien) den HR-
+      // Eintrag in der Sidebar aktiv markieren.
+      {
+        href: "/hr",
+        label: "HR",
+        icon: "Briefcase",
+        matchPrefixes: ["/stempelzeiten", "/tickets", "/ferien"],
+      },
     ],
   },
   {
@@ -176,10 +182,8 @@ export const NAV_GROUPS: NavGroup[] = [
 export const ADMIN_NAV_GROUP: NavGroup = {
   label: "Admin",
   items: [
-    // Löhne: LohnsummenPrognose (Ausgleichskasse/SUVA/BVG) + Monatsstunden
-    // + Lohnabrechnungen + Mitarbeiter-Löhne + Standardwerte. Admin-only
-    // via ADMIN_ONLY_PREFIXES in src/lib/permissions.ts + TrustedDeviceGate.
-    { href: "/hr", label: "Löhne", icon: "Wallet" },
+    // Löhne sind kein separater Sidebar-Eintrag mehr — sie leben als
+    // admin-only Tab (+ TrustedDeviceGate) innerhalb /hr.
     { href: "/einstellungen", label: "Einstellungen", icon: "Settings" },
   ],
 };

@@ -53,15 +53,18 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   // see-all / edit-all heben den Owner-Lock auf: sieht/bearbeitet
   // Todos aller Mitarbeiter (z.B. fuer Team-Leitung).
   { slug: "todos",         label: "Todos",         paths: ["/todos"],                                            actions: ["view", "create", "see-all", "edit-all"] },
-  // /hr ist strikt admin-only via ADMIN_ONLY_PREFIXES (unten) — kein
-  // "hr:view" hier, damit die Rolle in der Matrix gar nicht auftaucht.
+  // /hr ist der HR-Hub (Übersicht / Stempelzeiten / Tickets / Ferien /
+  // Löhne als Tabs) und fuer alle sichtbar — kein "hr:view" hier, damit
+  // die Rolle in der Matrix nicht auftaucht. Die einzelnen Tabs werden
+  // ueber ihre jeweiligen Module-Permissions (stempelzeiten/tickets) bzw.
+  // role='admin' + TrustedDeviceGate (loehne) gegated.
   // Loehne — Pro-Mitarbeiter-Saetze (Brutto + Arbeitgeber-Anteil) pflegen.
   // Sensitives Modul: nur HR/Geschaeftsfuehrung. Mitarbeiter sehen ihre
   // eigene Brutto-Zahl via /einstellungen → Mein Konto (RPC, kein Modul-View).
   // KEINE eigene Route — die Lohntabelle ist Content im Loehne-Tab unter /hr,
-  // daher leere paths-Liste. Page-Gate uebernimmt die admin-only-Regel.
+  // daher leere paths-Liste. Tab-internes Gate uebernimmt die admin-only-Regel.
   { slug: "lohn",          label: "Löhne",         paths: [],                                                    actions: ["manage"] },
-  // Stempelzeiten als eigenes Modul + eigener Sidebar-Bereich.
+  // Stempelzeiten als eigenes Modul (Tab im HR-Hub + Deep-Link /stempelzeiten).
   // see-all / edit-all heben den Owner-Lock auf der time_entries-Tabelle
   // auf — fuer HR-Verantwortliche die alle Stempelzeiten korrigieren.
   { slug: "stempelzeiten", label: "Stempelzeiten", paths: ["/stempelzeiten"],                                    actions: ["view", "see-all", "edit-all"] },
@@ -106,11 +109,10 @@ const ALWAYS_ALLOWED_PREFIXES = ["/dashboard", "/mein-konto", "/ferien"];
 /** Pfade die strikt nur fuer role='admin' sind — Sidebar blendet sie fuer
  *  alle anderen aus, isPathAllowed liefert false (-> /dashboard-Redirect
  *  im (app)/layout). RLS sperrt die Daten zusaetzlich auf der DB-Seite.
- *  /hr: Löhne-Hub (Lohnsummen-Prognose + Monatsstunden + Lohnabrechnungen
- *  + Mitarbeiter-Löhne + Standardwerte) — sensible Firmen-Aggregate,
- *  zusätzlich TrustedDeviceGate. Analytics ist in die jeweilige Fach-
- *  Seite gewandert (Löhne → /hr, Location-Overview → /locations). */
-const ADMIN_ONLY_PREFIXES: string[] = ["/hr"];
+ *  Leer seit HR-Tab-Hub (2026-09): /hr ist wieder für alle sichtbar, aber
+ *  der Löhne-Tab innerhalb ist admin-only + TrustedDeviceGate. Andere
+ *  admin-only Bereiche haben ihre eigenen Modul-View-Permissions. */
+const ADMIN_ONLY_PREFIXES: string[] = [];
 
 /** Pfade die immer erreichbar sind, auch ohne Modul-View-Permission, weil
  *  sie via Verknuepfung aus einem anderen Modul aufgerufen werden (z.B.
