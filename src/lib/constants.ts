@@ -173,7 +173,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/datenbank",
         label: "Datenbank",
         icon: "Database",
-        matchPrefixes: ["/kunden", "/lieferanten", "/locations", "/partner", "/standorte", "/raeume"],
+        matchPrefixes: ["/kunden", "/lieferanten", "/locations", "/standorte", "/raeume"],
       },
     ],
   },

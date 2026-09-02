@@ -35,17 +35,18 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Database, Users, Handshake, MapPin, HeartHandshake,
+  Database, Users, Handshake, MapPin,
 } from "lucide-react";
 import { TabsNav } from "@/components/ui/tabs-nav";
 import { usePermissions } from "@/lib/use-permissions";
 import { KundenView } from "@/components/kunden/kunden-view";
 import { LieferantenView } from "@/components/lieferanten/lieferanten-view";
 import { LocationsView } from "@/components/locations/locations-view";
-import { PartnerView } from "@/components/partner/partner-view";
 
-type Tab = "kunden" | "lieferanten" | "locations" | "partner";
-const ALL_TABS: Tab[] = ["kunden", "lieferanten", "locations", "partner"];
+// Partner ist bewusst NICHT hier — Location-Partner ist Verwaltungs-Thema
+// und lebt jetzt unter /einstellungen?tab=partner (Leo 2026-09-02).
+type Tab = "kunden" | "lieferanten" | "locations";
+const ALL_TABS: Tab[] = ["kunden", "lieferanten", "locations"];
 
 /**
  * Legacy-Mapping: alte ?tab=…-Werte transparent auf die neuen Keys mappen.
@@ -60,7 +61,6 @@ function mapLegacyTab(raw: string | null): Tab | null {
     location: "locations",
     standorte: "locations",
     raeume: "locations",
-    partners: "partner",
   };
   const mapped = legacy[raw];
   if (mapped) return mapped;
@@ -71,8 +71,7 @@ export default function DatenbankPage() {
   const searchParams = useSearchParams();
   const urlTab = mapLegacyTab(searchParams.get("tab"));
 
-  const { role, ready } = usePermissions();
-  const isAdmin = role === "admin";
+  const { ready } = usePermissions();
 
   const [tab, setTab] = useState<Tab>(urlTab ?? "kunden");
 
@@ -93,19 +92,13 @@ export default function DatenbankPage() {
 
   if (!ready) return null;
 
-  // Tab-Sichtbarkeit — Partner nur fuer Admin (PartnerView selbst zeigt
-  // sonst nur den „Nur für Administratoren"-Hinweis; besser: Tab weglassen).
-  const tabs: { key: Tab; label: string; icon: React.ReactNode; visible: boolean }[] = [
-    { key: "kunden",      label: "Kunden",      icon: <Users className="h-4 w-4" />,         visible: true },
-    { key: "lieferanten", label: "Lieferanten", icon: <Handshake className="h-4 w-4" />,     visible: true },
-    { key: "locations",   label: "Locations",   icon: <MapPin className="h-4 w-4" />,        visible: true },
-    { key: "partner",     label: "Partner",     icon: <HeartHandshake className="h-4 w-4" />, visible: isAdmin },
+  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: "kunden",      label: "Kunden",      icon: <Users className="h-4 w-4" /> },
+    { key: "lieferanten", label: "Lieferanten", icon: <Handshake className="h-4 w-4" /> },
+    { key: "locations",   label: "Locations",   icon: <MapPin className="h-4 w-4" /> },
   ];
 
-  const visibleTabs = tabs.filter((t) => t.visible);
-  // Fallback: User landet per Deep-Link auf einem nicht sichtbaren Tab
-  // (z.B. Non-Admin ?tab=partner) → auf ersten sichtbaren Tab zurueckfallen.
-  const activeTab: Tab = visibleTabs.some((t) => t.key === tab) ? tab : "kunden";
+  const activeTab: Tab = ALL_TABS.includes(tab) ? tab : "kunden";
 
   return (
     <div className="space-y-6">
@@ -118,7 +111,7 @@ export default function DatenbankPage() {
       </h1>
 
       <TabsNav
-        tabs={visibleTabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
+        tabs={tabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
         active={activeTab}
         onChange={(k) => selectTab(k as Tab)}
         ariaLabel="Datenbank-Bereiche"
@@ -128,7 +121,6 @@ export default function DatenbankPage() {
       {activeTab === "kunden" && <KundenView embedded />}
       {activeTab === "lieferanten" && <LieferantenView embedded />}
       {activeTab === "locations" && <LocationsView embedded />}
-      {activeTab === "partner" && isAdmin && <PartnerView embedded />}
     </div>
   );
 }

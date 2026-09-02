@@ -1,14 +1,12 @@
-"use client";
-
 /**
- * Deep-Link-Alias fuer Partner. Die eigentliche View lebt in
- * src/components/partner/partner-view.tsx — sowohl diese Seite als auch
- * /kontakte?tab=partner rendern sie. So bleiben bestehende Links
- * (Sidebar-Alt, Bookmarks, Mails) auf /partner funktionsfaehig.
+ * /partner → Redirect auf /einstellungen?tab=partner.
+ * Location-Partner ist Verwaltungs-Thema (Rollen/Anfrage-Formular/User-Liste
+ * gehoeren zusammen) und lebt jetzt komplett unter Einstellungen (Leo 2026-09-02).
+ * Der Redirect erhaelt bestehende Deep-Links am Leben.
  */
 
-import { PartnerView } from "@/components/partner/partner-view";
+import { redirect } from "next/navigation";
 
 export default function PartnerKontaktePage() {
-  return <PartnerView />;
+  redirect("/einstellungen?tab=partner");
 }

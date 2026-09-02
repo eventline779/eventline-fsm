@@ -25,24 +25,29 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plug, Users, Activity, Building2, FileText } from "lucide-react";
+import { Plug, Users, Activity, Building2, FileText, HeartHandshake } from "lucide-react";
 import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
 import { TeamTab } from "@/components/einstellungen/team-tab";
 import { RollenTab } from "@/components/einstellungen/rollen-tab";
 import { PermissionAuditLogCard } from "@/components/einstellungen/permission-audit-log";
 import { AktivitaetTab } from "@/components/einstellungen/aktivitaet-tab";
 import { PartnerFormTab } from "@/components/einstellungen/partner-form-tab";
+import { PartnerView } from "@/components/partner/partner-view";
 import { FirmaTab } from "@/components/einstellungen/firma-tab";
 import { BuildInfoBadge } from "@/components/einstellungen/build-info-badge";
 import { TabsNav } from "@/components/ui/tabs-nav";
 
-// Die 5 flachen Tabs. Reihenfolge = links→rechts in der Nav.
-type Tab = "firma" | "team" | "anfrage-form" | "integrationen" | "aktivitaet";
-const ALL_TABS: Tab[] = ["firma", "team", "anfrage-form", "integrationen", "aktivitaet"];
+// Die 6 flachen Tabs. Reihenfolge = links→rechts in der Nav.
+// "partner" ist die Partner-Benutzerliste (Locationspartner) — hier hin
+// zurueckgezogen von /datenbank, weil Partner ein Verwaltungs-Thema ist
+// (nicht Kontakt-Datenbank) und Anfrage-Formular + Rollen bereits hier
+// liegen (Leo 2026-09-02).
+type Tab = "firma" | "team" | "partner" | "anfrage-form" | "integrationen" | "aktivitaet";
+const ALL_TABS: Tab[] = ["firma", "team", "partner", "anfrage-form", "integrationen", "aktivitaet"];
 
 // Legacy-Mapping: alte Portal-Tabkeys → neue flache Tabkeys. Deckt
 // bestehende Deep-Links ab (Bexio-Callback, interne Hinweise wie
-// „nachpflegen unter Einstellungen → Team").
+// „nachpflegen unter Einstellungen → Team", /partner-Redirect).
 const LEGACY_TAB_MAP: Record<string, Tab> = {
   "firma-stammdaten": "firma",
   team: "team",
@@ -107,6 +112,7 @@ export default function EinstellungenPage() {
     ...(isAdmin ? [
       { key: "firma" as Tab, label: "Firma", icon: <Building2 className="h-4 w-4" /> },
       { key: "team" as Tab, label: "Team & Rollen", icon: <Users className="h-4 w-4" /> },
+      { key: "partner" as Tab, label: "Partner", icon: <HeartHandshake className="h-4 w-4" /> },
       { key: "anfrage-form" as Tab, label: "Anfrage-Formular", icon: <FileText className="h-4 w-4" /> },
     ] : []),
     { key: "integrationen", label: "Integrationen", icon: <Plug className="h-4 w-4" /> },
@@ -173,6 +179,8 @@ export default function EinstellungenPage() {
           <PermissionAuditLogCard />
         </div>
       )}
+
+      {tab === "partner" && isAdmin && <PartnerView embedded />}
 
       {tab === "anfrage-form" && isAdmin && <PartnerFormTab />}
 
