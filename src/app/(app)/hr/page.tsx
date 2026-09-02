@@ -3,23 +3,40 @@
 /**
  * HR-Hub — EIN Sidebar-Eintrag, mehrere Tabs.
  *
- * Nach dem Sidebar-Rebuild (2026-08) waren Stempelzeiten/Tickets/Ferien
- * jeweils eigene Sidebar-Bereiche — das hat die "HR-Zeug ist beisammen"-
- * Wahrnehmung zerstoert. Zurueck-Konsolidierung (2026-09) macht /hr wieder
- * zu EINER Anlaufstelle, aber mit kompakten Tabs statt der urspruenglichen
- * Riesen-Card-Zwischenseite.
+ * Rolle-Trennung (2026-09):
+ *   Beide Rollen sehen DIESELBEN Top-Tabs (Übersicht/Stempelzeiten/Tickets/
+ *   Ferien/Lohn). Innerhalb jedes personen-basierten Tabs schaltet Admin
+ *   via "Meine | Team"-Toggle zwischen Eigen-Sicht und Team-Sicht um.
+ *   MA sieht keinen Toggle (immer "meine" via RLS).
  *
- * Tabs (URL: ?tab=…):
- *   uebersicht    — Landing, kompakter Ueberblick "Heute" + "Diese Woche"
- *   stempelzeiten — StempelzeitenView (dieselbe Component wie /stempelzeiten)
- *   tickets       — TicketsView       (dieselbe Component wie /tickets)
- *   ferien        — FerienView        (dieselbe Component wie /ferien)
- *   loehne        — Admin-only + TrustedDeviceGate: Lohnsummen-Prognose +
- *                   Monatsstunden + Lohnabrechnungen + Mitarbeiter-Löhne
- *                   + Standardwerte (Sub-Tabs innerhalb).
+ *   Konkret pro Tab:
+ *     - Stempelzeiten: Toggle in StempelzeitenView (ersetzt frueheren
+ *       "Alle Mitarbeiter"-Kasten).
+ *     - Tickets: Toggle in TicketsView (ersetzt "Nur meine"-Kasten,
+ *       Semantik invertiert: Team = alle, Meine = nur eigene).
+ *     - Ferien: FerienView hatte den Toggle schon — unveraendert.
+ *     - Lohn: Toggle HIER auf HR-Ebene, weil die Team-Sicht komplett
+ *       anders aussieht (Verwaltung mit Sub-Tabs) als die Meine-Sicht
+ *       (PDF-Liste).
  *
- * Tab-Zustand ueberlebt Reload via URL-Query (?tab=…), Wechsel via
- * history.replaceState (siehe /einstellungen — identisches Muster).
+ * Lohn-Tab (frueher "Löhne", jetzt Singular fuer die MA-Sicht):
+ *   - MA-Sicht (default): MeineLohndokumenteView — eigene Lohn-PDFs +
+ *     Lohnausweise + Digital-Consent-Karte. Extrahiert aus dem alten
+ *     mein-konto/Dokumente-Tab.
+ *   - Admin-Sicht (Toggle "Team"): LohnsummenPrognose + Sub-Tabs
+ *     Monatsstunden/PDFs/Mitarbeiter/Standardwerte. TrustedDeviceGate
+ *     wrapt nur die Team-Sicht, nicht die eigene PDF-Liste.
+ *
+ * Sub-Tab-Rename (2026-09) — Semantik-Klarheit:
+ *   - "abrechnung"       → "monatsstunden" (matcht MonatsstundenTable)
+ *   - "lohnabrechnungen" → "pdfs"          (matcht LohndokumenteAdmin)
+ *   - "mitarbeiter"      → "mitarbeiter"   (Label kuerzer)
+ *   - "standardwerte"    → unveraendert
+ *   Alte URL-Query-Werte werden per Legacy-Mapping auf neu uebersetzt
+ *   damit alte Deep-Links (Sidebar-Bookmarks, Slack-Links) weiter
+ *   funktionieren.
+ *
+ * Tab-Zustand ueberlebt Reload via URL-Query (?tab=…&subtab=…&lohn=…).
  */
 
 import { useEffect, useState } from "react";
@@ -42,23 +59,47 @@ import { MonatsstundenTable } from "@/components/hr/monatsstunden-table";
 import { LohnStandardwerteCard } from "@/components/hr/loehne/lohn-standardwerte-card";
 import { MitarbeiterLohnTab } from "@/components/hr/loehne/mitarbeiter-lohn-tab";
 import { LohnsummenPrognose } from "@/components/analytics/lohnsummen-prognose";
+import { MeineLohndokumenteView } from "@/components/hr/meine-lohndokumente-view";
 import { ZRH_TZ, todayLocalIso } from "@/lib/swiss-time";
 
 type Tab = "uebersicht" | "stempelzeiten" | "tickets" | "ferien" | "loehne";
-type LoehneSubTab = "abrechnung" | "lohnabrechnungen" | "mitarbeiter" | "standardwerte";
+type LoehneSubTab = "monatsstunden" | "pdfs" | "mitarbeiter" | "standardwerte";
+type LohnMode = "meine" | "team";
 
 const ALL_TABS: Tab[] = ["uebersicht", "stempelzeiten", "tickets", "ferien", "loehne"];
+const ALL_SUBTABS: LoehneSubTab[] = ["monatsstunden", "pdfs", "mitarbeiter", "standardwerte"];
+
+/**
+ * Legacy-Mapping fuer die alten Sub-Tab-Keys — alte Deep-Links
+ * (?subtab=abrechnung etc.) werden transparent auf die neuen Keys
+ * umgeschrieben. Zurueckgeben: mapped key ODER unveraenderten Wert.
+ */
+function mapLegacySubtab(raw: string | null): LoehneSubTab | null {
+  if (!raw) return null;
+  const legacy: Record<string, LoehneSubTab> = {
+    abrechnung: "monatsstunden",
+    lohnabrechnungen: "pdfs",
+    "mitarbeiter-lohn": "mitarbeiter",
+  };
+  const mapped = legacy[raw];
+  if (mapped) return mapped;
+  return ALL_SUBTABS.includes(raw as LoehneSubTab) ? (raw as LoehneSubTab) : null;
+}
 
 export default function HRPage() {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as Tab | null;
-  const urlSub = searchParams.get("subtab") as LoehneSubTab | null;
+  const urlSub = searchParams.get("subtab");
+  const urlLohnMode = searchParams.get("lohn") as LohnMode | null;
 
   const { can, role, ready } = usePermissions();
   const isAdmin = role === "admin";
 
   const [tab, setTab] = useState<Tab>(urlTab && ALL_TABS.includes(urlTab) ? urlTab : "uebersicht");
-  const [subTab, setSubTab] = useState<LoehneSubTab>(urlSub ?? "abrechnung");
+  const [subTab, setSubTab] = useState<LoehneSubTab>(mapLegacySubtab(urlSub) ?? "monatsstunden");
+  // Lohn-Modus: Admin default "team" (Verwaltungs-Sicht), MA hat keinen
+  // Umschalter — immer "meine". URL-Override moeglich fuer Deep-Link.
+  const [lohnMode, setLohnMode] = useState<LohnMode>(urlLohnMode ?? "team");
 
   // URL-Aenderung von aussen (Back/Forward, Deep-Link nachtraeglich) mit
   // Local-State synchron halten — sonst zeigt Back auf altem Tab.
@@ -66,15 +107,22 @@ export default function HRPage() {
     if (urlTab && ALL_TABS.includes(urlTab)) setTab(urlTab);
   }, [urlTab]);
   useEffect(() => {
-    if (urlSub) setSubTab(urlSub);
+    const mapped = mapLegacySubtab(urlSub);
+    if (mapped) setSubTab(mapped);
   }, [urlSub]);
+  useEffect(() => {
+    if (urlLohnMode === "meine" || urlLohnMode === "team") setLohnMode(urlLohnMode);
+  }, [urlLohnMode]);
 
   function selectTab(t: Tab) {
     setTab(t);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", t);
-      if (t !== "loehne") url.searchParams.delete("subtab");
+      if (t !== "loehne") {
+        url.searchParams.delete("subtab");
+        url.searchParams.delete("lohn");
+      }
       window.history.replaceState({}, "", url.toString());
     }
   }
@@ -89,17 +137,34 @@ export default function HRPage() {
     }
   }
 
+  function selectLohnMode(m: LohnMode) {
+    setLohnMode(m);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "loehne");
+      url.searchParams.set("lohn", m);
+      // Sub-Tab macht in "meine" keinen Sinn — aus der URL raus.
+      if (m === "meine") url.searchParams.delete("subtab");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }
+
   if (!ready) return null;
 
-  // Tab-Sichtbarkeit nach Permissions gaten. Admin sieht alles via
-  // hasPermission-Kurzschluss.
+  // Effektiver Lohn-Modus — MA hat keinen Toggle, immer "meine".
+  const effectiveLohnMode: LohnMode = isAdmin ? lohnMode : "meine";
+
+  // Tab-Sichtbarkeit — Lohn ist jetzt fuer ALLE sichtbar (MA sieht seine
+  // eigenen PDFs, Admin sieht Team-Verwaltung). Frueher admin-only.
   const tabs: { key: Tab; label: string; icon: React.ReactNode; visible: boolean }[] = [
     { key: "uebersicht",    label: "Übersicht",    icon: <LayoutDashboard className="h-4 w-4" />, visible: true },
     { key: "stempelzeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" />,          visible: can("stempelzeiten:view") },
     { key: "tickets",       label: "Tickets",       icon: <TicketCheck className="h-4 w-4" />,    visible: can("tickets:view") },
     // Ferien ist immer erlaubt (Mitarbeiter reichen eigene Antraege via RLS ein).
     { key: "ferien",        label: "Ferien",        icon: <Palmtree className="h-4 w-4" />,       visible: true },
-    { key: "loehne",        label: "Löhne",         icon: <Wallet className="h-4 w-4" />,         visible: isAdmin },
+    // Lohn: MA sieht eigene Lohn-PDFs; Admin sieht Team-Verwaltung.
+    // Kein Permission-Gate — jeder MA soll seine Lohnzettel abrufen koennen.
+    { key: "loehne",        label: "Lohn",          icon: <Wallet className="h-4 w-4" />,         visible: true },
   ];
 
   const visibleTabs = tabs.filter((t) => t.visible);
@@ -108,10 +173,10 @@ export default function HRPage() {
   const activeTab: Tab = visibleTabs.some((t) => t.key === tab) ? tab : "uebersicht";
 
   const loehneSubTabs: { key: LoehneSubTab; label: string; icon: React.ReactNode }[] = [
-    { key: "abrechnung",       label: "Abrechnung",       icon: <Table className="h-4 w-4" /> },
-    { key: "lohnabrechnungen", label: "Lohnabrechnungen", icon: <FileText className="h-4 w-4" /> },
-    { key: "mitarbeiter",      label: "Mitarbeiter-Lohn", icon: <Users className="h-4 w-4" /> },
-    { key: "standardwerte",    label: "Standardwerte",    icon: <SettingsIcon className="h-4 w-4" /> },
+    { key: "monatsstunden", label: "Monatsstunden", icon: <Table className="h-4 w-4" /> },
+    { key: "pdfs",          label: "PDFs",          icon: <FileText className="h-4 w-4" /> },
+    { key: "mitarbeiter",   label: "Mitarbeiter",   icon: <Users className="h-4 w-4" /> },
+    { key: "standardwerte", label: "Standardwerte", icon: <SettingsIcon className="h-4 w-4" /> },
   ];
 
   return (
@@ -126,7 +191,7 @@ export default function HRPage() {
             HR
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Stempelzeiten, Tickets, Ferien{isAdmin ? " und Löhne" : ""} an einem Ort.
+            Stempelzeiten, Tickets, Ferien und Lohn an einem Ort.
           </p>
         </div>
       )}
@@ -139,6 +204,7 @@ export default function HRPage() {
         active={activeTab}
         onChange={(k) => selectTab(k as Tab)}
         ariaLabel="HR-Bereiche"
+        className="mb-4"
       />
 
       {activeTab === "uebersicht" && (
@@ -157,37 +223,75 @@ export default function HRPage() {
         <FerienView />
       )}
 
-      {activeTab === "loehne" && isAdmin && (
-        <TrustedDeviceGate>
-          {/* Lohnsummen-Prognose oben — Kennzahl fuer Ausgleichskasse /
-              SUVA / BVG-Meldung. */}
-          <LohnsummenPrognose />
+      {activeTab === "loehne" && (
+        <div className="space-y-4">
+          {/* Meine|Team-Umschalter — nur Admin sieht ihn. MA landet immer
+              in der Meine-Sicht (siehe effectiveLohnMode). Kasten-Toggle
+              rechts oben, Muster wie FerienView + reference_design_kasten_buttons. */}
+          {isAdmin && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Lohn</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {effectiveLohnMode === "meine"
+                    ? "Deine Lohnabrechnungen & Lohnausweise."
+                    : "Team-Verwaltung: Monatsstunden, PDFs, Mitarbeiter-Loehne."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectLohnMode("meine")}
+                  className={effectiveLohnMode === "meine" ? "kasten-active" : "kasten-toggle-off"}
+                >
+                  Meine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectLohnMode("team")}
+                  className={effectiveLohnMode === "team" ? "kasten-active" : "kasten-toggle-off"}
+                >
+                  Team
+                </button>
+              </div>
+            </div>
+          )}
 
-          {/* Loehne-Sub-Tabs: Kasten-Toggle-Style (nicht Underline).
-              Muster wie main-Einstellungen: Underline nur fuer TOP-Nav
-              (Portale/Sektionen), Kasten fuer Sub-Nav innerhalb einer
-              Sektion. */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            {loehneSubTabs.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => selectSubTab(t.key)}
-                className={subTab === t.key ? "kasten-active" : "kasten-toggle-off"}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {effectiveLohnMode === "meine" && <MeineLohndokumenteView />}
 
-          <div className="pt-2">
-            {subTab === "abrechnung" && <MonatsstundenTable />}
-            {subTab === "lohnabrechnungen" && <LohndokumenteAdmin />}
-            {subTab === "mitarbeiter" && <MitarbeiterLohnTab />}
-            {subTab === "standardwerte" && <LohnStandardwerteCard />}
-          </div>
-        </TrustedDeviceGate>
+          {effectiveLohnMode === "team" && isAdmin && (
+            <TrustedDeviceGate>
+              {/* Lohnsummen-Prognose oben — Kennzahl fuer Ausgleichskasse /
+                  SUVA / BVG-Meldung. */}
+              <LohnsummenPrognose />
+
+              {/* Loehne-Sub-Tabs: Kasten-Toggle-Style (nicht Underline).
+                  Muster wie main-Einstellungen: Underline nur fuer TOP-Nav
+                  (Portale/Sektionen), Kasten fuer Sub-Nav innerhalb einer
+                  Sektion. */}
+              <div className="mt-6 flex flex-wrap gap-2">
+                {loehneSubTabs.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => selectSubTab(t.key)}
+                    className={subTab === t.key ? "kasten-active" : "kasten-toggle-off"}
+                  >
+                    {t.icon}
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-2">
+                {subTab === "monatsstunden" && <MonatsstundenTable />}
+                {subTab === "pdfs" && <LohndokumenteAdmin />}
+                {subTab === "mitarbeiter" && <MitarbeiterLohnTab />}
+                {subTab === "standardwerte" && <LohnStandardwerteCard />}
+              </div>
+            </TrustedDeviceGate>
+          )}
+        </div>
       )}
     </div>
   );
@@ -207,6 +311,8 @@ interface OverviewData {
   } | null;
   weekMinutes: number;         // Eigene Wochen-Stunden (ISO-Woche)
   pendingLeaveRequests: number; // Admin: offene Team-Antraege
+  teamStampedToday: number;    // Admin: wieviele MA haben heute gestempelt
+  openTeamTickets: number;     // Admin: alle offenen Team-Tickets
   recentDoneTickets: {         // Eigene letzten 3 erledigten Tickets
     id: string;
     number: number;
@@ -216,6 +322,7 @@ interface OverviewData {
 
 // Type-Aliases fuer Supabase-Queries.
 interface TERow { clock_in: string; clock_out: string | null }
+interface TERowUser { user_id: string }
 interface TicketRow { id: string; ticket_number: number; title: string }
 interface TimeOffRow { type: string; end_date: string }
 
@@ -277,7 +384,7 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
       const weekToIso = new Date(weekEnd + "T23:59:59").toISOString();
 
       // Parallel-Queries — nichts blockiert.
-      const [teToday, teWeek, tOpen, tDone, absent, pending] = await Promise.all([
+      const [teToday, teWeek, tOpen, tDone, absent, pending, teamToday, teamTickets] = await Promise.all([
         supabase
           .from("time_entries")
           .select("clock_in, clock_out")
@@ -319,6 +426,23 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
               .select("id", { count: "exact", head: true })
               .eq("status", "beantragt")
           : Promise.resolve({ count: 0 } as { count: number | null }),
+        // Team heute: distinct user_ids die heute gestempelt haben.
+        // RLS blockiert Non-Admins — fuer Admin gibt Postgres alle Rows zurueck.
+        isAdmin
+          ? supabase
+              .from("time_entries")
+              .select("user_id")
+              .gte("clock_in", todayFromIso)
+              .lte("clock_in", todayToIso)
+          : Promise.resolve({ data: null } as { data: TERowUser[] | null }),
+        // Team-Tickets: alle offenen Tickets (RLS filtert Non-Admin auf eigene).
+        isAdmin
+          ? supabase
+              .from("tickets")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "offen")
+              .neq("type", "beleg")
+          : Promise.resolve({ count: 0 } as { count: number | null }),
       ]);
 
       if (cancelled) return;
@@ -337,6 +461,11 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
 
       const absentRow = (absent as { data?: TimeOffRow | null }).data ?? null;
 
+      const teamTodayRows = (teamToday as { data?: TERowUser[] | null }).data ?? null;
+      const distinctUsers = teamTodayRows
+        ? new Set(teamTodayRows.map((r) => r.user_id)).size
+        : 0;
+
       setData({
         todayMinutes: sumMinutes(teToday.data as TERow[] | null),
         openTicketsMine: (tOpen as { count: number | null }).count ?? 0,
@@ -345,6 +474,8 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
           : null,
         weekMinutes: sumMinutes(teWeek.data as TERow[] | null),
         pendingLeaveRequests: (pending as { count: number | null }).count ?? 0,
+        teamStampedToday: distinctUsers,
+        openTeamTickets: (teamTickets as { count: number | null }).count ?? 0,
         recentDoneTickets: ((tDone.data as TicketRow[] | null) ?? []).map((t) => ({
           id: t.id, number: t.ticket_number, title: t.title,
         })),
@@ -404,15 +535,6 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
             onClick={() => onGoto("stempelzeiten")}
             tooltip="Zu Stempelzeiten"
           />
-          {isAdmin && (
-            <OverviewRow
-              icon={<Palmtree className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
-              label="Offene Ferien-Anträge (Team)"
-              value={data ? String(data.pendingLeaveRequests) : "…"}
-              onClick={() => onGoto("ferien")}
-              tooltip="Antraege pruefen"
-            />
-          )}
           {data && data.recentDoneTickets.length > 0 ? (
             <div className="py-2">
               <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
@@ -442,6 +564,40 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
           )}
         </div>
       </div>
+
+      {/* Team-Sektion — nur Admin. Kompakte Vorschau ueber Team-Aktivitaet.
+          Nicht redundant zu den "Meine"-Zeilen oben: hier geht es um
+          Verwaltungs-Blick, nicht persoenlichen Blick. */}
+      {isAdmin && data && (
+        <div className="px-4 py-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+            Team
+          </p>
+          <div className="divide-y divide-border/60">
+            <OverviewRow
+              icon={<Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
+              label="Team heute gestempelt"
+              value={`${data.teamStampedToday} ${data.teamStampedToday === 1 ? "Person" : "Personen"}`}
+              onClick={() => onGoto("stempelzeiten")}
+              tooltip="Team-Stempelzeiten oeffnen"
+            />
+            <OverviewRow
+              icon={<Palmtree className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+              label="Offene Ferien-Anträge (Team)"
+              value={String(data.pendingLeaveRequests)}
+              onClick={() => onGoto("ferien")}
+              tooltip="Antraege pruefen"
+            />
+            <OverviewRow
+              icon={<TicketCheck className="h-4 w-4 text-red-600 dark:text-red-400" />}
+              label="Offene Team-Tickets"
+              value={String(data.openTeamTickets)}
+              onClick={() => onGoto("tickets")}
+              tooltip="Team-Tickets oeffnen"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
