@@ -181,20 +181,13 @@ export default function HRPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header — nur auf Uebersicht sichtbar. Auf den anderen Tabs bringt
-          jede View ihren eigenen H1 mit (Stempelzeiten/Tickets/Ferien/Löhne),
-          der doppelte HR-Header waere Bloat. */}
-      {activeTab === "uebersicht" && (
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Briefcase className="h-5 w-5" />
-            HR
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Stempelzeiten, Tickets, Ferien und Lohn an einem Ort.
-          </p>
-        </div>
-      )}
+      {/* HR-Header IMMER sichtbar (Leo 2026-09-02: "wenn man tabs wechselt
+          bleibt immernoch hr oben"). Die View-Components (Stempel/Tickets/
+          Ferien) rendern ihren H1 nicht mehr wenn sie im HR-Kontext sind. */}
+      <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+        <Briefcase className="h-5 w-5" />
+        HR
+      </h1>
 
       {/* Top-Level-Tab-Nav — Underline-Style (kanonisches Nav-Tab-Muster,
           siehe TabsNav-Kommentar). NAVIGATION zwischen unterschiedlichen
