@@ -10,16 +10,11 @@
  * der Sidebar — laenger, mit Placeholder-Text, so wie in Linear/Notion.
  */
 
-import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CMDK_OPEN_EVENT } from "@/components/shell/command-palette";
 
-interface Props {
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
-}
-
-export function TopHeader({ sidebarCollapsed, onToggleSidebar }: Props) {
+export function TopHeader() {
   const [mac, setMac] = useState(false);
   useEffect(() => {
     if (typeof navigator !== "undefined") {
@@ -35,16 +30,6 @@ export function TopHeader({ sidebarCollapsed, onToggleSidebar }: Props) {
 
   return (
     <header className="hidden md:flex sticky top-0 z-20 h-12 items-center gap-3 px-4 border-b border-border bg-background/85 backdrop-blur">
-      <button
-        type="button"
-        onClick={onToggleSidebar}
-        className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
-        aria-label={sidebarCollapsed ? "Sidebar einblenden" : "Sidebar ausblenden"}
-        data-tooltip={sidebarCollapsed ? "Sidebar einblenden" : "Sidebar ausblenden"}
-      >
-        {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-      </button>
-
       <button
         type="button"
         onClick={openPalette}

@@ -27,13 +27,9 @@ interface SidebarProps {
   /** Erlaubte Modul-Slugs aus der Rollen-Konfiguration. */
   permissions: string[];
   onSignOut: () => void;
-  /** Wenn true: Sidebar wird nach links weggeschoben (translate-x-full),
-   *  Content-Bereich nimmt die volle Breite. Zustand kommt vom Layout
-   *  (localStorage-persistiert). */
-  collapsed?: boolean;
 }
 
-export function Sidebar({ profile, permissions, onSignOut, collapsed = false }: SidebarProps) {
+export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
@@ -94,12 +90,7 @@ export function Sidebar({ profile, permissions, onSignOut, collapsed = false }: 
   }
 
   return (
-    <aside
-      className={cn(
-        "hidden md:flex md:flex-col fixed left-0 top-0 w-[240px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30 transition-transform duration-200",
-        collapsed && "-translate-x-full",
-      )}
-    >
+    <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[240px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
       {/* Logo — fuellt die Nav-Breite, aber mit Luft zum Rand (px-6 = 24px
           jeweils, damit's atmet — Leo 2026-09-02). */}
       <div className="px-6 pt-5 pb-4">

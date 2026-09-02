@@ -178,17 +178,30 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
+  // Global Escape-Handler: schliesst auch wenn Focus NICHT im Input ist
+  // (User klickt daneben und drueckt Esc → sollte trotzdem zu).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <>
-      {/* Backdrop klick schliesst. z-Indices ueber Leaflet (1000) analog Modal. */}
+      {/* Backdrop rein visuell (Dim + Blur). Klick-zu-Schliessen macht der
+          Panel-Container darueber — sonst faengt der Container die Klicks ab
+          weil er inset-0 liegt und ueber dem Backdrop rendert. */}
+      <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur pointer-events-none" />
       <div
-        className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur"
+        className="fixed inset-0 z-[1110] flex items-start justify-center p-4 pt-[10vh]"
         onClick={onClose}
-      />
-      <div className="fixed inset-0 z-[1110] flex items-start justify-center p-4 pt-[10vh]">
+      >
         <div
           className="bg-card rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border flex flex-col max-h-[70vh]"
           onClick={(e) => e.stopPropagation()}
@@ -208,9 +221,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             {loading && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
             )}
-            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded border bg-muted/50 text-muted-foreground shrink-0">
-              Esc
-            </kbd>
           </div>
 
           {/* Ergebnis-Liste */}
@@ -280,24 +290,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             )}
           </div>
 
-          {/* Footer mit Tastatur-Hinweisen */}
-          <div className="hidden sm:flex items-center justify-between gap-3 px-4 py-2 border-t text-[11px] text-muted-foreground shrink-0">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1">
-                <kbd className="px-1 py-0.5 rounded border bg-muted/50">↑</kbd>
-                <kbd className="px-1 py-0.5 rounded border bg-muted/50">↓</kbd>
-                Navigieren
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <kbd className="px-1 py-0.5 rounded border bg-muted/50">Enter</kbd>
-                Öffnen
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded border bg-muted/50">Esc</kbd>
-              Schließen
-            </span>
-          </div>
+          {/* Footer-Legende bewusst entfernt (Leo 2026-09-02): "nicht so viel
+              erklaeren". Esc/Pfeil/Enter sind Standard-Konvention. */}
         </div>
       </div>
     </>,

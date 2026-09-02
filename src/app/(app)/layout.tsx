@@ -53,16 +53,6 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const loading = !ready;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
-  // Sidebar-Collapse — persistiert in localStorage. Lazy-init damit SSR
-  // nicht crasht (typeof window-Guard). Beim Toggle wird zurueckgeschrieben.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("sidebar-collapsed") === "1";
-  });
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("sidebar-collapsed", sidebarCollapsed ? "1" : "0");
-  }, [sidebarCollapsed]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -311,23 +301,14 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         profile={profile}
         permissions={permissions}
         onSignOut={handleSignOut}
-        collapsed={sidebarCollapsed}
       />
 
-      {/* Margin-left = Sidebar-Breite (240px) ab md-Breakpoint. Wenn Sidebar
-          collapsed: 0 (Content nutzt volle Breite). Transition-duration
-          matched Sidebar-Slide-Animation. */}
+      {/* Margin-left = Sidebar-Breite (240px) ab md-Breakpoint. */}
       <div
         id="app-scroll"
-        className={cn(
-          "flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden transition-[margin] duration-200",
-          sidebarCollapsed ? "md:ml-0" : "md:ml-[240px]",
-        )}
+        className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden md:ml-[240px]"
       >
-        <TopHeader
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
-        />
+        <TopHeader />
         <Breadcrumbs />
         <main
           className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-6 max-w-[1280px] w-full mx-auto min-w-0"
