@@ -578,6 +578,7 @@ export type NotificationType =
   | "ticket_done"
   | "ticket_rejected"
   | "job_assigned"
+  | "job_overdue"
   | "appointment_new"
   | "todo_assigned"
   | "todo_overdue"

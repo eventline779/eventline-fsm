@@ -26,6 +26,7 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationTypeMeta> =
   ticket_done:      { icon: CheckCircle2, accent: "green", label: "Ticket erledigt"   },
   ticket_rejected:  { icon: XCircle,      accent: "red",   label: "Ticket abgelehnt"  },
   job_assigned:     { icon: Briefcase,    accent: "red",   label: "Auftrag zugewiesen" },
+  job_overdue:      { icon: AlertTriangle, accent: "red",  label: "Auftrag ueberfaellig" },
   appointment_new:  { icon: Calendar,     accent: "blue",  label: "Neuer Termin"      },
   todo_assigned:    { icon: CheckSquare,  accent: "amber", label: "Todo zugewiesen"   },
   todo_overdue:     { icon: AlertTriangle, accent: "red",  label: "Todo ueberfaellig" },

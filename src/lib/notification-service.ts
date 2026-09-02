@@ -401,6 +401,31 @@ export async function notifyJobAssigned(
   });
 }
 
+/**
+ * Tag +1 nach dem geplanten Enddatum eines Auftrags: freundlicher In-App-
+ * Ping an alle zugewiesenen MA. Bewusst NUR in-app (kein Mail-Kanal-Opt-in
+ * beruecksichtigt) — die Eskalation zur Mail passiert erst an Tag +3 und
+ * wird vom Cron direkt via Resend geschickt (siehe /api/cron/auftrag-overdue).
+ */
+export async function notifyJobOverdueDay1(
+  client: SupabaseClient,
+  args: BaseArgs & {
+    jobId: string;
+    jobNumber: number;
+    jobTitle: string;
+    /** YYYY-MM-DD, im Europe/Zurich-Kalender. */
+    endDateIso: string;
+  },
+) {
+  await deliver(client, args.recipients, "job_overdue", {
+    title: `Ueberfaelliger Auftrag: ${args.jobTitle}`,
+    message: `Auftrag INT-${args.jobNumber} sollte am ${args.endDateIso} abgeschlossen sein — bitte kuemmern.`,
+    link: `/auftraege/${args.jobId}`,
+    resource_type: "job",
+    resource_id: args.jobId,
+  });
+}
+
 // --- APPOINTMENTS --------------------------------------------
 
 export async function notifyAppointmentNew(
