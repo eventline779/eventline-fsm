@@ -395,14 +395,9 @@ export default function KalenderPage() {
     : monthLabel;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Aufträge, Vermietungen{view === "woche" ? " & Termine" : ""}
-          </p>
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
         <div className="flex items-center gap-2">
           {/* iCal-Feed als Icon-Button + Popover — vorher als Card unten
               (nur sichtbar wenn man scrollte). Rechts vom Header damit
@@ -449,7 +444,7 @@ export default function KalenderPage() {
       </div>
 
       <Card className="bg-card">
-        <CardContent className="p-5 space-y-4">
+        <CardContent className="p-3 space-y-3">
           {/* Top-Bar: Range-Label links + Legende/Navigation/View-Toggle rechts */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="text-lg font-bold capitalize">{rangeLabel}</h2>
@@ -463,6 +458,10 @@ export default function KalenderPage() {
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
                   Vermietung
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  Projekt
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
