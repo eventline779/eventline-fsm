@@ -92,10 +92,11 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
 
   return (
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[240px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
-      {/* Logo — linksbündig mit der Navigation (px-5 = 20px, Flucht der Nav-Icons) */}
-      <div className="px-5 pt-5 pb-3">
-        <Link href="/dashboard" className="block max-w-[116px]">
-          <Logo size="sm" />
+      {/* Logo — nutzt die volle Sidebar-Breite (Leo 2026-09-02:
+          "sodass es wieder von ganz links der navigation bis rechts geht") */}
+      <div className="px-3 pt-4 pb-3">
+        <Link href="/dashboard" className="block">
+          <Logo fillWidth />
         </Link>
       </div>
 
