@@ -34,8 +34,8 @@ import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Briefcase, FileText, Clock, Calendar, User, Trash2,
-  AlertTriangle, Moon, LayoutList, LayoutGrid, Table2, Archive,
+  Briefcase, FileText, Clock, Calendar, Trash2,
+  AlertTriangle, Moon, LayoutList, LayoutGrid, Table2, Archive, User,
 } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
