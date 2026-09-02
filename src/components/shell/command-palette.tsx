@@ -333,13 +333,13 @@ export function CommandPaletteTrigger({ onOpen }: { onOpen?: () => void }) {
     <button
       type="button"
       onClick={handle}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-sidebar-border/70 bg-sidebar-accent/40 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/70 transition-all w-full text-xs"
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/60 dark:bg-white/[0.06] dark:border-white/15 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-white/[0.10] dark:hover:border-white/25 transition-all w-full text-xs"
       aria-label="Suche öffnen"
       data-tooltip="Suche (⌘K)"
     >
       <Search className="h-3.5 w-3.5 shrink-0" />
       <span className="flex-1 text-left">Suche…</span>
-      <kbd className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded border border-sidebar-border/70 bg-sidebar/60 text-sidebar-foreground/60 shrink-0">
+      <kbd className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded border border-sidebar-border dark:border-white/15 bg-sidebar dark:bg-white/[0.04] text-sidebar-foreground/70 shrink-0">
         {mac ? "⌘K" : "Ctrl K"}
       </kbd>
     </button>
