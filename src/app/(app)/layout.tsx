@@ -21,6 +21,7 @@ import {
 import { Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { TopHeader } from "@/components/shell/top-header";
 import { Spinner } from "@/components/ui/spinner";
 import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
@@ -52,6 +53,16 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const loading = !ready;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
+  // Sidebar-Collapse — persistiert in localStorage. Lazy-init damit SSR
+  // nicht crasht (typeof window-Guard). Beim Toggle wird zurueckgeschrieben.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar-collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -300,20 +311,26 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         profile={profile}
         permissions={permissions}
         onSignOut={handleSignOut}
+        collapsed={sidebarCollapsed}
       />
 
-      {/* Margin-left = Sidebar-Breite (260px) ab md-Breakpoint, damit der
-          Content-Bereich nicht unter der fixed-positionierten Sidebar liegt.
-          Bottom-Padding auf Mobile: MobileNav (80px) + Stempel-Bar (52px) +
-          Safe-Area + Puffer = Content scrollt frei oberhalb der UI-Layer. */}
-      {/* id="app-scroll" — durch overflow-x-hidden wird overflow-y
-          implizit auto (CSS-Quirk), dieser Div ist daher der echte
-          Scroll-Container der App und nicht window. useScrollRestoration
-          targetiert das Element ueber diese id. */}
-      <div id="app-scroll" className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden md:ml-[240px]">
+      {/* Margin-left = Sidebar-Breite (240px) ab md-Breakpoint. Wenn Sidebar
+          collapsed: 0 (Content nutzt volle Breite). Transition-duration
+          matched Sidebar-Slide-Animation. */}
+      <div
+        id="app-scroll"
+        className={cn(
+          "flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden transition-[margin] duration-200",
+          sidebarCollapsed ? "md:ml-0" : "md:ml-[240px]",
+        )}
+      >
+        <TopHeader
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+        />
         <Breadcrumbs />
         <main
-          className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-8 max-w-[1280px] w-full mx-auto min-w-0"
+          className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-6 max-w-[1280px] w-full mx-auto min-w-0"
           style={{ ["--shell-py" as string]: "2.5rem" }}
         >{children}</main>
       </div>
