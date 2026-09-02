@@ -131,8 +131,9 @@ export interface NavGroup {
 // mit Riesen-Card-Buttons wie die Ur-Zwischenseite) haelt alles zusammen.
 // Deep-Links auf /stempelzeiten, /tickets, /ferien funktionieren weiter
 // (duenne Wrapper).
-// Partner-Kontakte leben eigenständig unter /partner (vorher in
-// /einstellungen versteckt).
+// Analog Kunden/Lieferanten/Locations/Partner → jetzt EIN Sidebar-Eintrag
+// "Datenbank" mit Tabs (/datenbank?tab=…). Die Einzel-Routes /kunden,
+// /lieferanten, /locations, /partner bleiben als Deep-Link-Alias erhalten.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "",
@@ -164,17 +165,16 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Intern",
     items: [
       { href: "/projekte", label: "Projekte", icon: "FolderKanban" },
-    ],
-  },
-  {
-    label: "Kontakte",
-    items: [
-      { href: "/kunden", label: "Kunden", icon: "Users" },
-      { href: "/lieferanten", label: "Lieferanten", icon: "Handshake" },
-      { href: "/partner", label: "Partner", icon: "HeartHandshake" },
-      // Standorte (Verwaltungen, intern) und Räume (externe Reference) leben
-      // gemeinsam unter /locations — Detail-Routen bleiben getrennt.
-      { href: "/locations", label: "Locations", icon: "MapPin", matchPrefixes: ["/standorte", "/raeume"] },
+      // Datenbank-Hub — konsolidiert Kunden/Lieferanten/Locations/Partner
+      // als Tabs. matchPrefixes damit die Einzel-Deep-Links + Detail-Routen
+      // (/kunden/[id], /standorte/[id], /raeume/[id] etc.) den Datenbank-
+      // Eintrag in der Sidebar aktiv markieren.
+      {
+        href: "/datenbank",
+        label: "Datenbank",
+        icon: "Database",
+        matchPrefixes: ["/kunden", "/lieferanten", "/locations", "/partner", "/standorte", "/raeume"],
+      },
     ],
   },
 ];
