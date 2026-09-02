@@ -33,8 +33,8 @@ const TIME_OFF_LABEL: Record<CalendarTimeOff["type"], string> = {
 };
 
 const MAX_LANES_PER_WEEK = 6;
-const LANE_HEIGHT_PX = 22;
-const HEADER_HEIGHT_PX = 28;
+const LANE_HEIGHT_PX = 20;
+const HEADER_HEIGHT_PX = 24;
 // Time-off Stripes sind dezent unten am Tag. Eigene duenne Lanes nach
 // dem 1fr-Filler — beeinflussen die Job-Bar-Lanes nicht.
 const TIME_OFF_LANE_HEIGHT_PX = 10;
