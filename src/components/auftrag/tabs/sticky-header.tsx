@@ -5,21 +5,20 @@
  *
  * Sitzt oben in der Detail-Seite und bleibt beim Scrollen an der oberen
  * Kante des #app-scroll-Wrappers stehen. Alle Zustands-Actions (Freigeben,
- * Abschliessen, Bearbeiten, Stornieren, Stempeln) und der Tab-Wechsel
- * spielen sich hier ab.
+ * Abschliessen, Bearbeiten, Stornieren, Stempeln) sitzen direkt in der
+ * Aktions-Bar — kein Overflow-Menu mehr; Farbtrennung (blau=primaer,
+ * gruen=abschliessen, rot=destruktiv) verhindert Klick-Verwechslungen.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Link from "next/link";
 import {
   MapPin,
   User,
   Calendar,
-  CheckCircle,
   XCircle,
   AlertCircle,
   Inbox,
-  MoreVertical,
   Pencil,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
@@ -48,8 +47,6 @@ type Props = {
   availableActions: StatusAction[];
   onStatusAction: (to: JobStatus) => void | Promise<void>;
   onOpenCancel: () => void;
-  overflowOpen: boolean;
-  setOverflowOpen: (v: boolean) => void;
   canFinish: boolean;
   finishBlockReason: string;
   tabs: Tab[];
@@ -68,8 +65,6 @@ export function AuftragStickyHeader({
   availableActions,
   onStatusAction,
   onOpenCancel,
-  overflowOpen,
-  setOverflowOpen,
   canFinish,
   finishBlockReason,
   tabs,
@@ -77,26 +72,6 @@ export function AuftragStickyHeader({
   onSelectTab,
   nextActionChip,
 }: Props) {
-  const overflowRef = useRef<HTMLDivElement | null>(null);
-
-  // Overflow-Menu schliessen bei Klick ausserhalb / Esc.
-  useEffect(() => {
-    if (!overflowOpen) return;
-    function onOutside(e: MouseEvent) {
-      if (!overflowRef.current) return;
-      if (!overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOverflowOpen(false);
-    }
-    document.addEventListener("mousedown", onOutside);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onOutside);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [overflowOpen, setOverflowOpen]);
-
   const customer = job.customer ?? job.location?.customer ?? undefined;
   const location = job.location ?? undefined;
   const room = job.room ?? undefined;
@@ -210,38 +185,21 @@ export function AuftragStickyHeader({
         )}
 
         {canEdit && availableActions.some((a) => a.to === "storniert") && (
-          <div className="relative" ref={overflowRef}>
-            <button
-              type="button"
-              onClick={() => setOverflowOpen(!overflowOpen)}
-              className={`kasten ${overflowOpen ? "kasten-active" : "kasten-muted"}`}
-              data-tooltip="Weitere Aktionen"
-              data-tooltip-align="end"
-              aria-expanded={overflowOpen}
-              aria-haspopup="menu"
-            >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
-            {overflowOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-[calc(100%+6px)] z-40 min-w-[180px] rounded-xl border border-border bg-card shadow-lg p-1"
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setOverflowOpen(false);
-                    onOpenCancel();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Stornieren
-                </button>
-              </div>
-            )}
-          </div>
+          // Stornieren als direkter Button (nicht mehr im Overflow-Menu).
+          // Rot ist app-weit ONLY fuer destruktive Aktionen reserviert, und
+          // die positiv-primaeren Buttons daneben nutzen kasten-blue
+          // (Freigeben) bzw. kasten-green (Abschliessen) — klare visuelle
+          // Trennung durch Farbe, kein Klick-Risiko.
+          <button
+            type="button"
+            onClick={onOpenCancel}
+            className="kasten kasten-red"
+            data-tooltip="Auftrag stornieren"
+            data-tooltip-align="end"
+          >
+            <XCircle className="h-4 w-4" />
+            Stornieren
+          </button>
         )}
 
         {(job.status === "offen" || job.status === "anfrage" || job.status === "entwurf") && (

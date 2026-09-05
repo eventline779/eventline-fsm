@@ -138,6 +138,9 @@ function deriveNextAction(args: {
   }
 
   // 3. Offen mit Terminen aber keiner hat einen assigned_to → Personal zuteilen.
+  //    scroll=termine sorgt dafuer, dass die Detail-Page nach Tab-Switch
+  //    auf die Termine-Section scrollt — sonst landet der User oben und
+  //    sieht die Zuweisen-Buttons erst nach eigenem Scrollen.
   const hasAssignees = appointments.some((a) => !!a.assigned_to);
   if (!hasAssignees) {
     return {
@@ -146,7 +149,7 @@ function deriveNextAction(args: {
       label: "Personal zuteilen",
       subtitle: `${appointments.length} Termin${appointments.length === 1 ? "" : "e"} ohne zugewiesene Person`,
       severity: "warn",
-      href: `/auftraege/${jobId}?tab=uebersicht`,
+      href: `/auftraege/${jobId}?tab=uebersicht&scroll=termine`,
     };
   }
 

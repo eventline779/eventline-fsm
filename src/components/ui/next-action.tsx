@@ -79,38 +79,27 @@ interface InlineProps {
  */
 export function NextActionInline({ action, className }: InlineProps) {
   if (!action) return null;
-  const s = SEVERITY[action.severity];
   const Icon = action.icon;
 
   const inner = (
     <>
-      <span
-        className={cn(
-          "flex items-center justify-center h-4 w-4 rounded-full shrink-0",
-          s.iconBg,
-          s.iconText,
-        )}
-      >
-        <Icon className="h-2.5 w-2.5" />
-      </span>
+      <Icon className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">{action.label}</span>
-      <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
+      <ChevronRight className="h-3 w-3 opacity-60 shrink-0 -mr-0.5" />
     </>
   );
 
-  // Kasten-Grammatik: kleiner Pill-Style, farbige Left-Border, hover
-  // etwas dunkler. Inline-Style haben wir hier bewusst NICHT — der Chip
-  // ist ein reines Link/Button-Element und kein Card-Row.
-  const classes = cn(
-    "inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full",
-    "text-[11px] font-medium max-w-[240px]",
-    "border-l-[3px]",
-    action.severity === "info" && "border-l-blue-400 dark:border-l-blue-500 bg-blue-500/[0.08] text-blue-800 dark:text-blue-200 hover:bg-blue-500/[0.14]",
-    action.severity === "warn" && "border-l-amber-400 dark:border-l-amber-500 bg-amber-500/[0.10] text-amber-800 dark:text-amber-200 hover:bg-amber-500/[0.16]",
-    action.severity === "danger" && "border-l-red-500 dark:border-l-red-500 bg-red-500/[0.10] text-red-800 dark:text-red-200 hover:bg-red-500/[0.16]",
-    "transition-colors",
-    className,
-  );
+  // Kasten-Grammatik: die Chip nutzt jetzt die app-weiten kasten-Klassen —
+  // gleicher Border (2px), gleicher Radius (rounded-xl), gleiche Toene wie
+  // alle anderen Action-Buttons. Severity → Kasten-Tone:
+  //   info   = kasten-blue    (gute Idee, kein Druck)
+  //   warn   = kasten-amber   (sollte bald passieren)
+  //   danger = kasten-red     (ueberfaellig / blockiert)
+  const tone =
+    action.severity === "warn"   ? "kasten-amber"
+  : action.severity === "danger" ? "kasten-red"
+  :                                 "kasten-blue";
+  const classes = cn("kasten", tone, "max-w-[280px]", className);
 
   if (action.href) {
     return (

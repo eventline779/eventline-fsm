@@ -8,7 +8,7 @@
  * Parent passt nur Daten + onReload-Callback rein.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteRow } from "@/lib/db-mutations";
 import { logError } from "@/lib/log";
@@ -51,6 +51,13 @@ export function AppointmentsSection({
   const supabase = createClient();
   const { can } = usePermissions();
   const [showApptForm, setShowApptForm] = useState(defaultOpen);
+  // Reagiere auf spaetere defaultOpen=true-Wechsel: der Chip "Termine
+  // anlegen" navigiert zu ?termin=neu. Wenn die AppointmentsSection dabei
+  // schon montiert ist (Uebersicht-Tab war bereits aktiv), reicht der
+  // useState-Init NICHT — der Prop-Wechsel muss das Form aufziehen.
+  useEffect(() => {
+    if (defaultOpen) setShowApptForm(true);
+  }, [defaultOpen]);
   const [apptForm, setApptForm] = useState({
     title: "",
     date: todayLocalDateString(),

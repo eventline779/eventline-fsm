@@ -5,8 +5,9 @@
  *
  * Struktur:
  *  - Sticky-Header oben: BackButton, Nummer/Titel, Status-Badges, Meta-Zeile
- *    (Kunde/Standort/Datum), Aktions-Bar (Freigeben / Abschliessen / Overflow-
- *    Menu mit Stornieren) und Tab-Nav. (→ tabs/sticky-header.tsx)
+ *    (Kunde/Standort/Datum), Aktions-Bar (Freigeben / Abschliessen /
+ *    Stornieren direkt als Buttons, farbgetrennt) und Tab-Nav.
+ *    (→ tabs/sticky-header.tsx)
  *  - Body: EIN Tab sichtbar (Uebersicht | Rapport & Abschluss | Dokumente & Historie).
  *  - Modals: Cancel-Flow, Partner-Reject (→ tabs/auftrag-modals.tsx), Rapport.
  *
@@ -92,7 +93,6 @@ export default function AuftragDetailPage() {
   const [partnerRejectOpen, setPartnerRejectOpen] = useState(false);
   const [partnerRejectReason, setPartnerRejectReason] = useState("");
   const [partnerDecisionBusy, setPartnerDecisionBusy] = useState(false);
-  const [overflowOpen, setOverflowOpen] = useState(false);
 
   // Auto-open-Termin-Form: ?termin=neu → Termin-Formular aufmachen. Wir
   // strippen nur den termin-Param, der tab-Param bleibt erhalten.
@@ -107,6 +107,21 @@ export default function AuftragDetailPage() {
       document.getElementById("termin-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
   }, [autoOpenAppt, jobId, router, searchParams]);
+
+  // Auto-scroll zur Termine-Section: ?scroll=termine (vom "Personal
+  // zuteilen"-Chip). Nur scrollen, Form nicht aufmachen. Param wird
+  // gestrippt damit der Reload nicht erneut scrollt.
+  const scrollTarget = searchParams.get("scroll");
+  useEffect(() => {
+    if (scrollTarget !== "termine") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("scroll");
+    const qs = params.toString();
+    router.replace(`/auftraege/${jobId}${qs ? `?${qs}` : ""}`, { scroll: false });
+    setTimeout(() => {
+      document.getElementById("termin-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }, [scrollTarget, jobId, router, searchParams]);
 
   // Auto-open Rapport-Modal via ?openDraft=1 (Dashboard-Bruecke). Weiterleitet
   // den User direkt in seinen offenen Rapport-Entwurf; Param wird gestrippt
@@ -293,8 +308,6 @@ export default function AuftragDetailPage() {
         availableActions={availableActions}
         onStatusAction={updateStatus}
         onOpenCancel={() => setCancelPhase("confirm")}
-        overflowOpen={overflowOpen}
-        setOverflowOpen={setOverflowOpen}
         canFinish={canFinish}
         finishBlockReason={finishBlockReason}
         tabs={tabs}
