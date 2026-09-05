@@ -33,15 +33,21 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { PERMISSION_MODULES, PARTNER_PERMISSION_MODULES, PERMISSION_FEATURES, type PermissionAction, type PermissionModule } from "@/lib/permissions";
-import { Plus, Trash2, Lock, Save, X, ChevronDown, ChevronRight } from "lucide-react";
+import { DASHBOARD_WIDGETS } from "@/lib/dashboard-widgets";
+import { Plus, Trash2, Lock, Save, X, ChevronDown, ChevronRight, GripVertical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
+
+/** Rollen-Override fuer das Dashboard-Set. NULL = Registry-Default. */
+type WidgetConfig = { order: string[]; hidden: string[] };
 
 interface Role {
   slug: string;
   label: string;
   permissions: string[];
   is_system: boolean;
+  /** NULL = Registry-Default; sonst explizites Override. */
+  dashboard_widgets: WidgetConfig | null;
 }
 
 const ACTION_LABELS: Record<PermissionAction, string> = {
@@ -115,6 +121,13 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({ label: "", permissions: [] as string[] });
   const [edits, setEdits] = useState<Record<string, string[]>>({});
+  // Widget-Overrides pro Rolle. NULL = Registry-Default (kein Override in DB).
+  // Sonst {order, hidden}: siehe migration 207. Wird beim ersten Toggle/Reorder
+  // aus dem Registry-Default materialisiert und weiter gepflegt.
+  const [widgetEdits, setWidgetEdits] = useState<Record<string, WidgetConfig | null>>({});
+  // Aktuell gezogenes Widget (roleSlug + Index) — nur ein Drag gleichzeitig.
+  const [dragging, setDragging] = useState<{ roleSlug: string; idx: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ roleSlug: string; idx: number } | null>(null);
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
   // Welche Rollen-Karten sind aufgeklappt? Default: alles zugeklappt damit
   // die Liste kompakt bleibt.
@@ -134,8 +147,17 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
       );
       setRoles(filtered);
       const initial: Record<string, string[]> = {};
-      for (const r of filtered) initial[r.slug] = [...r.permissions];
+      const initialWidgets: Record<string, WidgetConfig | null> = {};
+      for (const r of filtered) {
+        initial[r.slug] = [...r.permissions];
+        // dashboard_widgets kann fehlen (aeltere API-Antwort) → als NULL
+        // interpretieren = Registry-Default.
+        initialWidgets[r.slug] = r.dashboard_widgets
+          ? { order: [...r.dashboard_widgets.order], hidden: [...r.dashboard_widgets.hidden] }
+          : null;
+      }
       setEdits(initial);
+      setWidgetEdits(initialWidgets);
     }
     setLoading(false);
   }
@@ -186,10 +208,95 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     });
   }
 
+  // ============================================================
+  // Dashboard-Widget-Overrides
+  // ============================================================
+
+  /**
+   * Widget-Konfig einer Rolle wenn KEIN Override gesetzt ist: alle Registry-
+   * Widgets in Registry-Reihenfolge; hidden = alle Widgets deren
+   * `defaultRoles` diese Rolle NICHT enthalten.
+   *
+   * Genutzt fuer die visuelle Darstellung wenn `widgetEdits[slug] === null`
+   * (frisch aus DB, kein Override) und als "Reset"-Basis.
+   */
+  function defaultWidgetConfig(roleSlug: string): WidgetConfig {
+    return {
+      order: DASHBOARD_WIDGETS.map((w) => w.id),
+      hidden: DASHBOARD_WIDGETS.filter((w) => !w.defaultRoles.includes(roleSlug)).map((w) => w.id),
+    };
+  }
+
+  /** Aktuell wirksame Widget-Konfig einer Rolle (Override oder Default). */
+  function currentWidgetConfig(roleSlug: string): WidgetConfig {
+    const stored = widgetEdits[roleSlug];
+    return stored ?? defaultWidgetConfig(roleSlug);
+  }
+
+  /**
+   * Registry-Widgets in Anzeige-Reihenfolge. Order-Array kann veraltete IDs
+   * enthalten (=> ignorieren) und neue IDs verpassen (=> in Registry-
+   * Reihenfolge hintendran). Beides passiert nach Registry-Umbauten.
+   */
+  function orderedWidgets(config: WidgetConfig) {
+    const known = new Set<string>(DASHBOARD_WIDGETS.map((w) => w.id));
+    const listed = config.order.filter((id) => known.has(id));
+    const listedSet = new Set<string>(listed);
+    const rest = DASHBOARD_WIDGETS.filter((w) => !listedSet.has(w.id)).map((w) => w.id as string);
+    return [...listed, ...rest].map((id) => DASHBOARD_WIDGETS.find((w) => w.id === id)!);
+  }
+
+  function setWidgetsFor(roleSlug: string, next: WidgetConfig) {
+    setWidgetEdits((prev) => ({ ...prev, [roleSlug]: next }));
+  }
+
+  function toggleWidgetHidden(roleSlug: string, widgetId: string) {
+    const cur = currentWidgetConfig(roleSlug);
+    const nextHidden = cur.hidden.includes(widgetId)
+      ? cur.hidden.filter((w) => w !== widgetId)
+      : [...cur.hidden, widgetId];
+    // Order dabei auf ALLE bekannten IDs auffuellen, damit ein spaeteres
+    // Reorder eine vollstaendige Liste hat.
+    const orderedIds = orderedWidgets(cur).map((w) => w.id);
+    setWidgetsFor(roleSlug, { order: orderedIds, hidden: nextHidden });
+  }
+
+  function moveWidget(roleSlug: string, fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx) return;
+    const cur = currentWidgetConfig(roleSlug);
+    const orderedIds = orderedWidgets(cur).map((w) => w.id);
+    const [moved] = orderedIds.splice(fromIdx, 1);
+    orderedIds.splice(toIdx, 0, moved);
+    setWidgetsFor(roleSlug, { order: orderedIds, hidden: cur.hidden });
+  }
+
+  function resetWidgetsToDefault(roleSlug: string) {
+    // NULL zurueck-schreiben → beim Save landet dashboard_widgets = null in DB
+    // und die Rolle nutzt wieder das Registry-Default.
+    setWidgetEdits((prev) => ({ ...prev, [roleSlug]: null }));
+  }
+
+  // Vergleicht zwei Widget-Konfigs strikt (order-Reihenfolge zaehlt,
+  // hidden-Menge ist Set-vergleich). NULL === NULL.
+  function widgetsEqual(a: WidgetConfig | null, b: WidgetConfig | null): boolean {
+    if (a === null && b === null) return true;
+    if (a === null || b === null) return false;
+    if (a.order.length !== b.order.length) return false;
+    for (let i = 0; i < a.order.length; i++) if (a.order[i] !== b.order[i]) return false;
+    if (a.hidden.length !== b.hidden.length) return false;
+    const bh = new Set(b.hidden);
+    return a.hidden.every((h) => bh.has(h));
+  }
+
   function isDirty(role: Role): boolean {
     const edited = edits[role.slug] ?? [];
     if (edited.length !== role.permissions.length) return true;
-    return edited.some((s) => !role.permissions.includes(s));
+    if (edited.some((s) => !role.permissions.includes(s))) return true;
+    // Widget-Overrides diffen
+    const nowW = widgetEdits[role.slug] ?? null;
+    const origW = role.dashboard_widgets ?? null;
+    if (!widgetsEqual(nowW, origW)) return true;
+    return false;
   }
 
   async function saveRole(role: Role) {
@@ -197,7 +304,11 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     const res = await fetch(`/api/admin/roles/${role.slug}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ permissions: edits[role.slug] ?? [] }),
+      body: JSON.stringify({
+        permissions: edits[role.slug] ?? [],
+        // NULL = Registry-Default (Reset); Objekt = expliziter Override.
+        dashboard_widgets: widgetEdits[role.slug] ?? null,
+      }),
     });
     const json = await res.json();
     setSavingSlug(null);
@@ -205,7 +316,7 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
       TOAST.errorOr(json.error);
       return;
     }
-    toast.success("Berechtigungen gespeichert");
+    toast.success("Rolle gespeichert");
     load();
   }
 
@@ -343,6 +454,144 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     );
   }
 
+  // ============================================================
+  // Dashboard-Widget-Editor pro Rolle
+  //
+  // Liste aller Registry-Widgets in aktueller Anzeige-Reihenfolge. Pro Zeile:
+  //   - Drag-Handle (GripVertical) — HTML5 DnD zum Reihenfolge-Aendern
+  //   - PermCell-Toggle (rotes X = sichtbar) — visuell konsistent mit der
+  //     Modul-Matrix darueber
+  //   - Titel + Muted-Zeile mit `requires`-Slugs als Chips
+  //   - Amber-Warnchip wenn die Rolle die fuer das Widget noetigen
+  //     Permissions aktuell NICHT hat (Toggle bleibt trotzdem klickbar —
+  //     wird effektiv, sobald die Permission spaeter dazukommt)
+  // Ganz unten: "Auf Registry-Default zuruecksetzen"-Link — schreibt
+  // dashboard_widgets = NULL und hebt damit den Rollen-Override auf.
+  // ============================================================
+  function renderDashboardWidgets(roleSlug: string, rolePerms: string[]) {
+    const config = currentWidgetConfig(roleSlug);
+    const widgets = orderedWidgets(config);
+    const hiddenSet = new Set(config.hidden);
+    const hasOverride = widgetEdits[roleSlug] !== null && widgetEdits[roleSlug] !== undefined;
+
+    return (
+      <div className="space-y-2 border-t border-border pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Dashboard-Widgets
+          </p>
+          {hasOverride && (
+            <button
+              type="button"
+              onClick={() => resetWidgetsToDefault(roleSlug)}
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              data-tooltip="Rollen-Override loeschen — die Rolle zeigt wieder das Default-Set aus der Registry."
+            >
+              <RotateCcw className="h-3 w-3" />
+              Auf Registry-Default zuruecksetzen
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Welche Kacheln User dieser Rolle standardmaessig auf dem Dashboard sehen.
+          Jeder User kann fuer sich selbst zusaetzlich Widgets ausblenden oder umsortieren.
+        </p>
+        <div className="space-y-1">
+          {widgets.map((w, idx) => {
+            const isVisible = !hiddenSet.has(w.id);
+            const missing = w.requires.filter((req) => !rolePerms.includes(req));
+            const hasAllReqs = missing.length === 0;
+            const isDropTarget = dropTarget?.roleSlug === roleSlug && dropTarget.idx === idx;
+            const isDragged = dragging?.roleSlug === roleSlug && dragging.idx === idx;
+            return (
+              <div
+                key={w.id}
+                onDragOver={(e) => {
+                  if (dragging?.roleSlug !== roleSlug) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDropTarget({ roleSlug, idx });
+                }}
+                onDragLeave={() => {
+                  if (dropTarget?.roleSlug === roleSlug && dropTarget.idx === idx) setDropTarget(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragging?.roleSlug === roleSlug) {
+                    moveWidget(roleSlug, dragging.idx, idx);
+                  }
+                  setDragging(null);
+                  setDropTarget(null);
+                }}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04] transition-colors"
+                style={{
+                  opacity: isDragged ? 0.4 : hasAllReqs ? 1 : 0.6,
+                  boxShadow: isDropTarget && !isDragged ? "inset 0 2px 0 0 rgb(239,68,68)" : undefined,
+                }}
+              >
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    setDragging({ roleSlug, idx });
+                    e.dataTransfer.effectAllowed = "move";
+                    // Firefox verlangt setData() sonst startet kein Drag.
+                    e.dataTransfer.setData("text/plain", w.id);
+                  }}
+                  onDragEnd={() => { setDragging(null); setDropTarget(null); }}
+                  className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
+                  style={{ cursor: "grab" }}
+                  data-tooltip="Ziehen um die Reihenfolge zu aendern"
+                  aria-label="Reihenfolge aendern"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
+                <PermCell
+                  active={isVisible}
+                  locked={false}
+                  onToggle={() => toggleWidgetHidden(roleSlug, w.id)}
+                  label={`${w.title} ${isVisible ? "ausblenden" : "einblenden"}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium">{w.title}</p>
+                  <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                    {w.requires.length === 0 ? (
+                      <span className="text-[10px] text-muted-foreground/60">Keine Berechtigung noetig</span>
+                    ) : (
+                      w.requires.map((req) => {
+                        const present = rolePerms.includes(req);
+                        return (
+                          <span
+                            key={req}
+                            className={`inline-flex items-center px-1.5 py-0 text-[10px] font-mono rounded ${
+                              present
+                                ? "bg-foreground/[0.06] text-muted-foreground"
+                                : "bg-foreground/[0.06] text-muted-foreground/60 line-through"
+                            }`}
+                            data-tooltip="Wer diese Berechtigung nicht hat, sieht das Widget trotz Aktivierung nicht."
+                          >
+                            {req}
+                          </span>
+                        );
+                      })
+                    )}
+                    {!hasAllReqs && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        data-tooltip={`Diese Rolle hat ${missing.join(", ")} nicht — Widget bleibt trotz Aktivierung leer bis die Permission gesetzt ist.`}
+                      >
+                        Berechtigung fehlt
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderFeatureGrid(currentPerms: string[], locked: boolean, onToggle: (perm: string) => void) {
     if (features.length === 0) return null;
     return (
@@ -457,7 +706,8 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                   <CardContent className="px-4 pt-0 pb-4 space-y-4 border-t border-border">
                     {locked ? (
                       // Admin-Rolle: Matrix zeigen ist sinnlos (kann nicht geaendert
-                      // werden). Stattdessen eine kurze Erklaerung.
+                      // werden). Stattdessen eine kurze Erklaerung — inklusive Hinweis
+                      // dass der Widget-Editor fuer Admin gesperrt ist.
                       <div className="pt-3">
                         <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30 bg-blue-500/5">
                           <Lock className="h-4 w-4 text-blue-600 dark:text-blue-300 mt-0.5 shrink-0" />
@@ -468,6 +718,9 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                               gelöscht werden — sonst könntest du dich selbst aussperren.
                               Wenn du jemandem nur einen Teil der Admin-Funktionen geben
                               willst, lege eine neue Rolle an.
+                            </p>
+                            <p className="text-muted-foreground">
+                              Admin sieht per Definition alle verfuegbaren Dashboard-Widgets.
                             </p>
                           </div>
                         </div>
@@ -480,6 +733,7 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                         </div>
                         {renderModuleMatrix(role.slug, currentPerms, locked, (perm) => togglePermission(role.slug, perm))}
                         {renderFeatureGrid(currentPerms, locked, (perm) => togglePermission(role.slug, perm))}
+                        {renderDashboardWidgets(role.slug, currentPerms)}
                       </>
                     )}
                   </CardContent>
