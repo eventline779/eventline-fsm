@@ -581,9 +581,9 @@ export function StempelzeitenView() {
 
       {/* Filter-Zeile: Auftragsnummer-Suche + (Admin) Mitarbeiter-Selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Auftragsnummer-Filter */}
-        <div className="relative flex-1 min-w-[180px] sm:max-w-[260px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        {/* Auftragsnummer-Filter — Optik wie JobNumber-Pill (monospace,
+            tabular-nums, rounded-md, bg-card border) fuer app-weite Konsistenz. */}
+        <div className="relative inline-flex items-center">
           <input
             type="text"
             inputMode="numeric"
@@ -607,18 +607,18 @@ export function StempelzeitenView() {
                 e.preventDefault();
               }
             }}
-            placeholder="Auftragsnummer (INT-…)"
+            placeholder="INT- 00000"
             aria-label="Nach Auftragsnummer filtern"
-            className="w-full pl-7 pr-7 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/60"
+            className="w-[140px] font-mono font-semibold tabular-nums text-[13px] rounded-md bg-card border border-foreground/10 dark:border-foreground/15 px-2 py-0.5 pr-6 focus:outline-none focus:border-foreground/30 dark:focus:border-foreground/40 placeholder:font-mono placeholder:text-muted-foreground/60"
           />
           {jobFilterInput && (
             <button
               type="button"
               onClick={() => setJobFilterInput("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] dark:hover:bg-foreground/[0.10] transition-colors"
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] dark:hover:bg-foreground/[0.10] transition-colors"
               aria-label="Auftragsnummer-Filter leeren"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-3 w-3" />
             </button>
           )}
         </div>
