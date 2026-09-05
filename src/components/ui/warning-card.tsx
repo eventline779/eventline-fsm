@@ -51,29 +51,27 @@ type Props = {
 
 export function WarningCard({ warnings, children, className }: Props) {
   const hasWarnings = warnings.length > 0;
-
-  // Ohne Warnung: KEIN Extra-Wrapper — direkt children durchreichen. So
-  // rendern Non-Warning-Cards identisch zu einer plain Card (kein zusaetzlicher
-  // DOM-Level), was jede Chance auf abweichenden Layout/space-y-Effekt eliminiert.
-  if (!hasWarnings) return <>{children}</>;
-
   const tooltipText = warnings
     .map((w) => (w.detail ? `${w.label} — ${w.detail}` : w.label))
     .join(" · ");
 
+  // IMMER denselben Wrapper — auch ohne Warnung. Sonst haetten Warning-Cards
+  // einen Extra-DOM-Level und die Karten sitzen visuell anders auf der
+  // space-y-Skala als Non-Warning-Cards. Das Icon wird nur konditional
+  // gerendert, positioniert absolut innerhalb der Card oben rechts.
   return (
     <div className={cn("relative", className)}>
       {children}
-      {/* Info-Icon oben rechts. data-tooltip zeigt die Warnung(en).
-          pointer-events-auto damit der Tooltip trigger'n kann. */}
-      <span
-        className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300"
-        data-tooltip={tooltipText}
-        data-tooltip-align="end"
-        aria-label={tooltipText}
-      >
-        <Info className="h-3 w-3" strokeWidth={2.5} />
-      </span>
+      {hasWarnings && (
+        <span
+          className="pointer-events-auto absolute right-2 top-2 z-20 flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300"
+          data-tooltip={tooltipText}
+          data-tooltip-align="end"
+          aria-label={tooltipText}
+        >
+          <Info className="h-3 w-3" strokeWidth={2.5} />
+        </span>
+      )}
     </div>
   );
 }
