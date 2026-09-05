@@ -1,38 +1,36 @@
-// GET /api/dashboard — rollen-basiertes Cockpit-Bundle fuer die Startseite.
+// GET /api/dashboard — konfigurierbares Cockpit-Bundle fuer die Startseite.
 //
-// Rueckgabe je nach profiles.role:
+// Neu (Migration 207): die Rueckgabe folgt einer 3-Ebenen-Konfiguration.
+//   Ebene 1  Registry (src/lib/dashboard-widgets.ts) — alle Widget-IDs
+//            + Permission-Requirements + Default-Rollen.
+//   Ebene 2  Rollen-Override (roles.dashboard_widgets) — pro Rolle
+//            {order, hidden}; NULL = Registry-Default fuer diese Rolle.
+//   Ebene 3  User-Override (user_dashboard_overrides) — pro User
+//            {hidden, widget_order}; leer = Rollen-Zustand uebernehmen.
 //
-//   role = "techniker" -> {
-//     role, first_name,
-//     ma: {
-//       monat_stunden, ist_lohn_chf, wage_exempt, hourly_wage_chf,
-//       prognose_stunden, prognose_lohn_chf,
-//       naechster_einsatz: { id, title, start_time, end_time?, job_number, job_title, customer_name } | null,
-//     }
+// Merge (deterministisch, kein DB-Sort):
+//   roleVisible = roleOrder \ roleHidden   (Registry-unbekannte gefiltert)
+//   final       = userOrder (nur was noch in roleVisible und nicht user-
+//                            hidden ist) ++ roleVisible-Rest in Rollen-
+//                                            Reihenfolge (auch nicht user-hidden).
+//   dann Permission-Filter (Admin durch): jedes Widget dessen `requires` der
+//   User nicht erfuellt, wird SERVER-seitig entfernt — kein Payload leakt.
+//
+// Payload-Bau:
+//   Wir laden loadAdminData() nur, wenn irgendein Admin-Widget im finalen
+//   Set steckt (analog loadMaData). Spart die 10 Counts-Queries fuer reine
+//   Techniker-Dashboards und die MA-Compensation-Queries fuer reine Admins.
+//
+// Response-Shape (rueckwaerts-kompatibel + neu):
+//   {
+//     success, role, first_name,
+//     widgets: string[],           // NEU: sichtbare Widget-IDs in Reihenfolge
+//     widget_catalog: [{id,title,requires}], // NEU: Katalog fuer Zahnrad-Modal
+//     admin?: {kpi, zu_erledigen, team_status, overdue_jobs},
+//     ma?:    {monat_stunden, ist_lohn_chf, wage_exempt, hourly_wage_chf,
+//              prognose_stunden, prognose_lohn_chf, naechster_einsatz},
 //   }
-//   role = "admin" -> {
-//     role, first_name,
-//     kpi: { offene_auftraege, geplante_termine_woche, nicht_abgerechnet },
-//     zu_erledigen: { ferien_pending, ueberfaellige_auftraege, neue_belege },
-//     team_status: { eingestempelt, in_ferien_heute },
-//     overdue_jobs: {
-//       count,
-//       items: [{ id, job_number, title, end_date, days_overdue,
-//                 customer_name, location_name }]  // Top 5, aelteste zuerst
-//     },
-//   }
-//   role = "partner" -> { role, first_name }
-//
-// Lohn-Berechnung MA: bucketizeMinutes(clock_in, clock_out) fuer DST-safe
-// Ist-Stunden. Prognose = Ist-Stunden + geplante Termine (start_time in
-// aktuellem Monat, in der Zukunft). Netto-Faktor = 1 - (Summe AN-Pcts / 100),
-// analog wage-documents/generate — nur ohne Nacht/Sonntags-Zuschlaege
-// (Dashboard-Naeherung, nicht die richtige Lohnabrechnung).
-//
-// Sensible Zahlen: wir lesen employee_compensation via Admin-Client, aber
-// STRIKT nur die eigene Zeile (profile_id == auth.user.id) — kein Leak
-// anderer Loehne. Fuer Admin-Cockpit ebenfalls Admin-Client (Counts brauchen
-// meist RLS-Bypass, Admin passt aber ohnehin via has_permission).
+//   Sensible Zahlen (Lohn): via Admin-Client, aber STRIKT profile_id == user.id.
 
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api-auth";
@@ -51,6 +49,12 @@ import {
   sumEmployeePct,
   type PctComp,
 } from "@/lib/employer-costs";
+import {
+  DASHBOARD_WIDGETS,
+  widgetsForRole,
+  type WidgetId,
+} from "@/lib/dashboard-widgets";
+import { hasPermission } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -449,6 +453,83 @@ async function loadAdminData(): Promise<AdminPayload> {
 }
 
 // ---------------------------------------------------------------------------
+// Widget-Merge & Loader-Selection
+// ---------------------------------------------------------------------------
+
+/** Loader-Mapping: welche Widgets brauchen welchen Payload-Loader. Bewusst
+ *  hier lokal (nicht in der Registry) — die Registry bleibt UI-neutrales
+ *  Config-Data, das Loader-Mapping ist ein Backend-Detail dieser Route.
+ *
+ *  Widgets ohne Eintrag (anwesenheitskalender, stempel-status, partner-
+ *  willkommen) laden ihre Daten selbst clientseitig — sie brauchen nichts
+ *  aus admin/ma-Payload. */
+type WidgetLoader = "admin" | "ma";
+const WIDGET_LOADERS: Partial<Record<WidgetId, WidgetLoader>> = {
+  "kpi-offene-auftraege": "admin",
+  "kpi-termine-woche": "admin",
+  "kpi-nicht-abgerechnet": "admin",
+  "overdue-jobs": "admin",
+  "zu-erledigen": "admin",
+  "team-status": "admin",
+  "ma-monat-stunden": "ma",
+  "ma-prognose": "ma",
+  "ma-naechster-einsatz": "ma",
+};
+
+/** Fuegt Rollen- + User-Overrides deterministisch zusammen — siehe Kopf-Doku.
+ *  Rueckgabe: Widget-IDs die auf dem Dashboard erscheinen sollen, in
+ *  Anzeige-Reihenfolge. Permission-Filter passiert separat spaeter. */
+function resolveVisibleWidgets(params: {
+  role: string;
+  roleOverride: { order: string[]; hidden: string[] } | null;
+  userOverride: { hidden: string[]; widget_order: string[] } | null;
+}): WidgetId[] {
+  const knownIds = new Set(DASHBOARD_WIDGETS.map((w) => w.id));
+
+  // Ebene 2: Rollen-Set. NULL / leer / kaputt -> Registry-Default fuer die Rolle.
+  const roleOrderRaw = params.roleOverride?.order ?? [];
+  const roleHiddenRaw = new Set(params.roleOverride?.hidden ?? []);
+  const roleOrder = (roleOrderRaw.length > 0 ? roleOrderRaw : widgetsForRole(params.role))
+    .filter((id): id is WidgetId => knownIds.has(id as WidgetId));
+  const roleVisible = roleOrder.filter((id) => !roleHiddenRaw.has(id));
+
+  // Ebene 3: User-Override.
+  const userHidden = new Set(params.userOverride?.hidden ?? []);
+  const userOrder = params.userOverride?.widget_order ?? [];
+
+  // Greedy Merge: erst vom User bevorzugte IDs in seiner Reihenfolge,
+  // dann Rest in Rollen-Reihenfolge — jeweils nur wenn im Rollen-Set und
+  // nicht user-hidden.
+  const seen = new Set<WidgetId>();
+  const result: WidgetId[] = [];
+  for (const raw of userOrder) {
+    if (!knownIds.has(raw as WidgetId)) continue;
+    const id = raw as WidgetId;
+    if (!roleVisible.includes(id)) continue;
+    if (userHidden.has(id)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  for (const id of roleVisible) {
+    if (userHidden.has(id)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
+/** Katalog fuer das Zahnrad-Modal — reine Metadaten, kein Payload. Damit
+ *  der Client alle Widgets zum Ein-/Ausblenden anbieten kann, egal ob sie
+ *  gerade sichtbar sind. */
+const WIDGET_CATALOG = DASHBOARD_WIDGETS.map((w) => ({
+  id: w.id,
+  title: w.title,
+  requires: w.requires,
+}));
+
+// ---------------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------------
 
@@ -457,6 +538,12 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   const supabase = await createClient();
+  const admin = createAdminClient();
+
+  // Profile via anon-Client (RLS: eigenes Profil), Rolle + User-Override
+  // via Admin-Client, damit die Route auch wenn die roles-RLS mal restriktiv
+  // wird stabil weiter laeuft und ein User-Override immer geladen wird (der
+  // User darf sein eigenes lesen, aber wir vermeiden RLS-Reibung).
   const { data: profile, error: profErr } = await supabase
     .from("profiles")
     .select("role, full_name")
@@ -470,27 +557,80 @@ export async function GET() {
   const role = profile.role ?? "";
 
   try {
-    if (role === "admin") {
-      const adminData = await loadAdminData();
-      return NextResponse.json(
-        { success: true, role, first_name: firstName, admin: adminData },
-        { headers: { "Cache-Control": "private, max-age=60" } },
-      );
+    const [roleRes, overrideRes] = await Promise.all([
+      admin
+        .from("roles")
+        .select("permissions, dashboard_widgets")
+        .eq("slug", role)
+        .maybeSingle(),
+      admin
+        .from("user_dashboard_overrides")
+        .select("hidden, widget_order")
+        .eq("user_id", auth.user.id)
+        .maybeSingle(),
+    ]);
+
+    // permissions kommt aus jsonb (string[]).
+    const permsRaw = roleRes.data?.permissions;
+    const permissions: string[] = Array.isArray(permsRaw)
+      ? (permsRaw as unknown[]).filter((p): p is string => typeof p === "string")
+      : [];
+
+    // Rollen-Override: jsonb {order, hidden} oder NULL.
+    let roleOverride: { order: string[]; hidden: string[] } | null = null;
+    const rw = roleRes.data?.dashboard_widgets as unknown;
+    if (rw && typeof rw === "object" && !Array.isArray(rw)) {
+      const obj = rw as { order?: unknown; hidden?: unknown };
+      const order = Array.isArray(obj.order)
+        ? obj.order.filter((s): s is string => typeof s === "string")
+        : [];
+      const hidden = Array.isArray(obj.hidden)
+        ? obj.hidden.filter((s): s is string => typeof s === "string")
+        : [];
+      roleOverride = { order, hidden };
     }
 
-    if (role === "techniker") {
-      const ma = await loadMaData(auth.user.id);
-      return NextResponse.json(
-        { success: true, role, first_name: firstName, ma },
-        { headers: { "Cache-Control": "private, max-age=60" } },
-      );
-    }
+    const userOverride = overrideRes.data
+      ? {
+          hidden: (overrideRes.data.hidden ?? []) as string[],
+          widget_order: (overrideRes.data.widget_order ?? []) as string[],
+        }
+      : null;
 
-    // partner (und alle anderen Rollen) — nur Begruessung
-    return NextResponse.json(
-      { success: true, role, first_name: firstName },
-      { headers: { "Cache-Control": "private, max-age=60" } },
-    );
+    // 1) Rolle+User mergen (deterministisch).
+    const merged = resolveVisibleWidgets({ role, roleOverride, userOverride });
+
+    // 2) Permission-Filter (Admin durch — hasPermission gated).
+    const widgets = merged.filter((id) => {
+      const w = DASHBOARD_WIDGETS.find((x) => x.id === id);
+      if (!w) return false;
+      return w.requires.every((p) => hasPermission(permissions, role, p));
+    });
+
+    // 3) Payload gezielt laden — nur was ein sichtbares Widget wirklich braucht.
+    const loadersNeeded = new Set<WidgetLoader>();
+    for (const id of widgets) {
+      const l = WIDGET_LOADERS[id];
+      if (l) loadersNeeded.add(l);
+    }
+    const [adminData, maData] = await Promise.all([
+      loadersNeeded.has("admin") ? loadAdminData() : Promise.resolve(null),
+      loadersNeeded.has("ma") ? loadMaData(auth.user.id) : Promise.resolve(null),
+    ]);
+
+    const body: Record<string, unknown> = {
+      success: true,
+      role,
+      first_name: firstName,
+      widgets,
+      widget_catalog: WIDGET_CATALOG,
+    };
+    if (adminData) body.admin = adminData;
+    if (maData) body.ma = maData;
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "private, max-age=60" },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

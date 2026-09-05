@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/api-auth";
 import { allKnownPermissions } from "@/lib/permissions";
 import { logPermissionAudit } from "@/lib/permission-audit";
+import { DASHBOARD_WIDGETS } from "@/lib/dashboard-widgets";
 
 export async function PATCH(
   request: Request,
@@ -35,6 +36,27 @@ export async function PATCH(
     const valid = new Set(allKnownPermissions());
     update.permissions = (body.permissions as unknown[]).filter((s): s is string => typeof s === "string" && valid.has(s));
   }
+  // dashboard_widgets: {order: string[], hidden: string[]} oder null (=Reset).
+  // Unbekannte Widget-IDs werden STILL gedroppt (siehe user-override-Route),
+  // damit ein alter Admin-Client nach Registry-Umbau nicht plötzlich 400t.
+  if (Object.prototype.hasOwnProperty.call(body, "dashboard_widgets")) {
+    const dw = (body as { dashboard_widgets: unknown }).dashboard_widgets;
+    if (dw === null) {
+      update.dashboard_widgets = null;
+    } else if (dw && typeof dw === "object" && !Array.isArray(dw)) {
+      const known = new Set<string>(DASHBOARD_WIDGETS.map((w) => w.id));
+      const obj = dw as { order?: unknown; hidden?: unknown };
+      const order = Array.isArray(obj.order)
+        ? (obj.order as unknown[]).filter((s): s is string => typeof s === "string" && known.has(s))
+        : [];
+      const hidden = Array.isArray(obj.hidden)
+        ? (obj.hidden as unknown[]).filter((s): s is string => typeof s === "string" && known.has(s))
+        : [];
+      update.dashboard_widgets = { order, hidden };
+    } else {
+      return NextResponse.json({ success: false, error: "dashboard_widgets ungueltig" }, { status: 400 });
+    }
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ success: false, error: "Keine Aenderungen" }, { status: 400 });
   }
@@ -43,7 +65,7 @@ export async function PATCH(
   // Vorher-Zustand fuer Audit-Diff laden.
   const { data: before } = await admin
     .from("roles")
-    .select("label, permissions")
+    .select("label, permissions, dashboard_widgets")
     .eq("slug", slug)
     .maybeSingle();
   const { error } = await admin.from("roles").update(update).eq("slug", slug);
