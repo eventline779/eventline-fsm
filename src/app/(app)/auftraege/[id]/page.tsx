@@ -45,16 +45,13 @@ import { DocsHistoryTab } from "@/components/auftrag/tabs/docs-history-tab";
 import { useAuftragData } from "@/components/auftrag/tabs/use-auftrag-data";
 import { useBreadcrumbs } from "@/components/shell/breadcrumbs";
 
-// Rollen, die ihre Arbeit ueber den Rapport-Tab machen → dort landen sie per Default.
-const RAPPORT_DEFAULT_ROLES = new Set(["mitarbeiter", "techniker", "partner"]);
-
 export default function AuftragDetailPage() {
   const { id } = useParams();
   const jobId = id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { can, role, ready: permsReady } = usePermissions();
+  const { can, ready: permsReady } = usePermissions();
 
   const {
     job,
@@ -139,11 +136,17 @@ export default function AuftragDetailPage() {
   }, [autoOpenDraft, jobId, router, searchParams]);
 
   // ─── Tab-Auswahl (URL-State + Rollen-Default) ──────────────────
+  // Rollen, die ihre Arbeit ueber den Rapport-Tab machen (mitarbeiter,
+  // techniker, partner), landen dort per Default — abgeleitet aus der
+  // Permission: wer NICHT auftraege:edit hat, ist ausfuehrende Rolle und
+  // arbeitet primaer am Rapport. Vorher: hardcoded Rollen-Slugs — jetzt
+  // permission-driven, damit neue Rollen ohne Code-Aenderung greifen.
   const urlTab = searchParams.get("tab") as TabKey | null;
   const isValidTab = urlTab === "uebersicht" || urlTab === "rapport" || urlTab === "dokumente";
+  const canEditJob = can("auftraege:edit");
   const roleDefault: TabKey = useMemo(
-    () => (RAPPORT_DEFAULT_ROLES.has(role) ? "rapport" : "uebersicht"),
-    [role],
+    () => (canEditJob ? "uebersicht" : "rapport"),
+    [canEditJob],
   );
   const activeTab: TabKey = isValidTab ? (urlTab as TabKey) : roleDefault;
 
@@ -172,7 +175,14 @@ export default function AuftragDetailPage() {
       toast.error("Bitte erst Start- und Enddatum im Bearbeiten-Modus setzen, dann freigeben");
       return;
     }
-    await supabase.from("jobs").update({ status: newStatus }).eq("id", jobId);
+    // Error-Check zwingend — sonst schluckt der Aufruf RLS-Fehler und
+    // meldet dem User faelschlich "Erfolg" waehrend der Status in der DB
+    // unveraendert bleibt (Audit-Finding, CLAUDE.md §6).
+    const { error } = await supabase.from("jobs").update({ status: newStatus }).eq("id", jobId);
+    if (error) {
+      TOAST.supabaseError(error);
+      return;
+    }
     toast.success(`Status auf "${JOB_STATUS[newStatus].label}" geändert`);
     loadAll();
   }
@@ -301,7 +311,7 @@ export default function AuftragDetailPage() {
       <AuftragStickyHeader
         jobId={jobId}
         job={job}
-        canEdit={can("auftraege:edit")}
+        canEdit={canEditJob}
         availableActions={availableActions}
         onStatusAction={updateStatus}
         onOpenCancel={() => setCancelPhase("confirm")}
@@ -341,7 +351,7 @@ export default function AuftragDetailPage() {
             profiles={profiles}
             autoOpenAppt={autoOpenAppt}
             onReload={loadAll}
-            canEdit={can("auftraege:edit")}
+            canEdit={canEditJob}
             notesText={notesText}
             setNotesText={setNotesText}
             verwaltungsText={verwaltungsText}

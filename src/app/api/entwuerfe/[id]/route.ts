@@ -6,7 +6,7 @@
 //         nur nicht mehr in Listen auf).
 
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api-auth";
+import { requireUser, requirePermission } from "@/lib/api-auth";
 import { createClient } from "@/lib/supabase/server";
 
 const DETAIL_SELECT = `
@@ -88,7 +88,10 @@ interface PatchBody {
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
+  // Write-Endpoint: requirePermission statt requireUser — verhindert dass
+  // ein User ohne 'auftraege:edit' die RLS auf der DB-Seite selbst tragen
+  // muss (defense-in-depth, konsistent mit /convert-Route).
+  const auth = await requirePermission("auftraege:edit");
   if (auth.error) return auth.error;
   const { id } = await params;
 
@@ -134,7 +137,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // via join). Bewusst nicht hart geloescht damit versehentliches Loeschen
 // via History-Log rueckgaengig gemacht werden kann.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
+  const auth = await requirePermission("auftraege:edit");
   if (auth.error) return auth.error;
   const { id } = await params;
 

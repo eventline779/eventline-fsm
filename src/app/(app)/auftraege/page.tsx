@@ -40,6 +40,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/use-permissions";
+import { localDateIso } from "@/lib/swiss-time";
 
 type DonutCounts = {
   anfrage: number;
@@ -80,7 +81,12 @@ export default function AuftraegePage() {
   const [searchNumber, setSearchNumber] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-number") || "" : "");
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
-  const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as "all" | "scala" | "barakuba" | "bau3" | "sonstige" | null) || "all" : "all");
+  // Location-Filter: "all" | "sonstige" (kein location_id gesetzt) | <location_id>.
+  // Vorher hardcoded scala/barakuba/bau3 mit Substring-Match auf location.name —
+  // jetzt dynamisch aus der DB (siehe activeLocations useEffect) und per
+  // location_id server-seitig gefiltert (§4 CLAUDE.md).
+  const [filterLocation, setFilterLocation] = useState<string>(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") || "all") : "all");
+  const [activeLocations, setActiveLocations] = useState<{ id: string; name: string }[]>([]);
   // Segment-Toggle. Zwei disjunkte Ansichten:
   //   aktiv:  freigegebene Auftraege (status=offen)
   //   archiv: abgeschlossen + storniert
@@ -128,9 +134,9 @@ export default function AuftraegePage() {
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-search-title", searchTitle); }, [searchTitle]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-status", filterStatus); }, [filterStatus]);
   useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("auftraege-location", filterLocation); }, [filterLocation]);
-  // Active + Counts + Profiles: filter-unabhaengig, wird bei Mount, Segment-
-  // Wechsel und Invalidate neu geladen.
-  // Archive: filter-abhaengig, eigener Effect mit Debounce (siehe weiter unten).
+  // Active + Counts + Profiles: bei Mount, Segment-Wechsel, Filter-Wechsel
+  // und Invalidate neu geladen (Filter jetzt server-seitig → §4).
+  // Archive: eigener Effect mit Debounce (siehe weiter unten).
   useEffect(() => {
     loadActiveAndCounts();
     const handler = () => {
@@ -141,7 +147,35 @@ export default function AuftraegePage() {
     window.addEventListener("jobs:invalidate", handler);
     return () => window.removeEventListener("jobs:invalidate", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [segment]);
+  }, [segment, filterStatus, filterLocation]);
+
+  // Locations-Liste einmalig laden (aktive Locations mit id+name), damit
+  // der Location-Filter dynamisch aus der DB kommt. Vorher hardcoded
+  // scala/barakuba/bau3 im JSX + Substring-Match — jetzt data-driven.
+  useEffect(() => {
+    let alive = true;
+    supabase
+      .from("locations")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name")
+      .then(({ data }) => {
+        if (!alive) return;
+        const rows = (data as { id: string; name: string }[] | null) ?? [];
+        setActiveLocations(rows);
+        // Stale-localStorage-Cleanup: alte Werte "scala"/"barakuba"/"bau3"
+        // (oder inaktiv gewordene IDs) auf "all" zuruecksetzen, sonst
+        // liefert die Query dauerhaft 0 Ergebnisse.
+        setFilterLocation((cur) => {
+          if (cur === "all" || cur === "sonstige") return cur;
+          if (rows.some((r) => r.id === cur)) return cur;
+          return "all";
+        });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [supabase]);
 
   // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
   // Damit ist der Donut entkoppelt vom geladenen State und auch bei paginierter
@@ -170,11 +204,25 @@ export default function AuftraegePage() {
       .from("jobs")
       .select(JOBS_SELECT)
       .neq("is_deleted", true)
-      .or(cancelledFilter)
-      // aktiv-Segment: freigegebene Auftraege (partner_entwurf gehoert nur
-      // ins Partnerportal, Anfragen/Entwuerfe/Partner-Anfragen laufen ausserhalb
-      // dieser Liste).
-      .eq("status", "offen");
+      .or(cancelledFilter);
+    // aktiv-Segment: freigegebene Auftraege (partner_entwurf gehoert nur
+    // ins Partnerportal, Anfragen/Entwuerfe/Partner-Anfragen laufen ausserhalb
+    // dieser Liste). Status-Filter server-seitig (§4): filterStatus "all"
+    // → nur offen; ein konkreter Status ueberschreibt (gibt ggf. leere Liste,
+    // z.B. wenn "storniert" waehrend Aktiv-Segment).
+    if (filterStatus === "all") {
+      q = q.eq("status", "offen");
+    } else {
+      q = q.eq("status", filterStatus);
+    }
+    // Location-Filter server-seitig auf location_id (statt Substring-Match
+    // auf location.name im Client). "sonstige" = jobs ohne location_id
+    // (Kunden-/externe Auftraege).
+    if (filterLocation === "sonstige") {
+      q = q.is("location_id", null);
+    } else if (filterLocation !== "all") {
+      q = q.eq("location_id", filterLocation);
+    }
     if (cursor !== null) {
       // Composite-cursor: (start_date > c.start) OR (start_date = c.start AND id > c.id).
       // start_date null = Entwuerfe ohne Datum — kommen zuletzt (NULLS LAST).
@@ -188,7 +236,7 @@ export default function AuftraegePage() {
       .order("start_date", { ascending: true, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(ACTIVE_PAGE_SIZE + 1);
-  }, [supabase]);
+  }, [supabase, filterStatus, filterLocation]);
 
   async function loadActiveAndCounts() {
     const [activeRes, profRes, freshCounts] = await Promise.all([
@@ -219,8 +267,7 @@ export default function AuftraegePage() {
     setActiveLoadingMore(false);
   }
 
-  // Archive-Query mit Filtern: status, title, exakte Nummer — alles server-seitig.
-  // Location bleibt client-seitig (joined-table-Filter wuerde die Datenform aendern).
+  // Archive-Query mit Filtern: status, title, exakte Nummer, location — alles server-seitig.
   // job_number ist Integer — partial-Match nicht via PostgREST moeglich, daher
   // nur bei vollstaendiger Eingabe (6 Ziffern) als exact-Filter.
   // Sort: start_date DESC (juengste-past zuerst), composite cursor (start_date, id).
@@ -234,8 +281,18 @@ export default function AuftraegePage() {
 
     if (filterStatus === "abgeschlossen" || filterStatus === "storniert") {
       q = q.eq("status", filterStatus);
-    } else {
+    } else if (filterStatus === "all") {
       q = q.in("status", ["abgeschlossen", "storniert"]);
+    } else {
+      // Nicht-archiv-Status im Archiv-Segment → bewusst leere Ergebnisliste.
+      q = q.eq("status", filterStatus);
+    }
+
+    // Location-Filter server-seitig, identisch zur Active-Query (§4).
+    if (filterLocation === "sonstige") {
+      q = q.is("location_id", null);
+    } else if (filterLocation !== "all") {
+      q = q.eq("location_id", filterLocation);
     }
 
     const titleQ = searchTitle.trim();
@@ -257,7 +314,7 @@ export default function AuftraegePage() {
       .order("start_date", { ascending: false, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(ARCHIVE_PAGE_SIZE + 1);
-  }, [supabase, filterStatus, searchTitle, searchNumber]);
+  }, [supabase, filterStatus, filterLocation, searchTitle, searchNumber]);
 
   const reloadArchive = useCallback(async () => {
     const myId = ++archiveQueryIdRef.current;
@@ -298,9 +355,13 @@ export default function AuftraegePage() {
     setArchiveLoadingMore(false);
   }
 
-  // Anfang von heute (00:00) - Aufträge die heute stattfinden zählen noch als "kommend"
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayMs = todayStart.getTime();
+  // Anfang von heute (00:00) im Lokal-Kalender Europe/Zurich — Aufträge die
+  // heute stattfinden zählen noch als "kommend". Ueber swiss-time-Helper
+  // damit User in anderer Browser-TZ nicht falsche past/future-Buckets
+  // sehen (Datums-Bug 2026-06-15, CLAUDE.md §4).
+  const todayIsoZrh = localDateIso(new Date());
+  const [ty, tm, td] = todayIsoZrh.split("-").map(Number);
+  const todayMs = Date.UTC(ty, tm - 1, td, 0, 0, 0);
   // Quelle haengt vom Modus ab — Active ist voll geladen, Archive ist paginiert.
   // Wenn ein Such-Term aktiv ist, mixen wir auch im Aktiv-Modus die archivierten
   // Auftraege rein damit der User nicht aktiv vs archiv toggeln muss.
@@ -312,23 +373,18 @@ export default function AuftraegePage() {
   const totalForSource = segment === "archiv"
     ? counts.abgeschlossen + counts.storniert
     : counts.offen;
+  // Status- und Location-Filter laufen jetzt server-seitig in buildActive-/
+  // buildArchiveQuery (§4). Der verbleibende Client-Filter deckt nur noch
+  // Titel- und Nummer-Substring-Matching ab (Titel: fallback wenn ein Job
+  // aus der activeJobs-Liste in der ilike-Archive-Query nicht auftauchte;
+  // Nummer: Partial-Match, da die DB-Query nur bei voller 6-stelliger
+  // Nummer greift).
   const filtered = sourceJobs.filter((j) => {
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
     const matchesNumber = !numQ ? true : String(j.job_number ?? "").includes(numQ);
     const matchesTitle = !titleQ ? true : j.title.toLowerCase().includes(titleQ);
-    const matchesSearch = matchesNumber && matchesTitle;
-    const matchesStatus = filterStatus === "all" || j.status === filterStatus;
-    const locName = (j.location?.name || "").toLowerCase();
-    const isScala = locName.includes("scala");
-    const isBarakuba = locName.includes("barakuba");
-    const isBau3 = locName.includes("bau3");
-    let matchesLocation = true;
-    if (filterLocation === "scala") matchesLocation = isScala;
-    else if (filterLocation === "barakuba") matchesLocation = isBarakuba;
-    else if (filterLocation === "bau3") matchesLocation = isBau3;
-    else if (filterLocation === "sonstige") matchesLocation = !isScala && !isBarakuba && !isBau3;
-    return matchesSearch && matchesStatus && matchesLocation;
+    return matchesNumber && matchesTitle;
   }).sort((a, b) => {
     // Referenz-Datum: wenn Enddatum vorhanden, nutze das (damit mehrtägige Events heute noch als kommend gelten)
     const aRef = a.end_date ? new Date(a.end_date).getTime() : a.start_date ? new Date(a.start_date).getTime() : Infinity;
@@ -482,23 +538,18 @@ export default function AuftraegePage() {
           />
         </div>
 
-        {/* Location-Filter */}
+        {/* Location-Filter — dynamisch aus aktiven Locations (§1 CLAUDE.md).
+            "Sonstige" = jobs ohne location_id (Kunden-/externe Auftraege). */}
         <div className="w-full sm:w-44">
           <SearchableSelect
             value={filterLocation}
-            onChange={(v) =>
-              setFilterLocation(
-                v as "all" | "scala" | "barakuba" | "bau3" | "sonstige"
-              )
-            }
+            onChange={(v) => setFilterLocation(v)}
             items={[
               { id: "all", label: "Alle Locations" },
-              { id: "scala", label: "SCALA Basel" },
-              { id: "barakuba", label: "Barakuba" },
-              { id: "bau3", label: "Theater BAU3" },
+              ...activeLocations.map((l) => ({ id: l.id, label: l.name })),
               { id: "sonstige", label: "Sonstige" },
             ]}
-            searchable={false}
+            searchable={activeLocations.length > 8}
             clearable={false}
             active={filterLocation !== "all"}
           />

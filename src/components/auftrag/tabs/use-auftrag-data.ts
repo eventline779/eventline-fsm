@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { TOAST } from "@/lib/messages";
 import type {
   JobAppointment,
   Profile,
@@ -145,10 +146,16 @@ export function useAuftragData(id: string) {
   }, [loadAll]);
 
   // Notizen autosave.
+  // Wichtig: bei Fehler NICHT savedText setzen — sonst denkt der Effect
+  // "gespeichert" und der User verliert stumm seine Eingabe (Audit-Finding).
   useEffect(() => {
     if (notesText === savedText) return;
     const handle = setTimeout(async () => {
-      await supabase.from("jobs").update({ notes: notesText || null }).eq("id", id);
+      const { error } = await supabase.from("jobs").update({ notes: notesText || null }).eq("id", id);
+      if (error) {
+        TOAST.supabaseError(error, "Notizen konnten nicht gespeichert werden");
+        return;
+      }
       setSavedText(notesText);
     }, 800);
     return () => clearTimeout(handle);
@@ -158,7 +165,11 @@ export function useAuftragData(id: string) {
   useEffect(() => {
     if (verwaltungsText === savedVerwaltungsText) return;
     const handle = setTimeout(async () => {
-      await supabase.from("jobs").update({ verwaltungsaufwand: verwaltungsText || null }).eq("id", id);
+      const { error } = await supabase.from("jobs").update({ verwaltungsaufwand: verwaltungsText || null }).eq("id", id);
+      if (error) {
+        TOAST.supabaseError(error, "Verwaltungsaufwand konnte nicht gespeichert werden");
+        return;
+      }
       setSavedVerwaltungsText(verwaltungsText);
     }, 800);
     return () => clearTimeout(handle);
@@ -170,7 +181,11 @@ export function useAuftragData(id: string) {
     const handle = setTimeout(async () => {
       const trimmed = verwaltungsMinutes.trim();
       const value = trimmed === "" ? null : Math.max(0, parseInt(trimmed, 10) || 0);
-      await supabase.from("jobs").update({ verwaltungsaufwand_minutes: value }).eq("id", id);
+      const { error } = await supabase.from("jobs").update({ verwaltungsaufwand_minutes: value }).eq("id", id);
+      if (error) {
+        TOAST.supabaseError(error, "Aufwand-Minuten konnten nicht gespeichert werden");
+        return;
+      }
       setSavedVerwaltungsMinutes(verwaltungsMinutes);
     }, 800);
     return () => clearTimeout(handle);

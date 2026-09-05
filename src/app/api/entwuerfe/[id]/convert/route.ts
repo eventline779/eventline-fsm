@@ -26,6 +26,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/log";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission("auftraege:edit");
@@ -103,8 +104,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (updateErr) {
     // Best-effort rollback: den frisch angelegten Job wieder als deleted
     // markieren, sonst haben wir einen Auftrag ohne Draft-Backlink. Wir
-    // melden den Original-Fehler.
-    await admin.from("jobs").update({ is_deleted: true }).eq("id", newJob.id);
+    // melden den Original-Fehler — den Rollback-Fehler (falls einer) nur
+    // loggen, damit der Nutzer nicht doppelt verwirrt wird (Audit-Finding).
+    const { error: rollbackErr } = await admin
+      .from("jobs")
+      .update({ is_deleted: true })
+      .eq("id", newJob.id);
+    if (rollbackErr) {
+      logError("entwuerfe.convert.rollback", rollbackErr, {
+        draftId,
+        jobId: newJob.id,
+        originalError: updateErr.message,
+      });
+    }
     return NextResponse.json({ success: false, error: updateErr.message }, { status: 500 });
   }
 

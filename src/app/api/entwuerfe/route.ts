@@ -67,11 +67,28 @@ export async function GET(req: Request) {
   if (ownerId) q = q.eq("owner_id", ownerId);
   if (search) {
     // Freitext-Suche in Titel, customer_name, contact_person + draft_number.
+    //
+    // int4-Falle (CLAUDE.md §15): draft_number ist Integer. Ein grosser
+    // Zahlenstring (z.B. Telefonnummer) sprengt int4 und laesst die
+    // GANZE .or()-Query still fehlschlagen. Daher <= 2^31-1 gaten.
     const asNum = Number(search);
-    const numericPart = Number.isFinite(asNum) && /^\d+$/.test(search) ? `,draft_number.eq.${asNum}` : "";
-    q = q.or(
-      `title.ilike.%${search}%,customer_name.ilike.%${search}%,contact_person.ilike.%${search}%${numericPart}`,
-    );
+    const isValidInt =
+      Number.isFinite(asNum) && /^\d+$/.test(search) && asNum <= 2147483647;
+    const numericPart = isValidInt ? `,draft_number.eq.${asNum}` : "";
+    // Filter-Injection: Kommas/Klammern/Punkte im Search-Term brechen den
+    // .or()-Filter-String (PostgREST parst als Ausdrucksliste). Escape
+    // per Whitelist: alles was NICHT Alnum/Space/Bindestrich ist, raus.
+    // ilike-% werden explizit ausserhalb des Escapings gesetzt.
+    const safeSearch = search.replace(/[^\p{L}\p{N}\s\-_]/gu, " ").trim();
+    if (!safeSearch && !isValidInt) {
+      // Kein sinnvoll suchbarer Term uebrig — Query unveraendert lassen.
+    } else if (!safeSearch) {
+      q = q.or(`draft_number.eq.${asNum}`);
+    } else {
+      q = q.or(
+        `title.ilike.%${safeSearch}%,customer_name.ilike.%${safeSearch}%,contact_person.ilike.%${safeSearch}%${numericPart}`,
+      );
+    }
   }
 
   const { data, error } = await q;
