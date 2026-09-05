@@ -106,7 +106,7 @@ export function AuftragStickyHeader({
             )}
             {job.was_anfrage && (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
                 data-tooltip="Aus einer Vermietungs-Anfrage entstanden"
               >
                 <Inbox className="h-3 w-3" />
@@ -200,7 +200,7 @@ export function AuftragStickyHeader({
 
       {/* End-Date-Hint */}
       {!canFinish && job.status === "offen" && finishBlockReason && (
-        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+        <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1.5">
           <AlertCircle className="h-3 w-3" />
           {finishBlockReason} — Rapport kann jedoch schon jetzt vorbereitet werden.
         </p>

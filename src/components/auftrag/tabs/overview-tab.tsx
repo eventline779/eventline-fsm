@@ -81,14 +81,14 @@ export function OverviewTab({
   const placeAddress = locationAddress || roomAddress || (location || room ? "" : job.external_address ?? "");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Info */}
       <Card className="bg-card">
-        <CardContent className="p-5">
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             {/* Spalte WER — Kunde + Adresse + Veranstalter-Kontakt */}
             <div className="space-y-1.5 min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Wer
               </p>
               <div className="flex items-start justify-between gap-3">
@@ -123,7 +123,7 @@ export function OverviewTab({
               )}
               {(job.contact_person || job.contact_phone || job.contact_email) && (
                 <div className="pt-2 mt-1 border-t space-y-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Veranstalter-Kontakt
                   </p>
                   {job.contact_person && (
@@ -159,7 +159,7 @@ export function OverviewTab({
                 MapPin wird hier genau einmal gerendert (fuer die Ort-Zeile),
                 der Maps-Button traegt das Icon in sich. */}
             <div className="space-y-1.5 min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Wo &amp; Wann
               </p>
               {placeName ? (
@@ -217,8 +217,8 @@ export function OverviewTab({
       {/* Notizen — autosave via Parent-Effekt (Debounce 800ms) */}
       <Card className="bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <StickyNote className="h-4 w-4" />
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <StickyNote className="h-3.5 w-3.5" />
             Notizen
           </CardTitle>
         </CardHeader>
@@ -238,11 +238,11 @@ export function OverviewTab({
       {(canEdit || verwaltungsText || verwaltungsMinutes) && (
         <Card className="bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Briefcase className="h-4 w-4" />
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Briefcase className="h-3.5 w-3.5" />
               Verwaltungsaufwand
               {!canEdit && (
-                <span className="text-[10px] font-normal text-muted-foreground/60 ml-1">
+                <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground/60 ml-1">
                   nur Teamleiter editierbar
                 </span>
               )}
@@ -252,7 +252,7 @@ export function OverviewTab({
             {canEdit ? (
               <div className="flex gap-2 items-start">
                 <div className="flex flex-col items-center shrink-0">
-                  <label className="text-[10px] font-medium text-muted-foreground/70 mb-1">Minuten</label>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Minuten</label>
                   <input
                     type="number"
                     min={0}
@@ -263,7 +263,7 @@ export function OverviewTab({
                     className="w-20 px-2 py-2 text-sm text-center rounded-xl border bg-background transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
                   />
                   {verwaltungsMinutes && parseInt(verwaltungsMinutes, 10) >= 60 && (
-                    <span className="text-[10px] text-muted-foreground/60 mt-1 tabular-nums">
+                    <span className="text-[11px] text-muted-foreground/70 mt-1 tabular-nums">
                       = {Math.floor(parseInt(verwaltungsMinutes, 10) / 60)}h{" "}
                       {parseInt(verwaltungsMinutes, 10) % 60 > 0
                         ? `${parseInt(verwaltungsMinutes, 10) % 60}m`
@@ -272,7 +272,7 @@ export function OverviewTab({
                   )}
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] font-medium text-muted-foreground/70 mb-1 block">
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
                     Tätigkeit
                   </label>
                   <textarea

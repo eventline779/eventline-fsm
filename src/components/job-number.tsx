@@ -15,7 +15,9 @@ interface JobNumberProps {
 
 const sizeClasses = {
   sm: "text-sm px-2 py-0.5",
-  md: "text-base px-2.5 py-1",
+  // md: bewusst leichter als der H1-Titel — sonst konkurriert die
+  // Nummer-Pill visuell mit dem Auftragstitel im Sticky-Header.
+  md: "text-[13px] px-2 py-0.5",
   lg: "text-lg px-3 py-1",
   xl: "text-2xl px-3.5 py-1.5",
 };
@@ -24,7 +26,7 @@ export function JobNumber({ number, size = "sm", className = "" }: JobNumberProp
   if (!number) return null;
   return (
     <span
-      className={`inline-flex items-center font-mono font-semibold rounded bg-card whitespace-nowrap ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center font-mono font-semibold rounded-md bg-card border border-foreground/10 dark:border-foreground/15 tabular-nums whitespace-nowrap ${sizeClasses[size]} ${className}`}
     >
       INT-{number}
     </span>

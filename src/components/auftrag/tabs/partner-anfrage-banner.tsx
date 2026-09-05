@@ -55,7 +55,7 @@ export function PartnerAnfrageBanner({ jobId, onDecided, onOpenReject }: Props) 
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
             <div className="text-sm flex-1">
-              <p className="font-semibold text-amber-800 dark:text-amber-200">Partner-Anfrage</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-200">Partner-Anfrage</p>
               <p className="text-amber-700 dark:text-amber-300 mt-0.5">
                 Diese Anfrage kam vom Location-Partner. Annahme = wird offener Auftrag. Ablehnung = Partner
                 sieht den Grund.

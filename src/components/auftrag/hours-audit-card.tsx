@@ -71,10 +71,10 @@ export function HoursAuditCard({ rows }: Props) {
   return (
     <Card className="bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Scale className="h-4 w-4" />
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <Scale className="h-3.5 w-3.5" />
           Stundenkontrolle
-          <span className="text-[10px] font-normal text-muted-foreground/60 ml-1">
+          <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground/60 ml-1">
             Stempel vs. Rapport
           </span>
         </CardTitle>

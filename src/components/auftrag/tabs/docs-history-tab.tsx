@@ -17,7 +17,6 @@ import { Upload, Camera, FileText, Trash2, Eye, Download, XCircle } from "lucide
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { PartnerFormAnswersCard } from "@/components/auftrag/partner-form-answers-card";
 import { PdfPopup } from "@/components/pdf-popup";
 import { createClient } from "@/lib/supabase/client";
@@ -138,12 +137,12 @@ export function DocsHistoryTab({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Dokumente / PDFs */}
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Upload className="h-4 w-4" />
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Upload className="h-3.5 w-3.5" />
             Dokumente ({documents.length})
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -163,25 +162,24 @@ export function DocsHistoryTab({
               className="hidden"
               onChange={handleFileUpload}
             />
-            <Button
-              size="sm"
-              variant="outline"
-              className="md:hidden"
+            <button
+              type="button"
+              className="kasten kasten-blue md:hidden"
               onClick={() => document.getElementById("jobPhotoUpload")?.click()}
               disabled={uploading}
             >
-              <Camera className="h-4 w-4 mr-1" />
+              <Camera className="h-3.5 w-3.5" />
               Foto
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
+            </button>
+            <button
+              type="button"
+              className="kasten kasten-blue"
               onClick={() => document.getElementById("jobFileUpload")?.click()}
               disabled={uploading}
             >
-              <Upload className="h-4 w-4 mr-1" />
+              <Upload className="h-3.5 w-3.5" />
               {uploading ? "Lädt…" : "Hochladen"}
-            </Button>
+            </button>
           </div>
         </CardHeader>
         <CardContent>
@@ -197,7 +195,7 @@ export function DocsHistoryTab({
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100"
+                    className="flex items-center justify-between p-3 rounded-xl bg-foreground/[0.03] dark:bg-foreground/[0.06] border border-foreground/10 dark:border-foreground/15"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <FileText className="h-5 w-5 text-red-500 shrink-0" />
@@ -257,9 +255,9 @@ export function DocsHistoryTab({
       {/* Storno-Info — nur sichtbar wenn storniert */}
       {job.status === "storniert" && (job.cancelled_at || job.cancellation_reason) && (
         <Card className="bg-card border-destructive/30">
-          <CardContent className="p-5 space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
-              <XCircle className="h-4 w-4" />
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+              <XCircle className="h-3.5 w-3.5" />
               Storniert
             </div>
             <div className="text-sm text-muted-foreground">
@@ -285,7 +283,7 @@ export function DocsHistoryTab({
             </div>
             {job.cancellation_reason && (
               <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground mb-1">Grund</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Grund</p>
                 <p className="text-sm whitespace-pre-wrap">{job.cancellation_reason}</p>
               </div>
             )}

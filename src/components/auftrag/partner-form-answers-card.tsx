@@ -84,9 +84,9 @@ export function PartnerFormAnswersCard({ formAnswers, formSchemaSnapshot, locati
 
   return (
     <Card className="bg-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <FileText className="h-4 w-4" />
+      <CardHeader className="pb-3">
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5" />
           Anfrage-Details
         </CardTitle>
       </CardHeader>

@@ -11,7 +11,6 @@
 
 import { FileText, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HoursAuditCard } from "@/components/auftrag/hours-audit-card";
 import type { ServiceReport } from "@/types";
@@ -36,12 +35,12 @@ type Props = {
 
 export function RapportTab({ reports, isAdmin, audit }: Props) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Einsatzrapporte */}
       <Card className="bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <FileText className="h-4 w-4" />
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <FileText className="h-3.5 w-3.5" />
             Einsatzrapporte ({reports.length})
           </CardTitle>
         </CardHeader>
@@ -57,7 +56,7 @@ export function RapportTab({ reports, isAdmin, audit }: Props) {
               {reports.map((r) => (
                 <div
                   key={r.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100"
+                  className="flex items-center justify-between p-3 rounded-xl bg-foreground/[0.03] dark:bg-foreground/[0.06] border border-foreground/10 dark:border-foreground/15"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
@@ -70,11 +69,13 @@ export function RapportTab({ reports, isAdmin, audit }: Props) {
                       {r.creator?.full_name} · {r.status === "abgeschlossen" ? "Abgeschlossen" : "Entwurf"}
                     </p>
                   </div>
-                  <a href={`/api/reports/${r.id}/pdf`} download={`Rapport_${r.report_date}.pdf`}>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-1" />
-                      PDF
-                    </Button>
+                  <a
+                    href={`/api/reports/${r.id}/pdf`}
+                    download={`Rapport_${r.report_date}.pdf`}
+                    className="kasten kasten-muted"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    PDF
                   </a>
                 </div>
               ))}
