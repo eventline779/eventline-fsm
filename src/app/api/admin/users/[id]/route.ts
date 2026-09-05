@@ -101,8 +101,73 @@ export async function PATCH(
     update.team_lead_id = body.team_lead_id;
   }
 
-  if (Object.keys(update).length === 0) {
+  if (Object.keys(update).length === 0 && !Array.isArray(body.team_members)) {
     return NextResponse.json({ success: false, error: "Keine Aenderungen" }, { status: 400 });
+  }
+
+  // team_members (optional): Vollstaendige Liste der MA-UUIDs die diesem
+  // Teamleiter zugeordnet sein sollen. Umkehrung des klassischen „pro MA
+  // einen Teamleiter waehlen"-Flows: statt in 10 MA-Modals einzeln den
+  // Teamleiter zu setzen, waehlt der Admin im Teamleiter-Modal einmal
+  // alle Team-Mitglieder aus. Server berechnet Diff gegen den aktuellen
+  // Stand und setzt team_lead_id auf allen betroffenen Zeilen. Nur
+  // erlaubt wenn der bearbeitete User selbst eine Rolle mit scope='team'
+  // (oder 'all') hat — sonst waere die Semantik unklar (jemand ohne
+  // Team-Sichtbarkeit ist kein Teamleiter).
+  let teamMembersRequested: string[] | null = null;
+  if (Array.isArray(body.team_members)) {
+    // 1) IDs formal validieren + dedupen + Self-Ref abwehren.
+    const raw = (body.team_members as unknown[]).filter(
+      (v): v is string => typeof v === "string" && UUID_RE.test(v),
+    );
+    const dedup = Array.from(new Set(raw));
+    if (dedup.includes(id)) {
+      return NextResponse.json(
+        { success: false, error: "Ein Teamleiter kann sich nicht selbst als Team-Mitglied waehlen" },
+        { status: 400 },
+      );
+    }
+    // 2) Pruefen dass der Ziel-User selbst Teamleiter-Rolle (scope='team'|'all') hat.
+    const newRoleSlug = typeof update.role === "string"
+      ? (update.role as string)
+      : (await admin.from("profiles").select("role").eq("id", id).maybeSingle()).data?.role;
+    if (!newRoleSlug) {
+      return NextResponse.json({ success: false, error: "Rolle des Users nicht auffindbar" }, { status: 400 });
+    }
+    if (newRoleSlug !== "admin") {
+      const { data: roleRow } = await admin.from("roles").select("scope").eq("slug", newRoleSlug).maybeSingle();
+      const roleScope = roleRow?.scope ?? "self";
+      if (roleScope !== "team" && roleScope !== "all") {
+        return NextResponse.json(
+          { success: false, error: "Nur Rollen mit Sichtbarkeit „Nur Team\" oder „Alle\" duerfen Team-Mitglieder haben" },
+          { status: 400 },
+        );
+      }
+    }
+    // 3) Kandidaten-Ueberpruefung: keine anderen Teamleiter/Admins als Team-Mitglied.
+    //    Wir loesen die scope-Info aller Ziel-User ueber profiles.role -> roles.scope.
+    if (dedup.length > 0) {
+      const { data: candProfiles } = await admin.from("profiles").select("id, role, is_active").in("id", dedup);
+      if (!candProfiles || candProfiles.length !== dedup.length) {
+        return NextResponse.json({ success: false, error: "Mindestens ein Team-Mitglied existiert nicht" }, { status: 400 });
+      }
+      const roleSlugs = Array.from(new Set(candProfiles.map((p) => p.role)));
+      const { data: roleRows } = await admin.from("roles").select("slug, scope").in("slug", roleSlugs);
+      const scopeMap = new Map<string, string>((roleRows ?? []).map((r) => [r.slug, r.scope ?? "self"]));
+      for (const p of candProfiles) {
+        if (!p.is_active) {
+          return NextResponse.json({ success: false, error: "Deaktivierte Mitarbeiter koennen nicht Team-Mitglied sein" }, { status: 400 });
+        }
+        if (p.role === "admin") {
+          return NextResponse.json({ success: false, error: "Admins koennen nicht Team-Mitglied sein" }, { status: 400 });
+        }
+        const s = scopeMap.get(p.role) ?? "self";
+        if (s === "team" || s === "all") {
+          return NextResponse.json({ success: false, error: "Andere Teamleiter koennen nicht Team-Mitglied sein" }, { status: 400 });
+        }
+      }
+    }
+    teamMembersRequested = dedup;
   }
 
   // Vorherigen Profile-Stand laden — Audit-Diff fuer Rollen-Wechsel.
@@ -111,10 +176,50 @@ export async function PATCH(
     .select("role")
     .eq("id", id)
     .maybeSingle();
-  const { error: profErr } = await admin.from("profiles").update(update).eq("id", id);
-  if (profErr) {
-    logError("admin.users.update.profile", profErr, { userId: id });
-    return NextResponse.json({ success: false, error: "Update fehlgeschlagen" }, { status: 500 });
+  // Profil-Update nur wenn tatsaechlich Stammdaten geaendert wurden.
+  // Reine team_members-Requests (kein Stammdaten-Diff) skippen den Update.
+  if (Object.keys(update).length > 0) {
+    const { error: profErr } = await admin.from("profiles").update(update).eq("id", id);
+    if (profErr) {
+      logError("admin.users.update.profile", profErr, { userId: id });
+      return NextResponse.json({ success: false, error: "Update fehlgeschlagen" }, { status: 500 });
+    }
+  }
+
+  // Team-Mitglieder-Diff anwenden. Zwei Updates: added -> team_lead_id=id,
+  // removed -> team_lead_id=null. Nicht transaktional (Supabase-REST kann
+  // das nicht direkt), aber unkritisch: bei parallelen Sessions gewinnt
+  // ohnehin die letzte (Konzept: kein Locking).
+  if (teamMembersRequested !== null) {
+    const { data: currentMembers } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("team_lead_id", id);
+    const currentSet = new Set((currentMembers ?? []).map((p) => p.id));
+    const newSet = new Set(teamMembersRequested);
+    const added = teamMembersRequested.filter((mid) => !currentSet.has(mid));
+    const removed = Array.from(currentSet).filter((mid) => !newSet.has(mid));
+
+    if (added.length > 0) {
+      const { error: addErr } = await admin
+        .from("profiles")
+        .update({ team_lead_id: id })
+        .in("id", added);
+      if (addErr) {
+        logError("admin.users.update.team_add", addErr, { userId: id, added });
+        return NextResponse.json({ success: false, error: "Team-Zuordnung fehlgeschlagen" }, { status: 500 });
+      }
+    }
+    if (removed.length > 0) {
+      const { error: rmErr } = await admin
+        .from("profiles")
+        .update({ team_lead_id: null })
+        .in("id", removed);
+      if (rmErr) {
+        logError("admin.users.update.team_remove", rmErr, { userId: id, removed });
+        return NextResponse.json({ success: false, error: "Team-Abzug fehlgeschlagen" }, { status: 500 });
+      }
+    }
   }
 
   // Audit-Log nur fuer Rollen-Aenderungen (sicherheitsrelevant).

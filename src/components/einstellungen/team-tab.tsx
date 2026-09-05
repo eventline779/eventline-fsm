@@ -28,11 +28,23 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
-import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail, Users } from "lucide-react";
+import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail, Users, Search } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 
-type EditState = { id: string; full_name: string; role: string; birthdate: string; team_lead_id: string } | null;
+type EditState = {
+  id: string;
+  full_name: string;
+  role: string;
+  birthdate: string;
+  team_lead_id: string;
+  /** Nur relevant wenn der bearbeitete User selbst Teamleiter ist
+   *  (Rolle scope='team'|'all'). Umkehrung des klassischen Flows:
+   *  statt bei 10 MA einzeln den TL zu setzen, waehlt der Admin
+   *  hier alle Team-Mitglieder auf einmal aus. Beim Save berechnet
+   *  die API den Diff und setzt team_lead_id entsprechend. */
+  team_member_ids: string[];
+} | null;
 /** Rolle inkl. scope (Migration 208) — brauchen wir um in der MA-Liste
  *  die Teamleiter-Kandidaten zu filtern (nur Rollen mit scope='team'). */
 interface RoleOption { slug: string; label: string; scope: "self" | "team" | "all" }
@@ -59,6 +71,8 @@ export function TeamTab() {
   });
   const [edit, setEdit] = useState<EditState>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  /** Suchfeld ueber der Team-Mitglieder-Checkbox-Liste im Edit-Modal. */
+  const [memberSearch, setMemberSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const { confirm, ConfirmModalElement } = useConfirm();
 
@@ -100,14 +114,42 @@ export function TeamTab() {
   // (siehe get_my_scope()), taucht daher ebenfalls auf. Wird als items an
   // die SearchableSelect gegeben und pro Ort noch um den bearbeiteten User
   // selbst gefiltert (Self-Ausschluss).
+  const teamLeadRoleSlugs = useMemo(
+    () => new Set(roles.filter((r) => r.scope === "team" || r.scope === "all").map((r) => r.slug)),
+    [roles],
+  );
   const teamLeadCandidates = useMemo(() => {
-    const teamRoleSlugs = new Set(
-      roles.filter((r) => r.scope === "team" || r.scope === "all").map((r) => r.slug),
-    );
     return profiles.filter(
-      (p) => p.is_active && (p.role === "admin" || teamRoleSlugs.has(p.role)),
+      (p) => p.is_active && (p.role === "admin" || teamLeadRoleSlugs.has(p.role)),
     );
-  }, [profiles, roles]);
+  }, [profiles, teamLeadRoleSlugs]);
+
+  /** Ist die uebergebene Rolle eine „Teamleiter-Rolle" (scope='team'|'all')
+   *  im Sinne der Team-Mitglieder-Zuweisung? Admin wird bewusst NICHT als
+   *  Teamleiter gewertet — Admin sieht ohnehin alles und braucht keine
+   *  explizite Team-Zuordnung. */
+  function isTeamLeaderRole(slug: string): boolean {
+    return teamLeadRoleSlugs.has(slug);
+  }
+
+  /** Kandidaten fuer die Team-Mitglieder-Liste eines Teamleiters:
+   *  aktive Nicht-Admins, keine anderen Teamleiter (transitive Hierarchie
+   *  bewusst nicht gewuenscht), und der Teamleiter selbst wird
+   *  ausgeschlossen (Self-Exclude). */
+  function memberCandidatesFor(leaderId: string) {
+    return profiles.filter(
+      (p) =>
+        p.is_active &&
+        p.id !== leaderId &&
+        p.role !== "admin" &&
+        !teamLeadRoleSlugs.has(p.role),
+    );
+  }
+
+  /** Aktuell zugewiesene MA eines Teamleiters — abgeleitet aus profiles. */
+  function currentMembersOf(leaderId: string): string[] {
+    return profiles.filter((p) => p.team_lead_id === leaderId).map((p) => p.id);
+  }
 
   function profileName(id: string | null | undefined): string | null {
     if (!id) return null;
@@ -153,23 +195,37 @@ export function TeamTab() {
       role: p.role,
       birthdate: p.birthdate ?? "",
       team_lead_id: p.team_lead_id ?? "",
+      team_member_ids: currentMembersOf(p.id),
     });
+    setMemberSearch("");
   }
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!edit) return;
     setSavingEdit(true);
+    // Ist die (evtl. gerade geaenderte) Rolle eine Teamleiter-Rolle?
+    // -> team_members-Multi-Select zaehlt, team_lead_id (der Dropdown)
+    //    entfaellt visuell und wird bewusst nicht ueberschrieben.
+    // Sonst -> klassisches team_lead_id-Feld ueberschreibt wie bisher.
+    const asLeader = isTeamLeaderRole(edit.role);
+    const payload: Record<string, unknown> = {
+      full_name: edit.full_name,
+      role: edit.role,
+      birthdate: edit.birthdate ? edit.birthdate : null,
+    };
+    if (asLeader) {
+      // Nur den Diff-Trigger senden. Server berechnet was gesetzt/genullt
+      // werden muss. Dedup + Self-Ausschluss macht der Server ebenfalls.
+      payload.team_members = edit.team_member_ids;
+    } else {
+      // Leer-String = "kein Teamleiter" -> NULL in DB.
+      payload.team_lead_id = edit.team_lead_id ? edit.team_lead_id : null;
+    }
     const res = await fetch(`/api/admin/users/${edit.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        full_name: edit.full_name,
-        role: edit.role,
-        birthdate: edit.birthdate ? edit.birthdate : null,
-        // Leer-String = "kein Teamleiter" -> NULL in DB.
-        team_lead_id: edit.team_lead_id ? edit.team_lead_id : null,
-      }),
+      body: JSON.stringify(payload),
     });
     const json = await res.json();
     setSavingEdit(false);
@@ -308,6 +364,22 @@ export function TeamTab() {
                         TL: {profileName(p.team_lead_id)}
                       </span>
                     )}
+                    {/* „Team: N MA"-Badge beim Teamleiter selbst — zeigt auf
+                        einen Blick wie viele Mitarbeiter diesem TL zugeordnet
+                        sind. Nur wenn Rolle scope='team'|'all' (isTeamLeaderRole). */}
+                    {isTeamLeaderRole(p.role) && (() => {
+                      const n = profiles.filter((x) => x.team_lead_id === p.id).length;
+                      if (n === 0) return null;
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 shrink-0"
+                          data-tooltip="Anzahl direkt zugewiesener Team-Mitglieder"
+                        >
+                          <Users className="h-2.5 w-2.5" />
+                          Team: {n} MA
+                        </span>
+                      );
+                    })()}
                     {!p.is_active && (
                       <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                         Deaktiviert
@@ -483,31 +555,135 @@ export function TeamTab() {
                 {roles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
               </select>
             </div>
-            {/* Teamleiter — Kandidaten sind alle aktiven MA deren Rolle
-                scope='team'|'all' hat (Admin implizit). Self-Ausschluss: der
-                bearbeitete MA taucht in seiner eigenen Kandidatenliste nicht
-                auf, sonst koennte er sich selbst zuordnen. */}
-            <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">Teamleiter (optional)</p>
-              <SearchableSelect
-                value={edit.team_lead_id}
-                onChange={(id) => setEdit({ ...edit, team_lead_id: id })}
-                items={teamLeadCandidates
-                  .filter((c) => c.id !== edit.id)
-                  .map((c) => ({
-                    id: c.id,
-                    label: c.full_name,
-                    sub: roleLabel(c.role),
-                  }))}
-                placeholder={teamLeadCandidates.filter((c) => c.id !== edit.id).length === 0
-                  ? "Noch keine Teamleiter (Rolle braucht Sichtbarkeit „Nur Team\")"
-                  : "— kein Teamleiter —"}
-                clearable
-              />
-              <p className="text-[10px] text-muted-foreground/70 ml-1">
-                Nur Rollen mit Sichtbarkeit „Nur Team" oder „Alle" tauchen hier auf.
-              </p>
-            </div>
+            {/* Team-Zuweisung — zwei Modi je nach Rolle:
+                a) Bearbeiteter User IST Teamleiter (Rolle scope='team'|'all'):
+                   Multi-Select-Checkbox-Liste "Team-Mitglieder" (Umkehrung
+                   des klassischen Flows — spart 10 Modal-Oeffnungen).
+                b) Bearbeiteter User ist REGULAERER MA (scope='self'):
+                   klassischer Teamleiter-Dropdown wie bisher.
+                Admin ist scope='all', wird aber NICHT als Teamleiter im
+                Sinne dieser Zuweisung behandelt — er sieht ohnehin alles.
+                Beim Rollen-Wechsel schaltet die UI live um. */}
+            {isTeamLeaderRole(edit.role) ? (
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">
+                  Team-Mitglieder ({edit.team_member_ids.length})
+                </p>
+                {(() => {
+                  const candidates = memberCandidatesFor(edit.id);
+                  if (candidates.length === 0) {
+                    return (
+                      <div className="rounded-xl border border-dashed border-border bg-card px-3 py-4 text-xs text-muted-foreground text-center">
+                        Keine zuweisbaren Mitarbeiter vorhanden.
+                      </div>
+                    );
+                  }
+                  const q = memberSearch.trim().toLowerCase();
+                  const filtered = q
+                    ? candidates.filter((c) => c.full_name.toLowerCase().includes(q))
+                    : candidates;
+                  const selected = new Set(edit.team_member_ids);
+                  const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+                  function toggle(id: string) {
+                    if (!edit) return;
+                    const next = new Set(edit.team_member_ids);
+                    if (next.has(id)) next.delete(id); else next.add(id);
+                    setEdit({ ...edit, team_member_ids: Array.from(next) });
+                  }
+                  function toggleAllVisible() {
+                    if (!edit) return;
+                    const next = new Set(edit.team_member_ids);
+                    if (allVisibleSelected) {
+                      for (const c of filtered) next.delete(c.id);
+                    } else {
+                      for (const c of filtered) next.add(c.id);
+                    }
+                    setEdit({ ...edit, team_member_ids: Array.from(next) });
+                  }
+                  return (
+                    <div className="rounded-xl border border-border bg-card overflow-hidden">
+                      <div className="relative border-b border-border">
+                        <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        <input
+                          type="text"
+                          value={memberSearch}
+                          onChange={(ev) => setMemberSearch(ev.target.value)}
+                          placeholder="Mitarbeiter suchen…"
+                          className="w-full h-9 pl-8 pr-3 text-sm bg-transparent focus:outline-none placeholder:text-muted-foreground"
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-foreground/[0.02] dark:bg-foreground/[0.05] text-[11px] text-muted-foreground">
+                        <span>{filtered.length} von {candidates.length} sichtbar</span>
+                        <button
+                          type="button"
+                          onClick={toggleAllVisible}
+                          className="font-medium text-foreground/80 hover:text-foreground"
+                        >
+                          {allVisibleSelected ? "Sichtbare abwaehlen" : "Sichtbare auswaehlen"}
+                        </button>
+                      </div>
+                      <ul className="max-h-64 overflow-y-auto divide-y divide-border/60">
+                        {filtered.length === 0 ? (
+                          <li className="px-3 py-4 text-xs text-muted-foreground text-center">
+                            Keine Treffer.
+                          </li>
+                        ) : (
+                          filtered.map((c) => {
+                            const checked = selected.has(c.id);
+                            return (
+                              <li key={c.id}>
+                                <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.08]">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggle(c.id)}
+                                    className="h-3.5 w-3.5 rounded border-border text-red-600 focus:ring-red-500/30"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm truncate">{c.full_name}</div>
+                                    <div className="text-[10px] text-muted-foreground truncate">
+                                      {roleLabel(c.role)}
+                                    </div>
+                                  </div>
+                                </label>
+                              </li>
+                            );
+                          })
+                        )}
+                      </ul>
+                    </div>
+                  );
+                })()}
+                <p className="text-[10px] text-muted-foreground/70 ml-1">
+                  Alle direkt diesem Teamleiter zugeordneten Mitarbeiter. Admins
+                  und andere Teamleiter erscheinen bewusst nicht.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Teamleiter (optional)</p>
+                <SearchableSelect
+                  value={edit.team_lead_id}
+                  onChange={(id) => setEdit({ ...edit, team_lead_id: id })}
+                  items={teamLeadCandidates
+                    .filter((c) => c.id !== edit.id)
+                    .map((c) => ({
+                      id: c.id,
+                      label: c.full_name,
+                      sub: roleLabel(c.role),
+                    }))}
+                  placeholder={teamLeadCandidates.filter((c) => c.id !== edit.id).length === 0
+                    ? "Noch keine Teamleiter (Rolle braucht Sichtbarkeit „Nur Team\")"
+                    : "— kein Teamleiter —"}
+                  clearable
+                />
+                <p className="text-[10px] text-muted-foreground/70 ml-1">
+                  Nur Rollen mit Sichtbarkeit „Nur Team" oder „Alle" tauchen hier auf.
+                </p>
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground/70 ml-1">Geburtsdatum (für Ferienanteil-Auto-Erkennung)</p>
               <Input
