@@ -177,7 +177,7 @@ export default function EinstellungenPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header — konsistent mit /auftraege etc. (h1 + Subtitle-Spacer),
           rechts oben das Build-Info-Fun-Fact-Widget. */}
       <div className="flex items-start justify-between gap-3">
