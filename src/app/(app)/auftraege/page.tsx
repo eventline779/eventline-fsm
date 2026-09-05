@@ -21,7 +21,6 @@ import {
   ExternalLink,
   UserPlus,
   Download,
-  Info,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
@@ -669,21 +668,7 @@ export default function AuftraegePage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
-            <Link href={detailHref} className="block group relative">
-              {/* Warning-Icon absolute oben links, leicht ueber Card hinaus.
-                  Sitzt AUSSERHALB der Card (als Sibling im relative Link),
-                  damit die shadcn-Card `flex flex-col gap-4` nicht durch
-                  ein zusaetzliches Kind die Card-Hoehe erhoeht. */}
-              {warnings.length > 0 && (
-                <span
-                  className="pointer-events-auto absolute -left-1.5 -top-1.5 z-20 flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
-                  data-tooltip={warnings.map((w) => w.label).join(" · ")}
-                  aria-label={warnings.map((w) => w.label).join(" · ")}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                >
-                  <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
-                </span>
-              )}
+            <Link href={detailHref} className="block group">
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${isDoneOrCancelled ? "opacity-70" : ""}`}>
                 {/* Mobile-Variante: 2-Zeilen-Stack damit nichts horizontal
                     rausragt. Zeile 1: Nr | Titel | Action-Icon.
