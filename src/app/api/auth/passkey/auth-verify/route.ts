@@ -1,0 +1,177 @@
+/**
+ * POST /api/auth/passkey/auth-verify
+ * Body: { response: AuthenticationResponseJSON }
+ *
+ * Verifiziert die vom Browser signierte Antwort gegen den gespeicherten
+ * Public-Key + die Challenge. Bei Erfolg:
+ *   1. counter der Credential-Row hochschreiben (Replay-Schutz)
+ *   2. last_used_at setzen
+ *   3. Supabase-Session für den User erzeugen und an den Client zurück-
+ *      geben, damit er sich mit verifyOtp() einloggen kann.
+ *
+ * ============================================================
+ * SESSION-ERZEUGUNG (Kern-Trick)
+ * ============================================================
+ * Supabase hat keine native WebAuthn-/Passkey-Integration. Der Umweg:
+ *   admin.generateLink({ type: 'magiclink', email }) gibt uns einen
+ *   hashed_token zurück — der ist normalerweise in einem Mail-Link
+ *   drin, wir verwenden ihn hier direkt. Der Client ruft dann
+ *   supabase.auth.verifyOtp({ token_hash, type: 'email' }) und bekommt
+ *   damit eine echte Supabase-Session (Cookies werden gesetzt).
+ *
+ * Das ist der offiziell dokumentierte Weg für "custom auth" (siehe
+ * https://supabase.com/docs/guides/auth/auth-hooks bzw. discussions
+ * zu WebAuthn/Passkey). Sicher, weil:
+ *   - Der Passkey-Verify auf dem Server ist der Auth-Anker (nur wer
+ *     den privaten Schlüssel besitzt, kommt hier durch).
+ *   - Der hashed_token ist ein-mal verwendbar und läuft schnell ab.
+ *   - Der Server enthüllt die Email nur, wenn Passkey-Verify durchging.
+ */
+
+import { NextResponse } from "next/server";
+import { verifyAuthenticationResponse } from "@simplewebauthn/server";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { passkeyOrigin, passkeyRpId } from "@/lib/passkey";
+
+interface Body {
+  response?: AuthenticationResponseJSON;
+}
+
+export async function POST(request: Request) {
+  let body: Body;
+  try {
+    body = (await request.json()) as Body;
+  } catch {
+    return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
+  }
+
+  const response = body.response;
+  if (!response || !response.id) {
+    return NextResponse.json({ success: false, error: "response fehlt" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+
+  // 1) Credential aus DB laden — via credential_id (base64url).
+  const { data: credRow } = await admin
+    .from("user_passkeys")
+    .select("id, user_id, public_key, counter, transports")
+    .eq("credential_id", response.id)
+    .maybeSingle();
+
+  if (!credRow) {
+    return NextResponse.json(
+      { success: false, error: "Passkey unbekannt — bitte klassisch einloggen." },
+      { status: 401 },
+    );
+  }
+
+  // 2) Passende, noch gültige Auth-Challenge suchen (die wir bei
+  // /auth-challenge angelegt haben). Bei mehreren offenen nehmen wir
+  // die neueste — die alten sind entweder abgelaufen oder wurden nicht
+  // verwendet. Der clientData enthält die Challenge, WebAuthn matched.
+  const { data: chalRow } = await admin
+    .from("user_passkey_challenges")
+    .select("id, challenge, expires_at")
+    .eq("kind", "auth")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (!chalRow || chalRow.length === 0) {
+    return NextResponse.json(
+      { success: false, error: "Keine gültige Challenge — bitte Login neu starten." },
+      { status: 400 },
+    );
+  }
+
+  // Wir wissen nicht welche exakte Challenge zum Client-Round-Trip
+  // gehört, versuchen alle noch offenen — die richtige matched via
+  // WebAuthn-clientData. Falscher Match → verify wirft, dann next
+  // versuchen. In der Praxis fast immer beim ersten Treffer richtig.
+  let verified = false;
+  let matchedChallenge: { id: string; challenge: string } | null = null;
+  let newCounter = 0;
+
+  for (const c of chalRow) {
+    try {
+      const v = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge: c.challenge,
+        expectedOrigin: passkeyOrigin(),
+        expectedRPID: passkeyRpId(),
+        credential: {
+          id: response.id,
+          publicKey: new Uint8Array(Buffer.from(credRow.public_key, "base64url")),
+          counter: Number(credRow.counter ?? 0),
+          transports: (credRow.transports ?? undefined) as
+            | ("internal" | "hybrid" | "usb" | "nfc" | "ble")[]
+            | undefined,
+        },
+        requireUserVerification: false,
+      });
+      if (v.verified) {
+        verified = true;
+        matchedChallenge = { id: c.id as string, challenge: c.challenge as string };
+        newCounter = v.authenticationInfo.newCounter;
+        break;
+      }
+    } catch {
+      // nicht passende Challenge → nächste probieren
+    }
+  }
+
+  if (!verified || !matchedChallenge) {
+    return NextResponse.json({ success: false, error: "Passkey-Verifikation fehlgeschlagen." }, { status: 401 });
+  }
+
+  // 3) Counter + last_used_at hochschreiben, Challenge verbrauchen.
+  await admin
+    .from("user_passkeys")
+    .update({ counter: newCounter, last_used_at: new Date().toISOString() })
+    .eq("id", credRow.id);
+  await admin.from("user_passkey_challenges").delete().eq("id", matchedChallenge.id);
+
+  // 4) User laden (Email + is_active + role prüfen).
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, role, is_active")
+    .eq("id", credRow.user_id)
+    .maybeSingle();
+
+  if (!profile || profile.is_active === false) {
+    return NextResponse.json(
+      { success: false, error: "Dein Benutzer hat im Moment keinen Zugriff." },
+      { status: 403 },
+    );
+  }
+
+  const { data: authUser } = await admin.auth.admin.getUserById(credRow.user_id);
+  const email = authUser?.user?.email;
+  if (!email) {
+    return NextResponse.json({ success: false, error: "User hat keine Email." }, { status: 500 });
+  }
+
+  // 5) Magic-Link erzeugen und den hashed_token an den Client zurück.
+  // Der Client ruft damit supabase.auth.verifyOtp({ token_hash, type:
+  // 'email' }) → damit werden die Auth-Cookies gesetzt.
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+
+  if (linkErr || !linkData?.properties?.hashed_token) {
+    return NextResponse.json(
+      { success: false, error: "Session-Erzeugung fehlgeschlagen: " + (linkErr?.message ?? "unknown") },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    email,
+    token_hash: linkData.properties.hashed_token,
+    role: profile.role,
+  });
+}
