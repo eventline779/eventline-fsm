@@ -1,7 +1,8 @@
 // POST /api/tickets/notify — In-App-Notification fuer Ticket-Events.
 // Events:
-//   "created"          → an alle Admins (neues Ticket vom Mitarbeiter)
-//   "status_changed"   → an Ersteller (Admin hat erledigt/abgelehnt)
+//   "created"          → an alle User mit 'tickets:manage' (Admin +
+//                        Custom-Rollen mit dieser Permission)
+//   "status_changed"   → an Ersteller (Manager hat erledigt/abgelehnt)
 //
 // Notifications gehen via zentralem NotificationService, der die
 // per-User-Settings (user_notification_settings.channels) respektiert.
@@ -49,22 +50,29 @@ export async function POST(request: Request) {
   const creatorName = Array.isArray(t.creator) ? t.creator[0]?.full_name : t.creator?.full_name;
 
   if (body.event === "created") {
-    const { data: admins } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("role", "admin")
-      .eq("is_active", true);
-    const adminIds = (admins ?? []).map((a) => a.id).filter((id) => id !== t.created_by);
+    // Empfaenger = alle aktiven Profile mit einer Rolle, die
+    // 'tickets:manage' hat (admin-Rolle bekommt das immer, Custom-Rollen
+    // via Rollen-Matrix). Kein hardcoded role='admin' mehr — sonst
+    // wuerde eine Teamleiter-Rolle mit 'tickets:manage' keine
+    // Benachrichtigungen fuer neue Tickets bekommen.
+    const { data: rolesRes } = await admin.from("roles").select("slug, permissions");
+    const managerSlugs = ((rolesRes ?? []) as { slug: string; permissions: unknown }[])
+      .filter((r) => r.slug === "admin" || (Array.isArray(r.permissions) && (r.permissions as string[]).includes("tickets:manage")))
+      .map((r) => r.slug);
+    const recipients = managerSlugs.length > 0
+      ? await admin.from("profiles").select("id").in("role", managerSlugs).eq("is_active", true)
+      : { data: [] as { id: string }[] };
+    const recipientIds = (recipients.data ?? []).map((a) => a.id).filter((id) => id !== t.created_by);
 
     await notifyTicketNew(admin, {
-      recipients: adminIds,
+      recipients: recipientIds,
       ticketId: t.id,
       ticketNumber: t.ticket_number,
       ticketTitle: t.title,
       ticketType: t.type,
       byName: creatorName ?? "Unbekannt",
     });
-    return NextResponse.json({ success: true, sent: adminIds.length });
+    return NextResponse.json({ success: true, sent: recipientIds.length });
   }
 
   if (body.event === "status_changed") {

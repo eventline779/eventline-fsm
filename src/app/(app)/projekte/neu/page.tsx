@@ -31,8 +31,11 @@ function NeuesProjektInner() {
   const supabase = createClient();
   const search = useSearchParams();
   const parentId = search.get("parent");
-  const { role } = usePermissions();
-  const isAdmin = role === "admin";
+  const { can } = usePermissions();
+  // "isAdmin" = wer direkt anlegen darf (Status=genehmigt, Budget setzen,
+  // Members zuteilen); ohne die Berechtigung wird das Projekt als Entwurf
+  // gespeichert und braucht danach eine Genehmigung.
+  const isAdmin = can("projekte:approve");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

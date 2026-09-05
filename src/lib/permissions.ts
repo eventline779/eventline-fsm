@@ -37,7 +37,10 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   // view = /abrechnung-Seite sehen; edit = "Rechnung gestellt"-Button druecken.
   { slug: "abrechnung",    label: "Abrechnung",    paths: ["/abrechnung"],                                       actions: ["view", "edit"] },
   // Vertrieb — Lead-Pipeline. CRUD pro Lead.
-  { slug: "vertrieb",      label: "Vertrieb",      paths: ["/vertrieb"],                                         actions: ["view", "create", "edit", "delete"] },
+  // manage = Leads umverteilen (Reassign von User A auf User B), Team-
+  // Ziele setzen, alle personal columns sehen; ohne 'manage' kann ein
+  // Vertriebler nur eigene + unassigned Leads holen/zurueckgeben.
+  { slug: "vertrieb",      label: "Vertrieb",      paths: ["/vertrieb"],                                         actions: ["view", "create", "edit", "delete", "manage"] },
   // Projekte — interner Zeit-Budget-Topf. view = Seite sehen; create =
   // eigenes Projekt anfragen (Antrag); approve = Antrag pruefen und
   // Budget setzen (Admin-Domäne). see-all = alle Projekte sehen (statt

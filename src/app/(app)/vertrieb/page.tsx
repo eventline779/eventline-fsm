@@ -52,9 +52,12 @@ export default function VertriebPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { can, role } = usePermissions();
+  const { can } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
-  const isAdmin = role === "admin";
+  // "isAdmin" == wer Leads verwaltet (umverteilen, Team-Ziele setzen,
+  // fremde Personal-Columns sehen). Admin passt via hasPermission-Bypass
+  // immer durch; andere Rollen brauchen explizit 'vertrieb:manage'.
+  const isAdmin = can("vertrieb:manage");
 
   // Daten
   const [contacts, setContacts] = useState<VertriebContact[]>([]);
@@ -82,20 +85,34 @@ export default function VertriebPage() {
   const [folderReloadKey, setFolderReloadKey] = useState(0);
 
   const load = useCallback(async () => {
-    const [{ data }, countsRes, salesRes, userRes] = await Promise.all([
+    // Vertriebs-Personen = alle aktiven Profile mit einer Rolle die
+    // 'vertrieb:edit' hat (bzw. admin-Rolle, die alles darf). Kein
+    // hardcoded E-Mail-Whitelist mehr — neue Verkaeufer bekommen die
+    // Rolle in Einstellungen -> Rollen und sind sofort in der Personen-
+    // Auswahl sichtbar. RLS auf `roles` erlaubt SELECT allen
+    // authentifizierten Usern (siehe Migration 048).
+    const [{ data }, countsRes, rolesRes, userRes] = await Promise.all([
       supabase.from("vertrieb_contacts").select("*").order("nr").limit(2000),
       supabase.from("vertrieb_counts").select("*").single(),
-      supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("email", ["leo@eventline-basel.com", "mischa@eventline-basel.com", "raul@eventline-basel.com"])
-        .eq("is_active", true)
-        .order("full_name"),
+      supabase.from("roles").select("slug, permissions"),
       supabase.auth.getUser(),
     ]);
     if (data) setContacts(data as VertriebContact[]);
     if (countsRes.data) setCounts(countsRes.data);
-    if (salesRes.data) setSalesPeople(salesRes.data);
+    const salesRoleSlugs = ((rolesRes.data ?? []) as { slug: string; permissions: unknown }[])
+      .filter((r) => r.slug === "admin" || (Array.isArray(r.permissions) && (r.permissions as string[]).includes("vertrieb:edit")))
+      .map((r) => r.slug);
+    if (salesRoleSlugs.length > 0) {
+      const { data: sales } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("role", salesRoleSlugs)
+        .eq("is_active", true)
+        .order("full_name");
+      if (sales) setSalesPeople(sales);
+    } else {
+      setSalesPeople([]);
+    }
     if (userRes.data.user) {
       setCurrentUserId(userRes.data.user.id);
       if (!viewedPersonId) setViewedPersonId(userRes.data.user.id);

@@ -2,10 +2,12 @@
 
 /**
  * Todos — Liste, server-seitig gefiltert+paginiert (PAGE_SIZE 50).
- * RLS scoped Non-Admins auf eigene Todos (created_by oder assigned_to);
- * Admins sehen alles und kriegen einen Personen-Filter in der UI.
- * Layout 1:1 nach /auftraege: Header + Search + Status-Filter + Cards
- * mit auftrag-card-hover. Anhaenge in eigener Tabelle todo_attachments.
+ * RLS scoped auf eigene Todos (created_by oder assigned_to); wer die
+ * Permission 'todos:see-all' hat sieht alles und kriegt einen Personen-
+ * Filter in der UI. 'todos:edit-all' schaltet den "Erinnern"-Button
+ * fuer fremde Todos frei. Layout 1:1 nach /auftraege: Header + Search +
+ * Status-Filter + Cards mit auftrag-card-hover. Anhaenge in eigener
+ * Tabelle todo_attachments.
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -79,8 +81,13 @@ export default function TodosPage() {
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
-  const { can, role } = usePermissions();
-  const isAdmin = role === "admin";
+  const { can } = usePermissions();
+  // Personen-Filter braucht "alle Todos sehen" — semantisch das gleiche
+  // wie todos:see-all (das die RLS-Sicht oeffnet). Erinnern schickt eine
+  // Notification an einen fremden Assignee, also 'agieren auf fremde
+  // Todos' -> todos:edit-all. Admin passt via hasPermission-Bypass durch.
+  const canSeeAll = can("todos:see-all");
+  const canRemind = can("todos:edit-all");
   const { confirm, ConfirmModalElement } = useConfirm();
 
   useEffect(() => {
@@ -106,10 +113,10 @@ export default function TodosPage() {
       const like = `%${term}%`;
       q = q.or(`title.ilike.${like},description.ilike.${like}`);
     }
-    // Admin-Personen-Filter: zeige Todos die diese Person erstellt hat
-    // ODER an die sie zugewiesen ist. Non-Admins werden eh via RLS auf
-    // sich selbst beschraenkt — fuer die ist der Filter UI-mässig unsichtbar.
-    if (isAdmin && assigneeFilter !== "all") {
+    // Personen-Filter (nur wer alle Todos sehen darf): zeige Todos die
+    // diese Person erstellt hat ODER an die sie zugewiesen ist. Ohne
+    // 'todos:see-all' filtert die RLS ohnehin auf eigene Todos.
+    if (canSeeAll && assigneeFilter !== "all") {
       q = q.or(`created_by.eq.${assigneeFilter},assigned_to.eq.${assigneeFilter}`);
     }
     if (cursor !== null) {
@@ -119,7 +126,7 @@ export default function TodosPage() {
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("id", { ascending: false })
       .limit(PAGE_SIZE + 1);
-  }, [supabase, showArchive, search, isAdmin, assigneeFilter]);
+  }, [supabase, showArchive, search, canSeeAll, assigneeFilter]);
 
   const loadTodos = useCallback(async () => {
     const myId = ++queryIdRef.current;
@@ -438,7 +445,7 @@ export default function TodosPage() {
                   Wieder öffnen
                 </button>
               )}
-              {!selectedTodo.deleted_at && selectedTodo.status === "offen" && isAdmin && selectedTodo.assigned_to && (
+              {!selectedTodo.deleted_at && selectedTodo.status === "offen" && canRemind && selectedTodo.assigned_to && (
                 <button
                   onClick={() => remindTodo(selectedTodo)}
                   disabled={reminded.has(selectedTodo.id)}
@@ -594,8 +601,9 @@ export default function TodosPage() {
         </Card>
       )}
 
-      {/* Such-Bar + (Admin-only) Personen-Filter. RLS scoped Non-Admins
-          eh auf eigene Todos — fuer die ist der Filter ausgeblendet. */}
+      {/* Such-Bar + Personen-Filter fuer wer 'todos:see-all' hat. RLS scoped
+          ohne die Permission eh auf eigene Todos — fuer die ist der Filter
+          ausgeblendet. */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -606,7 +614,7 @@ export default function TodosPage() {
             className="pl-9 h-9"
           />
         </div>
-        {isAdmin && (
+        {canSeeAll && (
           <div className="w-full sm:w-56">
             <SearchableSelect
               value={assigneeFilter}
@@ -714,10 +722,11 @@ export default function TodosPage() {
                       ) : null}
                     </div>
                   </div>
-                  {/* Erinnern: Admin schickt dem Assignee einen In-App-
-                      Popup + Push (falls aktiviert). Nur sichtbar bei offenen
-                      Todos mit Zuweisung; per-Todo-30s-Cooldown gegen Spam. */}
-                  {!todo.deleted_at && todo.status === "offen" && isAdmin && todo.assigned_to && (
+                  {/* Erinnern: wer 'todos:edit-all' hat schickt dem Assignee
+                      einen In-App-Popup + Push (falls aktiviert). Nur sichtbar
+                      bei offenen Todos mit Zuweisung; per-Todo-30s-Cooldown
+                      gegen Spam. */}
+                  {!todo.deleted_at && todo.status === "offen" && canRemind && todo.assigned_to && (
                     <button
                       onClick={(e) => { e.stopPropagation(); remindTodo(todo); }}
                       disabled={reminded.has(todo.id)}

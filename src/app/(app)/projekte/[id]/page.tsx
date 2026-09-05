@@ -55,9 +55,13 @@ export default function ProjektDetailPage() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { role } = usePermissions();
-  const isAdmin = role === "admin";
-  const isTeamlead = role === "admin" || role === "teamleiter";
+  const { can, role } = usePermissions();
+  // "isAdmin" = wer Projekt-Anfragen genehmigt, Budget setzt, Projekte
+  // storniert/abschliesst/loescht. Semantisch das gleiche wie
+  // "Teamlead" — beide durften vorher via hardcoded Role-Slug alles;
+  // jetzt via projekte:approve (Admin passt automatisch durch).
+  const isAdmin = can("projekte:approve");
+  const isTeamlead = isAdmin;
   const { confirm, ConfirmModalElement } = useConfirm();
 
   const [project, setProject] = useState<Project | null>(null);

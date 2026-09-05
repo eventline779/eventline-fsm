@@ -42,8 +42,10 @@ interface ProjectRow {
 
 export default function ProjektePage() {
   const supabase = createClient();
-  const { role } = usePermissions();
-  const isAdmin = role === "admin";
+  const { can } = usePermissions();
+  // "isAdmin" = wer Projekt-Anfragen genehmigt; steuert nur, ob die
+  // "offene Anfragen"-Info-Zeile im Header angezeigt wird.
+  const isAdmin = can("projekte:approve");
   const [rows, setRows] = useState<ProjectRow[] | null>(null);
   const [showArchive, setShowArchive] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("projekte-archive") === "true" : false,
