@@ -15,6 +15,11 @@
 //     kpi: { offene_auftraege, geplante_termine_woche, nicht_abgerechnet },
 //     zu_erledigen: { ferien_pending, ueberfaellige_auftraege, neue_belege },
 //     team_status: { eingestempelt, in_ferien_heute },
+//     overdue_jobs: {
+//       count,
+//       items: [{ id, job_number, title, end_date, days_overdue,
+//                 customer_name, location_name }]  // Top 5, aelteste zuerst
+//     },
 //   }
 //   role = "partner" -> { role, first_name }
 //
@@ -37,6 +42,7 @@ import {
   bucketizeMinutes,
   todayLocalIso,
   localDateIso,
+  ZRH_TZ,
   type MinuteBucket,
 } from "@/lib/swiss-time";
 import {
@@ -64,6 +70,42 @@ function currentMonthStartIso(): string {
 function safeUtcMsFromLocalDate(iso: string, subtractDays = 2): number {
   const [y, m, d] = iso.split("-").map(Number);
   return Date.UTC(y, m - 1, d) - subtractDays * 24 * 3600 * 1000;
+}
+
+/** Zurich-Offset ("+01:00"/"+02:00") fuer ein Zurich-Datum YYYY-MM-DD.
+ *  Wir brauchen das, um exakt Zurich-Mitternacht als timestamptz-String
+ *  gegen jobs.end_date (timestamptz) vergleichen zu koennen — der DB-Server
+ *  laeuft in UTC, .lt("end_date", "YYYY-MM-DD") wuerde sonst gegen UTC-
+ *  Mitternacht vergleichen und Auftraege 00:00-02:00 Zurich als "ueberfaellig"
+ *  markieren, obwohl der neue Tag Zurich-lokal noch nicht angefangen hat. */
+function zurichOffsetForDate(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const probeMs = Date.UTC(y, m - 1, d, 12); // Zurich-Mittag ist in beiden Sommer/Winter eindeutig
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: ZRH_TZ,
+    timeZoneName: "longOffset",
+  }).formatToParts(new Date(probeMs));
+  const raw = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  // Formen: "GMT+02:00", "GMT+2", "GMT+02"
+  const m2 = raw.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+  if (!m2) return "+01:00";
+  const sign = m2[1];
+  const hh = m2[2].padStart(2, "0");
+  const mm = (m2[3] ?? "00").padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+/** Mitternacht (Anfang) des Zurich-Tages als timestamptz-ISO-String. */
+function zurichMidnightIso(dateIso: string): string {
+  return `${dateIso}T00:00:00${zurichOffsetForDate(dateIso)}`;
+}
+
+/** Anzahl volle Tage zwischen zwei Zurich-Datums-Strings (b - a, integer, >= 0). */
+function daysBetween(a: string, b: string): number {
+  const [ya, ma, da] = a.split("-").map(Number);
+  const [yb, mb, db] = b.split("-").map(Number);
+  const ms = Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da);
+  return Math.max(0, Math.round(ms / (24 * 3600 * 1000)));
 }
 
 /** Montag 00:00 der aktuellen Woche (Europe/Zurich) als YYYY-MM-DD.
@@ -236,6 +278,16 @@ async function loadMaData(userId: string): Promise<MaPayload> {
 // Admin: Firma-Cockpit
 // ---------------------------------------------------------------------------
 
+interface OverdueJobItem {
+  id: string;
+  job_number: number | null;
+  title: string;
+  end_date: string;
+  days_overdue: number;
+  customer_name: string | null;
+  location_name: string | null;
+}
+
 interface AdminPayload {
   kpi: {
     offene_auftraege: number;
@@ -251,11 +303,27 @@ interface AdminPayload {
     eingestempelt: number;
     in_ferien_heute: number;
   };
+  overdue_jobs: {
+    count: number;
+    items: OverdueJobItem[];
+  };
 }
 
 async function loadAdminData(): Promise<AdminPayload> {
   const admin = createAdminClient();
   const today = todayLocalIso();
+  const todayZurichStartIso = zurichMidnightIso(today);
+  // Auftraege gelten als "ueberfaellig" wenn end_date vor Zurich-Mitternacht-heute
+  // liegt UND der Auftrag noch nicht abgeschlossen ist. Draft/Anfrage-Zustaende
+  // sind explizit ausgeklammert (existieren als Vor-Auftrag, kein Termindruck).
+  const NON_OVERDUE_STATUS = [
+    "abgeschlossen",
+    "storniert",
+    "entwurf",
+    "anfrage",
+    "partner_anfrage",
+    "partner_entwurf",
+  ];
   const weekStart = currentWeekStartIso();
   const [y, m, d] = weekStart.split("-").map(Number);
   const weekEndDate = new Date(Date.UTC(y, m - 1, d + 7));
@@ -271,6 +339,8 @@ async function loadAdminData(): Promise<AdminPayload> {
     neueBelege,
     eingestempelt,
     ferienHeute,
+    overdueCountRes,
+    overdueListRes,
   ] = await Promise.all([
     admin
       .from("jobs")
@@ -315,7 +385,46 @@ async function loadAdminData(): Promise<AdminPayload> {
       .eq("status", "genehmigt")
       .lte("start_date", today)
       .gte("end_date", today),
+    // Ueberfaellig — Count aller Auftraege deren end_date vor heute (Zurich)
+    // liegt und die noch nicht abgeschlossen sind. Hier bewusst kein Filter
+    // auf status=offen wie in .zu_erledigen, sondern breiter: alles was
+    // "aktiv" ist (nicht abgeschlossen/storniert/entwurf/anfrage).
+    admin
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .neq("is_deleted", true)
+      .not("status", "in", `(${NON_OVERDUE_STATUS.join(",")})`)
+      .lt("end_date", todayZurichStartIso),
+    // Ueberfaellig — Top 5 zur Anzeige, aeltestes-end_date zuerst.
+    admin
+      .from("jobs")
+      .select("id, job_number, title, end_date, customer:customers(name), location:locations(name)")
+      .neq("is_deleted", true)
+      .not("status", "in", `(${NON_OVERDUE_STATUS.join(",")})`)
+      .lt("end_date", todayZurichStartIso)
+      .order("end_date", { ascending: true })
+      .limit(5),
   ]);
+
+  type OverdueRow = {
+    id: string;
+    job_number: number | null;
+    title: string;
+    end_date: string;
+    customer: { name: string } | null;
+    location: { name: string } | null;
+  };
+  const overdueItems: OverdueJobItem[] = ((overdueListRes.data ?? []) as unknown as OverdueRow[]).map((r) => ({
+    id: r.id,
+    job_number: r.job_number,
+    title: r.title,
+    end_date: r.end_date,
+    // Tage seit end_date im Zurich-Kalender — ein Auftrag der gestern faellig
+    // war ist "seit 1 Tag" ueberfaellig, unabhaengig von der Uhrzeit.
+    days_overdue: daysBetween(localDateIso(new Date(r.end_date)), today),
+    customer_name: r.customer?.name ?? null,
+    location_name: r.location?.name ?? null,
+  }));
 
   return {
     kpi: {
@@ -331,6 +440,10 @@ async function loadAdminData(): Promise<AdminPayload> {
     team_status: {
       eingestempelt: eingestempelt.count ?? 0,
       in_ferien_heute: ferienHeute.count ?? 0,
+    },
+    overdue_jobs: {
+      count: overdueCountRes.count ?? 0,
+      items: overdueItems,
     },
   };
 }

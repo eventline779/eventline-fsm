@@ -26,6 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobNumber } from "@/components/job-number";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
+import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
 
 // ---------------------------------------------------------------------------
 // Payload-Typen (Spiegel zu /api/dashboard)
@@ -65,6 +66,10 @@ interface AdminData {
   team_status: {
     eingestempelt: number;
     in_ferien_heute: number;
+  };
+  overdue_jobs: {
+    count: number;
+    items: OverdueJobItem[];
   };
 }
 
@@ -234,7 +239,7 @@ function MaDashboard({ ma }: { ma: MaData }) {
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{monatLohnLabel}</p>
           <Link
-            href="/stempelzeiten"
+            href="/stempelzeiten?from=dashboard"
             className="mt-3 inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline"
           >
             Zu meinen Stempelzeiten <ArrowRight className="h-3 w-3" />
@@ -323,6 +328,14 @@ function AdminDashboard({ admin }: { admin: AdminData }) {
           href="/abrechnung"
         />
       </div>
+
+      {/* Ueberfaellige Auftraege — end_date vergangen aber nicht abgeschlossen.
+          Bei count=0 dezenter positiver Zustand; bei count>0 volle rote Card
+          mit den 5 aeltesten. */}
+      <OverdueJobsCard
+        count={admin.overdue_jobs?.count ?? 0}
+        items={admin.overdue_jobs?.items ?? []}
+      />
 
       {/* Zu erledigen + Team-Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
