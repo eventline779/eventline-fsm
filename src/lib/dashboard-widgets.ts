@@ -28,11 +28,26 @@ export type WidgetId =
   | "ma-naechster-einsatz"
   | "partner-willkommen";
 
+/**
+ * Groesse eines Widgets im Dashboard-Raster (Desktop: 2 Spalten).
+ *   '1x1' = eine Zelle (halb-breit, eine Reihe)
+ *   '2x1' = volle Breite, eine Reihe
+ *   '1x2' = halb-breit, zwei Reihen hoch
+ *   '2x2' = volle Breite und zwei Reihen hoch
+ *
+ * Auf Mobile (1-Spalten-Layout) hat die Groesse keinen Effekt — jedes Widget
+ * sitzt linear untereinander. col-span/row-span sind bewusst nur unter dem
+ * `md:`-Breakpoint aktiv.
+ */
+export type WidgetSize = "1x1" | "2x1" | "1x2" | "2x2";
+
 export interface DashboardWidget {
   /** Stabile ID — wird in DB (Layout-Persistenz) und URLs referenziert, niemals umbenennen. */
   id: WidgetId;
   /** UI-Label fuer den Rollen-Tab und Widget-Header. */
   title: string;
+  /** Raster-Groesse im Dashboard-Grid (siehe WidgetSize). */
+  size: WidgetSize;
   /**
    * Permissions die ein Nutzer braucht, damit das Widget sichtbar ist.
    * Format "modul:action" (siehe src/lib/permissions.ts). Leeres Array = keine
@@ -55,76 +70,106 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   {
     id: "kpi-offene-auftraege",
     title: "Offene Auftraege",
+    size: "1x1",
     requires: ["auftraege:view"],
     defaultRoles: ["admin"],
   },
   {
     id: "kpi-termine-woche",
     title: "Termine diese Woche",
+    size: "1x1",
     requires: ["kalender:view"],
     defaultRoles: ["admin"],
   },
   {
     id: "kpi-nicht-abgerechnet",
     title: "Nicht abgerechnet",
+    size: "1x1",
     requires: ["abrechnung:view"],
     defaultRoles: ["admin"],
   },
   {
     id: "overdue-jobs",
     title: "Ueberfaellige Auftraege",
+    size: "2x1",
     requires: ["auftraege:view"],
     defaultRoles: ["admin"],
   },
   {
     id: "zu-erledigen",
     title: "Zu erledigen",
+    size: "1x1",
     requires: [],
     defaultRoles: ["admin"],
   },
   {
     id: "team-status",
     title: "Team-Status",
+    size: "1x1",
     requires: ["stempelzeiten:see-all"],
     defaultRoles: ["admin"],
   },
   {
     id: "anwesenheitskalender",
     title: "Buero-Anwesenheit",
+    size: "2x2",
     requires: ["anwesenheit:view"],
     defaultRoles: ["admin", "techniker"],
   },
   {
     id: "stempel-status",
     title: "Stempel-Status",
+    size: "1x1",
     requires: ["stempelzeiten:view"],
     defaultRoles: ["techniker"],
   },
   {
     id: "ma-monat-stunden",
     title: "Meine Stunden diesen Monat",
+    size: "1x1",
     requires: [],
     defaultRoles: ["techniker"],
   },
   {
     id: "ma-prognose",
     title: "Prognose Monatsende",
+    size: "1x1",
     requires: [],
     defaultRoles: ["techniker"],
   },
   {
     id: "ma-naechster-einsatz",
     title: "Naechster Einsatz",
+    size: "2x1",
     requires: ["kalender:view"],
     defaultRoles: ["techniker"],
   },
   {
     id: "partner-willkommen",
     title: "Willkommen im Partner-Portal",
+    size: "2x1",
     requires: [],
     defaultRoles: ["partner"],
   },
 ] as const;
+
+/**
+ * Tailwind-Klassen fuer die Positionierung eines Widgets im 2-Spalten-Grid
+ * (siehe Dashboard-Renderer). Mobile bleibt bewusst 1-spaltig — `md:`-Prefixe
+ * verhindern, dass col-span/row-span dort reinreissen.
+ */
+export function widgetSizeClasses(size: WidgetSize): string {
+  switch (size) {
+    case "1x1":
+      return "";
+    case "2x1":
+      return "md:col-span-2";
+    case "1x2":
+      return "md:row-span-2";
+    case "2x2":
+      return "md:col-span-2 md:row-span-2";
+  }
+}
 
 /**
  * Default-Widget-Reihenfolge fuer eine Rolle — alle Widgets deren
