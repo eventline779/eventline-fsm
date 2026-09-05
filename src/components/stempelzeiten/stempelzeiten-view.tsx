@@ -34,6 +34,7 @@ import {
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
+import { Input } from "@/components/ui/input";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import { JobNumber } from "@/components/job-number";
 import { toast } from "sonner";
@@ -581,17 +582,18 @@ export function StempelzeitenView() {
 
       {/* Filter-Zeile: Auftragsnummer-Suche + (Admin) Mitarbeiter-Selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Auftragsnummer-Filter — Optik wie JobNumber-Pill (monospace,
-            tabular-nums, rounded-md, bg-card border) fuer app-weite Konsistenz. */}
-        <div className="relative inline-flex items-center">
-          <input
-            type="text"
-            inputMode="numeric"
+        {/* Auftragsnummer-Filter — 1:1 wie im /auftraege-Filter (fixes "INT-"-Prefix
+            als absolute span + shadcn Input, digits-only), fuer app-weite Konsistenz. */}
+        <div className="relative w-full sm:w-44">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono text-muted-foreground/60 pointer-events-none">
+            INT-
+          </span>
+          <Input
+            placeholder="00000"
             value={jobFilterInput}
-            onChange={(e) => setJobFilterInput(e.target.value)}
+            onChange={(e) => setJobFilterInput(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                // Debounce sofort committen (Suche direkt auslösen).
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 const parsed = parseJobNumber(jobFilterInput);
                 setJobFilterNumber(parsed);
@@ -607,20 +609,11 @@ export function StempelzeitenView() {
                 e.preventDefault();
               }
             }}
-            placeholder="INT- 00000"
-            aria-label="Nach Auftragsnummer filtern"
-            className="w-[140px] font-mono font-semibold tabular-nums text-[13px] rounded-md bg-card border border-foreground/10 dark:border-foreground/15 px-2 py-0.5 pr-6 focus:outline-none focus:border-foreground/30 dark:focus:border-foreground/40 placeholder:font-mono placeholder:text-muted-foreground/60"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="pl-[3rem] h-9 font-mono"
+            aria-label="Auftragsnummer"
           />
-          {jobFilterInput && (
-            <button
-              type="button"
-              onClick={() => setJobFilterInput("")}
-              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] dark:hover:bg-foreground/[0.10] transition-colors"
-              aria-label="Auftragsnummer-Filter leeren"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
         </div>
 
         {/* Hinweistext (wenn kein Auftrags-Filter) — schiebt Selector nach rechts */}
