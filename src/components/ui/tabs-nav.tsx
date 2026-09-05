@@ -111,7 +111,7 @@ export function TabsNav({
       {tabs.map((t, idx) => {
         const isActive = t.key === active;
         const classes = cn(
-          "inline-flex items-center gap-2 px-3 py-2.5 -mb-px text-sm font-medium border-b-2 transition-colors whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/40",
+          "inline-flex items-center gap-2 px-3 py-2.5 -mb-px text-sm font-medium border-b-[3px] transition-colors whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/40",
           isActive
             ? "border-red-500 text-foreground"
             : "border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/20",
