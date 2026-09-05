@@ -37,6 +37,54 @@ export default function LoginPage() {
   const wasDeactivated = reason === "deactivated";
   const fromWrongPortal = reason === "wrong_portal";
 
+  // Auto-Trigger: beim Oeffnen der Login-Seite direkt Face-ID/Passkey
+  // aufpoppen lassen (aggressive UX, sinnvoll fuer Mobile/PWA). Guards:
+  // - SSR (typeof window)
+  // - Kein Redirect-Grund gesetzt (?reason=…) — sonst wurde User gerade
+  //   ausgeloggt / vom Partner-Portal geschubst und der Auto-Prompt
+  //   waere doppelt-nervig.
+  // - Kein ?email=-Prefill — kam ebenfalls per Redirect (Partner-Spiegel).
+  // - Nicht im Reset-Mode (User will Passwort zuruecksetzen).
+  // - Browser kann WebAuthn UND conditional-mediation. Letzteres ist
+  //   der Indikator dass der Browser Passkeys ernst nimmt — sonst kann
+  //   nativer .get() sofort abstuerzen.
+  // - Anti-Loop: sessionStorage-Flag `passkey-auto-attempted`. Wenn der
+  //   Auto-Prompt einmal in dieser Session gefeuert wurde, nicht nochmal
+  //   — sonst geraet ein User, der einmal abgebrochen hat, in eine
+  //   Endlosschleife bei jedem Rerender/Reload.
+  // - Fehler werden im silent-Mode geschluckt (siehe handlePasskeyLogin) —
+  //   Passwort-Form bleibt sichtbar, kein Toast.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (reason) return;
+    if (searchParams.get("email")) return;
+    if (resetMode) return;
+
+    let active = true;
+    (async () => {
+      try {
+        if (typeof PublicKeyCredential === "undefined") return;
+        if (!browserSupportsWebAuthn()) return;
+        const condAvail = await PublicKeyCredential.isConditionalMediationAvailable?.();
+        if (!condAvail) return;
+        if (sessionStorage.getItem("passkey-auto-attempted") === "1") return;
+        // Flag VOR dem Trigger setzen — auch StrictMode-Double-Mount in
+        // dev feuert dann nur einmal, und ein Cancel-Klick fuehrt nicht
+        // zu einem zweiten Prompt bei Rerender.
+        sessionStorage.setItem("passkey-auto-attempted", "1");
+        if (!active) return;
+        await handlePasskeyLogin({ silent: true });
+      } catch {
+        // Stille aufraeumen — User hat den Prompt nicht angefordert.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -104,8 +152,12 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function handlePasskeyLogin() {
-    setError("");
+  async function handlePasskeyLogin(opts?: { silent?: boolean }) {
+    // `silent` = auto-getriggert beim Mount. Fehler werden geschluckt —
+    // Passwort-Form bleibt sichtbar, kein setError-Rauschen, weil der
+    // User den Prompt nicht explizit angefordert hat.
+    const silent = opts?.silent === true;
+    if (!silent) setError("");
     setPasskeyLoading(true);
     try {
       // Optional Email vom Feld nehmen — engt die Passkey-Auswahl im
@@ -118,7 +170,7 @@ export default function LoginPage() {
       });
       const chJson = await chRes.json();
       if (!chRes.ok || !chJson.success) {
-        setError(chJson.error ?? "Passkey-Login konnte nicht gestartet werden.");
+        if (!silent) setError(chJson.error ?? "Passkey-Login konnte nicht gestartet werden.");
         return;
       }
 
@@ -129,7 +181,7 @@ export default function LoginPage() {
         // Abbruch durch User oder kein passender Passkey am Gerät.
         const msg = e instanceof Error ? e.message : "Abgebrochen";
         if (/cancel|abort/i.test(msg)) return;
-        setError(msg);
+        if (!silent) setError(msg);
         return;
       }
 
@@ -140,7 +192,7 @@ export default function LoginPage() {
       });
       const verifyJson = await verifyRes.json();
       if (!verifyRes.ok || !verifyJson.success) {
-        setError(verifyJson.error ?? "Passkey-Verifikation fehlgeschlagen.");
+        if (!silent) setError(verifyJson.error ?? "Passkey-Verifikation fehlgeschlagen.");
         return;
       }
 
@@ -151,7 +203,7 @@ export default function LoginPage() {
         token_hash: verifyJson.token_hash as string,
       });
       if (otpErr) {
-        setError("Session-Erzeugung fehlgeschlagen: " + otpErr.message);
+        if (!silent) setError("Session-Erzeugung fehlgeschlagen: " + otpErr.message);
         return;
       }
 
@@ -342,7 +394,7 @@ export default function LoginPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={handlePasskeyLogin}
+                    onClick={() => handlePasskeyLogin()}
                     disabled={loading || passkeyLoading}
                     className="kasten kasten-muted w-full !py-2.5 !text-sm"
                   >
