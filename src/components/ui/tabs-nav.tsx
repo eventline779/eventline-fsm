@@ -104,7 +104,7 @@ export function TabsNav({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "border-b flex gap-1 overflow-x-auto -mb-px",
+        "border-b flex gap-1 overflow-x-auto overflow-y-hidden -mb-px",
         className,
       )}
     >
