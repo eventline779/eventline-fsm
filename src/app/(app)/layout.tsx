@@ -309,7 +309,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
       >
         <Breadcrumbs />
         <main
-          className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-6 max-w-[1280px] w-full mx-auto min-w-0"
+          className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-10 max-w-[1280px] w-full mx-auto min-w-0"
           style={{ ["--shell-py" as string]: "2.5rem" }}
         >{children}</main>
       </div>
