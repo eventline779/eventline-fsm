@@ -23,25 +23,26 @@
  * Listen-Gruppierung selbst haengt die volle Schicht ans clock_in-Datum.
  */
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
-  AlertTriangle, Moon,
+  AlertTriangle, Moon, Search, X, Users,
 } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
+import { JobNumber } from "@/components/job-number";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import {
   ZRH_TZ, localDateIso, todayLocalIso, weekdayForDateIso,
 } from "@/lib/swiss-time";
 import Link from "next/link";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { BackButton } from "@/components/ui/back-button";
 
 interface AdminEntry {
@@ -66,6 +67,26 @@ interface OwnEntry {
   description: string | null;
   notes: string | null;
   job: { job_number: number; title: string } | null;
+}
+
+/** Ergebniszeile fuer den Auftragsnummer-Filter (Join zu profiles). */
+interface JobFilterEntry {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  clock_in: string;
+  clock_out: string | null;
+  description: string | null;
+  notes: string | null;
+  user: { full_name: string | null } | null;
+}
+
+/** Header-Info fuer den gefundenen Auftrag beim Auftragsnummer-Filter. */
+interface JobFilterHeader {
+  id: string;
+  job_number: number;
+  title: string;
+  customer: { name: string } | null;
 }
 
 interface NormalizedEntry {
@@ -167,6 +188,37 @@ function normalizeOwn(e: OwnEntry): NormalizedEntry {
   };
 }
 
+/** Auftragsnummer-Filter: Job-Header ist bereits im State — pro Zeile braucht
+ *  es keine Job-Info nochmal. userName kommt aus dem profiles-Join. */
+function normalizeJobFilter(e: JobFilterEntry, jobHeader: JobFilterHeader): NormalizedEntry {
+  const dur = e.clock_out
+    ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
+    : null;
+  return {
+    id: e.id,
+    userName: e.user?.full_name ?? "Unbekannt",
+    jobId: e.job_id,
+    jobLabel: `INT-${jobHeader.job_number} · ${jobHeader.title}`,
+    jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
+    description: e.description,
+    clockIn: e.clock_in,
+    clockOut: e.clock_out,
+    durationMinutes: dur,
+  };
+}
+
+/** Nutzer-Eingabe "INT-26268", "int 26268", "26268" → geparste int oder null.
+ *  int4-Schutz (>2^31-1) fuer versehentliche Telefonnummer-Eingaben. */
+function parseJobNumber(raw: string): number | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D+/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n > 2147483647) return null; // int4-Overflow-Guard
+  return n;
+}
+
 interface Anomaly {
   longShift: boolean;
   crossesMidnight: boolean;
@@ -233,6 +285,7 @@ export function StempelzeitenView() {
   // Pfeil — hier dann keinen zusaetzlichen zeigen (sonst 2 Pfeile).
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const showBackButton =
     pathname === "/stempelzeiten" && searchParams.get("from") === "dashboard";
   const { confirm, ConfirmModalElement } = useConfirm();
@@ -248,6 +301,22 @@ export function StempelzeitenView() {
   const [filterUserId, setFilterUserId] = useState("");
   const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
   const [now, setNow] = useState(() => Date.now());
+
+  // Auftragsnummer-Filter (URL-persistent via ?auftrag=XXXXX). Der Text im
+  // Input ist entkoppelt vom "committeten" Filter — Live-Suche mit 300ms
+  // Debounce (Enter committed sofort). Wenn gesetzt, zeigt die Ansicht alle
+  // time_entries auf diesem Auftrag (RLS filtert fuer Nicht-Admins auf eigene).
+  const [jobFilterInput, setJobFilterInput] = useState<string>(
+    () => searchParams.get("auftrag") ?? "",
+  );
+  const [jobFilterNumber, setJobFilterNumber] = useState<number | null>(
+    () => parseJobNumber(searchParams.get("auftrag") ?? ""),
+  );
+  const [jobFilterHeader, setJobFilterHeader] = useState<JobFilterHeader | null>(null);
+  const [jobFilterEntries, setJobFilterEntries] = useState<JobFilterEntry[]>([]);
+  const [jobLookupState, setJobLookupState] = useState<"idle" | "loading" | "not_found">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jobFilterActive = jobFilterNumber !== null;
 
   // Live-Tick nur wenn aktiv eingestempelt (fuer laufende Zeit-Anzeige).
   useEffect(() => {
@@ -286,6 +355,49 @@ export function StempelzeitenView() {
   const load = useCallback(async () => {
     setLoading(true);
     const fromTs = new Date(fromIso + "T00:00:00").toISOString();
+
+    // Auftragsnummer-Filter aktiv → eigenstaendiger Pfad. Kein 30-Tage-
+    // Cutoff (der Sinn ist "alles was auf diesem Auftrag gestempelt wurde").
+    if (jobFilterActive && jobFilterNumber !== null) {
+      setJobLookupState("loading");
+      // 1) Auftrag per job_number aufloesen. maybeSingle → null wenn nicht da.
+      const { data: job, error: jobErr } = await supabase
+        .from("jobs")
+        .select("id, job_number, title, customer:customers(name)")
+        .eq("job_number", jobFilterNumber)
+        .maybeSingle();
+      if (jobErr) TOAST.supabaseError(jobErr, "Auftrag konnte nicht geladen werden");
+      const jobHeader = (job as unknown as JobFilterHeader | null) ?? null;
+      setJobFilterHeader(jobHeader);
+      if (!jobHeader) {
+        setJobFilterEntries([]);
+        setJobLookupState("not_found");
+        setOwnEntries([]);
+        setAdminEntries([]);
+        setLoading(false);
+        return;
+      }
+      setJobLookupState("idle");
+      // 2) Alle time_entries fuer diesen Auftrag. RLS: Admins sehen alle,
+      //    Nicht-Admins nur eigene (per time_entries_select_own-Policy).
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, user_id, job_id, clock_in, clock_out, description, notes, user:profiles(full_name)")
+        .eq("job_id", jobHeader.id)
+        .order("clock_in", { ascending: false });
+      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+      setJobFilterEntries((data as unknown as JobFilterEntry[]) ?? []);
+      setOwnEntries([]);
+      setAdminEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    // Kein Auftrags-Filter → bestehende Logik (Eigene Sicht bzw. Admin-Fremdsicht).
+    setJobFilterHeader(null);
+    setJobFilterEntries([]);
+    setJobLookupState("idle");
+
     if (viewingOther) {
       const { data, error } = await supabase.rpc("get_all_time_entries", {
         filter_user_id: filterUserId,
@@ -311,9 +423,34 @@ export function StempelzeitenView() {
       setAdminEntries([]);
     }
     setLoading(false);
-  }, [supabase, viewingOther, currentUserId, filterUserId, fromIso]);
+  }, [supabase, viewingOther, currentUserId, filterUserId, fromIso, jobFilterActive, jobFilterNumber]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auftragsnummer-Filter mit URL sync + Debounce. Der Input triggert erst nach
+  // 300ms den commit-State (der wiederum die Query aufloest) — plus schreibt
+  // ?auftrag=... in die URL fuer Reload-Persist + Teilbarkeit. Leerer Input
+  // → param loeschen. Andere URL-Params (z.B. tab=stempelzeiten im HR-Hub)
+  // bleiben erhalten.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const parsed = parseJobNumber(jobFilterInput);
+      setJobFilterNumber(parsed);
+      const params = new URLSearchParams(searchParams.toString());
+      if (parsed !== null) {
+        params.set("auftrag", String(parsed));
+      } else {
+        params.delete("auftrag");
+      }
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // searchParams/pathname bewusst NICHT im dep-array: sonst Loop wenn wir
+    // die URL selbst rewriten. Sie werden nur beim Aendern des Inputs gelesen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobFilterInput]);
 
   async function deleteEntry(id: string) {
     const ok = await confirm({
@@ -333,8 +470,30 @@ export function StempelzeitenView() {
   }
 
   const normalized: NormalizedEntry[] = useMemo(() => {
+    if (jobFilterActive) {
+      if (!jobFilterHeader) return [];
+      return jobFilterEntries.map((e) => normalizeJobFilter(e, jobFilterHeader));
+    }
     return viewingOther ? adminEntries.map(normalizeAdmin) : ownEntries.map(normalizeOwn);
-  }, [viewingOther, adminEntries, ownEntries]);
+  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, viewingOther, adminEntries, ownEntries]);
+
+  // Aggregat fuer den Auftrags-Header: Total-Minuten + Anzahl unique
+  // Mitarbeiter, die auf dem Auftrag gestempelt haben.
+  const jobFilterSummary = useMemo(() => {
+    if (!jobFilterActive) return { totalMin: 0, userCount: 0 };
+    let total = 0;
+    const users = new Set<string>();
+    for (const e of jobFilterEntries) {
+      users.add(e.user_id);
+      if (e.clock_out) {
+        total += Math.max(
+          0,
+          Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000),
+        );
+      }
+    }
+    return { totalMin: total, userCount: users.size };
+  }, [jobFilterActive, jobFilterEntries]);
 
   const dayBuckets = useMemo(() => buildDayBuckets(normalized), [normalized]);
 
@@ -369,7 +528,11 @@ export function StempelzeitenView() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Stempelzeiten</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {viewingOther ? (selectedUserLabel ?? "Fremd-Ansicht") : "Deine Einträge"} · letzte {DEFAULT_RANGE_DAYS} Tage
+              {jobFilterActive
+                ? (jobFilterHeader
+                    ? `Auftrag INT-${jobFilterHeader.job_number} · alle Stempeleinträge`
+                    : `Auftragsnummer INT-${jobFilterNumber}`)
+                : `${viewingOther ? (selectedUserLabel ?? "Fremd-Ansicht") : "Deine Einträge"} · letzte ${DEFAULT_RANGE_DAYS} Tage`}
             </p>
           </div>
         </div>
@@ -411,16 +574,67 @@ export function StempelzeitenView() {
         </Card>
       )}
 
-      {/* KPI-Header (3 Kacheln) */}
-      <KpiHeader kpi={kpi} />
+      {/* KPI-Header (3 Kacheln) — bei aktivem Auftrags-Filter verstecken,
+          weil "Diese Woche/Monat" auf einen einzelnen Auftrag keinen Sinn ergibt.
+          Stattdessen erscheint der Auftrags-Header (siehe unten). */}
+      {!jobFilterActive && <KpiHeader kpi={kpi} />}
 
-      {/* Header-Zeile: Hinweistext links, Admin-User-Selector rechts */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs text-muted-foreground">
-          Stempeleinträge der letzten {DEFAULT_RANGE_DAYS} Tage
-        </p>
-        {isAdmin && (
-          <div className="w-full sm:w-56">
+      {/* Filter-Zeile: Auftragsnummer-Suche + (Admin) Mitarbeiter-Selector */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Auftragsnummer-Filter */}
+        <div className="relative flex-1 min-w-[180px] sm:max-w-[260px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            inputMode="numeric"
+            value={jobFilterInput}
+            onChange={(e) => setJobFilterInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                // Debounce sofort committen (Suche direkt auslösen).
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                const parsed = parseJobNumber(jobFilterInput);
+                setJobFilterNumber(parsed);
+                const params = new URLSearchParams(searchParams.toString());
+                if (parsed !== null) params.set("auftrag", String(parsed));
+                else params.delete("auftrag");
+                const qs = params.toString();
+                router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+                e.preventDefault();
+              }
+              if (e.key === "Escape" && jobFilterInput) {
+                setJobFilterInput("");
+                e.preventDefault();
+              }
+            }}
+            placeholder="Auftragsnummer (INT-…)"
+            aria-label="Nach Auftragsnummer filtern"
+            className="w-full pl-7 pr-7 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/60"
+          />
+          {jobFilterInput && (
+            <button
+              type="button"
+              onClick={() => setJobFilterInput("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] dark:hover:bg-foreground/[0.10] transition-colors"
+              aria-label="Auftragsnummer-Filter leeren"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Hinweistext (wenn kein Auftrags-Filter) — schiebt Selector nach rechts */}
+        {!jobFilterActive && (
+          <p className="text-xs text-muted-foreground hidden md:block ml-auto">
+            Stempeleinträge der letzten {DEFAULT_RANGE_DAYS} Tage
+          </p>
+        )}
+
+        {/* Admin-Selector — bei Auftrags-Filter ausgeblendet (die Ansicht zeigt
+            bewusst ALLE MA auf dem Auftrag; ein zusaetzlicher MA-Filter wuerde
+            das Bild reduzieren, ohne Mehrwert fuer den Anwendungsfall). */}
+        {isAdmin && !jobFilterActive && (
+          <div className="w-full sm:w-56 sm:ml-2">
             <SearchableSelect
               value={filterUserId}
               onChange={setFilterUserId}
@@ -433,9 +647,31 @@ export function StempelzeitenView() {
         )}
       </div>
 
+      {/* Auftrags-Header — bei aktivem Auftrags-Filter + gefundenem Auftrag */}
+      {jobFilterActive && jobFilterHeader && !loading && (
+        <JobFilterSummaryCard
+          job={jobFilterHeader}
+          totalMin={jobFilterSummary.totalMin}
+          userCount={jobFilterSummary.userCount}
+          entryCount={jobFilterEntries.length}
+        />
+      )}
+
       {/* Body */}
       {loading ? (
         <div className="space-y-2">{[1, 2, 3].map((i) => <Card key={i} className="animate-pulse bg-card"><CardContent className="p-4 h-16" /></Card>)}</div>
+      ) : jobFilterActive && jobLookupState === "not_found" ? (
+        <Card className="bg-card border-dashed">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <Search className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-lg">Kein Auftrag gefunden</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Es gibt keinen Auftrag mit Nummer INT-{jobFilterNumber}.
+            </p>
+          </CardContent>
+        </Card>
       ) : normalized.length === 0 ? (
         <Card className="bg-card border-dashed">
           <CardContent className="py-16 text-center">
@@ -444,9 +680,11 @@ export function StempelzeitenView() {
             </div>
             <h3 className="font-semibold text-lg">Keine Einträge</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {viewingOther
-                ? `${selectedUserLabel ?? "Diese Person"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
-                : `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
+              {jobFilterActive
+                ? `Auf INT-${jobFilterNumber} wurde bisher nicht gestempelt.`
+                : viewingOther
+                  ? `${selectedUserLabel ?? "Diese Person"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
+                  : `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
             </p>
           </CardContent>
         </Card>
@@ -501,6 +739,68 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
         <p className="text-xl font-bold tabular-nums mt-0.5">{value}</p>
         {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ------------------ Auftrags-Header (Summary) ------------------
+
+/**
+ * Kopf-Karte fuer den Auftragsnummer-Filter:
+ * INT-XX · Titel · Kunde · Total-Stunden · Anzahl MA · Anzahl Eintraege.
+ * Bewusst kompakt, single-row auf Desktop. Klick auf INT-Pill fuehrt in den
+ * Auftrag rein.
+ */
+function JobFilterSummaryCard({
+  job, totalMin, userCount, entryCount,
+}: {
+  job: JobFilterHeader;
+  totalMin: number;
+  userCount: number;
+  entryCount: number;
+}) {
+  return (
+    <Card className="bg-card border-red-200 dark:border-red-500/30">
+      <CardContent className="p-3 sm:p-4 flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-9 h-9 rounded-md bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+            <Briefcase className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/auftraege/${job.id}`}
+                className="hover:opacity-80 transition-opacity"
+                data-tooltip="Auftrag öffnen"
+              >
+                <JobNumber number={job.job_number} size="md" />
+              </Link>
+              <span className="font-semibold text-sm truncate">{job.title}</span>
+            </div>
+            {job.customer?.name && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {job.customer.name}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 sm:gap-6 sm:ml-auto tabular-nums">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total</span>
+            <span className="text-lg font-bold">{formatDuration(totalMin)}</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1">
+              <Users className="h-2.5 w-2.5" />Mitarbeiter
+            </span>
+            <span className="text-lg font-bold">{userCount}</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Einträge</span>
+            <span className="text-lg font-bold">{entryCount}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
