@@ -290,10 +290,13 @@ export function StempelzeitenView() {
   const showBackButton =
     pathname === "/stempelzeiten" && searchParams.get("from") === "dashboard";
   const { confirm, ConfirmModalElement } = useConfirm();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showStempelTicket, setShowStempelTicket] = useState(false);
   const { can } = usePermissions();
+  // "Fremd-Sicht" (Admin-Selector + andere MA laden) gated ueber Permission,
+  // nicht ueber die admin-Rolle direkt — so kann HR/Team-Leitung ebenfalls
+  // per Rechte-Matrix Zugriff bekommen ohne Voll-Admin zu sein.
+  const canSeeAll = can("stempelzeiten:see-all");
   const [ownEntries, setOwnEntries] = useState<OwnEntry[]>([]);
   const [adminEntries, setAdminEntries] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -331,18 +334,16 @@ export function StempelzeitenView() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUserId(user.id);
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      setIsAdmin(profile?.role === "admin");
     })();
   }, [supabase]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canSeeAll) return;
     (async () => {
       const { data } = await supabase.rpc("get_assignable_users");
       setUsers((data as { id: string; full_name: string }[]) ?? []);
     })();
-  }, [isAdmin, supabase]);
+  }, [canSeeAll, supabase]);
 
   // 30-Tage-Cutoff hart — kein UI-Umschalter. Aus dem Render heraus stabil.
   const fromIso = useMemo(
@@ -351,7 +352,7 @@ export function StempelzeitenView() {
   );
 
   // Admin schaut auf einen anderen Mitarbeiter?
-  const viewingOther = isAdmin && !!filterUserId && filterUserId !== currentUserId;
+  const viewingOther = canSeeAll && !!filterUserId && filterUserId !== currentUserId;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -626,7 +627,7 @@ export function StempelzeitenView() {
         {/* Admin-Selector — bei Auftrags-Filter ausgeblendet (die Ansicht zeigt
             bewusst ALLE MA auf dem Auftrag; ein zusaetzlicher MA-Filter wuerde
             das Bild reduzieren, ohne Mehrwert fuer den Anwendungsfall). */}
-        {isAdmin && !jobFilterActive && (
+        {canSeeAll && !jobFilterActive && (
           <div className="w-full sm:w-56 sm:ml-2">
             <SearchableSelect
               value={filterUserId}

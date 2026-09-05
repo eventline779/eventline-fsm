@@ -46,7 +46,7 @@ import { MonatsstundenTable } from "@/components/hr/monatsstunden-table";
 import { LohnStandardwerteCard } from "@/components/hr/loehne/lohn-standardwerte-card";
 import { MitarbeiterLohnTab } from "@/components/hr/loehne/mitarbeiter-lohn-tab";
 import { LohnsummenPrognose } from "@/components/analytics/lohnsummen-prognose";
-import { MeineLohndokumenteView } from "@/components/hr/meine-lohndokumente-view";
+import { LohnausweiseList } from "@/components/hr/lohnausweise-list";
 import { BackButton } from "@/components/ui/back-button";
 
 type Tab = "anfragen" | "stempelzeiten" | "tickets" | "ferien" | "loehne";
@@ -78,9 +78,9 @@ function mapLegacySubtab(raw: string | null): LoehneSubTab | null {
  * Landing-Tab pro Rolle umschreiben — damit alte Bookmarks/Deep-Links
  * nicht ins Leere zeigen.
  */
-function mapLegacyTab(raw: string | null, isAdmin: boolean): Tab | null {
+function mapLegacyTab(raw: string | null, canManageHR: boolean): Tab | null {
   if (!raw) return null;
-  if (raw === "uebersicht") return isAdmin ? "anfragen" : "stempelzeiten";
+  if (raw === "uebersicht") return canManageHR ? "anfragen" : "stempelzeiten";
   return ALL_TABS.includes(raw as Tab) ? (raw as Tab) : null;
 }
 
@@ -90,23 +90,27 @@ export default function HRPage() {
   const urlSub = searchParams.get("subtab");
   const urlLohnMode = searchParams.get("lohn") as LohnMode | null;
 
-  const { can, role, ready } = usePermissions();
-  const isAdmin = role === "admin";
+  const { can, ready } = usePermissions();
+  // "Anfragen"-Tab + Team-Uebersicht: Permission-gegated statt Rolle. Admins
+  // bekommen `hr:manage`/`lohn:manage` automatisch via hasPermission-Bypass;
+  // andere Rollen koennen es via Rollen-Matrix (lohn:manage) bekommen.
+  const canManageHR = can("hr:manage");
+  const canManageLohn = can("lohn:manage");
 
-  // Default-Landing: Admin → Anfragen, MA → Stempelzeiten.
-  const defaultTab: Tab = isAdmin ? "anfragen" : "stempelzeiten";
-  const initialTab = mapLegacyTab(urlTabRaw, isAdmin) ?? defaultTab;
+  // Default-Landing: HR-Manager → Anfragen, MA → Stempelzeiten.
+  const defaultTab: Tab = canManageHR ? "anfragen" : "stempelzeiten";
+  const initialTab = mapLegacyTab(urlTabRaw, canManageHR) ?? defaultTab;
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [subTab, setSubTab] = useState<LoehneSubTab>(mapLegacySubtab(urlSub) ?? "monatsstunden");
-  // Lohn-Modus: Admin default „team", MA immer „meine" (kein Umschalter).
+  // Lohn-Modus: Manager default „team", MA immer „meine" (kein Umschalter).
   const [lohnMode, setLohnMode] = useState<LohnMode>(urlLohnMode ?? "team");
 
   // URL → Local-State-Sync (Back/Forward-Navigation, Deep-Links).
   useEffect(() => {
-    const mapped = mapLegacyTab(urlTabRaw, isAdmin);
+    const mapped = mapLegacyTab(urlTabRaw, canManageHR);
     if (mapped) setTab(mapped);
-  }, [urlTabRaw, isAdmin]);
+  }, [urlTabRaw, canManageHR]);
   useEffect(() => {
     const mapped = mapLegacySubtab(urlSub);
     if (mapped) setSubTab(mapped);
@@ -151,12 +155,12 @@ export default function HRPage() {
 
   if (!ready) return null;
 
-  const effectiveLohnMode: LohnMode = isAdmin ? lohnMode : "meine";
+  const effectiveLohnMode: LohnMode = canManageLohn ? lohnMode : "meine";
 
-  // Tab-Sichtbarkeit — „Anfragen" ausschliesslich fuer Admin. Reihenfolge:
-  // Anfragen zuerst (dort landet der Admin), danach die operativen Tabs.
+  // Tab-Sichtbarkeit — „Anfragen" nur fuer HR-Manager (hr:manage). Reihenfolge:
+  // Anfragen zuerst (dort landet der Manager), danach die operativen Tabs.
   const tabs: { key: Tab; label: string; icon: React.ReactNode; visible: boolean }[] = [
-    { key: "anfragen",      label: "Anfragen",     icon: <Inbox className="h-4 w-4" />,          visible: isAdmin },
+    { key: "anfragen",      label: "Anfragen",     icon: <Inbox className="h-4 w-4" />,          visible: canManageHR },
     { key: "stempelzeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" />,          visible: can("stempelzeiten:view") },
     { key: "tickets",       label: "Tickets",       icon: <TicketCheck className="h-4 w-4" />,    visible: can("tickets:view") },
     { key: "ferien",        label: "Ferien",        icon: <Palmtree className="h-4 w-4" />,       visible: true },
@@ -199,7 +203,7 @@ export default function HRPage() {
         className="mb-4"
       />
 
-      {activeTab === "anfragen" && isAdmin && (
+      {activeTab === "anfragen" && canManageHR && (
         <AnfragenTab onGoto={(t) => selectTab(t)} />
       )}
 
@@ -217,7 +221,7 @@ export default function HRPage() {
 
       {activeTab === "loehne" && (
         <div className="space-y-4">
-          {isAdmin && (
+          {canManageLohn && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Lohn</h2>
@@ -246,9 +250,13 @@ export default function HRPage() {
             </div>
           )}
 
-          {effectiveLohnMode === "meine" && <MeineLohndokumenteView />}
+          {effectiveLohnMode === "meine" && (
+            <div className="max-w-3xl">
+              <LohnausweiseList />
+            </div>
+          )}
 
-          {effectiveLohnMode === "team" && isAdmin && (
+          {effectiveLohnMode === "team" && canManageLohn && (
             <TrustedDeviceGate>
               <LohnsummenPrognose />
 

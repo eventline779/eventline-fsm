@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logError } from "@/lib/log";
+import { ZRH_TZ } from "@/lib/swiss-time";
 
 /**
  * GET /api/hr/anfragen — Admin-only Aggregat fuer den HR-„Anfragen"-Tab.
@@ -36,6 +37,35 @@ interface AbsenceRow {
   user_id: string; type: string; end_date: string;
 }
 
+/**
+ * Liest Y/M/D/H/M/S eines Instants im Europe/Zurich-Kalender via
+ * Intl.DateTimeFormat.formatToParts — locale-unabhaengig und DST-safe
+ * (im Gegensatz zu `new Date(d.toLocaleString('en-US', {timeZone}))`,
+ * das je nach ICU-Version anders parst und bei DST-Wechseln kippen kann).
+ */
+function zurichPartsAt(instantMs: number): { y: number; m: number; d: number; h: number; mi: number; s: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZRH_TZ,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(instantMs));
+  const g = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  const h = g("hour");
+  return { y: g("year"), m: g("month"), d: g("day"), h: h === 24 ? 0 : h, mi: g("minute"), s: g("second") };
+}
+
+/** UTC-Millisekunden fuer einen Zurich-Wall-Clock-Zeitpunkt (y-m-d h:mi:s local).
+ *  Zwei-Pass-Offset: erst als UTC interpretieren, dann Offset per Zurich-Formatierung
+ *  ableiten. DST-korrekt, keine externe Library noetig. */
+function zurichWallToUtcMs(y: number, m: number, d: number, h = 0, mi = 0, s = 0): number {
+  const guess = Date.UTC(y, m - 1, d, h, mi, s);
+  const p = zurichPartsAt(guess);
+  const seen = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s);
+  const offset = seen - guess;
+  return guess - offset;
+}
+
 export async function GET() {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
@@ -47,10 +77,9 @@ export async function GET() {
     // Monatsgrenzen (Europe/Zurich Kalender-Monat) — als ISO fuer die
     // Postgres-Vergleiche gegen clock_in (timestamptz).
     const now = new Date();
-    const zurichNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Zurich" }));
-    const firstOfMonth = new Date(Date.UTC(zurichNow.getFullYear(), zurichNow.getMonth(), 1));
-    const monthStartIso = firstOfMonth.toISOString();
-    const todayIso = zurichNow.toISOString().slice(0, 10);
+    const zp = zurichPartsAt(now.getTime());
+    const monthStartIso = new Date(zurichWallToUtcMs(zp.y, zp.m, 1)).toISOString();
+    const todayIso = `${zp.y}-${String(zp.m).padStart(2, "0")}-${String(zp.d).padStart(2, "0")}`;
     const nowIso = now.toISOString();
 
     const [

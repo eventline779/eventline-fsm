@@ -289,10 +289,18 @@ function UploadModal({ open, onClose, profileId, onDone }: { open: boolean; onCl
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-[10px] text-muted-foreground">Typ</label>
-            <select value={docType} onChange={(e) => setDocType(e.target.value as "lohnabrechnung" | "lohnausweis")} className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card mt-1">
-              <option value="lohnabrechnung">Lohnabrechnung (monatlich)</option>
-              <option value="lohnausweis">Lohnausweis (jährlich)</option>
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                value={docType}
+                onChange={(v) => setDocType((v || "lohnabrechnung") as "lohnabrechnung" | "lohnausweis")}
+                items={[
+                  { id: "lohnabrechnung", label: "Lohnabrechnung (monatlich)" },
+                  { id: "lohnausweis",    label: "Lohnausweis (jährlich)" },
+                ]}
+                searchable={false}
+                clearable={false}
+              />
+            </div>
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground">Jahr</label>
@@ -302,9 +310,15 @@ function UploadModal({ open, onClose, profileId, onDone }: { open: boolean; onCl
         {docType === "lohnabrechnung" && (
           <div>
             <label className="text-[10px] text-muted-foreground">Monat</label>
-            <select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card mt-1">
-              {MONTH_NAMES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                value={month}
+                onChange={(v) => setMonth(v || String(new Date().getMonth() + 1))}
+                items={MONTH_NAMES.map((m, i) => ({ id: String(i + 1), label: m }))}
+                searchable={false}
+                clearable={false}
+              />
+            </div>
           </div>
         )}
         <div>
@@ -355,9 +369,15 @@ function GenerateModal({ open, onClose, profileId, employee, onDone }: { open: b
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-[10px] text-muted-foreground">Monat</label>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card mt-1">
-              {MONTH_NAMES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                value={String(month)}
+                onChange={(v) => setMonth(Number(v) || new Date().getMonth() + 1)}
+                items={MONTH_NAMES.map((m, i) => ({ id: String(i + 1), label: m }))}
+                searchable={false}
+                clearable={false}
+              />
+            </div>
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground">Jahr</label>
