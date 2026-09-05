@@ -33,12 +33,3 @@ export interface UploadedPhoto {
   caption: string;
   sort_order: number;
 }
-
-export interface RapportForm {
-  work_description: string;
-  equipment_used: string;
-  issues: string;
-  client_name: string;
-  technician_id: string;
-  technician_name: string;
-}

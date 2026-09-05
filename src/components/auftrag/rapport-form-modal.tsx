@@ -70,8 +70,10 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
   const supabase = createClient();
   const router = useRouter();
   const { confirm, ConfirmModalElement } = useConfirm();
-  const { role } = usePermissions();
-  const isAdmin = role === "admin";
+  const { can } = usePermissions();
+  // Sprung "Zur Rechnung" nach Abschluss nur wenn der User Abrechnung
+  // ueberhaupt sehen darf — sonst waere der Link nutzlos.
+  const canGoAbrechnung = can("abrechnung:view");
   const [saving, setSaving] = useState<"draft" | "final" | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<"entwurf" | "abgeschlossen" | null>(null);
@@ -138,22 +140,22 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
   }
 
   // Profile-Liste fuer Dropdowns (Service-Techniker + per-Tag-Techniker)
-  // sowie Self-Default beim ersten Open.
+  // sowie Self-Default beim ersten Open. RPC statt direktem profiles-Query,
+  // damit RLS-Regeln (053_profile_rls_tighten) + Partner-Filter
+  // (098_assignable_users_exclude_partner) zentral bleiben.
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .eq("is_active", true)
-        .neq("role", "partner")
-        .order("full_name");
-      setProfiles((data as ProfileOption[]) ?? []);
+      const { data } = await supabase.rpc("get_assignable_users");
+      const profileList: ProfileOption[] = (data as { id: string; full_name: string }[] | null)?.map(
+        (p) => ({ id: p.id, full_name: p.full_name }),
+      ) ?? [];
+      setProfiles(profileList);
 
       if (!form.technician_id) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const me = (data as ProfileOption[] | null)?.find((p) => p.id === user.id);
+          const me = profileList.find((p) => p.id === user.id);
           if (me) {
             setForm((f) => ({ ...f, technician_id: me.id, technician_name: me.full_name }));
           }
@@ -433,9 +435,21 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
   }
 
   async function removePhoto(photo: UploadedPhoto) {
-    // Storage + DB-Row entfernen — Reihenfolge egal, beide best-effort.
-    await supabase.storage.from("documents").remove([photo.storage_path]);
-    await supabase.from("report_photos").delete().eq("id", photo.id);
+    // Storage best-effort — orphan-Files sind kein User-Problem und
+    // koennen per Cleanup-Job entfernt werden. Aber die DB-Row ist
+    // die Wahrheit: schlaegt der Delete fehl, den State NICHT filtern,
+    // sonst zeigt die UI ein "geloeschtes" Foto das beim naechsten
+    // Load wieder auftaucht.
+    const { error: storageErr } = await supabase.storage.from("documents").remove([photo.storage_path]);
+    if (storageErr) {
+      logError("rapport.modal.photo-remove-storage", storageErr, { photoId: photo.id });
+    }
+    const { error: dbErr } = await supabase.from("report_photos").delete().eq("id", photo.id);
+    if (dbErr) {
+      logError("rapport.modal.photo-remove-db", dbErr, { photoId: photo.id });
+      toast.error("Foto konnte nicht entfernt werden");
+      return;
+    }
     setUploadedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
   }
 
@@ -507,7 +521,12 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
         technician_signature_url: nextTechPath,
       };
       const { error } = await supabase.from("service_reports").update(payload).eq("id", id);
-      if (handleDupError(error)) return;
+      if (handleDupError(error)) { setSaving(null); return; }
+      if (error) {
+        TOAST.supabaseError(error, "Rapport konnte nicht gespeichert werden");
+        setSaving(null);
+        return;
+      }
       setSaving(null);
       toast.success("Rapport zwischengespeichert");
     }
@@ -633,7 +652,11 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
 
     if (reportId) {
       try {
-        await fetch(`/api/reports/${reportId}/send-invoice`, { method: "POST" });
+        const pdfRes = await fetch(`/api/reports/${reportId}/send-invoice`, { method: "POST" });
+        const pdfJson = await pdfRes.json().catch(() => null);
+        if (!pdfRes.ok || !pdfJson?.success) {
+          throw new Error(pdfJson?.error || `HTTP ${pdfRes.status}`);
+        }
         toast.success("PDF am Auftrag gespeichert");
       } catch (err) {
         logError("rapport.modal.pdf", err, { reportId });
@@ -662,9 +685,10 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
     onCompleted();
     onClose();
 
-    // Success-Toast — Action-Button „Zur Rechnung" nur fuer Admin (Techniker/
-    // MA haben keinen /abrechnung-Zugriff, der Sprung waere nutzlos).
-    toast.success("Rapport abgeschlossen", isAdmin ? {
+    // Success-Toast — Action-Button „Zur Rechnung" nur wer Abrechnung
+    // sehen darf (Techniker/MA haben keinen /abrechnung-Zugriff, der
+    // Sprung waere nutzlos).
+    toast.success("Rapport abgeschlossen", canGoAbrechnung ? {
       action: {
         label: "Zur Rechnung",
         onClick: () => router.push(`/abrechnung?highlight=${job.id}`),
@@ -764,7 +788,6 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
 
           <SignaturesSection
             technicianId={form.technician_id}
-            technicianName={form.technician_name}
             clientName={form.client_name}
             signerType={signerType}
             signerRole={signerRole}

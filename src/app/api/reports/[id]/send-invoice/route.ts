@@ -5,7 +5,12 @@ import { NextResponse } from "next/server";
 import LOGO_BASE64 from "@/lib/logo-base64";
 import { requireUser } from "@/lib/api-auth";
 import { loadCompanySettings, formatFullFooter } from "@/lib/company-settings";
+import { logError } from "@/lib/log";
+import type { RapportReportRow, RapportJobInfo } from "@/lib/build-rapport-pdf";
 
+// Lokal-Typ fuer den Sub-Set der Range-Felder, die diese Route rendert.
+// Deckt sich mit dem in build-rapport-pdf.ts — nur die vom PDF genutzten
+// Felder sind pflichtig.
 interface TimeRange {
   date: string;
   start: string;
@@ -23,15 +28,15 @@ interface ReportPhoto {
 }
 
 async function generatePDF(
-  report: any,
-  job: any,
-  customer: any,
-  location: any,
+  report: RapportReportRow,
+  job: RapportJobInfo | null,
+  customer: RapportJobInfo["customer"] | null,
+  location: RapportJobInfo["location"] | null,
   photos: { base64: string; caption: string | null }[],
   signatures: { tech: string | null; client: string | null },
   footerText: string,
 ): Promise<Buffer> {
-  const timeRanges: TimeRange[] = report.time_ranges || [];
+  const timeRanges: TimeRange[] = (report.time_ranges as TimeRange[] | null) ?? [];
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -412,11 +417,11 @@ export async function POST(
     return NextResponse.json({ error: "Rapport nicht gefunden" }, { status: 404 });
   }
 
-  const job = report.job as any;
-  const customer = job?.customer;
-  const location = job?.location;
-  const jobNumber = job?.job_number || "?";
-  const customerName = customer?.name || "Unbekannt";
+  const typedReport = report as RapportReportRow;
+  const job = (report.job as RapportJobInfo | null) ?? null;
+  const customer = job?.customer ?? null;
+  const location = job?.location ?? null;
+  const jobNumber = job?.job_number ?? "?";
 
   // Fotos laden
   const { data: reportPhotos } = await supabase
@@ -470,23 +475,37 @@ export async function POST(
 
   // PDF generieren
   const company = await loadCompanySettings(supabase);
-  const pdfBuffer = await generatePDF(report, job, customer, location, photoImages, signatures, formatFullFooter(company));
+  const pdfBuffer = await generatePDF(typedReport, job, customer, location, photoImages, signatures, formatFullFooter(company));
 
-  // PDF in Supabase Storage speichern
+  // PDF in Supabase Storage speichern — Fehler HART machen, sonst
+  // meldet der Client "success" obwohl das PDF nirgends abgelegt ist.
   const pdfPath = `rapporte/Rapport_${jobNumber}_${id}.pdf`;
-  await supabase.storage.from("documents").upload(pdfPath, pdfBuffer, {
+  const { error: uploadErr } = await supabase.storage.from("documents").upload(pdfPath, pdfBuffer, {
     contentType: "application/pdf",
     upsert: true,
   });
+  if (uploadErr) {
+    logError("reports.send-invoice.upload", uploadErr, { reportId: id, pdfPath });
+    return NextResponse.json({ success: false, error: `PDF-Upload fehlgeschlagen: ${uploadErr.message}` }, { status: 500 });
+  }
 
-  await supabase.from("service_reports").update({ pdf_url: pdfPath }).eq("id", id);
+  const { error: updateErr } = await supabase.from("service_reports").update({ pdf_url: pdfPath }).eq("id", id);
+  if (updateErr) {
+    logError("reports.send-invoice.update", updateErr, { reportId: id });
+    return NextResponse.json({ success: false, error: `Rapport-Update fehlgeschlagen: ${updateErr.message}` }, { status: 500 });
+  }
 
-  // Dokument am Auftrag
-  const { data: existingDoc } = await supabase
+  // Dokument am Auftrag verlinken. Existierender Doc-Row wird uebersprungen —
+  // storage_path ist eindeutig. single()-Fehler NICHT als 500 werfen; PGRST116
+  // ("no rows") ist hier der Normalfall beim Ersteinstellen.
+  const { data: existingDoc, error: existingErr } = await supabase
     .from("documents")
     .select("id")
     .eq("storage_path", pdfPath)
-    .single();
+    .maybeSingle();
+  if (existingErr) {
+    logError("reports.send-invoice.doc-lookup", existingErr, { pdfPath });
+  }
 
   if (!existingDoc) {
     const { data: adminProfile } = await supabase
@@ -494,17 +513,22 @@ export async function POST(
       .select("id")
       .eq("role", "admin")
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (adminProfile) {
-      await supabase.from("documents").insert({
+      const jobId = (report as { job_id?: string | null }).job_id ?? null;
+      const { error: docInsertErr } = await supabase.from("documents").insert({
         name: `Einsatzrapport INT-${jobNumber}.pdf`,
         storage_path: pdfPath,
         file_size: pdfBuffer.length,
         mime_type: "application/pdf",
-        job_id: report.job_id,
+        job_id: jobId,
         uploaded_by: adminProfile.id,
       });
+      if (docInsertErr) {
+        logError("reports.send-invoice.doc-insert", docInsertErr, { pdfPath });
+        return NextResponse.json({ success: false, error: `Doc-Insert fehlgeschlagen: ${docInsertErr.message}` }, { status: 500 });
+      }
     }
   }
 

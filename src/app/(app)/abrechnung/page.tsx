@@ -385,16 +385,24 @@ export default function AbrechnungPage() {
       url = `/api/tickets/${modal.beleg.id}/reject-beleg`;
       body = { reason: trimmed };
     }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    setSubmitting(false);
-    if (!json.success) {
-      TOAST.errorOr(json.error, "Aktion fehlgeschlagen");
+    // Netzwerk-/JSON-Fehler MUESSEN das submitting-Flag freigeben, sonst
+    // bleibt der Modal-Button dauerhaft „Speichere…" und der User haengt.
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json().catch(() => null)) as { success?: boolean; error?: string } | null;
+      if (!res.ok || !json?.success) {
+        TOAST.errorOr(json?.error, "Aktion fehlgeschlagen");
+        return;
+      }
+    } catch (err) {
+      TOAST.errorOr(err instanceof Error ? err.message : null, "Netzwerkfehler");
       return;
+    } finally {
+      setSubmitting(false);
     }
     if (modal.kind === "job") {
       // Undo-Toast (5s): der User kann die Aktion sofort rueckgaengig machen
@@ -404,15 +412,15 @@ export default function AbrechnungPage() {
       const undoTrimmed = trimmed;
       toast.success(`INT-${undoJob.job_number ?? "?"} als Rechnung ${undoTrimmed} abgerechnet`, {
         action: {
-          label: "Rueckgaengig",
+          label: "Rückgängig",
           onClick: async () => {
             const res = await fetch(`/api/jobs/${undoJob.id}/undo-mark-invoiced`, { method: "POST" });
             const json = await res.json().catch(() => null);
             if (!json?.success) {
-              TOAST.errorOr(json?.error, "Rueckgaengig fehlgeschlagen");
+              TOAST.errorOr(json?.error, "Rückgängig fehlgeschlagen");
               return;
             }
-            toast.success(`INT-${undoJob.job_number ?? "?"} zurueck in der Abrechnungs-Liste`);
+            toast.success(`INT-${undoJob.job_number ?? "?"} zurück in der Abrechnungs-Liste`);
             load();
           },
         },
@@ -437,35 +445,42 @@ export default function AbrechnungPage() {
 
   async function createInBexio(job: UnbilledJob) {
     setBexioBusyId(job.id);
-    const res = await fetch(`/api/bexio/create-invoice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_id: job.id }),
-    });
-    const json = (await res.json().catch(() => null)) as
-      | { success: boolean; error?: string; bexio_id?: number; bexio_url?: string; preview?: { billable_hours?: number; customer_name?: string | null } }
-      | null;
-    setBexioBusyId(null);
-    if (!res.ok || !json?.success) {
-      // 501 = Bexio-Setup fehlt / Erstellung noch nicht produktiv. Wir
-      // zeigen dem User die Server-Meldung + ggf. den berechneten Vorschlag
-      // damit klar ist warum's noch nicht klappt.
-      const msg = json?.error ?? "Rechnung konnte nicht in Bexio angelegt werden";
-      const preview = json?.preview;
-      toast.error(msg, {
-        description: preview?.billable_hours != null
-          ? `Vorschlag: ${preview.billable_hours}h${preview.customer_name ? ` fuer ${preview.customer_name}` : ""}.`
-          : undefined,
-        duration: 8000,
+    // try/finally garantiert, dass bexioBusyId auch bei Netzwerkfehler
+    // resetted wird — sonst bleibt der Spinner-Button ewig „Legt an…".
+    try {
+      const res = await fetch(`/api/bexio/create-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: job.id }),
       });
-      return;
+      const json = (await res.json().catch(() => null)) as
+        | { success: boolean; error?: string; bexio_id?: number; bexio_url?: string; preview?: { billable_hours?: number; customer_name?: string | null } }
+        | null;
+      if (!res.ok || !json?.success) {
+        // 501 = Bexio-Setup fehlt / Erstellung noch nicht produktiv. Wir
+        // zeigen dem User die Server-Meldung + ggf. den berechneten Vorschlag
+        // damit klar ist warum's noch nicht klappt.
+        const msg = json?.error ?? "Rechnung konnte nicht in Bexio angelegt werden";
+        const preview = json?.preview;
+        toast.error(msg, {
+          description: preview?.billable_hours != null
+            ? `Vorschlag: ${preview.billable_hours}h${preview.customer_name ? ` für ${preview.customer_name}` : ""}.`
+            : undefined,
+          duration: 8000,
+        });
+        return;
+      }
+      toast.success("Rechnung in Bexio angelegt", {
+        action: json.bexio_url
+          ? { label: "Öffnen", onClick: () => window.open(json.bexio_url, "_blank", "noopener,noreferrer") }
+          : undefined,
+      });
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Netzwerkfehler beim Bexio-Aufruf");
+    } finally {
+      setBexioBusyId(null);
     }
-    toast.success("Rechnung in Bexio angelegt", {
-      action: json.bexio_url
-        ? { label: "Oeffnen", onClick: () => window.open(json.bexio_url, "_blank", "noopener,noreferrer") }
-        : undefined,
-    });
-    load();
   }
 
   if (!ready) return null;
@@ -708,7 +723,7 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
  *  visuell zur selben Familie gehoeren. */
 function IdentifierBadge({ prefix, number }: { prefix: string; number: number | string | null | undefined }) {
   return (
-    <span className="inline-flex items-center font-mono font-semibold text-[11px] px-1.5 py-0.5 rounded bg-foreground/[0.04] dark:bg-foreground/[0.06] shrink-0">
+    <span className="inline-flex items-center font-mono font-semibold text-[11px] px-1.5 py-0.5 rounded bg-foreground/[0.04] dark:bg-foreground/[0.10] shrink-0">
       {prefix}-{number ?? "?"}
     </span>
   );

@@ -41,6 +41,32 @@ interface TimeRange {
   technician_id?: string;
 }
 
+// Europe/Zurich UTC-Offset ("+01:00" oder "+02:00") fuer ein Lokal-Datum.
+// Wir MUESSEN das explizit anhaengen — sonst interpretiert `new Date(...)`
+// den lokalen String in der SERVER-Timezone (typisch UTC in Vercel), was
+// im Sommer 2h und im Winter 1h daneben liegt.
+function zurichOffsetForDate(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const probeMs = Date.UTC(y, m - 1, d, 12); // Zurich-Mittag ist in beiden Sommer/Winter eindeutig
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Zurich",
+    timeZoneName: "longOffset",
+  }).formatToParts(new Date(probeMs));
+  const raw = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  const m2 = raw.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+  if (!m2) return "+01:00";
+  const sign = m2[1];
+  const hh = m2[2].padStart(2, "0");
+  const mm = (m2[3] ?? "00").padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+/** Konvertiert einen lokalen "YYYY-MM-DDTHH:MM:00"-String in Europe/Zurich
+ *  in einen Date-Wert (echtes UTC-Timestamp). */
+function zurichLocalToDate(localIso: string, dateForOffset: string): Date {
+  return new Date(`${localIso}${zurichOffsetForDate(dateForOffset)}`);
+}
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
@@ -88,19 +114,21 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       skipped++;
       continue;
     }
-    // Local datetime im Browser-Timezone (Europe/Zurich) interpretieren.
-    // Beim Insert in timestamptz wird automatisch in UTC konvertiert.
+    // Lokal-Zeit als Europe/Zurich interpretieren und explizit in UTC
+    // konvertieren. Ohne Offset-Suffix nimmt `new Date()` die SERVER-TZ
+    // (typisch UTC auf Vercel) → 1-2h Fehler bei jedem Stempel-Eintrag.
     const clockInLocal = `${tr.date}T${tr.start}:00`;
+    let endDate = tr.date;
     let endLocal = `${tr.date}T${tr.end}:00`;
     // Overnight: end < start -> end ist auf dem naechsten Kalendertag
     if (tr.end < tr.start) {
       const [y, m, d] = tr.date.split("-").map(Number);
       const next = new Date(Date.UTC(y, m - 1, d + 1, 12)); // tz-ok: nur Datum-Arithmetik
-      const nextDate = next.toISOString().slice(0, 10); // tz-ok: ISO date YYYY-MM-DD
-      endLocal = `${nextDate}T${tr.end}:00`;
+      endDate = next.toISOString().slice(0, 10); // tz-ok: ISO date YYYY-MM-DD
+      endLocal = `${endDate}T${tr.end}:00`;
     }
-    const clockIn = new Date(clockInLocal);
-    const clockOut = new Date(endLocal);
+    const clockIn = zurichLocalToDate(clockInLocal, tr.date);
+    const clockOut = zurichLocalToDate(endLocal, endDate);
     if (Number.isNaN(clockIn.getTime()) || Number.isNaN(clockOut.getTime())) {
       errors.push(`Ungueltige Zeit ${tr.date} ${tr.start}-${tr.end}`);
       continue;
@@ -117,14 +145,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     // keine zweite (verschobene) Range zusaetzlich auflegen.
     // Tagesgrenze in Europe/Zurich, damit overnight-Faelle (range startet
     // 23:00, Stempel um 23:30 → gleicher Kalendertag) korrekt matchen.
-    const dayStartLocal = `${tr.date}T00:00:00`;
-    const dayEndLocal = (() => {
+    const nextDayIso = (() => {
       const [y, m, d] = tr.date.split("-").map(Number);
       const next = new Date(Date.UTC(y, m - 1, d + 1, 12));
-      return `${next.toISOString().slice(0, 10)}T00:00:00`; // tz-ok
+      return next.toISOString().slice(0, 10); // tz-ok
     })();
-    const dayStart = new Date(dayStartLocal).toISOString();
-    const dayEnd = new Date(dayEndLocal).toISOString();
+    const dayStart = zurichLocalToDate(`${tr.date}T00:00:00`, tr.date).toISOString();
+    const dayEnd = zurichLocalToDate(`${nextDayIso}T00:00:00`, nextDayIso).toISOString();
     const { data: existing } = await admin
       .from("time_entries")
       .select("id")

@@ -13,7 +13,6 @@ import type { ProfileOption } from "./types";
 
 interface Props {
   technicianId: string;
-  technicianName: string;
   clientName: string;
   signerType: "kunde" | "mieter";
   signerRole: string;

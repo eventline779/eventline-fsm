@@ -6,8 +6,9 @@
 // Draft + die Storage-Logik.
 
 import { useRef } from "react";
-import { Camera, Image as ImageIcon, X } from "lucide-react";
+import { Camera, Image as ImageIcon, Trash2 } from "lucide-react";
 import type { UploadedPhoto } from "./types";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 interface Props {
   photos: UploadedPhoto[];
@@ -21,6 +22,7 @@ interface Props {
 export function PhotosSection({ photos, uploadCount, isReadOnly, onSelectFiles, onRemove, onCaptionChange }: Props) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmModalElement } = useConfirm();
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -29,7 +31,20 @@ export function PhotosSection({ photos, uploadCount, isReadOnly, onSelectFiles, 
     e.target.value = "";
   }
 
+  async function handleRemove(photo: UploadedPhoto) {
+    const ok = await confirm({
+      title: "Foto entfernen?",
+      message: "Das Foto wird aus dem Rapport gelöscht.",
+      confirmLabel: "Löschen",
+      cancelLabel: "Abbrechen",
+      variant: "red",
+    });
+    if (!ok) return;
+    onRemove(photo);
+  }
+
   return (
+    <>
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fotos</p>
@@ -45,15 +60,21 @@ export function PhotosSection({ photos, uploadCount, isReadOnly, onSelectFiles, 
           {photos.map((photo) => (
             <div key={photo.id} className="relative group rounded-xl overflow-hidden border bg-muted/30">
               <div className="aspect-square relative">
-                <img src={photo.preview_url} alt={photo.caption || "Foto"} className="w-full h-full object-cover" />
+                <img
+                  src={photo.preview_url}
+                  alt={photo.caption || "Foto"}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                />
                 {!isReadOnly && (
                   <button
                     type="button"
-                    onClick={() => onRemove(photo)}
+                    onClick={() => handleRemove(photo)}
                     className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     aria-label="Foto entfernen"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -96,5 +117,7 @@ export function PhotosSection({ photos, uploadCount, isReadOnly, onSelectFiles, 
         </>
       )}
     </div>
+    {ConfirmModalElement}
+    </>
   );
 }
