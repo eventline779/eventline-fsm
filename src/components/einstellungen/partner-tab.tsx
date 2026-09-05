@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { SearchableSelect } from "@/components/searchable-select";
 import { Plus, Building2, KeyRound, Pencil, UserX, UserCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -22,7 +23,6 @@ import { TOAST } from "@/lib/messages";
 interface PartnerProfileRow {
   id: string;
   full_name: string;
-  email: string | null;
   is_active: boolean;
   partner_location_id: string | null;
   location_name: string | null;
@@ -58,13 +58,24 @@ export function PartnerTab() {
         .order("full_name"),
       supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
     ]);
+    // Beide Queries defensiv pruefen — vorher lief load() bei RLS-Fehler
+    // still ohne Toast weiter und zeigte leere Listen an.
+    if (profRes.error) {
+      TOAST.supabaseError(profRes.error, "Partner konnten nicht geladen werden");
+      setLoading(false);
+      return;
+    }
+    if (locRes.error) {
+      TOAST.supabaseError(locRes.error, "Locations konnten nicht geladen werden");
+      setLoading(false);
+      return;
+    }
     const rows: PartnerProfileRow[] = ((profRes.data as unknown as Array<{
       id: string; full_name: string; is_active: boolean; partner_location_id: string | null;
       location: { name: string } | { name: string }[] | null;
     }>) ?? []).map((p) => ({
       id: p.id,
       full_name: p.full_name,
-      email: null, // hole separat via RPC oder lass weg — Listen-View braucht's nicht zwingend
       is_active: p.is_active,
       partner_location_id: p.partner_location_id,
       location_name: Array.isArray(p.location) ? p.location[0]?.name ?? null : p.location?.name ?? null,
@@ -308,15 +319,14 @@ export function PartnerTab() {
             </div>
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground/70 ml-1">Location *</p>
-              <select
+              <SearchableSelect
                 value={edit.partner_location_id}
-                onChange={(e) => setEdit({ ...edit, partner_location_id: e.target.value })}
+                onChange={(id) => setEdit({ ...edit, partner_location_id: id })}
+                items={locations.map((l) => ({ id: l.id, label: l.name }))}
+                placeholder="Location auswählen…"
                 required
-                className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card"
-              >
-                <option value="">Auswählen…</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
+                clearable={false}
+              />
             </div>
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={() => setEdit(null)} disabled={savingEdit} className="kasten kasten-muted flex-1">Abbrechen</button>
@@ -354,15 +364,16 @@ export function PartnerTab() {
           </div>
           <div>
             <label className="text-xs font-medium">Location *</label>
-            <select
-              value={createForm.partner_location_id}
-              onChange={(e) => setCreateForm({ ...createForm, partner_location_id: e.target.value })}
-              required
-              className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring/40"
-            >
-              <option value="">Auswählen…</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <div className="mt-1">
+              <SearchableSelect
+                value={createForm.partner_location_id}
+                onChange={(id) => setCreateForm({ ...createForm, partner_location_id: id })}
+                items={locations.map((l) => ({ id: l.id, label: l.name }))}
+                placeholder="Location auswählen…"
+                required
+                clearable={false}
+              />
+            </div>
             <p className="text-[11px] text-muted-foreground mt-1">
               Der Partner sieht im Portal nur diese eine Location.
             </p>

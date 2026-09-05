@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { TOAST } from "@/lib/messages";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, CheckCircle2, Plug, X } from "lucide-react";
 import { useConfirm } from "@/components/ui/use-confirm";
-import { createClient } from "@/lib/supabase/client";
+import { usePermissions } from "@/lib/use-permissions";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 import { AlleVertrauteGeraeteCard } from "@/components/einstellungen/alle-vertraute-geraete-card";
 
@@ -19,31 +20,17 @@ interface BexioStatus {
 }
 
 export function IntegrationenTab() {
-  const supabase = createClient();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<BexioStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { confirm, ConfirmModalElement } = useConfirm();
-
-  // Role-Check fuer das iCal-Feed-Sektion: nur Admins kriegen den Block
-  // hier — fuer sie ist der Token-Filter automatisch der ganze Firma-
-  // Kalender. Fuer normale User wuerde der Token nur den eigenen Feed
-  // liefern, das ist nicht "Firma" und sie haben den Block jetzt eh
-  // direkt auf der /kalender-Page.
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-      setIsAdmin(profile?.role === "admin");
-    })();
-  }, [supabase]);
+  // Role via zentralem Permissions-Provider — vermeidet doppelten
+  // supabase.auth.getUser + profiles-select-Roundtrip pro Tab-Wechsel und
+  // hebt die duplizierte 'admin'-Slug-Check-Logik in eine Stelle.
+  // Nur Admins bekommen den iCal-Feed-Block + Vertraute-Geraete-Uebersicht.
+  const { role } = usePermissions();
+  const isAdmin = role === "admin";
 
   // OAuth-Rueckkehr: ?bexio=connected oder ?bexio=error&msg=...
   useEffect(() => {
@@ -79,8 +66,25 @@ export function IntegrationenTab() {
     });
     if (!ok) return;
     setDisconnecting(true);
-    await fetch("/api/bexio/disconnect", { method: "POST" });
+    // res.ok pruefen — sonst kam der "getrennt"-Toast auch wenn der Server
+    // 500/401 zurueckgab und die Verbindung in Wahrheit weiter aktiv war.
+    let ok2 = false;
+    let errMsg: string | null = null;
+    try {
+      const res = await fetch("/api/bexio/disconnect", { method: "POST" });
+      ok2 = res.ok;
+      if (!ok2) {
+        const json = await res.json().catch(() => null);
+        errMsg = json?.error ?? `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      errMsg = e instanceof Error ? e.message : "Netzwerkfehler";
+    }
     setDisconnecting(false);
+    if (!ok2) {
+      TOAST.errorOr(errMsg, "Bexio-Trennung fehlgeschlagen");
+      return;
+    }
     toast.success("Bexio getrennt");
     loadStatus();
   }

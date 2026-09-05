@@ -109,6 +109,7 @@ export function AktivitaetTab({ scope = "all" }: AktivitaetTabProps = {}) {
   const supabase = createClient();
   const [users, setUsers] = useState<UserStats[]>([]);
   const [allSessions, setAllSessions] = useState<UserSession[]>([]);
+  const [roleLabels, setRoleLabels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
@@ -128,13 +129,17 @@ export function AktivitaetTab({ scope = "all" }: AktivitaetTabProps = {}) {
     } else if (scope === "firma") {
       profilesQuery = profilesQuery.neq("role", "partner");
     }
-    const [profilesRes, sessionsRes] = await Promise.all([
+    // Rollen-Labels aus der Tabelle laden — dann werden custom Rollen
+    // (z.B. Vertrieb/Buchhaltung) mit ihrem echten Label angezeigt statt
+    // hart auf 'Admin' vs 'Mitarbeiter' zu fallen.
+    const [profilesRes, sessionsRes, rolesRes] = await Promise.all([
       profilesQuery.order("full_name", { ascending: true }),
       supabase
         .from("user_sessions")
         .select("id, user_id, started_at, last_seen_at, ended_at, end_reason")
         .gte("started_at", cutoff.toISOString())
         .order("started_at", { ascending: false }),
+      supabase.from("roles").select("slug, label"),
     ]);
 
     if (profilesRes.error) {
@@ -147,6 +152,12 @@ export function AktivitaetTab({ scope = "all" }: AktivitaetTabProps = {}) {
       setLoading(false);
       return;
     }
+    // rolesRes.error ist non-fatal — fallback auf Slug-Anzeige unten.
+    const labels: Record<string, string> = {};
+    for (const r of (rolesRes.data as Array<{ slug: string; label: string }> | null) ?? []) {
+      labels[r.slug] = r.label;
+    }
+    setRoleLabels(labels);
 
     const sessions = (sessionsRes.data ?? []) as UserSession[];
     setAllSessions(sessions);
@@ -254,7 +265,7 @@ export function AktivitaetTab({ scope = "all" }: AktivitaetTabProps = {}) {
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{u.full_name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {u.role === "admin" ? "Admin" : "Mitarbeiter"}
+                      {roleLabels[u.role] ?? u.role}
                       {!u.is_active && " · Deaktiviert"}
                     </p>
                   </div>

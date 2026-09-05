@@ -33,8 +33,21 @@ export async function POST(request: Request) {
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  if (!slug || slug === "admin" || slug === "techniker") {
-    return NextResponse.json({ success: false, error: "Reservierter oder ungueltiger Name" }, { status: 400 });
+  if (!slug) {
+    return NextResponse.json({ success: false, error: "Ungueltiger Name" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+
+  // Reservierte Slugs kommen aus der DB (roles.is_system=true) statt hart
+  // codiert — 'techniker' war z.B. mal System und ist es nicht mehr, das
+  // wurde in der alten Hardcode-Liste nie nachgezogen. Zusaetzlich schuetzt
+  // der 23505-Handler unten gegen Duplikate ueber alle Rollen (auch non-
+  // system).
+  const { data: systemRoles } = await admin.from("roles").select("slug").eq("is_system", true);
+  const reserved = new Set(((systemRoles ?? []) as Array<{ slug: string }>).map((r) => r.slug));
+  if (reserved.has(slug)) {
+    return NextResponse.json({ success: false, error: "Reservierter Name (System-Rolle)" }, { status: 400 });
   }
 
   // Permissions validieren — nur bekannte module:action-Strings erlaubt.
@@ -52,8 +65,6 @@ export async function POST(request: Request) {
     }
     scope = body.scope;
   }
-
-  const admin = createAdminClient();
   const { error } = await admin.from("roles").insert({
     slug,
     label,

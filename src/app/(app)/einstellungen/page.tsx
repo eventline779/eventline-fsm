@@ -31,7 +31,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePermissions } from "@/lib/use-permissions";
 import { Plug, Users, Shield, Activity, Building2, Handshake, FileText } from "lucide-react";
 import { IntegrationenTab } from "@/components/einstellungen/integrationen-tab";
 import { TeamTab } from "@/components/einstellungen/team-tab";
@@ -98,14 +98,18 @@ function resolveTab(raw: string | null): Tab | null {
 }
 
 export default function EinstellungenPage() {
-  const supabase = createClient();
   const searchParams = useSearchParams();
   const urlTab = resolveTab(searchParams.get("tab"));
   // Default = "firma" (erster Admin-Sub-Tab im Firmenportal). Non-Admin
   // wird via useEffect auf „integrationen" umgeleitet sobald der Admin-
   // Status geladen ist.
   const [tab, setTab] = useState<Tab>(urlTab ?? "firma");
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // Role via zentralem Permissions-Provider — vermeidet den doppelten
+  // profiles-Roundtrip beim Seitenwechsel und teilt die 'admin'-Definition
+  // mit dem Rest der (app)/-Baume (hasPermission gated Admin ohnehin
+  // durch, siehe permissions.ts:126).
+  const { role, ready } = usePermissions();
+  const isAdmin: boolean | null = ready ? role === "admin" : null;
 
   // Tab-Wechsel: state = sofortige UI-Quelle, URL parallel updaten via
   // History-API (Next.js router.replace triggerte in Next 16 unzuverlaessig
@@ -127,22 +131,15 @@ export default function EinstellungenPage() {
 
   const activePortal: Portal = PORTAL_OF[tab];
 
+  // Non-Admin auf einem Admin-only-Tab → automatisch Integrationen.
+  // Redirect erst wenn der Rolle-State fertig geladen ist (isAdmin !== null),
+  // sonst wuerde der Non-Admin-Zweig faelschlicherweise fuer eine Millisekunde
+  // waehrend usePermissions().ready===false triggern.
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setIsAdmin(false);
-        return;
-      }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      const admin = profile?.role === "admin";
-      setIsAdmin(admin);
-      // Non-Admin auf einem Admin-only-Tab → Integrationen.
-      if (!admin && tab !== "integrationen") {
-        selectTab("integrationen");
-      }
-    })();
-  }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isAdmin === false && tab !== "integrationen") {
+      selectTab("integrationen");
+    }
+  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Firmenportal-Sub-Tabs (admin sieht alles, Non-Admin nur Integrationen —
   // siehe useEffect-Redirect oben).

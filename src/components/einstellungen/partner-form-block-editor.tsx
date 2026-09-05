@@ -290,7 +290,8 @@ function CanvasBlock({ block, index, selected, onSelect, onDelete }: {
             type="button"
             onClick={onDelete}
             className="p-0.5 rounded hover:bg-red-600 shrink-0"
-            title="Block löschen"
+            data-tooltip="Block löschen"
+            aria-label="Block löschen"
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -649,7 +650,7 @@ function WidthSelector({ value, onChange }: { value: BlockWidth; onChange: (v: B
             ? "bg-red-500 text-white"
             : "bg-foreground/[0.04] dark:bg-foreground/[0.08] hover:bg-foreground/[0.08] dark:hover:bg-foreground/[0.12] text-foreground"
           }`}
-          title={w === "full" ? "ganze Breite" : `${w} der Zeile`}
+          data-tooltip={w === "full" ? "ganze Breite" : `${w} der Zeile`}
         >
           {w === "full" ? "voll" : w}
         </button>

@@ -43,9 +43,19 @@ export function FirmaTab({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/company-settings");
-      const j = await res.json();
-      if (j.success) setForm(j.settings as Settings);
+      try {
+        const res = await fetch("/api/company-settings");
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j?.success) {
+          // Vorher stiller Fallback auf EMPTY — der Admin haette das
+          // leere Formular gespeichert und alle Stammdaten geloescht.
+          TOAST.errorOr(j?.error, "Firmen-Stammdaten konnten nicht geladen werden");
+        } else {
+          setForm(j.settings as Settings);
+        }
+      } catch (e) {
+        TOAST.errorOr(e instanceof Error ? e.message : null, "Firmen-Stammdaten konnten nicht geladen werden");
+      }
       setLoading(false);
     })();
   }, []);
