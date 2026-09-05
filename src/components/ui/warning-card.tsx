@@ -58,26 +58,17 @@ export function WarningCard({ warnings, children, className }: Props) {
   return (
     <div className={cn("relative", className)}>
       {hasWarnings && (
-        <>
-          {/* 3px Left-Border im warning-color. Absolute-positioniert damit
-              der Streifen nicht die Grid-Spaltenbreiten der Liste
-              verschiebt. rounded-l-xl folgt der Card-Kante darunter. */}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl bg-amber-400 dark:bg-amber-500 z-10"
-          />
-          {/* Info-Icon oben rechts. data-tooltip zeigt die Warnung(en).
-              pointer-events-auto damit der Tooltip trigger'n kann,
-              obwohl der Wrapper selbst pointer-events durchreicht. */}
-          <span
-            className="pointer-events-auto absolute right-2 top-2 z-20 flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300"
-            data-tooltip={tooltipText}
-            data-tooltip-align="end"
-            aria-label={tooltipText}
-          >
-            <Info className="h-3 w-3" strokeWidth={2.5} />
-          </span>
-        </>
+        // Info-Icon oben rechts. data-tooltip zeigt die Warnung(en).
+        // pointer-events-auto damit der Tooltip trigger'n kann, obwohl
+        // der Wrapper selbst pointer-events durchreicht.
+        <span
+          className="pointer-events-auto absolute right-2 top-2 z-20 flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300"
+          data-tooltip={tooltipText}
+          data-tooltip-align="end"
+          aria-label={tooltipText}
+        >
+          <Info className="h-3 w-3" strokeWidth={2.5} />
+        </span>
       )}
       {children}
     </div>
