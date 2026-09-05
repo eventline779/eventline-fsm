@@ -4,6 +4,8 @@
  * DashboardPreferencesModal — Zahnrad-Modal fuer persoenliche
  * Widget-Sichtbarkeit + Reihenfolge im Dashboard.
  *
+ * Bau-Modus: Drag-and-Drop mit Live-Vorschau (Mini-Dashboard-Grid).
+ *
  * Datenmodell (Server, /api/dashboard + /api/dashboard/overrides):
  *   catalog        — alle Widgets die die Registry kennt (aus /api/dashboard).
  *   visibleIds     — die aktuell sichtbaren Widgets in ihrer Anzeige-Reihenfolge
@@ -12,7 +14,7 @@
  *   overrides      — {hidden, widget_order} aus user_dashboard_overrides
  *                    (leerer Default falls kein Eintrag existiert).
  *
- * Modal-Set (welche Zeilen der User ueberhaupt sieht):
+ * Modal-Set (welche Widgets der User ueberhaupt sieht):
  *   Wir zeigen nur Widgets die der User theoretisch sehen darf — d.h.
  *   `visibleIds ∪ overrides.hidden`. Widgets, die der User aufgrund Rollen-
  *   Restriction oder fehlender Permission NIE bekommt, tauchen erst gar
@@ -27,14 +29,28 @@
  *      overrides.widget_order-Reihenfolge, danach Registry-Reihenfolge.
  *
  * Steuerung:
- *   - Reihenfolge via ChevronUp/ChevronDown pro Zeile (robust ohne
- *     dnd-kit-Dependency; app-konsistent mit Rollen-Tab).
- *   - Sichtbarkeit via Eye/EyeOff-icon-btn (state-driven Hover per useState,
- *     CLAUDE.md §3).
+ *   - Reihenfolge via echtem Drag-and-Drop (@dnd-kit/core + sortable).
+ *     PointerSensor + KeyboardSensor -> Touch/Maus/Screenreader out of
+ *     the box (CLAUDE.md § "robust by default"). Fallback ohne Maus:
+ *     Tastatur-Pfeile ueber den Drag-Handle des fokussierten Widgets.
+ *   - Sichtbarkeit via Eye/EyeOff-icon-btn im Widget-Kopf; hidden Widgets
+ *     bleiben in der Reihenfolge, werden aber ausgegraut + mit Overlay
+ *     markiert (User sieht wo sie wieder auftauchen wuerden).
+ *   - Mobile-Vorschau-Toggle: zwingt alle Widgets im Preview auf volle
+ *     Breite (1 Spalte), so sieht der User das effektive Mobile-Layout.
  *   - Auto-Save debounced 400ms bei Aenderung — kein "Speichern"-Button;
- *     Server-Fehler landen als Toast (CLAUDE.md §7).
+ *     Server-Fehler landen als Toast (CLAUDE.md § "sofortiges Ladefeedback").
  *   - "Auf Standard zuruecksetzen" = DELETE /api/dashboard/overrides.
  *   - "Fertig" flusht pending Save und triggert Parent-Refetch.
+ *
+ * Vorschau vs. echtes Dashboard:
+ *   Die Preview-Bausteine sind Layout-Vorschauen: Titel + Icon + Span-
+ *   Groesse (col-span-4 / col-span-6 / col-span-12), NICHT die volle
+ *   Widget-Renderung. Damit bleibt das Modal schnell (keine API-Requests
+ *   pro Widget) und passt auch bei kleinem Viewport in den Modal-Rahmen.
+ *   Die Span-Klassen sind eine 1:1-Kopie aus dashboard/page.tsx —
+ *   Aenderungen dort muessen hier mit-nachgezogen werden (Konstante
+ *   PREVIEW_SPAN, siehe unten).
  *
  * Server-Roundtrips:
  *   - GET  /api/dashboard/overrides  (nur beim Oeffnen)
@@ -42,17 +58,44 @@
  *   - DELETE /api/dashboard/overrides (bei Reset)
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  ChevronDown,
-  ChevronUp,
+  AlertCircle,
+  Briefcase,
+  CalendarDays,
+  ClipboardList,
+  Clock,
   Eye,
   EyeOff,
   GripVertical,
+  Handshake,
   Loader2,
+  Monitor,
+  PlayCircle,
+  Receipt,
   RotateCcw,
+  Smartphone,
+  Users,
+  Wallet,
 } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -80,6 +123,53 @@ interface Props {
   visibleIds: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Widget-Preview-Metadaten. 1:1-Spiegel zu WIDGET_SPAN in dashboard/page.tsx.
+// Wenn ein Widget dort umsortiert wird, hier nachziehen — sonst zeigt die
+// Vorschau eine andere Aufteilung als das echte Dashboard.
+// ---------------------------------------------------------------------------
+
+const PREVIEW_SPAN: Record<string, string> = {
+  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
+  "kpi-termine-woche": "col-span-12 sm:col-span-4",
+  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
+  "overdue-jobs": "col-span-12",
+  "zu-erledigen": "col-span-12 lg:col-span-6",
+  "team-status": "col-span-12 lg:col-span-6",
+  "anwesenheitskalender": "col-span-12",
+  "stempel-status": "col-span-12 lg:col-span-6",
+  "ma-monat-stunden": "col-span-12 lg:col-span-6",
+  "ma-prognose": "col-span-12 lg:col-span-6",
+  "ma-naechster-einsatz": "col-span-12",
+  "partner-willkommen": "col-span-12",
+};
+
+/** Icon pro Widget — identisch zu Dashboard-Renderern. Fehlender Eintrag
+ *  faellt auf einen neutralen Punkt zurueck (siehe iconFor). */
+const WIDGET_ICONS: Record<string, React.ReactNode> = {
+  "kpi-offene-auftraege": <Briefcase className="h-4 w-4" />,
+  "kpi-termine-woche": <CalendarDays className="h-4 w-4" />,
+  "kpi-nicht-abgerechnet": <Receipt className="h-4 w-4" />,
+  "overdue-jobs": <AlertCircle className="h-4 w-4" />,
+  "zu-erledigen": <ClipboardList className="h-4 w-4" />,
+  "team-status": <Users className="h-4 w-4" />,
+  "anwesenheitskalender": <Users className="h-4 w-4" />,
+  "stempel-status": <Clock className="h-4 w-4" />,
+  "ma-monat-stunden": <Clock className="h-4 w-4" />,
+  "ma-prognose": <Wallet className="h-4 w-4" />,
+  "ma-naechster-einsatz": <PlayCircle className="h-4 w-4" />,
+  "partner-willkommen": <Handshake className="h-4 w-4" />,
+};
+
+function iconFor(id: string): React.ReactNode {
+  return WIDGET_ICONS[id] ?? <ClipboardList className="h-4 w-4" />;
+}
+
+function spanFor(id: string, mobile: boolean): string {
+  if (mobile) return "col-span-12";
+  return PREVIEW_SPAN[id] ?? "col-span-12";
+}
+
 export function DashboardPreferencesModal({
   open,
   onClose,
@@ -90,6 +180,7 @@ export function DashboardPreferencesModal({
   const [items, setItems] = useState<PreferenceItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mobilePreview, setMobilePreview] = useState(false);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -220,20 +311,22 @@ export function DashboardPreferencesModal({
   // ------------------------------------------------------------------
   // Mutations
   // ------------------------------------------------------------------
-  function move(idx: number, delta: -1 | 1) {
+  function toggleHidden(id: string) {
     setItems((prev) => {
-      const target = idx + delta;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[idx], next[target]] = [next[target], next[idx]];
+      const next = prev.map((it) => (it.id === id ? { ...it, hidden: !it.hidden } : it));
       scheduleSave(next);
       return next;
     });
   }
 
-  function toggleHidden(idx: number) {
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
     setItems((prev) => {
-      const next = prev.map((it, i) => (i === idx ? { ...it, hidden: !it.hidden } : it));
+      const oldIdx = prev.findIndex((i) => i.id === active.id);
+      const newIdx = prev.findIndex((i) => i.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      const next = arrayMove(prev, oldIdx, newIdx);
       scheduleSave(next);
       return next;
     });
@@ -274,37 +367,67 @@ export function DashboardPreferencesModal({
     onClose();
   }
 
+  // dnd-kit Sensoren: PointerSensor mit kleiner Aktivierungs-Distanz, damit
+  // ein reiner Klick auf den Auge-Button NICHT als Drag interpretiert wird.
+  // KeyboardSensor fuer Screenreader/Tastatur-Nutzer.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const sortableIds = useMemo(() => items.map((i) => i.id), [items]);
+
   return (
-    <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="md">
-      <p className="text-xs text-muted-foreground">
-        Blende Widgets aus oder aendere die Reihenfolge — nur fuer dich sichtbar.
-      </p>
+    <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="3xl">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Widgets verschieben, ausblenden oder Reihenfolge aendern — nur fuer dich sichtbar.
+        </p>
+        <PreviewToggle mobile={mobilePreview} onChange={setMobilePreview} />
+      </div>
 
       {!loaded ? (
-        <div className="space-y-1.5">
-          <Skeleton className="h-11" />
-          <Skeleton className="h-11" />
-          <Skeleton className="h-11" />
-          <Skeleton className="h-11" />
+        <div className="rounded-xl border bg-muted/30 p-3">
+          <div className="grid grid-cols-12 gap-2">
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-12" />
+            <Skeleton className="h-16 col-span-6" />
+            <Skeleton className="h-16 col-span-6" />
+          </div>
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">
           Keine Widgets verfuegbar.
         </p>
       ) : (
-        <ul className="space-y-1.5">
-          {items.map((it, idx) => (
-            <PreferenceRow
-              key={it.id}
-              item={it}
-              isFirst={idx === 0}
-              isLast={idx === items.length - 1}
-              onUp={() => move(idx, -1)}
-              onDown={() => move(idx, 1)}
-              onToggle={() => toggleHidden(idx)}
-            />
-          ))}
-        </ul>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+            <div
+              className="rounded-xl border p-3"
+              style={{
+                backgroundColor:
+                  "color-mix(in oklab, var(--foreground) 3%, transparent)",
+              }}
+            >
+              <div className="grid grid-cols-12 gap-2">
+                {items.map((it) => (
+                  <SortablePreviewTile
+                    key={it.id}
+                    item={it}
+                    spanClass={spanFor(it.id, mobilePreview)}
+                    onToggle={() => toggleHidden(it.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       <div className="flex items-center justify-between gap-2 pt-3 border-t">
@@ -331,77 +454,178 @@ export function DashboardPreferencesModal({
 }
 
 // ---------------------------------------------------------------------------
-// Zeile im Modal — state-driven Hover (CLAUDE.md §3, Tailwind `hover:` greift
-// hier unzuverlaessig).
+// Preview-Kachel — sortierbar via dnd-kit; state-driven Hover (CLAUDE.md §3).
+// Die Kachel bildet die Groesse des echten Widgets nach (col-span…), zeigt
+// Icon + Titel und den Sichtbarkeits-Toggle. Der Drag-Handle ist die ganze
+// Kachel-Oberflaeche minus des Auge-Buttons — so kann der User intuitiv
+// irgendwo auf das Widget greifen.
 // ---------------------------------------------------------------------------
 
-function PreferenceRow({
+function SortablePreviewTile({
   item,
-  isFirst,
-  isLast,
-  onUp,
-  onDown,
+  spanClass,
   onToggle,
 }: {
   item: PreferenceItem;
-  isFirst: boolean;
-  isLast: boolean;
-  onUp: () => void;
-  onDown: () => void;
+  spanClass: string;
   onToggle: () => void;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
   const [hover, setHover] = useState(false);
+
+  // CSS.Transform.toString liefert translate3d(...) mit korrekten Werten,
+  // inkl. Fallback wenn transform=null (kein aktives Dragging).
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : undefined,
+    opacity: isDragging ? 0.85 : 1,
+    // Kachel-Hintergrund: hidden = ausgegraut, hover = leichter Boost.
+    backgroundColor: item.hidden
+      ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
+      : hover
+        ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
+        : "var(--card)",
+    // Grip-Cursor nur wenn nicht gerade geklickt (Auge etc handelt eigenen Cursor).
+    cursor: isDragging ? "grabbing" : "grab",
+    // Touch-Action: pan-y ist Standard-Scroll; wir muessen es hier
+    // deaktivieren, sonst schluckt der Browser den Drag-Gesture auf Mobile.
+    touchAction: "none",
+    boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.18)" : undefined,
+  };
+
   return (
-    <li
+    <div
+      ref={setNodeRef}
+      style={style}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors"
-      style={{
-        backgroundColor: hover
-          ? "color-mix(in oklab, var(--foreground) 5%, transparent)"
-          : "transparent",
-      }}
+      className={`${spanClass} relative rounded-lg border transition-colors select-none`}
+      {...attributes}
+      {...listeners}
     >
-      <span className="text-muted-foreground/40 shrink-0" aria-hidden>
-        <GripVertical className="h-4 w-4" />
-      </span>
-      <span
-        className="flex-1 truncate"
-        style={{ opacity: item.hidden ? 0.55 : 1 }}
-      >
-        {item.title}
-      </span>
-      <div className="flex items-center gap-0.5 shrink-0">
-        <button
-          type="button"
-          onClick={onUp}
-          disabled={isFirst}
-          className="icon-btn"
-          aria-label="Nach oben"
-          data-tooltip="Nach oben"
+      <div className="flex items-start gap-2 p-2.5 min-h-16">
+        <span
+          className="mt-0.5 shrink-0 text-muted-foreground/60"
+          aria-hidden
         >
-          <ChevronUp className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onDown}
-          disabled={isLast}
-          className="icon-btn"
-          aria-label="Nach unten"
-          data-tooltip="Nach unten"
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+        <div
+          className="flex-1 min-w-0"
+          style={{ opacity: item.hidden ? 0.55 : 1 }}
         >
-          <ChevronDown className="h-4 w-4" />
-        </button>
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-accent shrink-0">{iconFor(item.id)}</span>
+            <span className="truncate">{item.title}</span>
+          </div>
+          <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
+          <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
+        </div>
+        {/* Auge-Button: eigenes Pointer-Handling, damit Klick NICHT als
+            Drag-Start missinterpretiert wird. stopPropagation reicht,
+            weil der Sensor am Container haengt. */}
         <button
           type="button"
-          onClick={onToggle}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
           className={item.hidden ? "icon-btn" : "icon-btn icon-btn-green"}
           aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
           data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
+          style={{ cursor: "pointer" }}
         >
           {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
-    </li>
+
+      {item.hidden && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--background) 55%, transparent)",
+          }}
+        >
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            ausgeblendet
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kleine Segmented-Control fuer Mobile/Desktop-Vorschau. State-driven Hover
+// pro Segment (CLAUDE.md §3).
+// ---------------------------------------------------------------------------
+
+function PreviewToggle({
+  mobile,
+  onChange,
+}: {
+  mobile: boolean;
+  onChange: (mobile: boolean) => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border p-0.5"
+      role="group"
+      aria-label="Vorschau-Modus"
+    >
+      <SegBtn active={!mobile} onClick={() => onChange(false)} icon={<Monitor className="h-3.5 w-3.5" />}>
+        Desktop
+      </SegBtn>
+      <SegBtn active={mobile} onClick={() => onChange(true)} icon={<Smartphone className="h-3.5 w-3.5" />}>
+        Mobil
+      </SegBtn>
+    </div>
+  );
+}
+
+function SegBtn({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
+      aria-pressed={active}
+      style={{
+        backgroundColor: active
+          ? "color-mix(in oklab, var(--foreground) 10%, transparent)"
+          : hover
+            ? "color-mix(in oklab, var(--foreground) 5%, transparent)"
+            : "transparent",
+        color: active ? "var(--foreground)" : "var(--muted-foreground)",
+        fontWeight: active ? 600 : 500,
+      }}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
