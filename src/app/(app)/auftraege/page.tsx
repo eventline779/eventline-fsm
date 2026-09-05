@@ -671,22 +671,26 @@ export default function AuftraegePage() {
               )}
             <Link href={detailHref} className="block group">
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${isDoneOrCancelled ? "opacity-70" : ""}`}>
+                {/* Warning-Icon absolute oben links, leicht ueber Card hinaus
+                    (-6px/-6px). Bewusst OUT-OF-FLOW, damit die JobNumber im
+                    Card-Inhalt an ihrer Original-Position bleibt — egal ob
+                    Warning aktiv ist oder nicht. */}
+                {warnings.length > 0 && (
+                  <span
+                    className="pointer-events-auto absolute -left-1.5 -top-1.5 z-20 flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+                    data-tooltip={warnings.map((w) => w.label).join(" · ")}
+                    aria-label={warnings.map((w) => w.label).join(" · ")}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
+                  </span>
+                )}
                 {/* Mobile-Variante: 2-Zeilen-Stack damit nichts horizontal
                     rausragt. Zeile 1: Nr | Titel | Action-Icon.
                     Zeile 2: Kunde · Datum + Status-Tags + ggf. Rechnungs-Pille
                     + Step-Tracker. */}
                 <div className="md:hidden px-3 py-2.5 flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 min-w-0">
-                    {warnings.length > 0 && (
-                      <span
-                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 shrink-0"
-                        data-tooltip={warnings.map((w) => w.label).join(" · ")}
-                        aria-label={warnings.map((w) => w.label).join(" · ")}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      >
-                        <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
-                      </span>
-                    )}
                     <JobNumber number={job.job_number} />
                     <span className="auftrag-card-title font-medium text-sm truncate transition-colors flex-1 min-w-0">{job.title}</span>
                     <div className="shrink-0">{renderActionIcon("sm")}</div>
@@ -757,20 +761,12 @@ export default function AuftraegePage() {
                   // + Kunde reicht, Standort steht eh im Detail-View).
                   // Min-Summe: 80+140+0+100+110+90+0+120 = 640px + 7*12 (gap) = 724
                   // -> fits locker ab Card-Inner-Breite ~750px (Browser ~1050px).
-                  style={{ gridTemplateColumns: "minmax(104px, 116px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
+                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
                 >
-                  {/* LINKS — Col 1: (optional) Warning-Info-Icon + Nr-Badge inline */}
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {warnings.length > 0 && (
-                      <span
-                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 shrink-0"
-                        data-tooltip={warnings.map((w) => w.label).join(" · ")}
-                        aria-label={warnings.map((w) => w.label).join(" · ")}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      >
-                        <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
-                      </span>
-                    )}
+                  {/* LINKS — Col 1: Nr-Badge (Warning-Icon sitzt absolute
+                      auf der Card selbst, damit die Nummer hier immer an
+                      derselben Position steht). */}
+                  <div className="flex items-center min-w-0">
                     <JobNumber number={job.job_number} />
                   </div>
 
