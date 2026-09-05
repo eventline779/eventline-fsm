@@ -477,121 +477,100 @@ function HRUebersicht({ isAdmin, onGoto }: { isAdmin: boolean; onGoto: (t: Tab) 
     return () => { cancelled = true; };
   }, [supabase, isAdmin]);
 
+  // Absence-Value kompakt zusammenfassen (Sekundaer-Info in eine Zeile).
+  const absenceValue = !data
+    ? "…"
+    : data.currentAbsent
+      ? `${data.currentAbsent.type} bis ${fmtDate(data.currentAbsent.endIso)}`
+      : "—";
+
   return (
-    <div className="rounded-xl border border-border bg-card divide-y divide-border">
-      {/* Heute-Sektion */}
-      <div className="px-4 py-3">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-          Heute
-        </p>
-        <div className="divide-y divide-border/60">
-          <OverviewRow
-            icon={<Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-            label="Heute gestempelt"
-            value={data ? fmtDur(data.todayMinutes) : "…"}
-            onClick={() => onGoto("stempelzeiten")}
-            tooltip="Zu Stempelzeiten"
-          />
-          <OverviewRow
-            icon={<TicketCheck className="h-4 w-4 text-red-600 dark:text-red-400" />}
-            label="Eigene offene Tickets"
-            value={data ? String(data.openTicketsMine) : "…"}
-            onClick={() => onGoto("tickets")}
-            tooltip="Zu Tickets"
-          />
-          <OverviewRow
-            icon={<Palmtree className="h-4 w-4 text-green-600 dark:text-green-400" />}
-            label="Aktuelle Abwesenheit"
-            value={
-              data
-                ? data.currentAbsent
-                  ? `${data.currentAbsent.type} bis ${fmtDate(data.currentAbsent.endIso)}`
-                  : "Keine"
-                : "…"
-            }
-            onClick={() => onGoto("ferien")}
-            tooltip="Zu Ferien"
-          />
-        </div>
+    <div className="space-y-6">
+      {/* 3 grosse KPI-Kacheln — die drei Kernwerte auf einen Blick.
+          Kein Sektions-Overhead, keine Chevron-Zeilen, keine Untertitel.
+          Klick springt zum jeweiligen Tab. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiCard
+          icon={<Clock className="h-4 w-4" />}
+          label="Diese Woche"
+          value={data ? fmtDur(data.weekMinutes) : "…"}
+          onClick={() => onGoto("stempelzeiten")}
+        />
+        <KpiCard
+          icon={<TicketCheck className="h-4 w-4" />}
+          label="Offene Tickets"
+          value={data ? String(data.openTicketsMine) : "…"}
+          onClick={() => onGoto("tickets")}
+        />
+        <KpiCard
+          icon={<Palmtree className="h-4 w-4" />}
+          label="Ferien / Frei"
+          value={absenceValue}
+          onClick={() => onGoto("ferien")}
+        />
       </div>
 
-      {/* Diese Woche-Sektion */}
-      <div className="px-4 py-3">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-          Diese Woche
-        </p>
-        <div className="divide-y divide-border/60">
-          <OverviewRow
-            icon={<Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-            label="Wochen-Total gestempelt"
-            value={data ? fmtDur(data.weekMinutes) : "…"}
-            onClick={() => onGoto("stempelzeiten")}
-            tooltip="Zu Stempelzeiten"
-          />
-          {data && data.recentDoneTickets.length > 0 ? (
-            <div className="py-2">
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Zuletzt erledigte Tickets
-              </p>
-              <div className="space-y-0.5">
-                {data.recentDoneTickets.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={`/tickets/${t.id}`}
-                    className="block px-2 py-1 rounded-md text-xs hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.06] transition-colors"
-                  >
-                    <span className="font-mono text-muted-foreground mr-2">T-{t.number}</span>
-                    <span className="truncate">{t.title}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : (
-            data && (
-              <div className="py-2 text-xs text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Noch keine erledigten Tickets diese Woche.
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Team-Sektion — nur Admin. Kompakte Vorschau ueber Team-Aktivitaet.
-          Nicht redundant zu den "Meine"-Zeilen oben: hier geht es um
-          Verwaltungs-Blick, nicht persoenlichen Blick. */}
-      {isAdmin && data && (
-        <div className="px-4 py-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-            Team
+      {/* Admin: eine dezente „Zu erledigen"-Zeile — nur wenn wirklich was
+          zu tun ist (Ferien-Antraege > 0 oder Team-Tickets > 0). Ansonsten
+          bleibt die Uebersicht bewusst leer. */}
+      {isAdmin && data && (data.pendingLeaveRequests > 0 || data.openTeamTickets > 0) && (
+        <div className="rounded-xl border border-border bg-card divide-y divide-border/60">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-4 pt-3 pb-2">
+            Zu erledigen
           </p>
-          <div className="divide-y divide-border/60">
-            <OverviewRow
-              icon={<Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
-              label="Team heute gestempelt"
-              value={`${data.teamStampedToday} ${data.teamStampedToday === 1 ? "Person" : "Personen"}`}
-              onClick={() => onGoto("stempelzeiten")}
-              tooltip="Team-Stempelzeiten oeffnen"
-            />
+          {data.pendingLeaveRequests > 0 && (
             <OverviewRow
               icon={<Palmtree className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
-              label="Offene Ferien-Anträge (Team)"
-              value={String(data.pendingLeaveRequests)}
+              label={`${data.pendingLeaveRequests} ${data.pendingLeaveRequests === 1 ? "Ferien-Antrag" : "Ferien-Anträge"} zu prüfen`}
+              value=""
               onClick={() => onGoto("ferien")}
               tooltip="Antraege pruefen"
             />
+          )}
+          {data.openTeamTickets > 0 && (
             <OverviewRow
               icon={<TicketCheck className="h-4 w-4 text-red-600 dark:text-red-400" />}
-              label="Offene Team-Tickets"
-              value={String(data.openTeamTickets)}
+              label={`${data.openTeamTickets} offene Team-Tickets`}
+              value=""
               onClick={() => onGoto("tickets")}
               tooltip="Team-Tickets oeffnen"
             />
-          </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+// KPI-Kachel — kompakt aber grosszuegig: Label oben klein, Wert gross, Icon dezent.
+function KpiCard({
+  icon, label, value, onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        borderColor: hover ? "var(--foreground)" : undefined,
+      }}
+      className="text-left rounded-xl border border-border bg-card p-4 transition-colors group"
+    >
+      <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wider mb-2">
+        <span className="opacity-70">{icon}</span>
+        {label}
+      </div>
+      <div className="text-2xl font-semibold tabular-nums truncate">
+        {value}
+      </div>
+    </button>
   );
 }
 
