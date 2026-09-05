@@ -33,7 +33,6 @@ import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-car
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
 import { StempelStatusCard } from "@/components/dashboard/stempel-status-card";
 import { DashboardPreferencesModal } from "@/components/dashboard/dashboard-preferences-modal";
-import { widgetById, widgetSizeClasses, type WidgetId, type WidgetSize } from "@/lib/dashboard-widgets";
 
 // ---------------------------------------------------------------------------
 // Payload-Typen (Spiegel zu /api/dashboard)
@@ -127,34 +126,31 @@ function fmtDateTime(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Widget-Layout — uniformes 2-Spalten-Raster
+// Widget-Layout — Column-Spans pro Widget im 12-Col-Grid
 // ---------------------------------------------------------------------------
-//
-// Das Dashboard rendert alle Widgets in EIN Raster:
-//   Desktop (md+): 2 gleich breite Spalten, Zeilen mind. 180 px (koennen
-//                  wachsen falls Inhalt mehr braucht — dann waechst die ganze
-//                  Zeile mit).
-//   Mobile:        1 Spalte, alles linear untereinander — col-span/row-span
-//                  sind bewusst nur unter `md:` aktiv (siehe
-//                  widgetSizeClasses() in src/lib/dashboard-widgets.ts), damit
-//                  nichts durcheinanderrutscht.
-//
-// Die Groesse pro Widget (1x1 / 2x1 / 1x2 / 2x2) steht als `size`-Feld in der
-// Registry (src/lib/dashboard-widgets.ts). Fehlt der Registry-Eintrag (alte
-// DB-Layout-Reste), faellt das Widget auf 1x1 zurueck.
 
-const DASHBOARD_GRID_CLASSES =
-  "grid grid-cols-1 md:grid-cols-2 gap-4 md:auto-rows-[minmax(180px,auto)]";
-
-function gridItemClasses(id: string): string {
-  const size: WidgetSize = widgetById(id as WidgetId)?.size ?? "1x1";
-  const sizeClasses = widgetSizeClasses(size);
-  // - min-h-[180px]: garantierte Grundhoehe pro Zelle (auch auf Mobile).
-  // - [&>*]:h-full: zwingt das Widget-Root (section/Link/Card…) auf 100 %
-  //   Zellhoehe, damit alle Kacheln in einer Reihe visuell buendig sind
-  //   ohne dass jede Einzelkomponente h-full mitbringen muss.
-  return ["min-h-[180px]", "[&>*]:h-full", sizeClasses].filter(Boolean).join(" ");
-}
+/** Wie breit jedes Widget im Grid ist. Fehlt ein Eintrag -> volle Breite.
+ *  Wir gruppieren nicht extra "KPI-Reihen" — das Grid packt automatisch
+ *  drei benachbarte 4/12-Widgets in eine Reihe. Wird ein KPI-Widget vom User
+ *  ausgeblendet, ruecken die anderen automatisch nach.
+ *
+ *  WICHTIG: 1:1-Spiegel zu PREVIEW_SPAN in
+ *  src/components/dashboard/dashboard-preferences-modal.tsx — bei Aenderung
+ *  dort nachziehen, damit die Vorschau im Modal dieselbe Aufteilung zeigt. */
+const WIDGET_SPAN: Record<string, string> = {
+  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
+  "kpi-termine-woche": "col-span-12 sm:col-span-4",
+  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
+  "overdue-jobs": "col-span-12",
+  "zu-erledigen": "col-span-12 lg:col-span-6",
+  "team-status": "col-span-12 lg:col-span-6",
+  "anwesenheitskalender": "col-span-12",
+  "stempel-status": "col-span-12 lg:col-span-6",
+  "ma-monat-stunden": "col-span-12 lg:col-span-6",
+  "ma-prognose": "col-span-12 lg:col-span-6",
+  "ma-naechster-einsatz": "col-span-12",
+  "partner-willkommen": "col-span-12",
+};
 
 interface RenderContext {
   admin: AdminData | null;
@@ -324,13 +320,13 @@ export default function DashboardPage() {
           Alle Widgets sind ausgeblendet. Klick oben rechts auf das Zahnrad, um wieder Widgets einzublenden.
         </div>
       ) : (
-        <div className={DASHBOARD_GRID_CLASSES}>
+        <div className="grid grid-cols-12 gap-4">
           {widgets.map((id) => {
             const render = WIDGET_RENDERERS[id];
             const node = render?.(ctx);
             if (!node) return null;
             return (
-              <div key={id} className={gridItemClasses(id)}>
+              <div key={id} className={WIDGET_SPAN[id] ?? "col-span-12"}>
                 {node}
               </div>
             );
