@@ -5,10 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JOB_STATUS, REQUEST_STEPS, REQUEST_MAIL_STEPS } from "@/lib/constants";
+import { JOB_STATUS } from "@/lib/constants";
 import type { JobStatus, Profile, JobWithRelations } from "@/types";
 import Link from "next/link";
-import { RequestStepTracker } from "@/components/request-step-tracker";
 import {
   Plus,
   Search,
@@ -17,9 +16,7 @@ import {
   AlertCircle,
   Archive,
   X,
-  Pencil,
   Check,
-  Send,
   ChevronDown,
   ExternalLink,
   UserPlus,
@@ -41,10 +38,8 @@ const ACTIVE_PAGE_SIZE = 30;
 const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, appointments:job_appointments(id, start_time, assigned_to), service_reports(status)";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
-import { SendStepModal } from "@/components/send-step-modal";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/use-permissions";
-import { TOAST } from "@/lib/messages";
 
 type DonutCounts = {
   anfrage: number;
@@ -86,21 +81,20 @@ export default function AuftraegePage() {
   const [searchTitle, setSearchTitle] = useState(() => typeof window !== "undefined" ? localStorage.getItem("auftraege-search-title") || "" : "");
   const [filterStatus, setFilterStatus] = useState<JobStatus | "all">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-status") as JobStatus | "all") || "all" : "all");
   const [filterLocation, setFilterLocation] = useState<"all" | "scala" | "barakuba" | "bau3" | "sonstige">(() => typeof window !== "undefined" ? (localStorage.getItem("auftraege-location") as "all" | "scala" | "barakuba" | "bau3" | "sonstige" | null) || "all" : "all");
-  // Segment-Toggle (Audit Thema 5, Regel 4). Drei disjunkte Ansichten:
-  //   anfragen: Vermietentwuerfe / Entwuerfe / Partner-Anfragen (Pipeline)
-  //   aktiv:    freigegebene Auftraege (status=offen)
-  //   archiv:   abgeschlossen + storniert
+  // Segment-Toggle. Zwei disjunkte Ansichten:
+  //   aktiv:  freigegebene Auftraege (status=offen)
+  //   archiv: abgeschlossen + storniert
   // Zustand lebt in ?segment=... (URL-persist + teilbar) mit localStorage-
   // Fallback fuer die naechste Session; Default=aktiv.
   const searchParams = useSearchParams();
   const router = useRouter();
-  type Segment = "anfragen" | "aktiv" | "archiv";
+  type Segment = "aktiv" | "archiv";
   function resolveInitialSegment(): Segment {
     if (typeof window === "undefined") return "aktiv";
     const fromUrl = searchParams.get("segment");
-    if (fromUrl === "anfragen" || fromUrl === "aktiv" || fromUrl === "archiv") return fromUrl;
+    if (fromUrl === "aktiv" || fromUrl === "archiv") return fromUrl;
     const fromLs = localStorage.getItem("auftraege-segment");
-    if (fromLs === "anfragen" || fromLs === "aktiv" || fromLs === "archiv") return fromLs;
+    if (fromLs === "aktiv" || fromLs === "archiv") return fromLs;
     // Kompatibilitaet: alter localStorage-Key "auftraege-archive"=true → archiv.
     if (localStorage.getItem("auftraege-archive") === "true") return "archiv";
     return "aktiv";
@@ -122,12 +116,6 @@ export default function AuftraegePage() {
   const [exportTo, setExportTo] = useState<string>("");
   const [exportInProgress, setExportInProgress] = useState(false);
   const [loading, setLoading] = useState(true);
-  // Inline-Step-Aktion: welche Anfrage-Karte hat aktuell das Mail-Modal offen?
-  const [activeStepJobId, setActiveStepJobId] = useState<string | null>(null);
-  // Doppelklick-Schutz: schneller Re-Klick auf "Naechster Schritt" sonst
-  // zwei parallele UPDATEs gegen die jobs-Row, dazwischen Realtime-Refresh
-  // mit unklarer Endposition. Disabled solange der eine Call lauft.
-  const [advancingId, setAdvancingId] = useState<string | null>(null);
   const supabase = createClient();
 
   // Race-Guard fuer Archive-Queries (alte Antworten verwerfen, wenn neuere unterwegs sind)
@@ -154,56 +142,6 @@ export default function AuftraegePage() {
     return () => window.removeEventListener("jobs:invalidate", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segment]);
-
-  // Step-Advance fuer eine Anfrage. Bei Mail-Schritten oeffnet das Modal das selber.
-  // Bei Warte-Schritten (2, 4) direkter UPDATE.
-  // Nach Schritt 4 (Angebot bestaetigt) -> direkt umwandeln in Auftrag
-  // (status='offen', kein Entwurf-Zwischenschritt). was_anfrage bleibt true.
-  async function advanceAnfrageStep(jobId: string) {
-    if (advancingId) return; // bereits ein Advance im Flug
-    const job = activeJobs.find((j) => j.id === jobId);
-    if (!job?.request_step) return;
-    setAdvancingId(jobId);
-    try {
-      const nextStep = job.request_step + 1;
-      if (nextStep > 4) {
-        // Schritt 4 erledigt -> Vermietentwurf -> Auftrag (offen)
-        const { error } = await supabase
-          .from("jobs")
-          .update({ status: "offen", request_step: null })
-          .eq("id", jobId);
-        if (error) {
-          TOAST.supabaseError(error);
-          return;
-        }
-        toast.success("Vermietentwurf in Auftrag umgewandelt");
-        window.dispatchEvent(new Event("jobs:invalidate"));
-        return;
-      }
-      const { error } = await supabase
-        .from("jobs")
-        .update({ request_step: nextStep })
-        .eq("id", jobId);
-      if (error) {
-        TOAST.supabaseError(error);
-        return;
-      }
-      toast.success(REQUEST_STEPS[nextStep - 1].label);
-      window.dispatchEvent(new Event("jobs:invalidate"));
-    } finally {
-      setAdvancingId(null);
-    }
-  }
-
-  async function handleAnfrageNext(jobId: string) {
-    const job = activeJobs.find((j) => j.id === jobId);
-    if (!job?.request_step) return;
-    if (REQUEST_MAIL_STEPS.has(job.request_step)) {
-      setActiveStepJobId(jobId);
-      return;
-    }
-    await advanceAnfrageStep(jobId);
-  }
 
   // Counts kommen aus 6 parallelen Count-Queries (head:true, kein Datenbody).
   // Damit ist der Donut entkoppelt vom geladenen State und auch bei paginierter
@@ -232,17 +170,11 @@ export default function AuftraegePage() {
       .from("jobs")
       .select(JOBS_SELECT)
       .neq("is_deleted", true)
-      .or(cancelledFilter);
-    // Segment-Filter (Audit Thema 5, Regel 4):
-    //   anfragen: Vermietentwurf/Entwurf/Partner-Anfrage (Pipeline)
-    //   aktiv:    freigegebene Auftraege (offen)
-    // Archiv-Segment nutzt den separaten buildArchiveQuery.
-    if (segment === "anfragen") {
-      q = q.in("status", ["anfrage", "entwurf", "partner_anfrage"]);
-    } else {
-      // aktiv (partner_entwurf gehoert nur ins Partnerportal)
-      q = q.eq("status", "offen");
-    }
+      .or(cancelledFilter)
+      // aktiv-Segment: freigegebene Auftraege (partner_entwurf gehoert nur
+      // ins Partnerportal, Anfragen/Entwuerfe/Partner-Anfragen laufen ausserhalb
+      // dieser Liste).
+      .eq("status", "offen");
     if (cursor !== null) {
       // Composite-cursor: (start_date > c.start) OR (start_date = c.start AND id > c.id).
       // start_date null = Entwuerfe ohne Datum — kommen zuletzt (NULLS LAST).
@@ -256,7 +188,7 @@ export default function AuftraegePage() {
       .order("start_date", { ascending: true, nullsFirst: false })
       .order("id", { ascending: true })
       .limit(ACTIVE_PAGE_SIZE + 1);
-  }, [supabase, segment]);
+  }, [supabase]);
 
   async function loadActiveAndCounts() {
     const [activeRes, profRes, freshCounts] = await Promise.all([
@@ -379,9 +311,7 @@ export default function AuftraegePage() {
       : activeJobs;
   const totalForSource = segment === "archiv"
     ? counts.abgeschlossen + counts.storniert
-    : segment === "anfragen"
-      ? counts.anfrage + counts.entwurf
-      : counts.offen;
+    : counts.offen;
   const filtered = sourceJobs.filter((j) => {
     const numQ = searchNumber.trim();
     const titleQ = searchTitle.trim().toLowerCase();
@@ -418,53 +348,39 @@ export default function AuftraegePage() {
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {segment === "archiv" ? "Operations Archiv" : segment === "anfragen" ? "Anfragen" : "Operations"}
+            {segment === "archiv" ? "Auftraege — Archiv" : "Auftraege"}
           </h1>
           {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
               identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
               auf gleicher Linie sitzen wie auf den anderen Seiten. */}
           <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
         </div>
-        {/* Action-Buttons — Segment-Toggle links, dann kontext-spezifische
-            Aktionen. Visuelle Grammatik (Audit Thema 5, Regel 1):
-            "Neuer Auftrag" ist positive Primaeraktion → kasten-blue,
-            nicht kasten-red (rot bleibt destruktiven Aktionen vorbehalten). */}
+        {/* Action-Buttons — EIN Toggle-Button (zeigt das jeweils andere
+            Segment), dann kontext-spezifische Aktionen. "Neuer Auftrag" ist
+            EVENTLINE-Brand-Primaeraktion und daher rot (Rot ist hier
+            Brand-Farbe, nicht destruktiv). */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Segment-Toggle [Anfragen · Aktiv · Archiv] (Audit Thema 5,
-              Regel 4). Zaehler kommen aus der counts-View, entkoppelt vom
-              geladenen State. */}
-          <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Auftragssegment">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={segment === "anfragen"}
-              onClick={() => selectSegment("anfragen")}
-              className={segment === "anfragen" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
-            >
-              <Send className="h-3.5 w-3.5" />
-              Anfragen ({counts.anfrage + counts.entwurf})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={segment === "aktiv"}
-              onClick={() => selectSegment("aktiv")}
-              className={segment === "aktiv" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
-            >
-              <ClipboardList className="h-3.5 w-3.5" />
-              Aktiv ({counts.offen})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={segment === "archiv"}
-              onClick={() => selectSegment("archiv")}
-              className={segment === "archiv" ? "kasten kasten-active" : "kasten kasten-toggle-off"}
-            >
-              <Archive className="h-3.5 w-3.5" />
-              Archiv ({counts.abgeschlossen + counts.storniert})
-            </button>
-          </div>
+          {/* Ein Toggle-Button: klickt zwischen Aktiv- und Archiv-View um.
+              Label + Icon zeigen das jeweils *andere* Segment, in das der
+              Klick fuehrt. Zaehler kommt aus der counts-View. */}
+          <button
+            type="button"
+            onClick={() => selectSegment(segment === "aktiv" ? "archiv" : "aktiv")}
+            className="kasten kasten-muted"
+            aria-label={segment === "aktiv" ? "Zum Archiv wechseln" : "Zu aktiven Auftraegen wechseln"}
+          >
+            {segment === "aktiv" ? (
+              <>
+                <Archive className="h-3.5 w-3.5" />
+                Archiv ({counts.abgeschlossen + counts.storniert})
+              </>
+            ) : (
+              <>
+                <ClipboardList className="h-3.5 w-3.5" />
+                Aktiv ({counts.offen})
+              </>
+            )}
+          </button>
           {segment === "archiv" && can("auftraege:see-all") && (
             <button
               onClick={() => {
@@ -494,7 +410,7 @@ export default function AuftraegePage() {
                 <span className="hidden sm:inline">Neuer Vermietentwurf</span>
                 <span className="sm:hidden">Vermietung</span>
               </Link>
-              <Link href="/auftraege/neu" className="kasten kasten-blue" data-tooltip="Neuer Auftrag">
+              <Link href="/auftraege/neu" className="kasten kasten-red" data-tooltip="Neuer Auftrag">
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Neuer Auftrag</span>
                 <span className="sm:hidden">Auftrag</span>
@@ -643,7 +559,7 @@ export default function AuftraegePage() {
                           <Plus className="h-3.5 w-3.5" />
                           Neuer Vermietentwurf
                         </Link>
-                        <Link href="/auftraege/neu" className="kasten kasten-blue">
+                        <Link href="/auftraege/neu" className="kasten kasten-red">
                           <Plus className="h-3.5 w-3.5" />
                           Neuer Auftrag
                         </Link>
@@ -676,18 +592,13 @@ export default function AuftraegePage() {
             // zuteilen bevor's als "alles bereit" zaehlt.
             const hasAssignedAppointment = !!(appointments && appointments.some((a) => a.assigned_to));
             const isActive = !["abgeschlossen", "storniert"].includes(job.status);
-            const isAnfrage = job.status === "anfrage";
             // Kunde-Fallback: Standort-Auftraege haben jobs.customer_id = NULL,
             // weil der Kunde implizit der Verwaltungs-Kunde des Standorts ist.
             const displayCustomerName = job.customer?.name ?? job.location?.customer?.name ?? null;
-            const placeLabel = job.location?.name ?? job.room?.name ?? job.external_address ?? null;
-            const currentStep = Math.min(Math.max(job.request_step ?? 1, 1), REQUEST_STEPS.length);
-            const stepInfo = REQUEST_STEPS[currentStep - 1];
-            const isMailStep = REQUEST_MAIL_STEPS.has(currentStep);
-            const noTermin = isActive && !hasAppointment && job.status !== "entwurf" && !isAnfrage;
-            const terminUnassigned = isActive && hasAppointment && !hasAssignedAppointment && job.status !== "entwurf" && !isAnfrage;
-            const allGood = isActive && hasAppointment && hasAssignedAppointment && job.status !== "entwurf" && !isAnfrage;
-            const detailHref = isAnfrage ? `/auftraege/vermietentwurf/${job.id}` : `/auftraege/${job.id}`;
+            const noTermin = isActive && !hasAppointment;
+            const terminUnassigned = isActive && hasAppointment && !hasAssignedAppointment;
+            const allGood = isActive && hasAppointment && hasAssignedAppointment;
+            const detailHref = `/auftraege/${job.id}`;
             // "Rapport-Entwurf"-Pille: nur wenn ein offener Entwurf existiert
             // und der Auftrag noch nicht abgeschlossen ist (Entwurf auf einem
             // abgeschlossenen Auftrag ist unmoeglich per DB-Trigger, aber wir
@@ -698,31 +609,13 @@ export default function AuftraegePage() {
                 + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
               : "";
 
-            // Action-Icon-Logik: kleines Icon in der Compact-Zeile.
-            // Volle Action-Behandlung (Send-Modal, Bearbeiten-Page, Termin-Plan)
-            // bleibt identisch zum vorherigen Verhalten.
+            // Action-Icon-Logik: kleines Icon in der Compact-Zeile —
+            // Termin-Zustand des Auftrags (kein Termin / nicht zugewiesen /
+            // alles bereit). Anfrage- und Entwurf-Jobs erscheinen nicht in
+            // dieser Liste (Aktiv=offen, Archiv=abgeschlossen+storniert).
             function renderActionIcon(size: "sm") {
               const iconCls = size === "sm" ? "h-4 w-4" : "h-5 w-5";
               const padCls = size === "sm" ? "p-1.5" : "p-2.5";
-              if (isAnfrage) {
-                if (isMailStep) return (
-                  <button type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAnfrageNext(job.id); }}
-                    disabled={advancingId === job.id}
-                    className={`${padCls} rounded-lg text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors disabled:opacity-40 disabled:pointer-events-none`}
-                    aria-label={stepInfo.label}
-                  >
-                    <Send className={iconCls} />
-                  </button>
-                );
-                return null;
-              }
-              if (job.status === "entwurf") return (
-                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}/bearbeiten`); }}
-                  className={`${padCls} rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors`} aria-label="Bearbeiten">
-                  <Pencil className={iconCls} />
-                </button>
-              );
               if (noTermin) return (
                 <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/auftraege/${job.id}?termin=neu`); }}
                   className={`${padCls} rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors`} aria-label="Termin planen">
@@ -767,9 +660,7 @@ export default function AuftraegePage() {
               )}
             <WarningCard warnings={warnings}>
             <Link href={detailHref} className="block group">
-              <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${
-                job.status === "entwurf" ? "border-dashed opacity-80" : ""
-              } ${isDoneOrCancelled ? "opacity-70" : ""}`}>
+              <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${isDoneOrCancelled ? "opacity-70" : ""}`}>
                 {/* Mobile-Variante: 2-Zeilen-Stack damit nichts horizontal
                     rausragt. Zeile 1: Nr | Titel | Action-Icon.
                     Zeile 2: Kunde · Datum + Status-Tags + ggf. Rechnungs-Pille
@@ -824,11 +715,6 @@ export default function AuftraegePage() {
                       )}
                     </div>
                   </div>
-                  {isAnfrage && (
-                    <div className="flex justify-end mt-0.5">
-                      <RequestStepTracker currentStep={currentStep} size="sm" />
-                    </div>
-                  )}
                 </div>
 
                 {/* Desktop Drei-Zonen-Layout (wie Leo's Skizze):
@@ -906,10 +792,7 @@ export default function AuftraegePage() {
                   {/* Col 8: Spacer (1fr) — leer */}
                   <div />
 
-                  {/* RECHTS — Col 9: Rechnungs-Pille / Hint / Aktion-Icon
-                      + bei Anfragen darunter direkt der Step-Tracker
-                      (vorher in eigener Zeile mit Luecke — jetzt eng
-                      gestackt). */}
+                  {/* RECHTS — Col 9: Rechnungs-Pille / Hint / Aktion-Icon. */}
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <div className="flex items-center gap-1.5 justify-end">
                       {job.invoiced_at && job.invoice_number && (
@@ -945,25 +828,12 @@ export default function AuftraegePage() {
                           Keine Rechnung
                         </span>
                       )}
-                      {isAnfrage && isMailStep && (
-                        <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
-                          {stepInfo.label}
-                        </span>
-                      )}
-                      {isAnfrage && !isMailStep && (
-                        <span className="text-xs font-medium whitespace-nowrap text-purple-700 dark:text-purple-300">
-                          Manuell in Details bestätigen
-                        </span>
-                      )}
                       {/* Termin-Warnungen ("Kein Termin", "Nicht zugewiesen")
                           werden ab Audit Thema 5 Regel 2 als WarningCard-
                           Border oben angezeigt — die Textzeile hier wuerde
                           die Warnung ein zweites Mal rendern. */}
                       {renderActionIcon("sm")}
                     </div>
-                    {isAnfrage && (
-                      <RequestStepTracker currentStep={currentStep} size="sm" />
-                    )}
                   </div>
                 </div>
               </Card>
@@ -1000,31 +870,6 @@ export default function AuftraegePage() {
           )}
         </div>
       )}
-
-      {/* Inline-Mail-Modal fuer Vermietentwuerfe — wird vom "Nächster Schritt"-Button auf jeder
-          Anfrage-Karte gefuettert. Beim Bestaetigen ruft onAdvance den entsprechenden
-          Step-+1 (oder oeffnet den Convert-Modal) auf. */}
-      {(() => {
-        // Nur Active-Anfragen bekommen das Mail-Modal — Anfragen sind nie im Archiv.
-        const activeJob = activeStepJobId ? activeJobs.find((j) => j.id === activeStepJobId) ?? null : null;
-        if (!activeJob) return null;
-        const customer = activeJob.customer;
-        const location = activeJob.location;
-        return (
-          <SendStepModal
-            open={true}
-            jobId={activeJob.id}
-            step={(activeJob.request_step ?? 1) as 1 | 2 | 3 | 4}
-            customerEmail={customer?.email ?? ""}
-            customerName={customer?.name ?? null}
-            locationName={location?.name ?? null}
-            eventDate={activeJob.start_date}
-            eventEndDate={activeJob.end_date}
-            onClose={() => setActiveStepJobId(null)}
-            onAdvance={() => advanceAnfrageStep(activeJob.id)}
-          />
-        );
-      })()}
 
       <Modal
         open={showRapportExport}
