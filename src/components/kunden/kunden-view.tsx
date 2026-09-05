@@ -295,7 +295,7 @@ export function KundenView({ embedded = false }: Props = {}) {
               {showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}
             </button>
             {!showArchive && can("kunden:create") && (
-              <Link href="/kunden/neu" className="kasten kasten-blue">
+              <Link href="/kunden/neu" className="kasten kasten-red">
                 <Plus className="h-3.5 w-3.5" />
                 Neuer Kunde
               </Link>
@@ -378,7 +378,7 @@ export function KundenView({ embedded = false }: Props = {}) {
                 {showArchive ? "Aktive" : `Archiv (${archiveCount})`}
               </button>
               {!showArchive && can("kunden:create") && (
-                <Link href="/kunden/neu" className="kasten kasten-blue">
+                <Link href="/kunden/neu" className="kasten kasten-red">
                   <Plus className="h-3.5 w-3.5" />
                   Neuer Kunde
                 </Link>
@@ -421,7 +421,7 @@ export function KundenView({ embedded = false }: Props = {}) {
             }
             action={
               !hasFilter && !showArchive ? (
-                <Link href="/kunden/neu" className="kasten kasten-blue inline-flex items-center gap-1.5">
+                <Link href="/kunden/neu" className="kasten kasten-red inline-flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" />
                   Kunde anlegen
                 </Link>

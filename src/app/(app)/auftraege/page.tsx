@@ -396,7 +396,7 @@ export default function AuftraegePage() {
                 }
                 setShowRapportExport(true);
               }}
-              className="kasten kasten-blue"
+              className="kasten kasten-red"
               data-tooltip="Alle abgeschlossenen Rapporte im Zeitraum als ZIP herunterladen"
             >
               <Download className="h-3.5 w-3.5" />
@@ -930,7 +930,7 @@ export default function AuftraegePage() {
                 }
               }}
               disabled={exportInProgress}
-              className="kasten kasten-blue flex-1"
+              className="kasten kasten-red flex-1"
             >
               <Download className="h-3.5 w-3.5" />
               {exportInProgress ? "Generiere…" : "Download"}

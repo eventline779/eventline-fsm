@@ -157,7 +157,7 @@ export default function ProjektePage() {
             <span className="hidden sm:inline">{showArchive ? "Aktive anzeigen" : `Archiv (${archiveCount})`}</span>
             <span className="sm:hidden">{showArchive ? "Aktiv" : `Archiv (${archiveCount})`}</span>
           </button>
-          <Link href="/projekte/neu" className="kasten kasten-blue">
+          <Link href="/projekte/neu" className="kasten kasten-red">
             <Plus className="h-3.5 w-3.5" /> Neues Projekt
           </Link>
         </div>
@@ -179,7 +179,7 @@ export default function ProjektePage() {
             }
             action={
               rows.length === 0 ? (
-                <Link href="/projekte/neu" className="kasten kasten-blue inline-flex items-center gap-1.5">
+                <Link href="/projekte/neu" className="kasten kasten-red inline-flex items-center gap-1.5">
                   <Plus className="h-3.5 w-3.5" />
                   Erstes Projekt anlegen
                 </Link>

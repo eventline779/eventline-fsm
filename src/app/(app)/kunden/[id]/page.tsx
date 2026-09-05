@@ -512,7 +512,7 @@ export default function KundenDetailPage() {
           {/* Direkt-Pfad: Auftrag fuer DIESEN Kunden anlegen — vorher musste
               der User zur globalen /auftraege/neu und Kunden manuell suchen. */}
           {can("auftraege:create") && (
-            <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue">
+            <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red">
               <Plus className="h-3.5 w-3.5" />
               Auftrag
             </Link>
@@ -526,7 +526,7 @@ export default function KundenDetailPage() {
               description="Auftraege fuer diesen Kunden erscheinen hier."
               action={
                 can("auftraege:create") ? (
-                  <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-blue inline-flex items-center gap-1.5">
+                  <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red inline-flex items-center gap-1.5">
                     <Plus className="h-3.5 w-3.5" />
                     Ersten Auftrag anlegen
                   </Link>

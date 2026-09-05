@@ -167,7 +167,7 @@ export function LohndokumenteAdmin() {
             </div>
             {selectedEmployee && (
               <>
-                <button type="button" onClick={() => setGenerateOpen(true)} className="kasten kasten-blue">
+                <button type="button" onClick={() => setGenerateOpen(true)} className="kasten kasten-red">
                   <Sparkles className="h-3.5 w-3.5" /> Monats-Abrechnung generieren
                 </button>
                 <button type="button" onClick={() => setUploadOpen(true)} className="kasten kasten-muted">
@@ -366,7 +366,7 @@ function GenerateModal({ open, onClose, profileId, employee, onDone }: { open: b
         </div>
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={onClose} disabled={busy} className="kasten kasten-muted flex-1">Abbrechen</button>
-          <button type="button" onClick={submit} disabled={busy} className="kasten kasten-blue flex-1">
+          <button type="button" onClick={submit} disabled={busy} className="kasten kasten-red flex-1">
             {busy ? "Generiert…" : <><Plus className="h-3.5 w-3.5" /> Generieren</>}
           </button>
         </div>
