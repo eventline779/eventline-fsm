@@ -21,7 +21,6 @@ import {
 import { Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
-import { TopHeader } from "@/components/shell/top-header";
 import { Spinner } from "@/components/ui/spinner";
 import { useTheme } from "next-themes";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
@@ -308,7 +307,6 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         id="app-scroll"
         className="flex-1 flex flex-col pb-[calc(env(safe-area-inset-bottom)+200px)] md:pb-0 min-w-0 overflow-x-hidden md:ml-[240px]"
       >
-        <TopHeader />
         <Breadcrumbs />
         <main
           className="flex-1 p-4 pt-[calc(env(safe-area-inset-top)+16px)] md:px-10 md:py-8 md:pt-6 max-w-[1280px] w-full mx-auto min-w-0"

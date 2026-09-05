@@ -20,6 +20,7 @@ import {
 import { useTheme } from "next-themes";
 import { useNavCounts, getBadgeForHref } from "@/lib/use-nav-counts";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
+import { CommandPaletteTrigger } from "@/components/shell/command-palette";
 import type { Profile } from "@/types";
 
 interface SidebarProps {
@@ -99,7 +100,10 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
         </Link>
       </div>
 
-      {/* Cmd-K Trigger ist jetzt im Top-Header (breiter, prominenter). */}
+      {/* Cmd-K Trigger direkt unter dem Logo — hoechste Discoverability. */}
+      <div className="px-3 pb-2">
+        <CommandPaletteTrigger />
+      </div>
 
       {/* Navigation — mask-image fade nur an Raendern wo tatsaechlich noch
           Content zu scrollen ist (siehe useEffect oben). Top-Items
