@@ -425,7 +425,7 @@ function TodoRow({
       className={`inline-flex items-center justify-center min-w-[1.75rem] h-6 px-2 rounded-full text-xs font-semibold tabular-nums ${
         urgent
           ? "bg-red-500/15 text-red-700 dark:text-red-300"
-          : "bg-accent/15 text-accent"
+          : "bg-foreground/10 text-foreground/80 dark:bg-foreground/15"
       }`}
     >
       {count}
