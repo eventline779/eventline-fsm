@@ -21,11 +21,12 @@ import {
   ExternalLink,
   UserPlus,
   Download,
+  Info,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
-import { WarningCard } from "@/components/ui/warning-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { BackButton } from "@/components/ui/back-button";
 
 // Kleinere Page-Size = "Mehr laden" wird sichtbar, schnellerer initial-Load.
 // Beide Listen jetzt server-seitig nach start_date sortiert damit Pagination
@@ -343,17 +344,25 @@ export default function AuftraegePage() {
     return bSort - aSort;
   });
 
+  // BackButton zeigen wenn User vom Dashboard hierhergekommen ist
+  // (Dashboard-Link setzt ?from=dashboard). Bei normaler Sidebar-Navigation
+  // kein Zurueck-Pfeil, damit Header nicht unnoetig zugestellt wird.
+  const fromDashboard = searchParams.get("from") === "dashboard";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {segment === "archiv" ? "Auftraege — Archiv" : "Auftraege"}
-          </h1>
-          {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
-              identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
-              auf gleicher Linie sitzen wie auf den anderen Seiten. */}
-          <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
+        <div className="flex items-center gap-3 min-w-0">
+          {fromDashboard && <BackButton fallbackHref="/dashboard" />}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {segment === "archiv" ? "Auftraege — Archiv" : "Auftraege"}
+            </h1>
+            {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
+                identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
+                auf gleicher Linie sitzen wie auf den anderen Seiten. */}
+            <p className="text-sm text-muted-foreground mt-1" aria-hidden="true">&nbsp;</p>
+          </div>
         </div>
         {/* Action-Buttons — EIN Toggle-Button (zeigt das jeweils andere
             Segment), dann kontext-spezifische Aktionen. "Neuer Auftrag" ist
@@ -660,7 +669,6 @@ export default function AuftraegePage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
               )}
-            <WarningCard warnings={warnings}>
             <Link href={detailHref} className="block group">
               <Card className={`auftrag-card-hover relative bg-card cursor-pointer ${isDoneOrCancelled ? "opacity-70" : ""}`}>
                 {/* Mobile-Variante: 2-Zeilen-Stack damit nichts horizontal
@@ -669,6 +677,16 @@ export default function AuftraegePage() {
                     + Step-Tracker. */}
                 <div className="md:hidden px-3 py-2.5 flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 min-w-0">
+                    {warnings.length > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 shrink-0"
+                        data-tooltip={warnings.map((w) => w.label).join(" · ")}
+                        aria-label={warnings.map((w) => w.label).join(" · ")}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      >
+                        <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
+                      </span>
+                    )}
                     <JobNumber number={job.job_number} />
                     <span className="auftrag-card-title font-medium text-sm truncate transition-colors flex-1 min-w-0">{job.title}</span>
                     <div className="shrink-0">{renderActionIcon("sm")}</div>
@@ -739,10 +757,22 @@ export default function AuftraegePage() {
                   // + Kunde reicht, Standort steht eh im Detail-View).
                   // Min-Summe: 80+140+0+100+110+90+0+120 = 640px + 7*12 (gap) = 724
                   // -> fits locker ab Card-Inner-Breite ~750px (Browser ~1050px).
-                  style={{ gridTemplateColumns: "minmax(80px, 92px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
+                  style={{ gridTemplateColumns: "minmax(104px, 116px) minmax(140px, 260px) minmax(0, 1fr) minmax(100px, 150px) minmax(110px, 150px) minmax(90px, 130px) minmax(0, 1fr) minmax(120px, 170px)" }}
                 >
-                  {/* LINKS — Col 1: Nr-Badge */}
-                  <JobNumber number={job.job_number} />
+                  {/* LINKS — Col 1: (optional) Warning-Info-Icon + Nr-Badge inline */}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {warnings.length > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-100 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 shrink-0"
+                        data-tooltip={warnings.map((w) => w.label).join(" · ")}
+                        aria-label={warnings.map((w) => w.label).join(" · ")}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      >
+                        <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
+                      </span>
+                    )}
+                    <JobNumber number={job.job_number} />
+                  </div>
 
                   {/* LINKS — Col 2: Titel (fixed width, truncate) */}
                   <span className="auftrag-card-title font-medium text-sm truncate transition-colors min-w-0">{job.title}</span>
@@ -840,7 +870,6 @@ export default function AuftraegePage() {
                 </div>
               </Card>
             </Link>
-            </WarningCard>
             </div>
             );
           })}
