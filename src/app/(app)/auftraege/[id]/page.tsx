@@ -322,7 +322,6 @@ export default function AuftragDetailPage() {
             currentUserId={currentUserId}
             onOpenRapport={() => setShowRapportModal(true)}
             onRelease={() => updateStatus("offen")}
-            onFinish={() => setShowRapportModal(true)}
           />
         }
       />

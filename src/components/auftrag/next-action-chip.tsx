@@ -24,7 +24,7 @@
  * wird der Header optisch ueberladen und die Aussagekraft verwaessert.
  */
 
-import { CheckCircle, Calendar, Users, FileEdit, FilePlus, Receipt, Flag } from "lucide-react";
+import { CheckCircle, Calendar, Users, FileEdit, FilePlus, Receipt } from "lucide-react";
 import { NextActionInline, type NextAction } from "@/components/ui/next-action";
 import { localDateIso } from "@/lib/swiss-time";
 import type { JobDetailWithRelations, JobAppointment } from "@/types";
@@ -41,14 +41,10 @@ interface Props {
   appointments: JobAppointment[];
   reports: ReportSummary[];
   currentUserId: string | null;
-  /** Callback fuer "Rapport starten/fortsetzen" — oeffnet das Rapport-Modal
-   *  im Detail-Page-State. Fuer "Termine anlegen"/etc. reicht href-Navigation. */
+  /** Callback fuer "Rapport starten/fortsetzen". */
   onOpenRapport: () => void;
   /** Callback fuer "Freigeben" — Status-Aktion. */
   onRelease: () => void;
-  /** Callback fuer "Auftrag abschliessen" — oeffnet ebenfalls das Rapport-Modal. */
-  onFinish: () => void;
-  /** Callback fuer "Rechnung stellen" — im Regelfall Link zu /abrechnung? */
 }
 
 export function AuftragNextActionChip({
@@ -59,9 +55,8 @@ export function AuftragNextActionChip({
   currentUserId,
   onOpenRapport,
   onRelease,
-  onFinish,
 }: Props) {
-  const action = deriveNextAction({ jobId, job, appointments, reports, currentUserId, onOpenRapport, onRelease, onFinish });
+  const action = deriveNextAction({ jobId, job, appointments, reports, currentUserId, onOpenRapport, onRelease });
   return <NextActionInline action={action} />;
 }
 
@@ -73,9 +68,8 @@ function deriveNextAction(args: {
   currentUserId: string | null;
   onOpenRapport: () => void;
   onRelease: () => void;
-  onFinish: () => void;
 }): NextAction | null {
-  const { jobId, job, appointments, reports, currentUserId, onOpenRapport, onRelease, onFinish } = args;
+  const { jobId, job, appointments, reports, currentUserId, onOpenRapport, onRelease } = args;
 
   // Storniert / partner_anfrage / anfrage: kein Chip — dort greifen andere
   // Grammatiken (Storno-Banner, Partner-Anfrage-Banner). NextAction ist
@@ -193,22 +187,11 @@ function deriveNextAction(args: {
     };
   }
 
-  // 6. Offen + Enddatum vorbei + kein abgeschlossener Rapport → abschliessen.
-  const hasCompletedReport = reports.some((r) => r.status === "abgeschlossen");
-  if (endISO && endISO < todayISO && !hasCompletedReport) {
-    const daysAgo = Math.max(
-      1,
-      Math.round((Date.parse(todayISO) - Date.parse(endISO)) / 86400000),
-    );
-    return {
-      key: `job-${jobId}-abschliessen`,
-      icon: Flag,
-      label: "Auftrag abschließen",
-      subtitle: `Enddatum vor ${daysAgo} Tag${daysAgo === 1 ? "" : "en"} — Rapport fehlt`,
-      severity: "danger",
-      onClick: onFinish,
-    };
-  }
+  // Regel 6 „Auftrag abschließen" bewusst entfernt (Leo 2026-09-05):
+  // in der Sticky-Header-Action-Bar gibt es bereits einen direkten
+  // Abschliessen-Button (kasten-green) — der Chip waere Duplikat.
+  // Der Ueberfaellig-Zustand wird stattdessen durch das Cron-Overdue-
+  // Reminder-System (Migration 205) an die Assignees kommuniziert.
 
   return null;
 }

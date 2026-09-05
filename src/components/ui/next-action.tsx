@@ -89,17 +89,18 @@ export function NextActionInline({ action, className }: InlineProps) {
     </>
   );
 
-  // Kasten-Grammatik: die Chip nutzt jetzt die app-weiten kasten-Klassen —
-  // gleicher Border (2px), gleicher Radius (rounded-xl), gleiche Toene wie
-  // alle anderen Action-Buttons. Severity → Kasten-Tone:
-  //   info   = kasten-blue    (gute Idee, kein Druck)
-  //   warn   = kasten-amber   (sollte bald passieren)
-  //   danger = kasten-red     (ueberfaellig / blockiert)
-  const tone =
-    action.severity === "warn"   ? "kasten-amber"
-  : action.severity === "danger" ? "kasten-red"
-  :                                 "kasten-blue";
-  const classes = cn("kasten", tone, "max-w-[280px]", className);
+  // Text-only-Chip (Leo 2026-09-05): kein Kasten-Hintergrund, kein Border —
+  // wirkt integriert statt aufgesetzt. Icon+Label uebernehmen die
+  // Severity-Farbe (blau/amber/rot); Hover unterstreicht + verstaerkt Farbe.
+  const toneText =
+    action.severity === "warn"   ? "text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300"
+  : action.severity === "danger" ? "text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+  :                                 "text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300";
+  const classes = cn(
+    "inline-flex items-center gap-1.5 px-1 py-1 text-sm font-medium transition-colors hover:underline underline-offset-4 decoration-1 max-w-[280px] outline-none focus-visible:underline",
+    toneText,
+    className,
+  );
 
   if (action.href) {
     return (
