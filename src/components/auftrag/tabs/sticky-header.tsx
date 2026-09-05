@@ -85,7 +85,7 @@ export function AuftragStickyHeader({
   const locationLabel = location?.name ?? room?.name ?? job.external_address ?? "";
 
   return (
-    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b -mx-4 md:-mx-10 px-4 md:px-10 pt-1 pb-3 mb-6">
+    <div className="sticky top-0 z-20 bg-[#f5f5f7]/85 dark:bg-[#0a0a0a]/85 backdrop-blur-md pt-1 pb-4 mb-4">
       <div className="flex items-start gap-3">
         <BackButton fallbackHref="/auftraege" />
         <div className="flex-1 min-w-0">
