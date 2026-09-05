@@ -192,7 +192,7 @@ export default function EinstellungenPage() {
           (kasten-Toggle) — bilden zusammen die zwei-Ebenen-Navigation.
           Non-Admin sieht keine Portal-Umschalter (nur Integrationen im
           Firmenportal). */}
-      <div className="space-y-8">
+      <div>
         {isAdmin && (
           <TabsNav
             tabs={portalTabs}
@@ -202,7 +202,7 @@ export default function EinstellungenPage() {
           />
         )}
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mt-10">
           {subTabs.map((t) => (
             <button
               key={t.key}
