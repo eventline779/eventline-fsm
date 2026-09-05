@@ -169,7 +169,6 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
           <TabsNav
             tabs={tabs}
             active={activeTab}
-            className="border-0"
             ariaLabel="Partner-Portal-Navigation"
           />
         </div>

@@ -352,7 +352,7 @@ export default function ProjektDetailPage() {
           tabs={tabs}
           active={tab}
           onChange={(k) => selectTab(k as Tab)}
-          className="mt-2 border-0"
+          className="mt-2"
           ariaLabel="Projekt-Bereiche"
         />
       </div>

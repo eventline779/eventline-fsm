@@ -211,7 +211,7 @@ export function AuftragStickyHeader({
         tabs={tabs}
         active={activeTab}
         onChange={(k) => onSelectTab(k as TabKey)}
-        className="mt-3 border-0"
+        className="mt-3"
         ariaLabel="Auftrag-Bereiche"
       />
     </div>

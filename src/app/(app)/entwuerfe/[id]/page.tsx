@@ -495,7 +495,7 @@ export default function EntwurfDetailPage() {
           tabs={tabs}
           active={activeTab}
           onChange={(k) => setTab(k as TabKey)}
-          className="mt-3 border-0"
+          className="mt-3"
           ariaLabel="Entwurf-Bereiche"
         />
       </div>
