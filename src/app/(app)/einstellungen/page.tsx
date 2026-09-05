@@ -192,7 +192,7 @@ export default function EinstellungenPage() {
           (kasten-Toggle) — bilden zusammen die zwei-Ebenen-Navigation.
           Non-Admin sieht keine Portal-Umschalter (nur Integrationen im
           Firmenportal). */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {isAdmin && (
           <TabsNav
             tabs={portalTabs}
