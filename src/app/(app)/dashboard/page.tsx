@@ -1,32 +1,38 @@
 "use client";
 
 /**
- * Dashboard — rollen-abhaengige Startseite.
+ * Dashboard — dynamische, User-anpassbare Startseite.
  *
- *   admin      -> Firma-Cockpit (KPIs + zu-erledigen + Team-Status + Anwesenheit)
- *   techniker  -> MA-Cockpit (Ist-Stunden diesen Monat + Ist-Lohn + Prognose
- *                 Monatsende + naechster Einsatz)
- *   partner    -> Schlanke Portal-Willkommens-Kachel + Link zu /partner/anfragen
+ * Rendering-Modell:
+ *   Der Server liefert in /api/dashboard eine `widgets`-Liste (WidgetId[]) in
+ *   Anzeige-Reihenfolge. Wir mappen jede ID auf einen React-Renderer
+ *   (WIDGET_RENDERERS) und legen sie in ein Grid mit vorgegebenen Column-
+ *   Spans (WIDGET_SPAN). Rolle-basierte hardcoded Layouts gibt es nicht mehr —
+ *   admin / techniker / partner sind einfach unterschiedliche `widgets`-Sets.
  *
- * Datenquelle: /api/dashboard bundelt alle Queries pro Rolle in Promise.all,
- * Cache-Control: private, max-age=60. Beim Reload kein Waterfall, beim
- * Nav-Klick innerhalb 60s kein Neu-Load.
+ * Anpassbarkeit:
+ *   Zahnrad-Icon oben rechts oeffnet `DashboardPreferencesModal`
+ *   (Sichtbarkeit + Reihenfolge, persistent in user_dashboard_overrides).
+ *   Nach Save/Reset triggern wir einen Refetch von /api/dashboard.
  *
- * Sensible Zahlen: Ist-/Prognose-Lohn wird server-seitig aus employee_compensation
- * (Admin-Client, aber strikt eigene Zeile) berechnet. Der Client bekommt nur die
- * fertigen Betraege und den Stundenlohn — keine AN/AG-Pcts.
+ * Payloads:
+ *   `admin` und `ma` sind optional — der Server laedt sie nur wenn
+ *   mindestens ein sichtbares Widget den Loader braucht. Wir uebergeben
+ *   sie via Kontext-Objekt an die Renderer.
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle, ArrowRight, Briefcase, CalendarDays, ClipboardList,
-  Clock, Handshake, PlaneTakeoff, PlayCircle, Receipt, Users, Wallet,
+  Clock, Handshake, PlaneTakeoff, PlayCircle, Receipt, Settings2, Users, Wallet,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobNumber } from "@/components/job-number";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
+import { StempelStatusCard } from "@/components/dashboard/stempel-status-card";
+import { DashboardPreferencesModal } from "@/components/dashboard/dashboard-preferences-modal";
 
 // ---------------------------------------------------------------------------
 // Payload-Typen (Spiegel zu /api/dashboard)
@@ -73,10 +79,18 @@ interface AdminData {
   };
 }
 
+interface WidgetCatalogEntry {
+  id: string;
+  title: string;
+  requires: string[];
+}
+
 interface DashboardResponse {
   success: true;
   role: "admin" | "techniker" | "partner" | string;
   first_name: string;
+  widgets: string[];
+  widget_catalog: WidgetCatalogEntry[];
   admin?: AdminData;
   ma?: MaData;
 }
@@ -112,6 +126,82 @@ function fmtDateTime(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Widget-Layout — Column-Spans pro Widget im 12-Col-Grid
+// ---------------------------------------------------------------------------
+
+/** Wie breit jedes Widget im Grid ist. Fehlt ein Eintrag -> volle Breite.
+ *  Wir gruppieren nicht extra "KPI-Reihen" — das Grid packt automatisch
+ *  drei benachbarte 4/12-Widgets in eine Reihe. Wird ein KPI-Widget vom User
+ *  ausgeblendet, ruecken die anderen automatisch nach. */
+const WIDGET_SPAN: Record<string, string> = {
+  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
+  "kpi-termine-woche": "col-span-12 sm:col-span-4",
+  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
+  "overdue-jobs": "col-span-12",
+  "zu-erledigen": "col-span-12 lg:col-span-6",
+  "team-status": "col-span-12 lg:col-span-6",
+  "anwesenheitskalender": "col-span-12",
+  "stempel-status": "col-span-12 lg:col-span-6",
+  "ma-monat-stunden": "col-span-12 lg:col-span-6",
+  "ma-prognose": "col-span-12 lg:col-span-6",
+  "ma-naechster-einsatz": "col-span-12",
+  "partner-willkommen": "col-span-12",
+};
+
+interface RenderContext {
+  admin: AdminData | null;
+  ma: MaData | null;
+}
+
+/** Widget-Renderer-Registry. Getrennt von der Config-Registry
+ *  (src/lib/dashboard-widgets.ts) weil dort keine React-Renderer landen
+ *  duerfen — die Config wird server-side gelesen. */
+const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> = {
+  "kpi-offene-auftraege": ({ admin }) =>
+    admin && (
+      <KpiCard
+        icon={<Briefcase className="h-3.5 w-3.5" />}
+        label="Offene Auftraege"
+        value={admin.kpi.offene_auftraege}
+        href="/auftraege?from=dashboard"
+      />
+    ),
+  "kpi-termine-woche": ({ admin }) =>
+    admin && (
+      <KpiCard
+        icon={<CalendarDays className="h-3.5 w-3.5" />}
+        label="Termine diese Woche"
+        value={admin.kpi.geplante_termine_woche}
+        href="/kalender?from=dashboard"
+      />
+    ),
+  "kpi-nicht-abgerechnet": ({ admin }) =>
+    admin && (
+      <KpiCard
+        icon={<Receipt className="h-3.5 w-3.5" />}
+        label="Nicht abgerechnet"
+        value={admin.kpi.nicht_abgerechnet}
+        href="/abrechnung?from=dashboard"
+      />
+    ),
+  "overdue-jobs": ({ admin }) =>
+    admin && (
+      <OverdueJobsCard
+        count={admin.overdue_jobs?.count ?? 0}
+        items={admin.overdue_jobs?.items ?? []}
+      />
+    ),
+  "zu-erledigen": ({ admin }) => admin && <ZuErledigenCard data={admin.zu_erledigen} />,
+  "team-status": ({ admin }) => admin && <TeamStatusCard data={admin.team_status} />,
+  "anwesenheitskalender": () => <AnwesenheitskalenderCard />,
+  "stempel-status": () => <StempelStatusCard />,
+  "ma-monat-stunden": ({ ma }) => ma && <MaMonatStundenCard ma={ma} />,
+  "ma-prognose": ({ ma }) => ma && <MaPrognoseCard ma={ma} />,
+  "ma-naechster-einsatz": ({ ma }) => ma && <NaechsterEinsatzCard einsatz={ma.naechster_einsatz} />,
+  "partner-willkommen": () => <PartnerWillkommenCard />,
+};
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -119,12 +209,17 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [settingsHover, setSettingsHover] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     (async () => {
       try {
-        const res = await fetch("/api/dashboard", { credentials: "include" });
+        const res = await fetch("/api/dashboard", { credentials: "include", cache: "no-store" });
         const json = await res.json();
         if (cancelled) return;
         if (!json.success) {
@@ -140,7 +235,7 @@ export default function DashboardPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const greeting = greetingForHour(new Date().getHours());
   const name = data?.first_name?.trim() ?? "";
@@ -176,222 +271,79 @@ export default function DashboardPage() {
     );
   }
 
+  const ctx: RenderContext = { admin: data?.admin ?? null, ma: data?.ma ?? null };
+  const widgets = data?.widgets ?? [];
+  const catalog = data?.widget_catalog ?? [];
+  const subtitle = data?.role === "admin"
+    ? "Was jetzt wichtig ist"
+    : data?.role === "techniker"
+    ? "Dein Monat auf einen Blick"
+    : data?.role === "partner"
+    ? "Willkommen im Portal"
+    : "";
+
   return (
     <div className="page-enter space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold">
-          {greeting}{name ? `, ${name}` : ""}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {data?.role === "admin"
-            ? "Was jetzt wichtig ist"
-            : data?.role === "techniker"
-            ? "Dein Monat auf einen Blick"
-            : "Willkommen im Portal"}
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <h1 className="font-heading text-2xl font-semibold truncate">
+            {greeting}{name ? `, ${name}` : ""}
+          </h1>
+          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={() => setPrefsOpen(true)}
+          onMouseEnter={() => setSettingsHover(true)}
+          onMouseLeave={() => setSettingsHover(false)}
+          data-tooltip="Dashboard anpassen"
+          aria-label="Dashboard anpassen"
+          className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-lg border transition-colors"
+          style={{
+            color: settingsHover ? "var(--foreground)" : "var(--muted-foreground)",
+            backgroundColor: settingsHover
+              ? "color-mix(in oklab, var(--foreground) 5%, transparent)"
+              : "transparent",
+            borderColor: "var(--border)",
+          }}
+        >
+          <Settings2 className="h-4 w-4" />
+        </button>
       </header>
 
-      {data?.role === "admin" && data.admin && <AdminDashboard admin={data.admin} />}
-      {data?.role === "techniker" && data.ma && <MaDashboard ma={data.ma} />}
-      {data?.role === "partner" && <PartnerDashboard />}
-      {data && data.role !== "admin" && data.role !== "techniker" && data.role !== "partner" && (
+      {widgets.length === 0 ? (
         <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-          Fuer deine Rolle ist noch kein Dashboard konfiguriert. Nutze die Sidebar zur Navigation.
+          Alle Widgets sind ausgeblendet. Klick oben rechts auf das Zahnrad, um wieder Widgets einzublenden.
+        </div>
+      ) : (
+        <div className="grid grid-cols-12 gap-4">
+          {widgets.map((id) => {
+            const render = WIDGET_RENDERERS[id];
+            const node = render?.(ctx);
+            if (!node) return null;
+            return (
+              <div key={id} className={WIDGET_SPAN[id] ?? "col-span-12"}>
+                {node}
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// MA-Dashboard
-// ---------------------------------------------------------------------------
-
-function MaDashboard({ ma }: { ma: MaData }) {
-  const monatLohnLabel = ma.wage_exempt
-    ? "Kein Lohn hinterlegt"
-    : ma.hourly_wage_chf == null
-    ? "Kein Stundensatz hinterlegt"
-    : `= CHF ${fmtChf(ma.ist_lohn_chf)} ausbezahlt`;
-
-  const prognoseLohnLabel = ma.wage_exempt
-    ? "Kein Lohn hinterlegt"
-    : ma.hourly_wage_chf == null
-    ? "Kein Stundensatz hinterlegt"
-    : `= CHF ${fmtChf(ma.prognose_lohn_chf)}`;
-
-  const plannedHours = Math.max(0, ma.prognose_stunden - ma.monat_stunden);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Hero: Ist-Stunden */}
-        <section className="rounded-xl border bg-card p-5">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            <Clock className="h-3.5 w-3.5 text-accent" />
-            Deine Stunden diesen Monat
-          </div>
-          <div className="mt-3 flex items-baseline gap-2 tabular-nums">
-            <span className="font-heading text-5xl font-semibold leading-none">
-              {ma.monat_stunden.toLocaleString("de-CH", { maximumFractionDigits: 1 })}
-            </span>
-            <span className="text-xl text-muted-foreground">h</span>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{monatLohnLabel}</p>
-          <Link
-            href="/stempelzeiten?from=dashboard"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline"
-          >
-            Zu meinen Stempelzeiten <ArrowRight className="h-3 w-3" />
-          </Link>
-        </section>
-
-        {/* Prognose Monatsende */}
-        <section className="rounded-xl border bg-card p-5">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            <Wallet className="h-3.5 w-3.5 text-accent" />
-            Prognose Monatsende
-          </div>
-          <div className="mt-3 flex items-baseline gap-2 tabular-nums">
-            <span className="font-heading text-5xl font-semibold leading-none">
-              {ma.prognose_stunden.toLocaleString("de-CH", { maximumFractionDigits: 1 })}
-            </span>
-            <span className="text-xl text-muted-foreground">h</span>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{prognoseLohnLabel}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            aktuell {fmtHours(ma.monat_stunden)} + geplant {fmtHours(plannedHours)}
-          </p>
-        </section>
-      </div>
-
-      {/* Naechster Einsatz */}
-      <NaechsterEinsatzCard einsatz={ma.naechster_einsatz} />
-    </div>
-  );
-}
-
-function NaechsterEinsatzCard({ einsatz }: { einsatz: NaechsterEinsatz | null }) {
-  if (!einsatz) {
-    return (
-      <section className="rounded-xl border bg-card p-4 text-sm text-muted-foreground flex items-center gap-2">
-        <CalendarDays className="h-4 w-4 text-muted-foreground/70" />
-        Kein anstehender Einsatz.
-      </section>
-    );
-  }
-  return (
-    <Link
-      href="/kalender?from=dashboard"
-      className="block rounded-xl border bg-card p-4 hover:border-accent transition-colors"
-    >
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        <CalendarDays className="h-3.5 w-3.5 text-accent" />
-        Naechster Einsatz
-      </div>
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-semibold tabular-nums">{fmtDateTime(einsatz.start_time)}</span>
-        {einsatz.job_number != null && <JobNumber number={einsatz.job_number} />}
-        <span className="text-sm text-muted-foreground truncate">
-          {einsatz.customer_name ?? einsatz.job_title ?? einsatz.title}
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Admin-Dashboard
-// ---------------------------------------------------------------------------
-
-function AdminDashboard({ admin }: { admin: AdminData }) {
-  return (
-    <div className="space-y-5">
-      {/* KPI-Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard
-          icon={<Briefcase className="h-3.5 w-3.5" />}
-          label="Offene Auftraege"
-          value={admin.kpi.offene_auftraege}
-          href="/auftraege?from=dashboard"
-        />
-        <KpiCard
-          icon={<CalendarDays className="h-3.5 w-3.5" />}
-          label="Termine diese Woche"
-          value={admin.kpi.geplante_termine_woche}
-          href="/kalender?from=dashboard"
-        />
-        <KpiCard
-          icon={<Receipt className="h-3.5 w-3.5" />}
-          label="Nicht abgerechnet"
-          value={admin.kpi.nicht_abgerechnet}
-          href="/abrechnung?from=dashboard"
-        />
-      </div>
-
-      {/* Ueberfaellige Auftraege — end_date vergangen aber nicht abgeschlossen.
-          Bei count=0 dezenter positiver Zustand; bei count>0 volle rote Card
-          mit den 5 aeltesten. */}
-      <OverdueJobsCard
-        count={admin.overdue_jobs?.count ?? 0}
-        items={admin.overdue_jobs?.items ?? []}
+      <DashboardPreferencesModal
+        open={prefsOpen}
+        onClose={() => setPrefsOpen(false)}
+        onSaved={() => setReloadKey((k) => k + 1)}
+        catalog={catalog}
+        visibleIds={widgets}
       />
-
-      {/* Zu erledigen + Team-Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-3">
-            <ClipboardList className="h-4 w-4 text-accent" /> Zu erledigen
-          </h2>
-          <div className="divide-y">
-            <TodoRow
-              icon={<PlaneTakeoff className="h-4 w-4" />}
-              label="Ferien-Antraege pending"
-              count={admin.zu_erledigen.ferien_pending}
-              href="/hr?tab=anfragen&from=dashboard"
-            />
-            <TodoRow
-              icon={<AlertCircle className="h-4 w-4" />}
-              label="Ueberfaellige Auftraege"
-              count={admin.zu_erledigen.ueberfaellige_auftraege}
-              href="/auftraege?from=dashboard"
-              urgent={admin.zu_erledigen.ueberfaellige_auftraege > 0}
-            />
-            <TodoRow
-              icon={<Receipt className="h-4 w-4" />}
-              label="Neue Belege"
-              count={admin.zu_erledigen.neue_belege}
-              href="/abrechnung?from=dashboard"
-            />
-          </div>
-        </section>
-
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-3">
-            <Users className="h-4 w-4 text-accent" /> Team-Status
-          </h2>
-          <div className="divide-y">
-            <TodoRow
-              icon={<PlayCircle className="h-4 w-4" />}
-              label="Gerade eingestempelt"
-              count={admin.team_status.eingestempelt}
-              href="/stempelzeiten?from=dashboard"
-            />
-            <TodoRow
-              icon={<PlaneTakeoff className="h-4 w-4" />}
-              label="Heute in Ferien"
-              count={admin.team_status.in_ferien_heute}
-              href="/ferien?from=dashboard"
-            />
-          </div>
-        </section>
-      </div>
-
-      {/* Anwesenheitsplan (nur wenn User berechtigt — Card blendet sich sonst selbst aus) */}
-      <AnwesenheitskalenderCard />
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Widget-Bausteine
+// ---------------------------------------------------------------------------
 
 function KpiCard({
   icon,
@@ -407,7 +359,7 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="rounded-xl border bg-card p-4 hover:border-accent transition-colors block"
+      className="rounded-xl border bg-card p-4 hover:border-accent transition-colors block h-full"
     >
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
         <span className="text-accent">{icon}</span>
@@ -415,6 +367,61 @@ function KpiCard({
       </div>
       <div className="mt-2 font-heading text-3xl font-semibold tabular-nums">{value}</div>
     </Link>
+  );
+}
+
+function ZuErledigenCard({ data }: { data: AdminData["zu_erledigen"] }) {
+  return (
+    <section className="rounded-xl border bg-card p-4 h-full">
+      <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-3">
+        <ClipboardList className="h-4 w-4 text-accent" /> Zu erledigen
+      </h2>
+      <div className="divide-y">
+        <TodoRow
+          icon={<PlaneTakeoff className="h-4 w-4" />}
+          label="Ferien-Antraege pending"
+          count={data.ferien_pending}
+          href="/hr?tab=anfragen&from=dashboard"
+        />
+        <TodoRow
+          icon={<AlertCircle className="h-4 w-4" />}
+          label="Ueberfaellige Auftraege"
+          count={data.ueberfaellige_auftraege}
+          href="/auftraege?from=dashboard"
+          urgent={data.ueberfaellige_auftraege > 0}
+        />
+        <TodoRow
+          icon={<Receipt className="h-4 w-4" />}
+          label="Neue Belege"
+          count={data.neue_belege}
+          href="/abrechnung?from=dashboard"
+        />
+      </div>
+    </section>
+  );
+}
+
+function TeamStatusCard({ data }: { data: AdminData["team_status"] }) {
+  return (
+    <section className="rounded-xl border bg-card p-4 h-full">
+      <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-3">
+        <Users className="h-4 w-4 text-accent" /> Team-Status
+      </h2>
+      <div className="divide-y">
+        <TodoRow
+          icon={<PlayCircle className="h-4 w-4" />}
+          label="Gerade eingestempelt"
+          count={data.eingestempelt}
+          href="/stempelzeiten?from=dashboard"
+        />
+        <TodoRow
+          icon={<PlaneTakeoff className="h-4 w-4" />}
+          label="Heute in Ferien"
+          count={data.in_ferien_heute}
+          href="/ferien?from=dashboard"
+        />
+      </div>
+    </section>
   );
 }
 
@@ -458,10 +465,99 @@ function TodoRow({
 }
 
 // ---------------------------------------------------------------------------
-// Partner-Dashboard
+// MA-Widgets
 // ---------------------------------------------------------------------------
 
-function PartnerDashboard() {
+function MaMonatStundenCard({ ma }: { ma: MaData }) {
+  const monatLohnLabel = ma.wage_exempt
+    ? "Kein Lohn hinterlegt"
+    : ma.hourly_wage_chf == null
+    ? "Kein Stundensatz hinterlegt"
+    : `= CHF ${fmtChf(ma.ist_lohn_chf)} ausbezahlt`;
+  return (
+    <section className="rounded-xl border bg-card p-5 h-full">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <Clock className="h-3.5 w-3.5 text-accent" />
+        Deine Stunden diesen Monat
+      </div>
+      <div className="mt-3 flex items-baseline gap-2 tabular-nums">
+        <span className="font-heading text-5xl font-semibold leading-none">
+          {ma.monat_stunden.toLocaleString("de-CH", { maximumFractionDigits: 1 })}
+        </span>
+        <span className="text-xl text-muted-foreground">h</span>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{monatLohnLabel}</p>
+      <Link
+        href="/stempelzeiten?from=dashboard"
+        className="mt-3 inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline"
+      >
+        Zu meinen Stempelzeiten <ArrowRight className="h-3 w-3" />
+      </Link>
+    </section>
+  );
+}
+
+function MaPrognoseCard({ ma }: { ma: MaData }) {
+  const prognoseLohnLabel = ma.wage_exempt
+    ? "Kein Lohn hinterlegt"
+    : ma.hourly_wage_chf == null
+    ? "Kein Stundensatz hinterlegt"
+    : `= CHF ${fmtChf(ma.prognose_lohn_chf)}`;
+  const plannedHours = Math.max(0, ma.prognose_stunden - ma.monat_stunden);
+  return (
+    <section className="rounded-xl border bg-card p-5 h-full">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <Wallet className="h-3.5 w-3.5 text-accent" />
+        Prognose Monatsende
+      </div>
+      <div className="mt-3 flex items-baseline gap-2 tabular-nums">
+        <span className="font-heading text-5xl font-semibold leading-none">
+          {ma.prognose_stunden.toLocaleString("de-CH", { maximumFractionDigits: 1 })}
+        </span>
+        <span className="text-xl text-muted-foreground">h</span>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{prognoseLohnLabel}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        aktuell {fmtHours(ma.monat_stunden)} + geplant {fmtHours(plannedHours)}
+      </p>
+    </section>
+  );
+}
+
+function NaechsterEinsatzCard({ einsatz }: { einsatz: NaechsterEinsatz | null }) {
+  if (!einsatz) {
+    return (
+      <section className="rounded-xl border bg-card p-4 text-sm text-muted-foreground flex items-center gap-2">
+        <CalendarDays className="h-4 w-4 text-muted-foreground/70" />
+        Kein anstehender Einsatz.
+      </section>
+    );
+  }
+  return (
+    <Link
+      href="/kalender?from=dashboard"
+      className="block rounded-xl border bg-card p-4 hover:border-accent transition-colors"
+    >
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <CalendarDays className="h-3.5 w-3.5 text-accent" />
+        Naechster Einsatz
+      </div>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-semibold tabular-nums">{fmtDateTime(einsatz.start_time)}</span>
+        {einsatz.job_number != null && <JobNumber number={einsatz.job_number} />}
+        <span className="text-sm text-muted-foreground truncate">
+          {einsatz.customer_name ?? einsatz.job_title ?? einsatz.title}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Partner-Widget
+// ---------------------------------------------------------------------------
+
+function PartnerWillkommenCard() {
   return (
     <section className="rounded-xl border bg-card p-6">
       <div className="flex items-start gap-3">
@@ -482,4 +578,3 @@ function PartnerDashboard() {
     </section>
   );
 }
-
