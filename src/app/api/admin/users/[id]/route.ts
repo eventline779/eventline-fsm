@@ -144,10 +144,14 @@ export async function PATCH(
         );
       }
     }
-    // 3) Kandidaten-Ueberpruefung: keine anderen Teamleiter/Admins als Team-Mitglied.
+    // 3) Kandidaten-Ueberpruefung: keine anderen Teamleiter/Admins/Deaktivierten,
+    //    UND keine "Team-Diebstahl"-Kandidaten (schon in einem anderen Team).
     //    Wir loesen die scope-Info aller Ziel-User ueber profiles.role -> roles.scope.
     if (dedup.length > 0) {
-      const { data: candProfiles } = await admin.from("profiles").select("id, role, is_active").in("id", dedup);
+      const { data: candProfiles } = await admin
+        .from("profiles")
+        .select("id, full_name, role, is_active, team_lead_id")
+        .in("id", dedup);
       if (!candProfiles || candProfiles.length !== dedup.length) {
         return NextResponse.json({ success: false, error: "Mindestens ein Team-Mitglied existiert nicht" }, { status: 400 });
       }
@@ -165,6 +169,33 @@ export async function PATCH(
         if (s === "team" || s === "all") {
           return NextResponse.json({ success: false, error: "Andere Teamleiter koennen nicht Team-Mitglied sein" }, { status: 400 });
         }
+      }
+      // Team-EXKLUSIVITAETS-Check ("Diebstahl"-Sperre): ein MA der bereits
+      // einem ANDEREN Teamleiter zugeordnet ist, darf nicht ohne "Umzug"
+      // uebernommen werden. Alle-oder-nichts: beim ersten Konflikt abort,
+      // KEIN Teil-Update. Der Check laeuft VOR jedem profiles-Update, also
+      // ist kein Rollback noetig. Fehler enthaelt user_id + current_lead,
+      // damit der Client den Konflikt-MA namentlich im Toast anzeigen kann.
+      // MA die bereits zu 'id' gehoeren sind ok (das ist ja "mein" Team).
+      const conflict = candProfiles.find(
+        (p) => p.team_lead_id && p.team_lead_id !== id,
+      );
+      if (conflict) {
+        const { data: leadRow } = await admin
+          .from("profiles")
+          .select("id, full_name")
+          .eq("id", conflict.team_lead_id as string)
+          .maybeSingle();
+        const leadName = leadRow?.full_name ?? "einem anderen Teamleiter";
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Mitarbeiter ${conflict.full_name} ist bereits im Team von ${leadName} — bitte erst dort entfernen`,
+            user_id: conflict.id,
+            current_lead: leadRow ? { id: leadRow.id, full_name: leadRow.full_name } : null,
+          },
+          { status: 409 },
+        );
       }
     }
     teamMembersRequested = dedup;

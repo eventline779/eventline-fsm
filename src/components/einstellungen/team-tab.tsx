@@ -583,7 +583,20 @@ export function TeamTab() {
                     ? candidates.filter((c) => c.full_name.toLowerCase().includes(q))
                     : candidates;
                   const selected = new Set(edit.team_member_ids);
-                  const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+                  /** Team-Exklusivitaet: MA die bereits einem ANDEREN Teamleiter
+                   *  angehoeren (team_lead_id gesetzt und != aktuell edierter TL)
+                   *  sind gesperrt — nicht auswaehlbar, sichtbar mit Hinweis
+                   *  "Bereits im Team von X". Verhindert Team-Diebstahl durch
+                   *  parallele Save-Races (Server erzwingt es zusaetzlich 409).
+                   *  Ausnahme: eigenes Team (team_lead_id === edit.id) bleibt
+                   *  frei ab-/waehlbar — sonst waere ein Transfer (Team A -> B)
+                   *  unmoeglich (in A abwaehlen ist explizit erlaubt). */
+                  function isLockedByOther(c: Profile): boolean {
+                    return !!c.team_lead_id && c.team_lead_id !== edit!.id;
+                  }
+                  const selectable = filtered.filter((c) => !isLockedByOther(c));
+                  const allSelectableSelected =
+                    selectable.length > 0 && selectable.every((c) => selected.has(c.id));
                   function toggle(id: string) {
                     if (!edit) return;
                     const next = new Set(edit.team_member_ids);
@@ -593,10 +606,12 @@ export function TeamTab() {
                   function toggleAllVisible() {
                     if (!edit) return;
                     const next = new Set(edit.team_member_ids);
-                    if (allVisibleSelected) {
-                      for (const c of filtered) next.delete(c.id);
+                    // Bulk-Toggle nur ueber die freien Kandidaten — gesperrte
+                    // MA werden uebersprungen (Server wuerde sonst 409 werfen).
+                    if (allSelectableSelected) {
+                      for (const c of selectable) next.delete(c.id);
                     } else {
-                      for (const c of filtered) next.add(c.id);
+                      for (const c of selectable) next.add(c.id);
                     }
                     setEdit({ ...edit, team_member_ids: Array.from(next) });
                   }
@@ -615,13 +630,21 @@ export function TeamTab() {
                         />
                       </div>
                       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-foreground/[0.02] dark:bg-foreground/[0.05] text-[11px] text-muted-foreground">
-                        <span>{filtered.length} von {candidates.length} sichtbar</span>
+                        <span>
+                          {filtered.length} von {candidates.length} sichtbar
+                          {selectable.length !== filtered.length && (
+                            <span className="ml-1 text-amber-700 dark:text-amber-400">
+                              · {filtered.length - selectable.length} bereits in anderem Team
+                            </span>
+                          )}
+                        </span>
                         <button
                           type="button"
                           onClick={toggleAllVisible}
-                          className="font-medium text-foreground/80 hover:text-foreground"
+                          disabled={selectable.length === 0}
+                          className="font-medium text-foreground/80 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {allVisibleSelected ? "Sichtbare abwaehlen" : "Sichtbare auswaehlen"}
+                          {allSelectableSelected ? "Sichtbare abwaehlen" : "Sichtbare auswaehlen"}
                         </button>
                       </div>
                       <ul className="max-h-64 overflow-y-auto divide-y divide-border/60">
@@ -632,21 +655,37 @@ export function TeamTab() {
                         ) : (
                           filtered.map((c) => {
                             const checked = selected.has(c.id);
+                            const locked = isLockedByOther(c);
+                            const lockLeaderName = locked ? profileName(c.team_lead_id) : null;
                             return (
                               <li key={c.id}>
-                                <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.08]">
+                                <label
+                                  className={
+                                    locked
+                                      ? "flex items-center gap-2.5 px-3 py-2 cursor-not-allowed bg-foreground/[0.02] dark:bg-foreground/[0.04]"
+                                      : "flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.08]"
+                                  }
+                                  data-tooltip={locked ? "Zuerst im anderen Team abwaehlen, dann hier hinzufuegen" : undefined}
+                                >
                                   <input
                                     type="checkbox"
                                     checked={checked}
-                                    onChange={() => toggle(c.id)}
-                                    className="h-3.5 w-3.5 rounded border-border text-red-600 focus:ring-red-500/30"
+                                    disabled={locked}
+                                    onChange={() => { if (!locked) toggle(c.id); }}
+                                    className="h-3.5 w-3.5 rounded border-border text-red-600 focus:ring-red-500/30 disabled:cursor-not-allowed"
                                   />
-                                  <div className="min-w-0 flex-1">
+                                  <div className={`min-w-0 flex-1 ${locked ? "opacity-60" : ""}`}>
                                     <div className="text-sm truncate">{c.full_name}</div>
                                     <div className="text-[10px] text-muted-foreground truncate">
                                       {roleLabel(c.role)}
                                     </div>
                                   </div>
+                                  {locked && (
+                                    <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400 shrink-0 whitespace-nowrap ml-2 inline-flex items-center gap-1">
+                                      <Users className="h-2.5 w-2.5" />
+                                      Bereits im Team von {lockLeaderName ?? "anderem TL"}
+                                    </span>
+                                  )}
                                 </label>
                               </li>
                             );
