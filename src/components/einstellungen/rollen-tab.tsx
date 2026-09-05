@@ -7,21 +7,17 @@
  * sich nicht alle Matrizen gleichzeitig auftuermen.
  *
  * Pro Rolle:
- *   - Modul-Liste: pro Bereich EINE Zeile mit „Alle"-Preset + Chip-Row
- *     der verfuegbaren Aktionen (Sehen / Anlegen / Bearbeiten /
- *     Archivieren / Loeschen / Genehmigen / Verwalten / Alle sehen /
- *     Alle bearbeiten). Chips wrappen — kein horizontales Scroll.
+ *   - Modul-Matrix (Sehen/Anlegen/Bearbeiten/Loeschen …) als Tabelle.
+ *     Kaestchen-Matrix mit rotem X pro erlaubter Zelle — Klick toggelt.
  *   - Feature-Section (z.B. Bexio-Zugriff) — cross-cutting Permissions
  *     die nicht an einen Modul-Pfad gebunden sind.
  *
- * Aktive Permission = kasten-active Chip (gefuellt). Inaktive =
- * kasten-toggle-off. Klick toggelt die Permission.
+ * Aktive Permission = rotes X-Icon im Cell. Anklickbares Cell, Toggle
+ * fuegt die Permission der Liste zu / entfernt sie.
  *
- * Warum keine Spalten-Matrix mehr: bei bis zu 9 Actions (5 Standard +
- * 4 Advanced) sprengte die Tabelle jede normale Modal-Breite und
- * erzwang horizontales Scrollen. Chip-Row wrappt sauber und zeigt pro
- * Bereich nur die Aktionen, die dort tatsaechlich verfuegbar sind —
- * keine „—"-Zellen mehr fuer nicht-vorhandene Verben.
+ * Modal-Breite: `4xl` (896px) damit die volle Aktions-Matrix ohne
+ * horizontales Scrollen passt. `overflow-x-auto` bleibt als Safety
+ * fuer sehr schmale Viewports.
  *
  * Schutzregeln:
  *   - Admin-Rolle ist gesperrt (sonst Lockout-Risiko).
@@ -37,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { PERMISSION_MODULES, PARTNER_PERMISSION_MODULES, PERMISSION_FEATURES, type PermissionAction, type PermissionModule } from "@/lib/permissions";
-import { Plus, Trash2, Lock, Save, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Lock, Save, X, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 
@@ -60,14 +56,41 @@ const ACTION_LABELS: Record<PermissionAction, string> = {
   "edit-all": "Alle bearbeiten",
 };
 
-// Action-Gruppen: Standard-CRUD vs. Erweiterte/Spezial-Permissions.
-// Sortier-Reihenfolge in der Chip-Row — Standard zuerst, dann Advanced.
-// Nicht jede Aktion existiert in jedem Bereich (siehe Modul-Definitionen
-// in `lib/permissions.ts`) — die Chip-Row rendert nur die tatsaechlich
-// verfuegbaren Aktionen des jeweiligen Moduls.
+// Spalten gruppiert: Standard-CRUD vs. erweiterte/Spezial-Permissions.
+// Visuell durch einen Trennstrich in der Matrix unterschieden, damit
+// klar ist dass z.B. 'Alle sehen' oder 'Genehmigen' nicht in jedem
+// Bereich existieren — sondern bewusst nur dort wo angeboten.
 const STANDARD_ACTIONS: PermissionAction[] = ["view", "create", "edit", "archive", "delete"];
 const ADVANCED_ACTIONS: PermissionAction[] = ["approve", "manage", "see-all", "edit-all"];
-const ACTION_ORDER: PermissionAction[] = [...STANDARD_ACTIONS, ...ADVANCED_ACTIONS];
+const ACTION_COLUMNS: PermissionAction[] = [...STANDARD_ACTIONS, ...ADVANCED_ACTIONS];
+
+// Visuelles Toggle-Cell: aktive Permission = rotes X im Cell, sonst leer.
+// `onToggle` fehlt bei locked-Rollen (Admin) damit die Cells nicht klickbar sind.
+function PermCell({ active, locked, onToggle, label }: {
+  active: boolean;
+  locked: boolean;
+  onToggle?: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={locked}
+      onClick={onToggle}
+      aria-label={label}
+      aria-pressed={active}
+      className={`
+        inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors
+        ${active
+          ? "border-red-300 bg-red-50 dark:bg-red-500/15 dark:border-red-500/40"
+          : "border-border hover:bg-foreground/[0.04]"}
+        ${locked ? "cursor-not-allowed opacity-70" : "cursor-pointer"}
+      `}
+    >
+      {active && <X className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={3} />}
+    </button>
+  );
+}
 
 interface RollenTabProps {
   /** "firma" = alle Rollen ausser partner, "partner" = nur partner.
@@ -82,6 +105,10 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
   const modules: PermissionModule[] = scope === "partner" ? PARTNER_PERMISSION_MODULES : PERMISSION_MODULES;
   // Zusatz-Features (z.B. Bexio) sind nur im Firmenportal relevant.
   const features = scope === "partner" ? [] : PERMISSION_FEATURES;
+  // Action-Spalten dynamisch: nur Aktionen anzeigen die mind. ein Modul
+  // unterstuetzt — sonst hat Partnerportal leere "Archivieren"/"Genehmigen"-
+  // Spalten weil dort niemand diese Aktionen kennt.
+  const actionCols = ACTION_COLUMNS.filter((a) => modules.some((m) => m.actions.includes(a)));
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -220,92 +247,102 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     load();
   }
 
-  // Modul-Liste als Chip-Rows: pro Bereich EINE Zeile mit Bereichsname
-  // links, „Alle"-Preset + Chip-Row der verfuegbaren Aktionen rechts.
-  // Chips wrappen — deshalb kein horizontales Scroll auch bei schmalen
-  // Modals/Sidebars. Nur tatsaechlich verfuegbare Aktionen werden
-  // gerendert (keine „—"-Zellen wie in der alten Spalten-Matrix).
-  function renderModuleRows(
+  // Modul-Matrix als Tabelle: Zeilen = Bereiche, Spalten = Aktionen, pro
+  // erlaubter Zelle ein `PermCell` (Klick toggelt). `overflow-x-auto` als
+  // Safety fuer schmale Viewports — bei Modal-Breite `4xl` (896px) passt
+  // die volle Matrix normal ohne x-Scroll.
+  //
+  // `onSetAll` erlaubt es dem Create-Modal, den "Alle"-Preset-Klick in
+  // seinen eigenen `createForm.permissions`-State zu schreiben statt in
+  // die Inline-`edits`-Map (Bug-Fix: ohne diesen Callback wuerde der
+  // Preset stillschweigend in `edits["create"]` landen).
+  function renderModuleMatrix(
     roleSlug: string,
     currentPerms: string[],
     locked: boolean,
     onToggle: (perm: string) => void,
-    // Callback fuer den „Alle"-Preset-Chip. Wenn nicht gesetzt: fallback
-    // auf die interne setAllForModule (fuer Inline-Rollen-Karten). Der
-    // Create-Modal uebergibt eine eigene Implementierung, die den
-    // createForm-State updated statt `edits`.
     onSetAll?: (modSlug: string, actions: PermissionAction[]) => void,
   ) {
     const setAll = onSetAll ?? ((mSlug: string, acts: PermissionAction[]) => setAllForModule(roleSlug, mSlug, acts));
     return (
-      <div className="space-y-1.5">
-        {modules.map((mod) => {
-          // Tooltip-Hinweise pro Modul wo es Sub-Pfade gibt die nicht
-          // offensichtlich sind. Wird auf den Bereich-Namen gelegt.
-          const moduleTooltip = mod.slug === "kalender"
-            ? "Steuert auch Termine auf Auftrag-Detail-Seiten."
-            : mod.slug === "stempelzeiten"
-            ? "Eigene Stempelzeiten bleiben sichtbar; diese Permission steuert die /stempelzeiten-Seite."
-            : undefined;
-          // Aktionen in kanonischer Reihenfolge (Standard vor Advanced),
-          // gefiltert auf die im Modul unterstuetzten.
-          const orderedActions = ACTION_ORDER.filter((a) => mod.actions.includes(a));
-          const modPerms = orderedActions.map((a) => `${mod.slug}:${a}`);
-          const allActive = modPerms.every((p) => (locked ? true : currentPerms.includes(p)));
-          return (
-            <div
-              key={`${roleSlug}-${mod.slug}`}
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04] px-3 py-2"
-            >
-              {/* Bereichs-Name links — schrumpft nicht unter min-w. */}
-              <div className="flex items-center gap-2 min-w-[9rem] shrink-0">
-                <span className="text-xs font-medium" data-tooltip={moduleTooltip}>{mod.label}</span>
-              </div>
-
-              {/* Chip-Row rechts — wrappt bei schmalem Modal. */}
-              <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-                {!locked && orderedActions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setAll(mod.slug, mod.actions)}
-                    aria-pressed={allActive}
-                    className={allActive ? "kasten-active" : "kasten-toggle-off"}
-                    data-tooltip={`Alle ${orderedActions.length} Aktionen ${allActive ? "entfernen" : "aktivieren"}`}
+      <div className="overflow-x-auto -mx-2 sm:mx-0">
+        <table className="w-full text-sm border-separate border-spacing-y-1 px-2 sm:px-0">
+          <thead>
+            <tr className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              <th className="text-left pb-1 pr-3">Bereich</th>
+              {actionCols.map((a, i) => {
+                const isFirstAdvanced = ADVANCED_ACTIONS.includes(a) && (i === 0 || STANDARD_ACTIONS.includes(actionCols[i - 1]));
+                return (
+                  <th
+                    key={a}
+                    className={`text-center pb-1 px-1 w-16 ${isFirstAdvanced ? "border-l border-border" : ""}`}
+                    data-tooltip={ADVANCED_ACTIONS.includes(a) ? "Erweiterte Permission — nur in einzelnen Bereichen verfuegbar." : undefined}
                   >
-                    Alle
-                  </button>
-                )}
-                {orderedActions.map((a) => {
+                    {ACTION_LABELS[a]}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {modules.map((mod) => {
+              // Tooltip-Hinweise pro Modul wo es Sub-Pfade gibt die nicht
+              // offensichtlich sind. Wird auf den Bereich-Namen gelegt.
+              const moduleTooltip = mod.slug === "kalender"
+                ? "Steuert auch Termine auf Auftrag-Detail-Seiten."
+                : mod.slug === "stempelzeiten"
+                ? "Eigene Stempelzeiten bleiben sichtbar; diese Permission steuert die /stempelzeiten-Seite."
+                : undefined;
+              return (
+              <tr key={`${roleSlug}-${mod.slug}`} className="bg-foreground/[0.02] dark:bg-foreground/[0.04]">
+                <td className="py-1 px-3 rounded-l-lg text-xs font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span data-tooltip={moduleTooltip}>{mod.label}</span>
+                    {!locked && mod.actions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setAll(mod.slug, mod.actions)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                        data-tooltip={`Alle ${actionCols.filter(a => mod.actions.includes(a)).length} Aktionen toggeln`}
+                      >
+                        Alle
+                      </button>
+                    )}
+                  </div>
+                </td>
+                {actionCols.map((a, i) => {
+                  const supported = mod.actions.includes(a);
                   const perm = `${mod.slug}:${a}`;
-                  const active = locked ? true : currentPerms.includes(perm);
-                  const isAdvanced = ADVANCED_ACTIONS.includes(a);
+                  const active = locked ? supported : currentPerms.includes(perm);
+                  const isLast = a === actionCols[actionCols.length - 1];
+                  const isFirstAdvanced = ADVANCED_ACTIONS.includes(a) && (i === 0 || STANDARD_ACTIONS.includes(actionCols[i - 1]));
                   return (
-                    <button
-                      key={a}
-                      type="button"
-                      disabled={locked}
-                      onClick={() => onToggle(perm)}
-                      aria-pressed={active}
-                      aria-label={`${mod.label} ${ACTION_LABELS[a]}`}
-                      className={active ? "kasten-active" : "kasten-toggle-off"}
-                      data-tooltip={isAdvanced ? "Erweiterte Permission — nicht in jedem Bereich verfuegbar." : undefined}
-                    >
-                      {ACTION_LABELS[a]}
-                    </button>
+                    <td key={a} className={`text-center py-1 px-1 ${isLast ? "rounded-r-lg" : ""} ${isFirstAdvanced ? "border-l border-border" : ""}`}>
+                      {supported ? (
+                        <PermCell
+                          active={active}
+                          locked={locked}
+                          onToggle={() => onToggle(perm)}
+                          label={`${mod.label} ${ACTION_LABELS[a]}`}
+                        />
+                      ) : (
+                        <span
+                          className="text-muted-foreground/40"
+                          data-tooltip={`'${ACTION_LABELS[a]}' gibt es im Bereich '${mod.label}' nicht.`}
+                        >—</span>
+                      )}
+                    </td>
                   );
                 })}
-              </div>
-            </div>
-          );
-        })}
+              </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   }
 
-  // Zusatz-Funktionen (cross-cutting Features wie Bexio) — pro Feature
-  // eine Zeile mit Label + Beschreibung links und einem An/Aus-Chip rechts.
-  // Gleicher Chip-Stil wie die Modul-Aktionen, damit die Toggle-Sprache
-  // durchgehend konsistent ist.
   function renderFeatureGrid(currentPerms: string[], locked: boolean, onToggle: (perm: string) => void) {
     if (features.length === 0) return null;
     return (
@@ -313,28 +350,21 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
           Zusatz-Funktionen
         </p>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {features.map((f) => {
             const active = locked ? true : currentPerms.includes(f.key);
             return (
-              <div
-                key={f.key}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04]"
-              >
-                <div className="flex-1 min-w-[9rem]">
+              <div key={f.key} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-foreground/[0.02] dark:bg-foreground/[0.04]">
+                <PermCell
+                  active={active}
+                  locked={locked}
+                  onToggle={() => onToggle(f.key)}
+                  label={f.label}
+                />
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium">{f.label}</p>
                   <p className="text-[11px] text-muted-foreground">{f.description}</p>
                 </div>
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => onToggle(f.key)}
-                  aria-pressed={active}
-                  aria-label={f.label}
-                  className={active ? "kasten-active" : "kasten-toggle-off"}
-                >
-                  {active ? "An" : "Aus"}
-                </button>
               </div>
             );
           })}
@@ -445,10 +475,10 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                     ) : (
                       <>
                         <div className="pt-3 text-[11px] text-muted-foreground italic">
-                          Aktive Aktionen sind farbig markiert. Klick auf einen Chip toggelt die Berechtigung.
-                          „Alle" schaltet alle Aktionen des Bereichs auf einmal.
+                          Rotes X = erlaubt. Klick auf eine Zelle setzt oder entfernt die Berechtigung.
+                          „—" = Aktion ist im jeweiligen Bereich nicht möglich.
                         </div>
-                        {renderModuleRows(role.slug, currentPerms, locked, (perm) => togglePermission(role.slug, perm))}
+                        {renderModuleMatrix(role.slug, currentPerms, locked, (perm) => togglePermission(role.slug, perm))}
                         {renderFeatureGrid(currentPerms, locked, (perm) => togglePermission(role.slug, perm))}
                       </>
                     )}
@@ -475,10 +505,10 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Berechtigungen</p>
             <p className="text-[11px] text-muted-foreground italic mb-2">
-              Aktive Aktionen sind farbig markiert. Klick toggelt die Berechtigung.
+              Rotes X = erlaubt. Klick auf eine Zelle setzt oder entfernt die Berechtigung.
               „Alle" schaltet alle Aktionen eines Bereichs auf einmal.
             </p>
-            {renderModuleRows(
+            {renderModuleMatrix(
               "create",
               createForm.permissions,
               false,
