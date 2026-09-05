@@ -10,7 +10,7 @@ import {
   type Location,
   type Room,
 } from "@/components/auftrag-form-fields";
-import { Save, CheckCircle } from "lucide-react";
+import { Save } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -36,10 +36,9 @@ export default function AuftragBearbeitenPage() {
   const returnPath = `/auftraege/${jobId}/bearbeiten`;
   const supabase = createClient();
 
-  const [saving, setSaving] = useState<"save" | "publish" | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
   const [loadingJob, setLoadingJob] = useState(true);
   const [jobNumber, setJobNumber] = useState<number | null>(null);
-  const [originalStatus, setOriginalStatus] = useState<string>("");
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [locations, setLocations] = useState<Location[] | null>(null);
   const [rooms, setRooms] = useState<Room[] | null>(null);
@@ -93,7 +92,6 @@ export default function AuftragBearbeitenPage() {
 
       const j = jobRes.data;
       setJobNumber(j.job_number);
-      setOriginalStatus(j.status);
 
       // Resume-Pfad: kommen wir gerade von /kunden/neu zurueck, dann ueberschreibt
       // der Draft den DB-Stand und der frische customer_id wird aus der URL gesetzt.
@@ -147,18 +145,12 @@ export default function AuftragBearbeitenPage() {
     router.push(`/kunden/neu?prefillName=${encodeURIComponent(query)}&return=${encodeURIComponent(returnPath)}`);
   }
 
-  function validate(target: "save" | "publish"): string | null {
+  function validate(): string | null {
     if (!form.title.trim()) return "Titel ist Pflicht";
     // 4-stelliges Jahr erzwingen — verhindert Jahr-0026-Bug.
     const yearOk = (iso: string) => !iso || /^[12]\d{3}-/.test(iso);
     if (!yearOk(form.start_date)) return "Startdatum: bitte ein 4-stelliges Jahr angeben";
     if (!yearOk(form.end_date))   return "Enddatum: bitte ein 4-stelliges Jahr angeben";
-    if (target === "save" && originalStatus === "entwurf") {
-      if (form.start_date && form.end_date && form.end_date < form.start_date) {
-        return "Enddatum darf nicht vor dem Startdatum liegen";
-      }
-      return null;
-    }
     if (form.job_type === "location" && !form.location_id) {
       return "Bitte eine Location auswählen";
     }
@@ -180,21 +172,18 @@ export default function AuftragBearbeitenPage() {
     return null;
   }
 
-  async function submit(target: "save" | "publish") {
-    const err = validate(target);
+  async function submit() {
+    const err = validate();
     if (err) {
       toast.error(err);
       return;
     }
-    setSaving(target);
-
-    const newStatus = target === "publish" ? "offen" : originalStatus;
+    setSaving(true);
 
     const payload = {
       job_type: form.job_type,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      status: newStatus,
       priority: form.urgent ? "dringend" : "normal",
       customer_id: form.job_type === "extern" && form.customer_id ? form.customer_id : null,
       location_id: form.job_type === "location" && form.location_id ? form.location_id : null,
@@ -218,20 +207,14 @@ export default function AuftragBearbeitenPage() {
 
     if (error || !updated || updated.length === 0) {
       TOAST.supabaseError(error, "Auftrag konnte nicht gespeichert werden");
-      setSaving(null);
+      setSaving(false);
       return;
     }
 
-    if (target === "publish") {
-      toast.success(`Auftrag INT-${jobNumber} freigegeben`);
-    } else {
-      toast.success(`Änderungen gespeichert`);
-    }
+    toast.success(`Änderungen gespeichert`);
     window.dispatchEvent(new Event("jobs:invalidate"));
     router.push("/auftraege");
   }
-
-  const isDraft = originalStatus === "entwurf";
 
   if (loadingJob) {
     return (
@@ -247,9 +230,7 @@ export default function AuftragBearbeitenPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <BackButton fallbackHref="/auftraege" size="sm" />
-        <h1 className="text-xl font-bold tracking-tight">
-          {isDraft ? "Entwurf bearbeiten" : "Auftrag bearbeiten"}
-        </h1>
+        <h1 className="text-xl font-bold tracking-tight">Auftrag bearbeiten</h1>
         <div className="ml-auto">
           <JobNumber number={jobNumber} />
         </div>
@@ -259,7 +240,7 @@ export default function AuftragBearbeitenPage() {
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          submit("save");
+          submit();
         }}
         className="rounded-xl border bg-card p-5 space-y-5"
       >
@@ -283,23 +264,12 @@ export default function AuftragBearbeitenPage() {
           </Link>
           <button
             type="submit"
-            disabled={saving !== null}
-            className={`kasten flex-1 ${isDraft ? "kasten-muted" : "kasten-red"}`}
+            disabled={saving}
+            className="kasten kasten-red flex-1"
           >
             <Save className="h-3.5 w-3.5" />
-            {saving === "save" ? "Speichert…" : "Speichern"}
+            {saving ? "Speichert…" : "Speichern"}
           </button>
-          {isDraft && (
-            <button
-              type="button"
-              disabled={saving !== null}
-              onClick={() => submit("publish")}
-              className="kasten kasten-red flex-1"
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-              {saving === "publish" ? "Speichert…" : "Freigeben"}
-            </button>
-          )}
         </div>
       </form>
     </div>

@@ -11,7 +11,7 @@ import {
   type Room,
   todayLocalISO,
 } from "@/components/auftrag-form-fields";
-import { Save, FileEdit, Paperclip, X } from "lucide-react";
+import { Save, Paperclip, X } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { scrollToError } from "@/lib/scroll-to-error";
 import Link from "next/link";
@@ -35,11 +35,11 @@ function NeuerAuftragPageContent() {
   // rueckwirkend erfassen (z.B. nach Event-Wochenende nachpflegen).
   const { role } = usePermissions();
   const isAdmin = role === "admin";
-  // Aus Instandhaltung kommend: Titel/Location/Veranstalter-Kontakt fallen
-  // weg, "Als Entwurf"-Pfad ebenfalls — eine technische Arbeit am Standort
-  // soll nicht als Vermarktungs-Entwurf parkiert werden.
+  // Aus Instandhaltung kommend: Titel/Location/Veranstalter-Kontakt fallen weg.
   const fromMaintenance = !!searchParams.get("from_maintenance");
-  const [saving, setSaving] = useState<"draft" | "create" | null>(null);
+  // "Entwurf"-Pfad ist 2026-09 aus /auftraege/neu weg — Auftrags-Entwuerfe
+  // leben ab Migration 206 in job_drafts (/entwuerfe/neu).
+  const [saving, setSaving] = useState<boolean>(false);
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [locations, setLocations] = useState<Location[] | null>(null);
   const [rooms, setRooms] = useState<Room[] | null>(null);
@@ -149,7 +149,7 @@ function NeuerAuftragPageContent() {
   // — damit der submit-Handler beim Fehler an die richtige Stelle scrollen
   // kann (Form ist mehrere Bildschirme lang, Toast allein wird leicht
   // uebersehen).
-  function validate(target: "draft" | "create"): { error: string; field?: string } | null {
+  function validate(): { error: string; field?: string } | null {
     if (!form.title.trim()) return { error: "Titel ist Pflicht", field: "title" };
     // Vierstelliges Jahr erzwingen — verhindert dass jemand versehentlich
     // "26" statt "2026" ins date-Feld tippt und der Job auf Jahr 0026
@@ -158,12 +158,6 @@ function NeuerAuftragPageContent() {
     const yearOk = (iso: string) => !iso || /^[12]\d{3}-/.test(iso);
     if (!yearOk(form.start_date)) return { error: "Startdatum: bitte ein 4-stelliges Jahr angeben", field: "start_date" };
     if (!yearOk(form.end_date))   return { error: "Enddatum: bitte ein 4-stelliges Jahr angeben", field: "end_date" };
-    if (target === "draft") {
-      if (form.start_date && form.end_date && form.end_date < form.start_date) {
-        return { error: "Enddatum darf nicht vor dem Startdatum liegen", field: "end_date" };
-      }
-      return null;
-    }
     if (form.job_type === "location" && !form.location_id) {
       return { error: "Bitte eine Location auswählen", field: "location_id" };
     }
@@ -188,14 +182,14 @@ function NeuerAuftragPageContent() {
     return null;
   }
 
-  async function submit(target: "draft" | "create") {
-    const err = validate(target);
+  async function submit() {
+    const err = validate();
     if (err) {
       toast.error(err.error);
       scrollToError(err.field);
       return;
     }
-    setSaving(target);
+    setSaving(true);
 
     const {
       data: { user },
@@ -205,7 +199,7 @@ function NeuerAuftragPageContent() {
       job_type: form.job_type,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      status: target === "draft" ? "entwurf" : "offen",
+      status: "offen",
       priority: form.urgent ? "dringend" : "normal",
       customer_id: form.job_type === "extern" && form.customer_id ? form.customer_id : null,
       location_id: form.job_type === "location" && form.location_id ? form.location_id : null,
@@ -230,7 +224,7 @@ function NeuerAuftragPageContent() {
 
     if (error || !inserted) {
       TOAST.supabaseError(error, "Auftrag konnte nicht angelegt werden");
-      setSaving(null);
+      setSaving(false);
       return;
     }
 
@@ -283,31 +277,26 @@ function NeuerAuftragPageContent() {
       });
     }
 
-    if (target === "draft") {
-      toast.success(`Entwurf INT-${inserted.job_number} gespeichert`);
-      router.push("/auftraege");
-    } else {
-      toast.success(`Auftrag INT-${inserted.job_number} erstellt`, {
-        duration: 5000,
-        action: {
-          label: "Rückgängig",
-          onClick: async () => {
-            const { data: updated, error: delErr } = await supabase
-              .from("jobs")
-              .update({ is_deleted: true })
-              .eq("id", inserted.id)
-              .select("id");
-            if (delErr || !updated || updated.length === 0) {
-              toast.error("Konnte nicht rückgängig gemacht werden");
-              return;
-            }
-            toast.success(`INT-${inserted.job_number} verworfen`);
-            window.dispatchEvent(new Event("jobs:invalidate"));
-          },
+    toast.success(`Auftrag INT-${inserted.job_number} erstellt`, {
+      duration: 5000,
+      action: {
+        label: "Rückgängig",
+        onClick: async () => {
+          const { data: updated, error: delErr } = await supabase
+            .from("jobs")
+            .update({ is_deleted: true })
+            .eq("id", inserted.id)
+            .select("id");
+          if (delErr || !updated || updated.length === 0) {
+            toast.error("Konnte nicht rückgängig gemacht werden");
+            return;
+          }
+          toast.success(`INT-${inserted.job_number} verworfen`);
+          window.dispatchEvent(new Event("jobs:invalidate"));
         },
-      });
-      router.push("/auftraege");
-    }
+      },
+    });
+    router.push("/auftraege");
   }
 
   return (
@@ -326,7 +315,7 @@ function NeuerAuftragPageContent() {
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          submit("create");
+          submit();
         }}
         className="rounded-xl border bg-card p-5 space-y-5"
       >
@@ -393,22 +382,12 @@ function NeuerAuftragPageContent() {
             Abbrechen
           </Link>
           <button
-            type="button"
-            disabled={saving !== null || fromMaintenance}
-            onClick={() => submit("draft")}
-            className="kasten kasten-purple flex-1"
-            data-tooltip={fromMaintenance ? "Instandhaltungs-Aufträge werden direkt erstellt, nicht als Entwurf gespeichert" : undefined}
-          >
-            <FileEdit className="h-3.5 w-3.5" />
-            {saving === "draft" ? "Speichert…" : "Als Entwurf"}
-          </button>
-          <button
             type="submit"
-            disabled={saving !== null}
+            disabled={saving}
             className="kasten kasten-red flex-1"
           >
             <Save className="h-3.5 w-3.5" />
-            {saving === "create" ? "Speichert…" : "Auftrag erstellen"}
+            {saving ? "Speichert…" : "Auftrag erstellen"}
           </button>
         </div>
       </form>

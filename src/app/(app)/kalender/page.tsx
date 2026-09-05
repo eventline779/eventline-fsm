@@ -11,8 +11,8 @@
  *                 visuell gefärbt nach ihrem Auftrag)
  *
  * Daten:
- *   - jobs: Aufträge (status != 'anfrage' und != 'storniert') + Vermietungen
- *           (status = 'anfrage' und nicht stornierter Vermietentwurf)
+ *   - jobs: Aufträge (status != 'storniert', legacy status='anfrage' /
+ *           frueher Vermietentwurf-Pipeline / ausgeblendet)
  *   - job_appointments: Termine in der Range, mit Job-Join fuer den Bezug
  *
  * Skalierung:
@@ -188,27 +188,26 @@ export default function KalenderPage() {
       for (const j of (jobsRes.data ?? []) as unknown as RawJob[]) {
         if (!j.start_date) continue;
         if (j.status === "storniert") continue;
-        // Vermietentwürfe die spaeter storniert wurden bleiben als
-        // "cancelled_as_anfrage = true" — die ueberspringen wir.
+        // Legacy Vermietentwuerfe (status='anfrage') werden nicht mehr
+        // gezeigt — die Pipeline ist 2026-09 weggefallen, Auftrags-
+        // Entwuerfe leben ab Migration 206 in job_drafts (/entwuerfe).
+        if (j.status === "anfrage") continue;
+        // Alt-Records mit cancelled_as_anfrage=true bleiben ebenfalls ausgeblendet.
         if (j.cancelled_as_anfrage === true) continue;
-        // 3-Way-Mapping (Vermietentwuerfe gelten als Entwurf — gleiche lila Farbe):
-        //   - status=anfrage|entwurf   → entwurf   (lila, Draft)
+        // 2-Way-Mapping (status='entwurf' ist nur Legacy — neue Entwuerfe
+        // liegen in job_drafts und werden nicht ueber diese Query geladen):
+        //   - status=entwurf           → entwurf    (lila, Legacy)
         //   - was_anfrage=true (sonst) → vermietung (hellblau, bestaetigt)
         //   - sonst                    → auftrag    (rot)
         const itemType: ItemType =
-          j.status === "anfrage" || j.status === "entwurf" ? "entwurf"
+          j.status === "entwurf" ? "entwurf"
           : j.was_anfrage ? "vermietung"
           : "auftrag";
-        const isVermietung = j.status === "anfrage";
         const start = new Date(j.start_date);
         const end = j.end_date ? new Date(j.end_date) : undefined;
         const customerName = j.customer?.name ?? null;
         const locationName = j.location?.name ?? j.room?.name ?? null;
-        // Beide Typen mit INT-Nr-Prefix: Vermietung zeigt Kunde, Auftrag den
-        // Job-Titel. Konsistente Darstellung im Kalender — INT-Nr ist immer
-        // der Anker zur Identifikation.
-        const body = isVermietung ? (customerName ?? j.title) : j.title;
-        const title = j.job_number != null ? `INT-${j.job_number} | ${body}` : body;
+        const title = j.job_number != null ? `INT-${j.job_number} | ${j.title}` : j.title;
         calItems.push({
           id: j.id,
           type: itemType,
@@ -218,7 +217,7 @@ export default function KalenderPage() {
           endDate: end,
           customerName,
           locationName,
-          href: isVermietung ? `/auftraege/vermietentwurf/${j.id}` : `/auftraege/${j.id}`,
+          href: `/auftraege/${j.id}`,
         });
       }
 
@@ -228,10 +227,14 @@ export default function KalenderPage() {
         // Termine eines stornierten Auftrags ueberspringen — Konsistenz mit
         // calItems oben, wo storniert auch raus geht.
         if (job?.status === "storniert") continue;
+        // Termine legacy Vermietentwurf-Jobs (status='anfrage') werden
+        // ebenfalls ausgeblendet — sonst zeigt der Kalender Punkte, die zu
+        // gar nichts mehr fuehren.
+        if (job?.status === "anfrage") continue;
         const start = new Date(a.start_time);
         const end = a.end_time ? new Date(a.end_time) : undefined;
         const jobType: CalendarShift["jobType"] = job
-          ? job.status === "anfrage" || job.status === "entwurf" ? "entwurf"
+          ? job.status === "entwurf" ? "entwurf"
           : job.was_anfrage ? "vermietung"
           : "auftrag"
           : null;
@@ -246,13 +249,7 @@ export default function KalenderPage() {
           title: a.title,
           assigneeName: a.assignee?.full_name ?? null,
           assigneeId: a.assigned_to ?? null,
-          // Routing: Vermietentwuerfe (status=anfrage) haben eine andere
-          // Detail-Page als normale Auftraege/Entwuerfe.
-          href: a.job_id
-            ? job?.status === "anfrage"
-              ? `/auftraege/vermietentwurf/${a.job_id}`
-              : `/auftraege/${a.job_id}`
-            : null,
+          href: a.job_id ? `/auftraege/${a.job_id}` : null,
           meetingLink: a.meeting_link ?? null,
         });
       }
@@ -449,7 +446,7 @@ export default function KalenderPage() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="text-lg font-bold capitalize">{rangeLabel}</h2>
             <div className="flex items-center gap-3">
-              {/* Legende — Vermietentwurf gilt als Entwurf (gleiche lila Farbe). */}
+              {/* Legende — status='entwurf' ist Legacy, neue Entwuerfe leben in /entwuerfe. */}
               <div className="flex items-center gap-x-3 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500" />

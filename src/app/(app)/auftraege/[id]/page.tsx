@@ -268,14 +268,11 @@ export default function AuftragDetailPage() {
         })}) abgeschlossen werden`
       : "";
 
+  // Auftraege haben ab 2026-09 nur noch den Lebenszyklus offen → abgeschlossen
+  // | storniert. Der "entwurf"-Status ist mit Migration 206 in die eigene
+  // Tabelle job_drafts (siehe /entwuerfe) ausgezogen — bestehende jobs mit
+  // status='entwurf' wurden dabei auf is_deleted=true gesetzt.
   const statusActions = [
-    {
-      from: ["entwurf"] as JobStatus[],
-      to: "offen" as JobStatus,
-      label: "Freigeben",
-      icon: <CheckCircle className="h-4 w-4" />,
-      variant: "primary" as const,
-    },
     {
       from: ["offen"] as JobStatus[],
       to: "abgeschlossen" as JobStatus,
@@ -284,7 +281,7 @@ export default function AuftragDetailPage() {
       variant: "outline" as const,
     },
     {
-      from: ["entwurf", "offen"] as JobStatus[],
+      from: ["offen"] as JobStatus[],
       to: "storniert" as JobStatus,
       label: "Stornieren",
       icon: <XCircle className="h-4 w-4" />,

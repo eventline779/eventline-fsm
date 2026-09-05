@@ -290,8 +290,9 @@ export interface Document {
   created_at: string;
 }
 
-// RentalRequest-Type entfernt — Vermietungsanfragen sind jetzt jobs mit
-// status='anfrage' und request_step 1..5 (siehe REQUEST_STEPS in constants.ts).
+// RentalRequest-Type + Vermietentwurf-Pipeline entfernt (2026-09) —
+// Auftrags-Entwuerfe leben ab Migration 206 in der eigenen Tabelle
+// job_drafts (siehe /entwuerfe).
 
 export interface LocationContact {
   id: string;

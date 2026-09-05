@@ -14,7 +14,7 @@
  *   - tickets_own  — eigene offene Tickets (created_by = me, status=offen)
  *   - tickets_open — alle offenen Tickets ausser Belege (admin-action queue)
  *   - abrechnung   — abgeschlossene Auftraege ohne Rechnung + offene Belege
- *   - auftraege_action — Vermietentwurf Step 4 + Partner-Anfragen warten
+ *   - auftraege_action — Partner-Anfragen warten auf Freigabe
  *
  * Aggregation per Nav-Item siehe sidebar.tsx / mobile-nav.tsx —
  *   /todos      → todos
@@ -97,13 +97,9 @@ export function NavCountsProvider({ children, isAdmin }: ProviderProps) {
             .eq("type", "beleg")
             .is("filed_at", null)
             .neq("status", "abgelehnt"),
-          // Auftraege-Action = Vermietentwurf Step 4 + Partner-Anfragen
-          supabase
-            .from("jobs")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "anfrage")
-            .eq("request_step", 4)
-            .neq("is_deleted", true),
+          // Auftraege-Action = Partner-Anfragen die auf Freigabe warten.
+          // (Vermietentwurf-Pipeline weggefallen 2026-09 — Entwuerfe leben
+          // jetzt in job_drafts und tauchen nicht in dieser Queue auf.)
           supabase
             .from("jobs")
             .select("id", { count: "exact", head: true })
@@ -125,9 +121,9 @@ export function NavCountsProvider({ children, isAdmin }: ProviderProps) {
     setCounts({
       todos: personal[0]?.count ?? 0,
       tickets_own: personal[1]?.count ?? 0,
-      tickets_open: admin[4]?.count ?? 0,
+      tickets_open: admin[3]?.count ?? 0,
       abrechnung: (admin[0]?.count ?? 0) + (admin[1]?.count ?? 0),
-      auftraege_action: (admin[2]?.count ?? 0) + (admin[3]?.count ?? 0),
+      auftraege_action: admin[2]?.count ?? 0,
     });
   }, [supabase, isAdmin]);
 

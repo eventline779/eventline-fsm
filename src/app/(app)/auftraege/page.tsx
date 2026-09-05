@@ -405,10 +405,12 @@ export default function AuftraegePage() {
           )}
           {segment !== "archiv" && can("auftraege:create") && (
             <>
-              <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple" data-tooltip="Neuer Vermietentwurf">
+              {/* Entwuerfe wandern seit 2026-09 in einen eigenen Bereich —
+                  Link fuehrt zu /entwuerfe/neu (Migration 206, job_drafts). */}
+              <Link href="/entwuerfe/neu" className="kasten kasten-purple" data-tooltip="Neuer Entwurf">
                 <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Neuer Vermietentwurf</span>
-                <span className="sm:hidden">Vermietung</span>
+                <span className="hidden sm:inline">Neuer Entwurf</span>
+                <span className="sm:hidden">Entwurf</span>
               </Link>
               <Link href="/auftraege/neu" className="kasten kasten-red" data-tooltip="Neuer Auftrag">
                 <Plus className="h-3.5 w-3.5" />
@@ -555,9 +557,9 @@ export default function AuftraegePage() {
                       </button>
                     ) : (
                       <div className="flex items-center justify-center gap-2 flex-wrap">
-                        <Link href="/auftraege/vermietentwurf/neu" className="kasten kasten-purple">
+                        <Link href="/entwuerfe/neu" className="kasten kasten-purple">
                           <Plus className="h-3.5 w-3.5" />
-                          Neuer Vermietentwurf
+                          Neuer Entwurf
                         </Link>
                         <Link href="/auftraege/neu" className="kasten kasten-red">
                           <Plus className="h-3.5 w-3.5" />

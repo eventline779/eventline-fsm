@@ -12,19 +12,17 @@ export const maxDuration = 30;
 // ueber upsert:true).
 //
 // Quellen der Prefixes (aus 'const path = ...' in der App):
-//   - jobs/             → auftraege/neu, auftraege/[id], vermietentwurf/neu
+//   - jobs/             → auftraege/neu, auftraege/[id]
 //   - raeume/           → raeume/[id]
 //   - standorte/        → standorte/[id]
 //   - maintenance/      → standorte/[id] (Wartungs-Aufgaben)
 //   - todos/            → todos/page
 //   - tickets/          → new-ticket-modal
 //   - vertrieb/         → vertrieb/page (Offerten-PDF)
-//   - vermietentwurf/        → send-step-modal (Mail-Anhaenge je Schritt)
-//   - vermietentwurf-direct/ → vermietentwurf/[id] (Direkt-Upload aus
-//                              der Dokumentenliste, ohne Mail-Schritt)
-//   - partner-anfragen/      → partner-Portal (Anhaenge bei Anfrage-Erstellung)
+//   - partner-anfragen/ → partner-Portal (Anhaenge bei Anfrage-Erstellung)
 //   - rapport-photos/   → rapport-form-modal
 //   - signatures/client + signatures/tech → rapport-form-modal
+//   - projekte/         → Projekte-Detail
 const ALLOWED_PREFIXES = [
   "jobs/",
   "raeume/",
@@ -33,8 +31,6 @@ const ALLOWED_PREFIXES = [
   "todos/",
   "tickets/",
   "vertrieb/",
-  "vermietentwurf/",
-  "vermietentwurf-direct/",
   "partner-anfragen/",
   "rapport-photos/",
   "signatures/",

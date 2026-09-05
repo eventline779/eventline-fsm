@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 //   [{ type, id, label, sublabel, href }]
 //
 // Suchfelder pro Typ:
-//   - jobs (Auftraege + Vermietentwuerfe): title, job_number (INT-XXXXX)
+//   - jobs (Auftraege): title, job_number (INT-XXXXX)
 //     + Kundenname (via customer)
 //   - vertrieb_contacts (Leads): firma, ansprechperson
 //   - customers (Kunden): name, email
@@ -32,7 +32,6 @@ const INT32_MAX = 2147483647;
 export interface SearchResult {
   type:
     | "auftrag"
-    | "vermietentwurf"
     | "lead"
     | "kunde"
     | "standort"
@@ -99,7 +98,7 @@ export async function GET(request: NextRequest) {
       .select("id, job_number, title, status, customer:customers(name)")
       .or(jobsFilter)
       .order("job_number", { ascending: false, nullsFirst: false })
-      .limit(LIMIT_PER_TYPE * 2), // *2 weil wir noch nach status splitten
+      .limit(LIMIT_PER_TYPE),
     supabase
       .from("vertrieb_contacts")
       .select("id, firma, ansprechperson, status")
@@ -146,11 +145,11 @@ export async function GET(request: NextRequest) {
 
   const results: SearchResult[] = [];
 
-  // Jobs: nach status auf Auftraege vs Vermietentwuerfe splitten.
-  // status='anfrage' => Vermietentwurf (eigene URL). Rest => Auftrag.
+  // Jobs → alle als Auftrag. Vermietentwurf-Pipeline (status='anfrage')
+  // ist 2026-09 weggefallen; legacy Records mit status='anfrage' werden
+  // ausgeblendet — sie haben keine Detail-Seite mehr.
   if (!jobsRes.error && jobsRes.data) {
     const auftraege: SearchResult[] = [];
-    const entwuerfe: SearchResult[] = [];
     for (const j of jobsRes.data as Array<{
       id: string;
       job_number: number | null;
@@ -158,29 +157,19 @@ export async function GET(request: NextRequest) {
       status: string;
       customer: { name: string } | { name: string }[] | null;
     }>) {
+      if (j.status === "anfrage") continue;
+      if (auftraege.length >= LIMIT_PER_TYPE) continue;
       const cust = Array.isArray(j.customer) ? j.customer[0] : j.customer;
       const nrLabel = j.job_number ? `INT-${j.job_number}` : "INT-…";
-      if (j.status === "anfrage") {
-        if (entwuerfe.length >= LIMIT_PER_TYPE) continue;
-        entwuerfe.push({
-          type: "vermietentwurf",
-          id: j.id,
-          label: `${nrLabel} · ${j.title}`,
-          sublabel: cust?.name ?? undefined,
-          href: `/auftraege/vermietentwurf/${j.id}`,
-        });
-      } else {
-        if (auftraege.length >= LIMIT_PER_TYPE) continue;
-        auftraege.push({
-          type: "auftrag",
-          id: j.id,
-          label: `${nrLabel} · ${j.title}`,
-          sublabel: cust?.name ?? undefined,
-          href: `/auftraege/${j.id}`,
-        });
-      }
+      auftraege.push({
+        type: "auftrag",
+        id: j.id,
+        label: `${nrLabel} · ${j.title}`,
+        sublabel: cust?.name ?? undefined,
+        href: `/auftraege/${j.id}`,
+      });
     }
-    results.push(...auftraege, ...entwuerfe);
+    results.push(...auftraege);
   }
 
   if (!leadsRes.error && leadsRes.data) {

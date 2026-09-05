@@ -7,8 +7,9 @@ import { PartnerBelegungsplan } from "@/components/partner-belegungsplan";
 // Partner-Belegungsplan: Monats-Kalender + Buchungs-Liste fuer die
 // zugewiesene Location. Eigene Anfragen status-gefaerbt (Entwurf,
 // Wartet, Bestaetigt, Abgelehnt), EVENTLINE-Vermietungen als blaue
-// "Vermietung"-Kategorie sichtbar (was_anfrage=true / Vermietentwurf).
-// Reine EVENTLINE-Auftraege ohne Vermietungs-Tag werden nicht angezeigt.
+// "Vermietung"-Kategorie sichtbar (was_anfrage=true — Auftrag aus einer
+// frueheren Vermietungs-Anfrage entstanden). Reine EVENTLINE-Auftraege
+// ohne Vermietungs-Tag werden nicht angezeigt.
 
 export default function PartnerBelegungsplanPage() {
   const supabase = createClient();

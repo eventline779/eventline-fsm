@@ -36,12 +36,6 @@ type Props = {
   onDocumentsChange: (fn: (prev: DocType[]) => DocType[]) => void;
 };
 
-// Mail-Anhaenge aus dem Vermietentwurf sind nicht loeschbar — sie
-// dokumentieren, was an den Kunden ging.
-function isMailDoc(storagePath: string) {
-  return storagePath.startsWith("vermietentwurf/");
-}
-
 export function DocsHistoryTab({
   jobId,
   job,
@@ -200,7 +194,6 @@ export function DocsHistoryTab({
           ) : (
             <div className="space-y-2">
               {documents.map((doc) => {
-                const fromMail = isMailDoc(doc.storage_path);
                 return (
                   <div
                     key={doc.id}
@@ -222,10 +215,10 @@ export function DocsHistoryTab({
                       <button
                         type="button"
                         onClick={() => deleteDoc(doc.id, doc.storage_path, doc.name)}
-                        className={`kasten kasten-red ${fromMail || isArchivedJob ? "invisible pointer-events-none" : ""}`}
+                        className={`kasten kasten-red ${isArchivedJob ? "invisible pointer-events-none" : ""}`}
                         data-tooltip="Löschen"
-                        aria-hidden={fromMail || isArchivedJob || undefined}
-                        tabIndex={fromMail || isArchivedJob ? -1 : undefined}
+                        aria-hidden={isArchivedJob || undefined}
+                        tabIndex={isArchivedJob ? -1 : undefined}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

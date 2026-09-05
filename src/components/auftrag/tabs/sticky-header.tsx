@@ -11,7 +11,6 @@
  */
 
 import { type ReactNode } from "react";
-import Link from "next/link";
 import {
   MapPin,
   User,
@@ -19,7 +18,6 @@ import {
   XCircle,
   AlertCircle,
   Inbox,
-  Pencil,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { JobNumber } from "@/components/job-number";
@@ -109,10 +107,10 @@ export function AuftragStickyHeader({
             {job.was_anfrage && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground/[0.06] text-muted-foreground"
-                data-tooltip="Aus einem Vermietentwurf entstanden"
+                data-tooltip="Aus einer Vermietungs-Anfrage entstanden"
               >
                 <Inbox className="h-3 w-3" />
-                Vermietentwurf
+                Vermietung
               </span>
             )}
             {/* Auto-abgeleiteter "was jetzt?"-Chip — Klick fuehrt direkt
@@ -177,13 +175,6 @@ export function AuftragStickyHeader({
             );
           })}
 
-        {job.status === "entwurf" && canEdit && (
-          <Link href={`/auftraege/${jobId}/bearbeiten`} className="kasten kasten-purple">
-            <Pencil className="h-3.5 w-3.5" />
-            Bearbeiten
-          </Link>
-        )}
-
         {canEdit && availableActions.some((a) => a.to === "storniert") && (
           // Stornieren als direkter Button (nicht mehr im Overflow-Menu).
           // Rot ist app-weit ONLY fuer destruktive Aktionen reserviert, und
@@ -202,7 +193,7 @@ export function AuftragStickyHeader({
           </button>
         )}
 
-        {(job.status === "offen" || job.status === "anfrage" || job.status === "entwurf") && (
+        {job.status === "offen" && (
           <JobStempelButton jobId={jobId} jobNumber={job.job_number} />
         )}
       </div>

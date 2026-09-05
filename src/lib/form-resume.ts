@@ -2,7 +2,7 @@
 // Formular kurz nach /kunden/neu springen, einen neuen Kunden anlegen und danach mit
 // allem schon Ausgefuellten zurueckkommen kann.
 //
-// Konvention: Key ist der Pfad, auf dem das Formular liegt (z.B. "/auftraege/vermietentwurf/neu"
+// Konvention: Key ist der Pfad, auf dem das Formular liegt (z.B. "/auftraege/neu"
 // oder "/auftraege/<id>/bearbeiten"). So koennen mehrere Drafts parallel existieren.
 //
 // sessionStorage statt localStorage: ueberlebt Reloads, raeumt sich aber beim
