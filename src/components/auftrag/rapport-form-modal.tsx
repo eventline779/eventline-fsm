@@ -662,17 +662,15 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
     onCompleted();
     onClose();
 
-    // Bruecke Rapport -> Abrechnung: sobald der Auftrag abgeschlossen ist,
-    // liegt er in der Abrechnungs-Warteschlange. Wir zeigen einen Toast mit
-    // Direkt-Sprung dorthin — die Zielseite scrollt die Karte in View und
-    // flasht sie kurz auf.
-    toast.success("Rapport abgeschlossen", {
+    // Success-Toast — Action-Button „Zur Rechnung" nur fuer Admin (Techniker/
+    // MA haben keinen /abrechnung-Zugriff, der Sprung waere nutzlos).
+    toast.success("Rapport abgeschlossen", isAdmin ? {
       action: {
         label: "Zur Rechnung",
         onClick: () => router.push(`/abrechnung?highlight=${job.id}`),
       },
       duration: 8000,
-    });
+    } : undefined);
   }
 
   const isReadOnly = draftStatus === "abgeschlossen";
