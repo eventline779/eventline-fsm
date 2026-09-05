@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 
 import { BackButton } from "@/components/ui/back-button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
@@ -161,7 +162,7 @@ function InlineTextarea({
       rows={rows}
       disabled={disabled}
       style={{ fieldSizing: "content" } as React.CSSProperties}
-      className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring disabled:opacity-60"
+      className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring disabled:opacity-60"
     />
   );
 }
@@ -385,7 +386,7 @@ export default function EntwurfDetailPage() {
           <BackButton fallbackHref="/entwuerfe" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-foreground/[0.08] text-[12px] font-mono font-semibold tabular-nums">
+              <span className="inline-flex items-center font-mono font-semibold rounded-md bg-card border border-foreground/10 dark:border-foreground/15 text-[13px] px-2 py-0.5 tabular-nums whitespace-nowrap">
                 ENT-{draft.draft_number}
               </span>
               <span
@@ -410,6 +411,30 @@ export default function EntwurfDetailPage() {
             <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate mt-0.5">
               {draft.title}
             </h1>
+            {(draft.customer?.name || draft.customer_name || draft.location?.name || draft.expected_start_date || draft.expected_end_date) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                {(draft.customer?.name || draft.customer_name) && (
+                  <span className="inline-flex items-center gap-1 min-w-0">
+                    <UserIcon className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{draft.customer?.name ?? draft.customer_name}</span>
+                  </span>
+                )}
+                {draft.location?.name && (
+                  <span className="inline-flex items-center gap-1 min-w-0">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{draft.location.name}</span>
+                  </span>
+                )}
+                {(draft.expected_start_date || draft.expected_end_date) && (
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="h-3 w-3 shrink-0" />
+                    <span className="tabular-nums">
+                      {formatDateRange(draft.expected_start_date, draft.expected_end_date)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground mt-1">
               Angelegt {formatDateTime(draft.created_at)}
               {draft.updated_at !== draft.created_at && (
@@ -479,188 +504,222 @@ export default function EntwurfDetailPage() {
       {activeTab === "uebersicht" && (
         <div className={`space-y-4 ${isArchived ? "opacity-80" : ""}`}>
           {/* Kunde + Kontakt */}
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Kunde & Kontakt
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Bestehender Kunde</p>
-                <SearchableSelect
-                  value={draft.customer_id ?? ""}
-                  onChange={(id) =>
-                    patch({
-                      customer_id: id || null,
-                      // Wenn ein Kunde gewaehlt wird, koennen wir customer_name
-                      // leeren — der name kommt jetzt aus der customers-Row.
-                      customer_name: id ? null : draft.customer_name,
-                    })
-                  }
-                  items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                  placeholder="— kein Kunden-Datensatz —"
-                  clearable
-                />
-              </div>
-              {!draft.customer_id && (
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground/70">
-                    Firma / Kundenname (Freitext)
-                  </p>
-                  <Input
-                    defaultValue={draft.customer_name ?? ""}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v !== (draft.customer_name ?? "")) patch({ customer_name: v || null });
-                    }}
-                    placeholder="z.B. Firma XY"
+          <Card className="bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Kunde & Kontakt
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Bestehender Kunde
+                  </label>
+                  <SearchableSelect
+                    value={draft.customer_id ?? ""}
+                    onChange={(id) =>
+                      patch({
+                        customer_id: id || null,
+                        // Wenn ein Kunde gewaehlt wird, koennen wir customer_name
+                        // leeren — der name kommt jetzt aus der customers-Row.
+                        customer_name: id ? null : draft.customer_name,
+                      })
+                    }
+                    items={customers.map((c) => ({ id: c.id, label: c.name }))}
+                    placeholder="— kein Kunden-Datensatz —"
+                    clearable
                   />
                 </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Ansprechperson</p>
-                <Input
-                  defaultValue={draft.contact_person ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v !== (draft.contact_person ?? "")) patch({ contact_person: v || null });
-                  }}
-                />
+                {!draft.customer_id && (
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                      Firma / Kundenname (Freitext)
+                    </label>
+                    <Input
+                      defaultValue={draft.customer_name ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v !== (draft.customer_name ?? "")) patch({ customer_name: v || null });
+                      }}
+                      placeholder="z.B. Firma XY"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Ansprechperson
+                  </label>
+                  <Input
+                    defaultValue={draft.contact_person ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (draft.contact_person ?? "")) patch({ contact_person: v || null });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    E-Mail
+                  </label>
+                  <Input
+                    type="email"
+                    defaultValue={draft.contact_email ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (draft.contact_email ?? "")) patch({ contact_email: v || null });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Telefon
+                  </label>
+                  <Input
+                    type="tel"
+                    defaultValue={draft.contact_phone ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (draft.contact_phone ?? "")) patch({ contact_phone: v || null });
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">E-Mail</p>
-                <Input
-                  type="email"
-                  defaultValue={draft.contact_email ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v !== (draft.contact_email ?? "")) patch({ contact_email: v || null });
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Telefon</p>
-                <Input
-                  type="tel"
-                  defaultValue={draft.contact_phone ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v !== (draft.contact_phone ?? "")) patch({ contact_phone: v || null });
-                  }}
-                />
-              </div>
-            </div>
-          </section>
+            </CardContent>
+          </Card>
 
           {/* Location */}
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5" />
-              Location
-            </h2>
-            <SearchableSelect
-              value={draft.location_id ?? ""}
-              onChange={(id) => patch({ location_id: id || null })}
-              items={locations.map((l) => ({
-                id: l.id,
-                label: l.name,
-                sub: [l.address_street, l.address_zip, l.address_city]
-                  .filter(Boolean)
-                  .join(", "),
-              }))}
-              placeholder="— keine Location —"
-              clearable
-            />
-            {draft.location && (
-              <p className="text-xs text-muted-foreground">
-                {[draft.location.address_street, draft.location.address_zip, draft.location.address_city]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            )}
-          </section>
+          <Card className="bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5" />
+                Location
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <SearchableSelect
+                value={draft.location_id ?? ""}
+                onChange={(id) => patch({ location_id: id || null })}
+                items={locations.map((l) => ({
+                  id: l.id,
+                  label: l.name,
+                  sub: [l.address_street, l.address_zip, l.address_city]
+                    .filter(Boolean)
+                    .join(", "),
+                }))}
+                placeholder="— keine Location —"
+                clearable
+              />
+              {draft.location && (
+                <p className="text-xs text-muted-foreground">
+                  {[draft.location.address_street, draft.location.address_zip, draft.location.address_city]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Datum + Gäste */}
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Calendar className="h-3.5 w-3.5" />
-              Erwartetes Datum & Gäste
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Start</p>
-                <Input
-                  type="date"
-                  defaultValue={draft.expected_start_date ?? ""}
-                  onBlur={(e) => {
-                    const v = e.target.value || null;
-                    if (v !== draft.expected_start_date) patch({ expected_start_date: v });
-                  }}
-                />
+          <Card className="bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5" />
+                Erwartetes Datum & Gäste
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Start
+                  </label>
+                  <Input
+                    type="date"
+                    defaultValue={draft.expected_start_date ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value || null;
+                      if (v !== draft.expected_start_date) patch({ expected_start_date: v });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Ende
+                  </label>
+                  <Input
+                    type="date"
+                    defaultValue={draft.expected_end_date ?? ""}
+                    min={draft.expected_start_date ?? undefined}
+                    onBlur={(e) => {
+                      const v = e.target.value || null;
+                      if (v !== draft.expected_end_date) patch({ expected_end_date: v });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Gäste
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    defaultValue={draft.guest_count ?? ""}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      const v = raw ? parseInt(raw, 10) : null;
+                      if (v !== draft.guest_count) patch({ guest_count: v });
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Ende</p>
-                <Input
-                  type="date"
-                  defaultValue={draft.expected_end_date ?? ""}
-                  min={draft.expected_start_date ?? undefined}
-                  onBlur={(e) => {
-                    const v = e.target.value || null;
-                    if (v !== draft.expected_end_date) patch({ expected_end_date: v });
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70">Gäste</p>
-                <Input
-                  type="number"
-                  min={1}
-                  defaultValue={draft.guest_count ?? ""}
-                  onBlur={(e) => {
-                    const raw = e.target.value.trim();
-                    const v = raw ? parseInt(raw, 10) : null;
-                    if (v !== draft.guest_count) patch({ guest_count: v });
-                  }}
-                />
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Aktuell: {formatDateRange(draft.expected_start_date, draft.expected_end_date)}
-              {draft.guest_count ? ` · ${draft.guest_count} Gäste` : ""}
-            </p>
-          </section>
+              <p className="text-[11px] text-muted-foreground">
+                Aktuell: {formatDateRange(draft.expected_start_date, draft.expected_end_date)}
+                {draft.guest_count ? ` · ${draft.guest_count} Gäste` : ""}
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Owner */}
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <UserIcon className="h-3.5 w-3.5" />
-              Verantwortlich
-            </h2>
-            <SearchableSelect
-              value={draft.owner_id ?? ""}
-              onChange={(id) => patch({ owner_id: id || null })}
-              items={owners.map((o) => ({ id: o.id, label: o.full_name }))}
-              placeholder="— niemand zugewiesen —"
-              searchable={owners.length > 8}
-              clearable
-            />
-          </section>
+          <Card className="bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <UserIcon className="h-3.5 w-3.5" />
+                Verantwortlich
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SearchableSelect
+                value={draft.owner_id ?? ""}
+                onChange={(id) => patch({ owner_id: id || null })}
+                items={owners.map((o) => ({ id: o.id, label: o.full_name }))}
+                placeholder="— niemand zugewiesen —"
+                searchable={owners.length > 8}
+                clearable
+              />
+            </CardContent>
+          </Card>
 
           {/* Notizen-Freitextsammlung */}
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Notizen / Rahmenbedingungen
-            </h2>
-            <InlineTextarea
-              value={draft.general_notes ?? ""}
-              onSave={(v) => patch({ general_notes: v.trim() || null })}
-              placeholder="Budget, Sonderwuensche, allgemeine Info…"
-              rows={4}
-              disabled={isArchived}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Fuer chronologische Anruf-/Mail-Historie den Notizen-Tab verwenden.
-            </p>
-          </section>
+          <Card className="bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Notizen / Rahmenbedingungen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <InlineTextarea
+                value={draft.general_notes ?? ""}
+                onSave={(v) => patch({ general_notes: v.trim() || null })}
+                placeholder="Budget, Sonderwuensche, allgemeine Info…"
+                rows={4}
+                disabled={isArchived}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Fuer chronologische Anruf-/Mail-Historie den Notizen-Tab verwenden.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -668,49 +727,53 @@ export default function EntwurfDetailPage() {
         <div className="space-y-4">
           {/* Add-Notiz */}
           {!isArchived && (
-            <section className="rounded-xl border bg-card p-4 space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Neue Notiz
-              </h2>
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="w-full md:w-44">
-                  <SearchableSelect
-                    value={newNoteKind}
-                    onChange={(v) => setNewNoteKind(v as NoteKind)}
-                    items={(Object.keys(NOTE_KIND_META) as NoteKind[]).map((k) => ({
-                      id: k,
-                      label: NOTE_KIND_META[k].label,
-                    }))}
-                    searchable={false}
-                    clearable={false}
-                  />
+            <Card className="bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Neue Notiz
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col md:flex-row gap-2">
+                  <div className="w-full md:w-44">
+                    <SearchableSelect
+                      value={newNoteKind}
+                      onChange={(v) => setNewNoteKind(v as NoteKind)}
+                      items={(Object.keys(NOTE_KIND_META) as NoteKind[]).map((k) => ({
+                        id: k,
+                        label: NOTE_KIND_META[k].label,
+                      }))}
+                      searchable={false}
+                      clearable={false}
+                    />
+                  </div>
                 </div>
-              </div>
-              <textarea
-                value={newNoteBody}
-                onChange={(e) => setNewNoteBody(e.target.value)}
-                placeholder="Was ist passiert? (z.B. Kunde hat sich zurueckgemeldet, Preisrahmen abgestimmt…)"
-                rows={3}
-                style={{ fieldSizing: "content" } as React.CSSProperties}
-                className="w-full px-3 py-1.5 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
-              />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={addNote}
-                  disabled={noteBusy || !newNoteBody.trim()}
-                  className="kasten kasten-red"
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  {noteBusy ? "Speichere…" : "Hinzufuegen"}
-                </button>
-              </div>
-            </section>
+                <textarea
+                  value={newNoteBody}
+                  onChange={(e) => setNewNoteBody(e.target.value)}
+                  placeholder="Was ist passiert? (z.B. Kunde hat sich zurueckgemeldet, Preisrahmen abgestimmt…)"
+                  rows={3}
+                  style={{ fieldSizing: "content" } as React.CSSProperties}
+                  className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={addNote}
+                    disabled={noteBusy || !newNoteBody.trim()}
+                    className="kasten kasten-blue"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {noteBusy ? "Speichere…" : "Hinzufuegen"}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Notizen-Historie */}
           {notes.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card">
+            <div className="rounded-xl border border-dashed border-foreground/15 dark:border-foreground/20 bg-card">
               <EmptyState
                 icon={MessageSquare}
                 title="Noch keine Notizen"
@@ -729,9 +792,9 @@ export default function EntwurfDetailPage() {
                 return (
                   <li
                     key={n.id}
-                    className="rounded-xl border bg-card p-3 flex items-start gap-3"
+                    className="rounded-xl bg-foreground/[0.03] dark:bg-foreground/[0.06] border border-foreground/10 dark:border-foreground/15 p-3 flex items-start gap-3"
                   >
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-foreground/[0.06] text-muted-foreground shrink-0">
+                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-foreground/[0.06] dark:bg-foreground/[0.12] text-muted-foreground shrink-0">
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="flex-1 min-w-0">
