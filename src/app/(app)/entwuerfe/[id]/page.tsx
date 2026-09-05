@@ -381,7 +381,7 @@ export default function EntwurfDetailPage() {
   return (
     <div className="max-w-3xl mx-auto page-enter">
       {/* Sticky-Header */}
-      <div className="sticky top-0 z-20 bg-[#f5f5f7]/85 dark:bg-[#0a0a0a]/85 backdrop-blur-md pt-1 pb-4 mb-4">
+      <div className="sticky top-0 z-20 bg-[#f5f5f7]/85 dark:bg-[#0a0a0a]/85 backdrop-blur-md pt-1 pb-4 mb-8">
         <div className="flex items-start gap-3">
           <BackButton fallbackHref="/entwuerfe" />
           <div className="flex-1 min-w-0">
