@@ -25,15 +25,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { User, Bell, Calendar } from "lucide-react";
+import { User, Bell, Calendar, Fingerprint } from "lucide-react";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
 import { MeinKontoCard } from "@/components/einstellungen/mein-konto-card";
 import { BenachrichtigungenTab } from "@/components/einstellungen/benachrichtigungen-tab";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
+import { PasskeysCard } from "@/components/einstellungen/passkeys-card";
 import { TabsNav } from "@/components/ui/tabs-nav";
 
-type Tab = "profil" | "benachrichtigungen" | "kalender";
-const ALL_TABS: Tab[] = ["profil", "benachrichtigungen", "kalender"];
+type Tab = "profil" | "sicherheit" | "benachrichtigungen" | "kalender";
+const ALL_TABS: Tab[] = ["profil", "sicherheit", "benachrichtigungen", "kalender"];
 
 export default function MeinKontoPage() {
   const router = useRouter();
@@ -75,6 +76,7 @@ export default function MeinKontoPage() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "profil",             label: "Profil",             icon: <User className="h-4 w-4" /> },
+    { key: "sicherheit",         label: "Sicherheit",         icon: <Fingerprint className="h-4 w-4" /> },
     { key: "benachrichtigungen", label: "Benachrichtigungen", icon: <Bell className="h-4 w-4" /> },
     { key: "kalender",           label: "Kalender",           icon: <Calendar className="h-4 w-4" /> },
   ];
@@ -98,6 +100,12 @@ export default function MeinKontoPage() {
       {tab === "profil" && (
         <div className="max-w-3xl mx-auto">
           <MeinKontoCard />
+        </div>
+      )}
+
+      {tab === "sicherheit" && (
+        <div className="max-w-3xl mx-auto">
+          <PasskeysCard />
         </div>
       )}
 
