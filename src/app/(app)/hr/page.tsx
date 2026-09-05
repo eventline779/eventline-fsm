@@ -47,6 +47,7 @@ import { LohnStandardwerteCard } from "@/components/hr/loehne/lohn-standardwerte
 import { MitarbeiterLohnTab } from "@/components/hr/loehne/mitarbeiter-lohn-tab";
 import { LohnsummenPrognose } from "@/components/analytics/lohnsummen-prognose";
 import { MeineLohndokumenteView } from "@/components/hr/meine-lohndokumente-view";
+import { BackButton } from "@/components/ui/back-button";
 
 type Tab = "anfragen" | "stempelzeiten" | "tickets" | "ferien" | "loehne";
 type LoehneSubTab = "monatsstunden" | "pdfs" | "mitarbeiter" | "standardwerte";
@@ -175,12 +176,20 @@ export default function HRPage() {
     { key: "standardwerte", label: "Standardwerte", icon: <SettingsIcon className="h-4 w-4" /> },
   ];
 
+  // Zurueck-Pfeil zeigen, wenn User via Dashboard-Link (?from=dashboard)
+  // hierhergekommen ist — z.B. via "Ferien-Antraege pending"-Kachel.
+  // Bei normaler Sidebar-Navigation kein Pfeil (unnoetige Kluft).
+  const fromDashboard = searchParams.get("from") === "dashboard";
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-        <Briefcase className="h-5 w-5" />
-        HR
-      </h1>
+      <div className="flex items-center gap-3 min-w-0">
+        {fromDashboard && <BackButton fallbackHref="/dashboard" />}
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <Briefcase className="h-5 w-5" />
+          HR
+        </h1>
+      </div>
 
       <TabsNav
         tabs={visibleTabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}

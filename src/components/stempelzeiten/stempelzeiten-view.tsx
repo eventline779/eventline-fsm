@@ -41,6 +41,8 @@ import {
   ZRH_TZ, localDateIso, todayLocalIso, weekdayForDateIso,
 } from "@/lib/swiss-time";
 import Link from "next/link";
+import { useSearchParams, usePathname } from "next/navigation";
+import { BackButton } from "@/components/ui/back-button";
 
 interface AdminEntry {
   id: string;
@@ -226,6 +228,13 @@ function buildDayBuckets(entries: NormalizedEntry[]): Map<string, DayBucket> {
 export function StempelzeitenView() {
   const supabase = createClient();
   const { active } = useStempel();
+  // Deep-Link-Route /stempelzeiten kann via Dashboard aufgerufen werden
+  // (?from=dashboard). In /hr eingebettet regelt der HR-Header den Zurueck-
+  // Pfeil — hier dann keinen zusaetzlichen zeigen (sonst 2 Pfeile).
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const showBackButton =
+    pathname === "/stempelzeiten" && searchParams.get("from") === "dashboard";
   const { confirm, ConfirmModalElement } = useConfirm();
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -355,11 +364,14 @@ export function StempelzeitenView() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3 min-h-9">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Stempelzeiten</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {viewingOther ? (selectedUserLabel ?? "Fremd-Ansicht") : "Deine Einträge"} · letzte {DEFAULT_RANGE_DAYS} Tage
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          {showBackButton && <BackButton fallbackHref="/dashboard" />}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Stempelzeiten</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {viewingOther ? (selectedUserLabel ?? "Fremd-Ansicht") : "Deine Einträge"} · letzte {DEFAULT_RANGE_DAYS} Tage
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {can("tickets:create") && (

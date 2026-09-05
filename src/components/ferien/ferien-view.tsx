@@ -24,6 +24,8 @@ import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
 import { useConfirm } from "@/components/ui/use-confirm";
 import type { TimeOff, TimeOffType, TimeOffStatus } from "@/types";
+import { useSearchParams, usePathname } from "next/navigation";
+import { BackButton } from "@/components/ui/back-button";
 
 interface TimeOffWithUser extends TimeOff {
   user: { full_name: string } | null;
@@ -75,6 +77,13 @@ export function FerienView() {
   const supabase = createClient();
   const { profile, can, ready } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
+  // Deep-Link-Route /ferien kann via Dashboard aufgerufen werden
+  // (?from=dashboard). In /hr eingebettet regelt der HR-Header den Zurueck-
+  // Pfeil — hier dann keinen zusaetzlichen zeigen (sonst 2 Pfeile).
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const showBackButton =
+    pathname === "/ferien" && searchParams.get("from") === "dashboard";
 
   const canApprove = can("ferien:approve");
   const userId = profile?.id ?? null;
@@ -231,13 +240,16 @@ export function FerienView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ferien & Abwesenheit</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {canApprove
-              ? "Eigene Anträge einreichen, Team-Anträge genehmigen oder ablehnen."
-              : "Eigene Ferien-, Krank- oder Frei-Tage eintragen."}
-          </p>
+        <div className="flex items-start gap-3 min-w-0">
+          {showBackButton && <BackButton fallbackHref="/dashboard" />}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Ferien & Abwesenheit</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {canApprove
+                ? "Eigene Anträge einreichen, Team-Anträge genehmigen oder ablehnen."
+                : "Eigene Ferien-, Krank- oder Frei-Tage eintragen."}
+            </p>
+          </div>
         </div>
         <button type="button" onClick={openCreate} className="kasten kasten-red shrink-0">
           <Plus className="h-3.5 w-3.5" />

@@ -40,6 +40,8 @@ import { TerminEditModal } from "@/components/kalender/termin-edit-modal";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 import { usePermissions } from "@/lib/use-permissions";
 import { todayLocalIso } from "@/lib/swiss-time";
+import { useSearchParams } from "next/navigation";
+import { BackButton } from "@/components/ui/back-button";
 
 // Supabase-Joined-Shape — am API-Boundary getypt damit die Loader-Logik
 // nicht durchgehend mit any/unknown rumhantieren muss.
@@ -82,6 +84,10 @@ interface RawTimeOff {
 
 export default function KalenderPage() {
   const supabase = createClient();
+  // BackButton nur zeigen wenn ueber Dashboard-Link (?from=dashboard) hier
+  // gelandet — bei Sidebar-Navigation gibt's keinen Zurueck-Kontext.
+  const searchParams = useSearchParams();
+  const fromDashboard = searchParams.get("from") === "dashboard";
   // Auf Mobile starten wir mit der Wochen-Ansicht — das Monats-Grid (7×6)
   // ist auf < 768px nicht sinnvoll bedienbar (Cells werden < 50px breit,
   // INT-Nrn schneiden ab). Auf Desktop bleibt Default = monat.
@@ -394,7 +400,10 @@ export default function KalenderPage() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
+        <div className="flex items-center gap-3 min-w-0">
+          {fromDashboard && <BackButton fallbackHref="/dashboard" />}
+          <h1 className="text-2xl font-bold tracking-tight">Kalender</h1>
+        </div>
         <div className="flex items-center gap-2">
           {/* iCal-Feed als Icon-Button + Popover — vorher als Card unten
               (nur sichtbar wenn man scrollte). Rechts vom Header damit

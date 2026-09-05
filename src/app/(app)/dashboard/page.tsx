@@ -282,7 +282,7 @@ function NaechsterEinsatzCard({ einsatz }: { einsatz: NaechsterEinsatz | null })
   }
   return (
     <Link
-      href="/kalender"
+      href="/kalender?from=dashboard"
       className="block rounded-xl border bg-card p-4 hover:border-accent transition-colors"
     >
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -313,19 +313,19 @@ function AdminDashboard({ admin }: { admin: AdminData }) {
           icon={<Briefcase className="h-3.5 w-3.5" />}
           label="Offene Auftraege"
           value={admin.kpi.offene_auftraege}
-          href="/auftraege"
+          href="/auftraege?from=dashboard"
         />
         <KpiCard
           icon={<CalendarDays className="h-3.5 w-3.5" />}
           label="Termine diese Woche"
           value={admin.kpi.geplante_termine_woche}
-          href="/kalender"
+          href="/kalender?from=dashboard"
         />
         <KpiCard
           icon={<Receipt className="h-3.5 w-3.5" />}
           label="Nicht abgerechnet"
           value={admin.kpi.nicht_abgerechnet}
-          href="/abrechnung"
+          href="/abrechnung?from=dashboard"
         />
       </div>
 
@@ -348,20 +348,20 @@ function AdminDashboard({ admin }: { admin: AdminData }) {
               icon={<PlaneTakeoff className="h-4 w-4" />}
               label="Ferien-Antraege pending"
               count={admin.zu_erledigen.ferien_pending}
-              href="/hr?tab=anfragen"
+              href="/hr?tab=anfragen&from=dashboard"
             />
             <TodoRow
               icon={<AlertCircle className="h-4 w-4" />}
               label="Ueberfaellige Auftraege"
               count={admin.zu_erledigen.ueberfaellige_auftraege}
-              href="/auftraege"
+              href="/auftraege?from=dashboard"
               urgent={admin.zu_erledigen.ueberfaellige_auftraege > 0}
             />
             <TodoRow
               icon={<Receipt className="h-4 w-4" />}
               label="Neue Belege"
               count={admin.zu_erledigen.neue_belege}
-              href="/abrechnung"
+              href="/abrechnung?from=dashboard"
             />
           </div>
         </section>
@@ -375,13 +375,13 @@ function AdminDashboard({ admin }: { admin: AdminData }) {
               icon={<PlayCircle className="h-4 w-4" />}
               label="Gerade eingestempelt"
               count={admin.team_status.eingestempelt}
-              href="/stempelzeiten"
+              href="/stempelzeiten?from=dashboard"
             />
             <TodoRow
               icon={<PlaneTakeoff className="h-4 w-4" />}
               label="Heute in Ferien"
               count={admin.team_status.in_ferien_heute}
-              href="/ferien"
+              href="/ferien?from=dashboard"
             />
           </div>
         </section>

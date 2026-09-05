@@ -30,6 +30,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import Link from "next/link";
 import type { TicketDataBeleg } from "@/types";
 import { PdfPopup } from "@/components/pdf-popup";
+import { BackButton } from "@/components/ui/back-button";
 
 // =====================================================================
 // Auftrags-Stream (links)
@@ -508,13 +509,20 @@ export default function AbrechnungPage() {
         ? `Bexio-Beleg-Nummer oder andere Ablage-Referenz.`
         : `Wird dem Mitarbeiter im Ticket-Detail angezeigt.`;
 
+  // BackButton konditional: nur wenn User via Dashboard-Link (?from=dashboard)
+  // hierhergekommen ist. Sidebar-Navigation braucht keinen Zurueck-Pfeil.
+  const fromDashboard = searchParams.get("from") === "dashboard";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Abrechnung</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Aufträge mit gestellter Rechnung und Belege als abgelegt markieren.
-        </p>
+      <div className="flex items-center gap-3 min-w-0">
+        {fromDashboard && <BackButton fallbackHref="/dashboard" />}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Abrechnung</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Aufträge mit gestellter Rechnung und Belege als abgelegt markieren.
+          </p>
+        </div>
       </div>
 
       {loading ? (
