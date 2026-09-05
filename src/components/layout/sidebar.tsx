@@ -92,9 +92,9 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
 
   return (
     <aside className="hidden md:flex md:flex-col fixed left-0 top-0 w-[240px] h-screen bg-sidebar text-sidebar-foreground shadow-lg border-r border-sidebar-border font-heading z-30">
-      {/* Logo — mit satter Luft nach oben, damit es nicht in die Ecke geklebt
-          wirkt (Leo 2026-09-02). pt-8 = 32px vom oberen Sidebar-Rand. */}
-      <div className="px-6 pt-8 pb-5">
+      {/* Logo — symmetrische Luft (Leo 2026-09-05): oben = unten = 32px,
+          damit das Logo optisch zentriert in seinem Container-Slot sitzt. */}
+      <div className="px-6 pt-8 pb-8">
         <Link href="/dashboard" className="block">
           <Logo fillWidth />
         </Link>
