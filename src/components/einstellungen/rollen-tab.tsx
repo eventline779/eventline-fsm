@@ -460,7 +460,7 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
         </div>
       )}
 
-      <Modal open={showCreate} onClose={() => !creating && setShowCreate(false)} title="Neue Rolle" size="lg">
+      <Modal open={showCreate} onClose={() => !creating && setShowCreate(false)} title="Neue Rolle" size="4xl">
         <form onSubmit={createRole} className="space-y-4">
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Name *</p>

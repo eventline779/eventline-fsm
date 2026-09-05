@@ -32,8 +32,9 @@ export interface ModalProps {
   title?: string;
   /** Header-Icon links vom Titel (z.B. <Send className="h-5 w-5 text-blue-500" />) */
   icon?: React.ReactNode;
-  /** Default 'sm' (max-w-sm). 'md' fuer Formulare, 'lg' fuer breitere Inhalte. */
-  size?: "sm" | "md" | "lg";
+  /** Default 'sm' (max-w-sm). 'md' fuer Formulare, 'lg' fuer breitere Inhalte,
+   *  'xl'/'2xl'/'3xl'/'4xl' fuer Chip-Grids/Matrix-Layouts (z.B. Rollen-Modal). */
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
   /** Default true. Wenn false, klick auf Backdrop + Esc + X tun nichts. Fuer
    *  Saving-States verwenden, damit der User nicht versehentlich abbricht. */
   closable?: boolean;
@@ -44,6 +45,10 @@ const SIZE_CLASS = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
+  "4xl": "max-w-4xl",
 } as const;
 
 export function Modal({ open, onClose, title, icon, size = "sm", closable = true, children }: ModalProps) {
