@@ -6,7 +6,6 @@
  * Aufgeteilt nach Themen (Tabs):
  *  - Profil: Name/Email + Daten-Export (DSG/DSGVO)
  *  - Benachrichtigungen: Channel-Matrix + Push + Sound + Quiet Hours
- *  - Dokumente: eigene Lohnabrechnungen + Lohnausweise zum Download
  *  - Kalender: iCal-Feed-Token fuer externen Kalender-Import
  *  - Admin-Space (admin-only): geteilte Notizen aller Admins
  *
@@ -15,27 +14,42 @@
  * pro-User -- Erst-Trust passiert automatisch via TrustedDeviceGate auf
  * sensiblen Seiten.
  *
+ * Eigene Lohn-PDFs (Lohnabrechnungen + Lohnausweise) leben unter
+ * /hr → Tab "Lohn" — MeineLohndokumenteView. Der frueher hier gehostete
+ * "Dokumente"-Tab wurde bewusst dorthin verschoben, damit ALLE HR-Themen
+ * (Stempel, Tickets, Ferien, Lohn) an EINEM Ort landen (2026-09).
+ * Legacy-Link ?tab=dokumente wird auf /hr?tab=loehne umgeleitet.
+ *
  * Verfuegbarkeit: ALLE authenticated User (kein Permission-Gate).
  */
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { User, Bell, FileText, Calendar } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { User, Bell, Calendar } from "lucide-react";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
 import { MeinKontoCard } from "@/components/einstellungen/mein-konto-card";
 import { BenachrichtigungenTab } from "@/components/einstellungen/benachrichtigungen-tab";
-import { LohnausweiseList } from "@/components/hr/lohnausweise-list";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 import { TabsNav } from "@/components/ui/tabs-nav";
 
-type Tab = "profil" | "benachrichtigungen" | "dokumente" | "kalender";
-const ALL_TABS: Tab[] = ["profil", "benachrichtigungen", "dokumente", "kalender"];
+type Tab = "profil" | "benachrichtigungen" | "kalender";
+const ALL_TABS: Tab[] = ["profil", "benachrichtigungen", "kalender"];
 
 export default function MeinKontoPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const urlTab = searchParams.get("tab") as Tab | null;
+  const urlTab = searchParams.get("tab");
+  // Legacy-Deep-Link ?tab=dokumente → nach /hr?tab=loehne umleiten
+  // (die MA-Lohn-Sicht lebt jetzt dort). Muss VOR dem State-Init passieren
+  // sonst rendern wir kurz einen Empty-State.
+  useEffect(() => {
+    if (urlTab === "dokumente") {
+      router.replace("/hr?tab=loehne");
+    }
+  }, [urlTab, router]);
+  const initialTab: Tab = (urlTab && ALL_TABS.includes(urlTab as Tab)) ? (urlTab as Tab) : "profil";
   const { firstVisitedAt, ready: onboardingReady, markVisited } = useMeinKontoOnboarding();
-  const [tab, setTab] = useState<Tab>(urlTab && ALL_TABS.includes(urlTab) ? urlTab : "profil");
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   // Sidebar-Badge ausschalten sobald die Seite das erste Mal geoeffnet
   // wird. Idempotent — API no-op-t wenn schon gesetzt.
@@ -55,19 +69,18 @@ export default function MeinKontoPage() {
   // Falls die URL einen Tab nennt der noch nicht im state ist (z.B. via
   // direktem Link aus der Glocke), nachziehen.
   useEffect(() => {
-    if (urlTab && ALL_TABS.includes(urlTab) && urlTab !== tab) setTab(urlTab);
+    if (urlTab && ALL_TABS.includes(urlTab as Tab) && urlTab !== tab) setTab(urlTab as Tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab]);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "profil",             label: "Profil",             icon: <User className="h-4 w-4" /> },
     { key: "benachrichtigungen", label: "Benachrichtigungen", icon: <Bell className="h-4 w-4" /> },
-    { key: "dokumente",          label: "Dokumente",          icon: <FileText className="h-4 w-4" /> },
     { key: "kalender",           label: "Kalender",           icon: <Calendar className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Mein Konto</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -91,12 +104,6 @@ export default function MeinKontoPage() {
       {tab === "benachrichtigungen" && (
         <div className="max-w-3xl mx-auto">
           <BenachrichtigungenTab />
-        </div>
-      )}
-
-      {tab === "dokumente" && (
-        <div className="max-w-3xl mx-auto">
-          <LohnausweiseList />
         </div>
       )}
 
