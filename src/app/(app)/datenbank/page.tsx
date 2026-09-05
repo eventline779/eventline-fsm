@@ -1,79 +1,86 @@
 "use client";
 
 /**
- * Datenbank — EIN Sidebar-Eintrag, mehrere Tabs.
+ * Datenbank — EIN Sidebar-Eintrag, zwei Tabs (Kunden + Lieferanten).
  *
- * Konsolidiert die vier vormals eigenständigen Sidebar-Positionen
- * Kunden/Lieferanten/Locations/Partner in einen Hub. Grund: die vier
- * Kontakte-Listen sind semantisch verwandt (Stammdaten-Datenbank) und
- * ein Sidebar-Eintrag mit Tabs ist übersichtlicher als vier Eintraege.
+ * Konsolidiert die vormals eigenständigen Sidebar-Positionen Kunden und
+ * Lieferanten in einen Hub. Grund: beides sind Kontakte-Listen (Stamm-
+ * daten-Datenbank), ein Sidebar-Eintrag mit Tabs ist übersichtlicher.
+ *
+ * Locations ist seit 2026-09-05 wieder ein EIGENER Sidebar-Eintrag
+ * (/locations) — Schluesselcodes werden bei Aufbau regelmaessig
+ * nachgeschlagen, das muss ein Klick tief sein, nicht zwei. Partner
+ * lebt unter /einstellungen?tab=partner (Verwaltungs-Thema).
  *
  * Tab-Muster: TabsNav (Underline, roter aktiver Underline) — kanonisches
  * NAVIGATION-Muster (siehe TabsNav-Kommentar); nicht Kasten-Toggle, weil
- * die vier Tabs vollstaendig unterschiedliche Sektionen sind, keine
- * Filter derselben Datenmenge. Muster übernommen 1:1 von /hr.
- *
- * Rollen-Sichtbarkeit: Partner-Tab nur fuer Admin (die PartnerView selbst
- * lehnt Non-Admins ab; wir zeigen den Tab entsprechend erst gar nicht).
+ * die Tabs vollstaendig unterschiedliche Sektionen sind, keine Filter
+ * derselben Datenmenge. Muster übernommen 1:1 von /hr.
  *
  * URL-Persistenz: ?tab=… ueberlebt Reload, Back/Forward, Teilen von Links.
  * history.replaceState statt router.push — kein neuer History-Eintrag pro
  * Tab-Klick, Back geht sinnvoll zurueck zur vorigen Seite.
  *
- * Deep-Link-Kompatibilitaet: /kunden, /lieferanten, /locations, /partner
- * bleiben eigenstaendige Routes (rendern dort dieselben View-Components
- * ohne embedded-Prop). So funktionieren Bookmarks, interne Links,
- * Command-Palette-Eintraege, Bexio-OAuth-Callback etc. unveraendert.
- * Detail-Routen (/kunden/[id] etc.) sowieso.
+ * Deep-Link-Kompatibilitaet: /kunden, /lieferanten bleiben eigenstaendige
+ * Routes (rendern dort dieselben View-Components ohne embedded-Prop). So
+ * funktionieren Bookmarks, interne Links, Command-Palette-Eintraege,
+ * Bexio-OAuth-Callback etc. unveraendert. Detail-Routen (/kunden/[id]
+ * etc.) sowieso.
  *
- * Legacy-Mapping: alte Deep-Links aus dem frueheren /kontakte-Konzept
- * (?tab=kunden|lieferanten|partner|locations) werden 1:1 uebernommen
- * — die Keys sind zufaellig gleich. Zusaetzlich ein Alias fuer Plural/
- * Singular-Varianten, falls existent.
+ * Legacy-Mapping: alte ?tab=locations|location|standorte|raeume-Links
+ * werden auf /locations umgeleitet (Locations lebt nicht mehr als Tab).
  */
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Database, Users, Handshake, MapPin,
+  Database, Users, Handshake,
 } from "lucide-react";
 import { TabsNav } from "@/components/ui/tabs-nav";
 import { usePermissions } from "@/lib/use-permissions";
 import { KundenView } from "@/components/kunden/kunden-view";
 import { LieferantenView } from "@/components/lieferanten/lieferanten-view";
-import { LocationsView } from "@/components/locations/locations-view";
 
-// Partner ist bewusst NICHT hier — Location-Partner ist Verwaltungs-Thema
-// und lebt jetzt unter /einstellungen?tab=partner (Leo 2026-09-02).
-type Tab = "kunden" | "lieferanten" | "locations";
-const ALL_TABS: Tab[] = ["kunden", "lieferanten", "locations"];
+type Tab = "kunden" | "lieferanten";
+const ALL_TABS: Tab[] = ["kunden", "lieferanten"];
 
 /**
  * Legacy-Mapping: alte ?tab=…-Werte transparent auf die neuen Keys mappen.
- * Aktuell direkt identisch, plus ein paar Singular-/Alt-Aliase falls in
- * alten Bookmarks/Links im Umlauf.
+ * Locations-Aliase geben null zurueck — dann redirected der Aufrufer
+ * nach /locations (siehe useEffect unten).
  */
 function mapLegacyTab(raw: string | null): Tab | null {
   if (!raw) return null;
   const legacy: Record<string, Tab> = {
     kunde: "kunden",
     lieferant: "lieferanten",
-    location: "locations",
-    standorte: "locations",
-    raeume: "locations",
   };
   const mapped = legacy[raw];
   if (mapped) return mapped;
   return ALL_TABS.includes(raw as Tab) ? (raw as Tab) : null;
 }
 
+// Alte Locations-Deep-Links (?tab=locations|location|standorte|raeume)
+// leiten auf die eigenstaendige /locations-Route weiter.
+const LOCATIONS_LEGACY_TABS = new Set(["locations", "location", "standorte", "raeume"]);
+
 export default function DatenbankPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const urlTab = mapLegacyTab(searchParams.get("tab"));
+  const rawTab = searchParams.get("tab");
+  const urlTab = mapLegacyTab(rawTab);
 
   const { ready } = usePermissions();
 
   const [tab, setTab] = useState<Tab>(urlTab ?? "kunden");
+
+  // Alte Locations-Deep-Links (?tab=locations|location|standorte|raeume)
+  // leiten auf die eigenstaendige Locations-Route weiter.
+  useEffect(() => {
+    if (rawTab && LOCATIONS_LEGACY_TABS.has(rawTab)) {
+      router.replace("/locations");
+    }
+  }, [rawTab, router]);
 
   // Externe URL-Aenderungen (Back/Forward, nachtraegliche Deep-Links) mit
   // Local-State synchron halten — sonst zeigt Back den alten Tab.
@@ -95,7 +102,6 @@ export default function DatenbankPage() {
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "kunden",      label: "Kunden",      icon: <Users className="h-4 w-4" /> },
     { key: "lieferanten", label: "Lieferanten", icon: <Handshake className="h-4 w-4" /> },
-    { key: "locations",   label: "Locations",   icon: <MapPin className="h-4 w-4" /> },
   ];
 
   const activeTab: Tab = ALL_TABS.includes(tab) ? tab : "kunden";
@@ -120,7 +126,6 @@ export default function DatenbankPage() {
 
       {activeTab === "kunden" && <KundenView embedded />}
       {activeTab === "lieferanten" && <LieferantenView embedded />}
-      {activeTab === "locations" && <LocationsView embedded />}
     </div>
   );
 }

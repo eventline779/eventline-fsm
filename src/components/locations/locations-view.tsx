@@ -2,14 +2,20 @@
 
 /**
  * Locations-View — Standorte (Verwaltungen) + Raeume (externe Reference)
- * in einer Liste, mit Schweizer Karte + Belegungsplan darueber.
+ * in einer schlichten Liste. Zweck: schnelle Suche + Detail-Klick, damit
+ * bei Aufbau Schluesselcodes / Kontakt-Infos einer Location in einem
+ * Klick greifbar sind.
  *
- * Wird gerendert von /locations (Deep-Link-Alias) und /kontakte?tab=locations.
- * Detail- und Edit-Routen bleiben getrennt: /standorte/[id] und /raeume/[id].
+ * Bewusst OHNE Karte / Belegungsplan / Analytics-Widget (Leo 2026-09-05,
+ * Locations wieder als eigene Sidebar-Seite): die Seite muss schnell und
+ * ruhig sein, kein Chart-Bling. Wer die Standort-Auslastungs-Tabelle
+ * (LocationOverview) oder die Schweizer Karte / den Belegungsplan
+ * braucht — beides lebt im Git-History (audit-umsetzung vor 2026-09-05).
  *
- * "embedded"-Prop: unterdrueckt Header (h1 + Subtitle + Anlegen-Buttons)
- * wenn im Kontakte-Hub eingebettet. Anlegen-Buttons wandern in die
- * Filter-Zeile.
+ * Wird nur noch von /locations gerendert; die frueheren Einbettungen im
+ * Datenbank-Hub / Kontakte-Hub sind entfallen (Locations ist wieder ein
+ * eigenstaendiger Sidebar-Eintrag). Detail- und Edit-Routen bleiben
+ * getrennt: /standorte/[id] und /raeume/[id].
  */
 
 import { useEffect, useState } from "react";
@@ -22,23 +28,9 @@ import Link from "next/link";
 import {
   Plus, Search, MapPin, Users as UsersIcon, Building, DoorOpen, X,
 } from "lucide-react";
-import dynamic from "next/dynamic";
 import { usePermissions } from "@/lib/use-permissions";
-import { LocationOverview } from "@/components/analytics/location-overview";
-import { TrustedDeviceGate } from "@/components/trust/trusted-device-gate";
 import { EmptyState } from "@/components/ui/empty-state";
 import { logError } from "@/lib/log";
-
-// Map ist Leaflet + GeoJSON + Plugins — ~250kb-Chunk. Lazy laden.
-const LocationsSwitzerlandMap = dynamic(
-  () => import("@/components/locations-switzerland-map").then((m) => m.LocationsSwitzerlandMap),
-  { ssr: false, loading: () => <div className="h-[280px] rounded-xl border bg-card animate-pulse" /> },
-);
-
-const BelegungsplanView = dynamic(
-  () => import("@/components/belegungsplan-view").then((m) => m.BelegungsplanView),
-  { ssr: false, loading: () => <div className="h-96 rounded-xl border bg-card animate-pulse" /> },
-);
 
 type OrtType = "standort" | "raum";
 
@@ -55,14 +47,8 @@ type OrtItem = {
 
 type FormType = OrtType | null;
 
-interface Props {
-  /** Wenn true, wird der Header (h1 + Subtitle + Anlegen-Buttons) weggelassen. */
-  embedded?: boolean;
-}
-
-export function LocationsView({ embedded = false }: Props = {}) {
-  const { can, role } = usePermissions();
-  const isAdmin = role === "admin";
+export function LocationsView() {
+  const { can } = usePermissions();
   const [items, setItems] = useState<OrtItem[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | OrtType>("all");
@@ -158,39 +144,30 @@ export function LocationsView({ embedded = false }: Props = {}) {
 
   return (
     <div className="space-y-6">
-      {!embedded && (
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {standortCount} {standortCount === 1 ? "Verwaltung" : "Verwaltungen"} · {raumCount} {raumCount === 1 ? "Raum" : "Räume"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {can("locations:create") && (
-              <>
-                <button type="button" onClick={() => setShowForm(showForm === "standort" ? null : "standort")} className="kasten kasten-red">
-                  <Plus className="h-3.5 w-3.5" />
-                  Neue Verwaltung
-                </button>
-                <button type="button" onClick={() => setShowForm(showForm === "raum" ? null : "raum")} className="kasten kasten-blue">
-                  <Plus className="h-3.5 w-3.5" />
-                  Neuer Raum
-                </button>
-              </>
-            )}
-          </div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Locations
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {standortCount} {standortCount === 1 ? "Verwaltung" : "Verwaltungen"} · {raumCount} {raumCount === 1 ? "Raum" : "Räume"}
+          </p>
         </div>
-      )}
-
-      {/* Schweizer Karte — mobile ausgeblendet (Leaflet braucht zu viel Hoehe). */}
-      <div className="hidden md:block">
-        <LocationsSwitzerlandMap />
-      </div>
-
-      {/* Belegungsplan — mobile ausgeblendet (Matrix scrollt horizontal). */}
-      <div className="hidden md:block">
-        <BelegungsplanView />
+        <div className="flex items-center gap-2 flex-wrap">
+          {can("locations:create") && (
+            <>
+              <button type="button" onClick={() => setShowForm(showForm === "standort" ? null : "standort")} className="kasten kasten-red">
+                <Plus className="h-3.5 w-3.5" />
+                Neue Verwaltung
+              </button>
+              <button type="button" onClick={() => setShowForm(showForm === "raum" ? null : "raum")} className="kasten kasten-muted">
+                <Plus className="h-3.5 w-3.5" />
+                Neuer Raum
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Inline Form — gleiche Felder, nur Header/Submit-Label wechseln. */}
@@ -281,7 +258,7 @@ export function LocationsView({ embedded = false }: Props = {}) {
                 <button
                   type="submit"
                   disabled={!form.name || saving}
-                  className={`kasten ${showForm === "standort" ? "kasten-red" : "kasten-blue"}`}
+                  className={`kasten ${showForm === "standort" ? "kasten-red" : "kasten-muted"}`}
                 >
                   {saving ? "Speichern…" : (showForm === "standort" ? "Verwaltung erstellen" : "Raum erstellen")}
                 </button>
@@ -313,28 +290,6 @@ export function LocationsView({ embedded = false }: Props = {}) {
               {t === "all" ? "Alle" : t === "standort" ? "Verwaltungen" : "Räume"}
             </button>
           ))}
-          {/* Wenn embedded, wandern die beiden Anlegen-Buttons in die Filter-Zeile. */}
-          {embedded && can("locations:create") && (
-            <>
-              <span className="w-px self-stretch bg-border mx-0.5" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={() => setShowForm(showForm === "standort" ? null : "standort")}
-                className="kasten kasten-red"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Neue Verwaltung
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(showForm === "raum" ? null : "raum")}
-                className="kasten kasten-blue"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Neuer Raum
-              </button>
-            </>
-          )}
         </div>
         {(search || filterType !== "all") && (
           <button
@@ -423,13 +378,6 @@ export function LocationsView({ embedded = false }: Props = {}) {
             );
           })}
         </div>
-      )}
-
-      {/* Location-Overview — Aggregation pro Standort. Admin + TrustedDevice. */}
-      {isAdmin && (
-        <TrustedDeviceGate>
-          <LocationOverview />
-        </TrustedDeviceGate>
       )}
     </div>
   );

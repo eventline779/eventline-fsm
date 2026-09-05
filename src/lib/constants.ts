@@ -1,25 +1,24 @@
-// Primaerer Admin-Empfaenger fuer Benachrichtigungen aus Vertrieb /
-// Vermietentwurf-Bestaetigungen. Ueber env-var ueberschreibbar fuer
-// Test-/Staging-Umgebungen — Default ist Leo's Adresse.
-// Sender-Adresse (from:/replyTo:) bleibt im jeweiligen Mail-Template
-// hartkodiert, da das die Brand-Identitaet ist.
+// Primaerer Admin-Empfaenger fuer Benachrichtigungen aus Vertrieb.
+// Ueber env-var ueberschreibbar fuer Test-/Staging-Umgebungen — Default ist
+// Leo's Adresse. Sender-Adresse (from:/replyTo:) bleibt im jeweiligen
+// Mail-Template hartkodiert, da das die Brand-Identitaet ist.
 export const ADMIN_NOTIFICATION_EMAIL =
   process.env.ADMIN_NOTIFICATION_EMAIL || "leo@eventline-basel.com";
 
 // Status-Labels für Aufträge — Light- + Dark-Mode-Farben.
-// Lifecycle: anfrage → entwurf → offen → abgeschlossen | storniert.
-// 'anfrage' ist die Akquise-Phase (5 Schritte via REQUEST_STEPS). Sobald die
-// Anfrage konvertiert wird, wechselt der Status auf 'offen' (oder 'entwurf')
-// und request_step wird NULL. Ab dann normale Auftragslogik.
+// Lifecycle: entwurf → offen → abgeschlossen | storniert.
+// 'anfrage' (frueher Vermietentwurf-Akquise) und 'entwurf' bleiben als
+// Labels erhalten (Historie), werden im UI aber nicht mehr als Filter
+// angeboten — Entwuerfe leben ab 2026-09 in der eigenen Tabelle
+// job_drafts (siehe Migration 206) unter /entwuerfe.
 export const JOB_STATUS = {
   // Partner-Anfrage: gelb/amber, "wartet auf Eventline-Entscheidung".
   // Entsteht ueber das Partner-Portal — Partner erstellt eine Anfrage,
   // Admin akzeptiert (→ offen) oder lehnt ab (→ storniert).
   partner_anfrage: { label: "Partner-Anfrage", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
-  // Vermietentwurf + Auftrag-Entwurf: gleiche LILA Draft-Farbe, app-weit
-  // als "WIP" einheitlich. Status-Codes sind unterschiedlich (anfrage =
-  // Sales-Pipeline, entwurf = Ops-Side-Draft) damit Lifecycle-Logik greift.
-  anfrage: { label: "Vermietentwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
+  // Historische Status-Labels — es entstehen keine neuen Jobs mehr in
+  // diesen Zustaenden, aber Alt-Datensaetze koennen sie noch tragen.
+  anfrage: { label: "Anfrage", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   entwurf: { label: "Entwurf", color: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
   offen: { label: "Bevorstehend", color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
   abgeschlossen: { label: "Abgeschlossen", color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
@@ -32,51 +31,6 @@ export const JOB_STATUS = {
 // Join-Teil eigenstaendig.
 export const JOB_FORM_FIELDS =
   "id, job_number, job_type, title, description, status, priority, customer_id, location_id, room_id, external_address, start_date, end_date, contact_person, contact_phone, contact_email";
-
-// === Mietanfrage-Pipeline ===
-// 4 Schritte waehrend status='anfrage'. Step-Position wird in jobs.request_step gespeichert.
-// Nach Schritt 4 (Angebot bestaetigt durch Kunde) wird der Vermietentwurf
-// automatisch in einen Auftrag (status='offen') umgewandelt — der Vertrag
-// laeuft dann ausserhalb dieser Pipeline (z.B. ueber den normalen Auftrag-
-// Mail-Flow oder direkt am Standort).
-// Labels formuliert als ERREICHTER ZUSTAND — selbsterklaerend, keine Sub-Beschreibung noetig.
-// Single source of truth — sowohl Step-Tracker-UI als auch Listen-Filter ziehen daraus.
-export interface RequestStep {
-  step: 1 | 2 | 3 | 4;
-  label: string;
-  /** True wenn dieser Schritt eine Mail an den Kunden ausloest (Schritt 1+3).
-   *  Auf Warte-Schritten (2+4) ist es false — der Kunde bestaetigt aus der Mail. */
-  sendsMail: boolean;
-}
-
-// Haeufigste Veranstaltungstypen einer Anfrage. UI zeigt diese als Dropdown,
-// Letztes Item ist "Sonstige" — dann oeffnet sich ein Textfeld fuer Freitext.
-export const EVENT_TYPES = [
-  "Konzert",
-  "Theater",
-  "Firmenanlass",
-  "Comedyshow",
-  "Privatfeier",
-] as const;
-
-export const REQUEST_STEPS: readonly RequestStep[] = [
-  { step: 1, label: "Konditionen senden", sendsMail: true },
-  // Schritt 2 + 4 sind Warte-Zustaende: nach Mail-Send wird der Step
-  // weitergerueckt, aber der Kunde hat noch nicht bestaetigt. Label im
-  // Infinitiv ("bestätigen", nicht "bestätigt"), sonst liest sich der
-  // aktive Step wie eine bereits erfolgte Bestaetigung — das ist nicht
-  // der Fall (Bestaetigung kommt erst per Mail-Link oder manuell
-  // durchs "Manuell bestätigen"-Modal).
-  { step: 2, label: "Konditionen bestätigen", sendsMail: false },
-  { step: 3, label: "Angebot senden", sendsMail: true },
-  { step: 4, label: "Angebot bestätigen", sendsMail: false },
-] as const;
-
-// Schritt-Nummern die eine Mail ausloesen — abgeleitet aus REQUEST_STEPS.
-// Vorher in 3 Files dupliziert (auftraege/page, vermietentwurf/[id], send-step-modal).
-export const REQUEST_MAIL_STEPS = new Set<number>(
-  REQUEST_STEPS.filter((s) => s.sendsMail).map((s) => s.step),
-);
 
 // Prioritäten — nur 'normal' (default) und 'dringend'
 // 'niedrig' und 'hoch' wurden nie genutzt, der relevante Hinweis ist binär:
@@ -131,9 +85,11 @@ export interface NavGroup {
 // mit Riesen-Card-Buttons wie die Ur-Zwischenseite) haelt alles zusammen.
 // Deep-Links auf /stempelzeiten, /tickets, /ferien funktionieren weiter
 // (duenne Wrapper).
-// Analog Kunden/Lieferanten/Locations/Partner → jetzt EIN Sidebar-Eintrag
-// "Datenbank" mit Tabs (/datenbank?tab=…). Die Einzel-Routes /kunden,
-// /lieferanten, /locations, /partner bleiben als Deep-Link-Alias erhalten.
+// Kunden/Lieferanten → EIN Sidebar-Eintrag "Datenbank" mit 2 Tabs
+// (/datenbank?tab=…). Die Einzel-Routes /kunden, /lieferanten bleiben als
+// Deep-Link-Alias erhalten. Locations lebt wieder als EIGENER Sidebar-
+// Eintrag (Leo, 2026-09-05): Schluesselcodes werden bei Auftraegen
+// regelmaessig nachgeschlagen — muss ein Klick tief sein, nicht zwei.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "",
@@ -157,6 +113,11 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Kunden-Workflow",
     items: [
       { href: "/vertrieb", label: "Vertrieb", icon: "TrendingUp" },
+      // Entwuerfe (Migration 206, 2026-09-05): eigener Bereich fuer
+      // Auftrags-Entwuerfe — intensive Kunden-Kontakte, Notizen-Historie,
+      // Umwandlung in echten Auftrag als bewusster Schritt. Liegt bewusst
+      // ueber "Aufträge", weil Entwuerfe der Vorstufe in der Pipeline sind.
+      { href: "/entwuerfe", label: "Entwürfe", icon: "FileEdit" },
       { href: "/auftraege", label: "Aufträge", icon: "ClipboardList", mobile: true },
       { href: "/abrechnung", label: "Rechnungen", icon: "Receipt" },
     ],
@@ -165,15 +126,24 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Intern",
     items: [
       { href: "/projekte", label: "Projekte", icon: "FolderKanban" },
-      // Datenbank-Hub — konsolidiert Kunden/Lieferanten/Locations/Partner
-      // als Tabs. matchPrefixes damit die Einzel-Deep-Links + Detail-Routen
-      // (/kunden/[id], /standorte/[id], /raeume/[id] etc.) den Datenbank-
-      // Eintrag in der Sidebar aktiv markieren.
+      // Datenbank-Hub — konsolidiert Kunden + Lieferanten als Tabs.
+      // matchPrefixes damit /kunden, /lieferanten und ihre Detail-Routen
+      // (/kunden/[id] etc.) den Datenbank-Eintrag aktiv markieren.
       {
         href: "/datenbank",
         label: "Datenbank",
         icon: "Database",
-        matchPrefixes: ["/kunden", "/lieferanten", "/locations", "/standorte", "/raeume"],
+        matchPrefixes: ["/kunden", "/lieferanten"],
+      },
+      // Locations eigenstaendig — bei Aufbau werden Schluesselcodes /
+      // Kontakt-Infos regelmaessig nachgeschlagen (Barakuba, Theater BAU3
+      // etc.). matchPrefixes damit /standorte/[id] und /raeume/[id] den
+      // Locations-Eintrag aktiv markieren.
+      {
+        href: "/locations",
+        label: "Locations",
+        icon: "MapPin",
+        matchPrefixes: ["/standorte", "/raeume"],
       },
     ],
   },
