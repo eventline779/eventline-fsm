@@ -36,6 +36,18 @@ export async function PATCH(
     const valid = new Set(allKnownPermissions());
     update.permissions = (body.permissions as unknown[]).filter((s): s is string => typeof s === "string" && valid.has(s));
   }
+  // scope: Zugriffs-Reichweite der Rolle (siehe Migration 208).
+  //   'self' = nur eigene Datensaetze (Default)
+  //   'team' = zusaetzlich Datensaetze der Mitarbeiter mit team_lead_id = ich
+  //   'all'  = alle Datensaetze
+  // Wird von sees_user()/get_my_scope() gelesen und in RLS als
+  // zusaetzlicher PERMISSIVE-Zweig ausgewertet.
+  if (typeof body.scope === "string") {
+    if (body.scope !== "self" && body.scope !== "team" && body.scope !== "all") {
+      return NextResponse.json({ success: false, error: "scope ungueltig (self/team/all)" }, { status: 400 });
+    }
+    update.scope = body.scope;
+  }
   // dashboard_widgets: {order: string[], hidden: string[]} oder null (=Reset).
   // Unbekannte Widget-IDs werden STILL gedroppt (siehe user-override-Route),
   // damit ein alter Admin-Client nach Registry-Umbau nicht plötzlich 400t.
@@ -65,7 +77,7 @@ export async function PATCH(
   // Vorher-Zustand fuer Audit-Diff laden.
   const { data: before } = await admin
     .from("roles")
-    .select("label, permissions, dashboard_widgets")
+    .select("label, permissions, dashboard_widgets, scope")
     .eq("slug", slug)
     .maybeSingle();
   const { error } = await admin.from("roles").update(update).eq("slug", slug);

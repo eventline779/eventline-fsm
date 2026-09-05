@@ -53,6 +53,14 @@ export async function POST(request: Request) {
     return Number.isFinite(n) && n >= 0 && n < 10000 ? n : null;
   })();
 
+  // Optional: Teamleiter (profiles.team_lead_id). Wird direkt nach dem
+  // Anlegen gesetzt — so ist der neue MA sofort einem Teamleiter
+  // zugeordnet ohne 2. Klick durch das Edit-Modal.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const team_lead_id: string | null = typeof body.team_lead_id === "string" && UUID_RE.test(body.team_lead_id)
+    ? body.team_lead_id
+    : null;
+
   if (!email || !full_name) {
     return NextResponse.json({ success: false, error: "Email und Name sind Pflicht" }, { status: 400 });
   }
@@ -92,6 +100,19 @@ export async function POST(request: Request) {
       { success: false, error: created.error, debug: created.debug },
       { status: 400 },
     );
+  }
+
+  // Optional: Teamleiter setzen (Existenz-Check auf profiles). Wenn die
+  // uebergebene ID nicht existiert, nur loggen und weitermachen — der User
+  // ist bereits angelegt, die Zuordnung kann via Edit nachgeholt werden.
+  if (team_lead_id) {
+    const { data: leadRow } = await admin.from("profiles").select("id").eq("id", team_lead_id).maybeSingle();
+    if (leadRow) {
+      const { error: tlErr } = await admin.from("profiles").update({ team_lead_id }).eq("id", created.userId);
+      if (tlErr) logError("admin.users.create.team_lead", tlErr, { userId: created.userId, team_lead_id });
+    } else {
+      logError("admin.users.create.team_lead.not_found", null, { userId: created.userId, team_lead_id });
+    }
   }
 
   // Optional: Comp-Zeile mit uses_standard_lohn=true anlegen wenn Brutto

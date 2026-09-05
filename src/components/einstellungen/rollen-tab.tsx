@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { SearchableSelect } from "@/components/searchable-select";
 import { PERMISSION_MODULES, PARTNER_PERMISSION_MODULES, PERMISSION_FEATURES, type PermissionAction, type PermissionModule } from "@/lib/permissions";
 import { DASHBOARD_WIDGETS } from "@/lib/dashboard-widgets";
 import { Plus, Trash2, Lock, Save, X, ChevronDown, ChevronRight, GripVertical, RotateCcw } from "lucide-react";
@@ -41,6 +42,22 @@ import { TOAST } from "@/lib/messages";
 /** Rollen-Override fuer das Dashboard-Set. NULL = Registry-Default. */
 type WidgetConfig = { order: string[]; hidden: string[] };
 
+/** Sichtbarkeits-Reichweite einer Rolle (Migration 208).
+ *   self = nur eigene Datensaetze (Default)
+ *   team = zusaetzlich Datensaetze der Mitarbeiter mit team_lead_id = ich
+ *   all  = alle Datensaetze */
+type RoleScope = "self" | "team" | "all";
+
+const SCOPE_OPTIONS: Array<{ id: RoleScope; label: string; sub: string }> = [
+  { id: "self", label: "Nur eigene", sub: "Sieht ausschliesslich die eigenen Datensaetze — Default." },
+  { id: "team", label: "Nur Team",   sub: "Sieht zusaetzlich Datensaetze der Mitarbeiter, die auf sie als Teamleiter zeigen." },
+  { id: "all",  label: "Alle",       sub: "Sieht alle Datensaetze der Firma. Wie *:see-all fuer jedes Modul." },
+];
+
+function scopeLabel(scope: RoleScope): string {
+  return SCOPE_OPTIONS.find((o) => o.id === scope)?.label ?? scope;
+}
+
 interface Role {
   slug: string;
   label: string;
@@ -48,6 +65,9 @@ interface Role {
   is_system: boolean;
   /** NULL = Registry-Default; sonst explizites Override. */
   dashboard_widgets: WidgetConfig | null;
+  /** Zugriffs-Reichweite (Migration 208). Default 'self' fuer alte API-
+   *  Antworten die das Feld nicht liefern. */
+  scope: RoleScope;
 }
 
 const ACTION_LABELS: Record<PermissionAction, string> = {
@@ -119,8 +139,10 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({ label: "", permissions: [] as string[] });
+  const [createForm, setCreateForm] = useState<{ label: string; permissions: string[]; scope: RoleScope }>({ label: "", permissions: [], scope: "self" });
   const [edits, setEdits] = useState<Record<string, string[]>>({});
+  // Scope-Overrides pro Rolle. 'self'/'team'/'all' — Default 'self'.
+  const [scopeEdits, setScopeEdits] = useState<Record<string, RoleScope>>({});
   // Widget-Overrides pro Rolle. NULL = Registry-Default (kein Override in DB).
   // Sonst {order, hidden}: siehe migration 207. Wird beim ersten Toggle/Reorder
   // aus dem Registry-Default materialisiert und weiter gepflegt.
@@ -142,12 +164,18 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
       // Scope-Filter: firma = alle ausser partner, partner = nur partner.
       // Trennung der zwei Rollen-Welten in /einstellungen (Firmenportal vs
       // Partnerportal Haupt-Tabs).
-      const filtered: Role[] = (json.roles as Role[]).filter((r) =>
+      // Zusaetzlich: scope kann bei aelterer API-Antwort fehlen -> auf 'self'
+      // defaulten, damit spaetere Vergleiche nicht undefined lesen.
+      const filtered: Role[] = (json.roles as Array<Role & { scope?: string }>).filter((r) =>
         scope === "partner" ? r.slug === "partner" : r.slug !== "partner"
-      );
+      ).map((r) => ({
+        ...r,
+        scope: (r.scope === "team" || r.scope === "all" ? r.scope : "self") as RoleScope,
+      }));
       setRoles(filtered);
       const initial: Record<string, string[]> = {};
       const initialWidgets: Record<string, WidgetConfig | null> = {};
+      const initialScopes: Record<string, RoleScope> = {};
       for (const r of filtered) {
         initial[r.slug] = [...r.permissions];
         // dashboard_widgets kann fehlen (aeltere API-Antwort) → als NULL
@@ -155,9 +183,11 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
         initialWidgets[r.slug] = r.dashboard_widgets
           ? { order: [...r.dashboard_widgets.order], hidden: [...r.dashboard_widgets.hidden] }
           : null;
+        initialScopes[r.slug] = r.scope;
       }
       setEdits(initial);
       setWidgetEdits(initialWidgets);
+      setScopeEdits(initialScopes);
     }
     setLoading(false);
   }
@@ -296,6 +326,9 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     const nowW = widgetEdits[role.slug] ?? null;
     const origW = role.dashboard_widgets ?? null;
     if (!widgetsEqual(nowW, origW)) return true;
+    // Scope-Aenderungen
+    const nowScope = scopeEdits[role.slug] ?? role.scope;
+    if (nowScope !== role.scope) return true;
     return false;
   }
 
@@ -308,6 +341,8 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
         permissions: edits[role.slug] ?? [],
         // NULL = Registry-Default (Reset); Objekt = expliziter Override.
         dashboard_widgets: widgetEdits[role.slug] ?? null,
+        // Sichtbarkeits-Scope der Rolle (self/team/all, Migration 208).
+        scope: scopeEdits[role.slug] ?? role.scope,
       }),
     });
     const json = await res.json();
@@ -344,6 +379,8 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     const res = await fetch("/api/admin/roles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // scope wird bei neuen Rollen mitgeschickt; API validiert self/team/all,
+      // DB-Default bleibt 'self' falls das Feld fehlt.
       body: JSON.stringify(createForm),
     });
     const json = await res.json();
@@ -354,7 +391,7 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
     }
     toast.success("Rolle angelegt");
     setShowCreate(false);
-    setCreateForm({ label: "", permissions: [] });
+    setCreateForm({ label: "", permissions: [], scope: "self" });
     load();
   }
 
@@ -662,6 +699,18 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                         System
                       </span>
                     )}
+                    {/* Scope-Chip auch im geschlossenen Header — auf einen
+                        Blick sichtbar wer Team-/All-Sicht hat, ohne dass man
+                        jede Rolle einzeln aufklappen muss. Admin bleibt implizit
+                        scope='all' und braucht keinen Chip (immer-alles-Regel). */}
+                    {scope === "firma" && !locked && (
+                      <span
+                        className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300"
+                        data-tooltip="Sichtbarkeits-Reichweite dieser Rolle"
+                      >
+                        {scopeLabel(scopeEdits[role.slug] ?? role.scope)}
+                      </span>
+                    )}
                     {locked && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300">
                         <Lock className="h-2.5 w-2.5" />Geschützt
@@ -727,6 +776,33 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                       </div>
                     ) : (
                       <>
+                        {/* Sichtbarkeits-Scope — steuert ob User dieser Rolle
+                            zusaetzlich Datensaetze ihres Teams oder aller MA
+                            sehen (Migration 208). Nur im Firmenportal-Scope;
+                            im Partner-Editor irrelevant. */}
+                        {scope === "firma" && (
+                          <div className="pt-3 space-y-1">
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                              Sichtbarkeit
+                            </p>
+                            <div className="max-w-sm">
+                              <SearchableSelect
+                                value={scopeEdits[role.slug] ?? role.scope}
+                                onChange={(id) => {
+                                  if (id === "self" || id === "team" || id === "all") {
+                                    setScopeEdits((prev) => ({ ...prev, [role.slug]: id }));
+                                  }
+                                }}
+                                items={SCOPE_OPTIONS}
+                                searchable={false}
+                                clearable={false}
+                              />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              „Nur Team" macht diese Rolle zum Teamleiter-Kandidaten — MA koennen ihr im Team-Tab zugeordnet werden.
+                            </p>
+                          </div>
+                        )}
                         <div className="pt-3 text-[11px] text-muted-foreground italic">
                           Rotes X = erlaubt. Klick auf eine Zelle setzt oder entfernt die Berechtigung.
                           „—" = Aktion ist im jeweiligen Bereich nicht möglich.
@@ -755,6 +831,25 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
               required
               autoFocus
             />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground/70 ml-1">Sichtbarkeit</p>
+            <div className="max-w-sm">
+              <SearchableSelect
+                value={createForm.scope}
+                onChange={(id) => {
+                  if (id === "self" || id === "team" || id === "all") {
+                    setCreateForm({ ...createForm, scope: id });
+                  }
+                }}
+                items={SCOPE_OPTIONS}
+                searchable={false}
+                clearable={false}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 ml-1">
+              Default „Nur eigene". „Nur Team" macht die Rolle zum Teamleiter-Kandidaten.
+            </p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Berechtigungen</p>

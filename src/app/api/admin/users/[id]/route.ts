@@ -75,6 +75,32 @@ export async function PATCH(
     update.birthdate = body.birthdate;
   }
 
+  // team_lead_id (UUID oder null um zu loeschen).
+  // Zeigt auf den Teamleiter dieses Mitarbeiters — gelesen von sees_user()
+  // wenn eine Rolle scope='team' hat (Migration 208).
+  //
+  // Self-Ausschluss: MA kann nicht sich selbst als Teamleiter waehlen,
+  // sonst wuerde sees_user() eine Endlos-Schleife der Sichtbarkeit
+  // suggerieren (der User "sieht" sich selbst — was er sowieso tut).
+  // Existenz-Check auf profiles verhindert dass ein Client per PATCH
+  // eine beliebige UUID einschleusen kann.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (body.team_lead_id === null) {
+    update.team_lead_id = null;
+  } else if (typeof body.team_lead_id === "string" && UUID_RE.test(body.team_lead_id)) {
+    if (body.team_lead_id === id) {
+      return NextResponse.json(
+        { success: false, error: "Ein Mitarbeiter kann nicht sein eigener Teamleiter sein" },
+        { status: 400 },
+      );
+    }
+    const { data: leadRow } = await admin.from("profiles").select("id").eq("id", body.team_lead_id).maybeSingle();
+    if (!leadRow) {
+      return NextResponse.json({ success: false, error: "Teamleiter existiert nicht" }, { status: 400 });
+    }
+    update.team_lead_id = body.team_lead_id;
+  }
+
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ success: false, error: "Keine Aenderungen" }, { status: 400 });
   }

@@ -44,6 +44,9 @@ export interface Profile {
   /** Geburtsdatum YYYY-MM-DD. Wird fuer Ferienanteil-Auto-Erkennung
    *  gebraucht (U20 -> 10.64%). Sensible Daten, nur Admins lesen. */
   birthdate?: string | null;
+  /** FK auf profiles.id des Teamleiters (Migration 208). NULL = kein Teamleiter.
+   *  Wird von sees_user() gelesen wenn eine Rolle scope='team' hat. */
+  team_lead_id?: string | null;
 }
 
 export interface Customer {

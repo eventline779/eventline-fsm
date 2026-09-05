@@ -43,12 +43,23 @@ export async function POST(request: Request) {
     ? (body.permissions as unknown[]).filter((s): s is string => typeof s === "string" && valid.has(s))
     : [];
 
+  // scope: Zugriffs-Reichweite. Default = 'self' (DB-Default aus Migration 208).
+  // Wenn explizit gesetzt, validieren; sonst DB-Default nutzen.
+  let scope: "self" | "team" | "all" | undefined;
+  if (typeof body.scope === "string") {
+    if (body.scope !== "self" && body.scope !== "team" && body.scope !== "all") {
+      return NextResponse.json({ success: false, error: "scope ungueltig (self/team/all)" }, { status: 400 });
+    }
+    scope = body.scope;
+  }
+
   const admin = createAdminClient();
   const { error } = await admin.from("roles").insert({
     slug,
     label,
     permissions,
     is_system: false,
+    ...(scope ? { scope } : {}),
   });
   if (error) {
     if (error.code === "23505") {
@@ -61,7 +72,7 @@ export async function POST(request: Request) {
     actor_profile_id: auth.user.id,
     action: "role.created",
     target_role_slug: slug,
-    details: { label, permissions },
+    details: { label, permissions, scope: scope ?? "self" },
   });
   return NextResponse.json({ success: true, slug });
 }

@@ -19,7 +19,7 @@
  * reine Stammdaten-Verwaltung.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { todayLocalIso } from "@/lib/swiss-time";
 import type { Profile } from "@/types";
@@ -27,12 +27,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
-import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail } from "lucide-react";
+import { SearchableSelect } from "@/components/searchable-select";
+import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail, Users } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 
-type EditState = { id: string; full_name: string; role: string; birthdate: string } | null;
-interface RoleOption { slug: string; label: string }
+type EditState = { id: string; full_name: string; role: string; birthdate: string; team_lead_id: string } | null;
+/** Rolle inkl. scope (Migration 208) — brauchen wir um in der MA-Liste
+ *  die Teamleiter-Kandidaten zu filtern (nur Rollen mit scope='team'). */
+interface RoleOption { slug: string; label: string; scope: "self" | "team" | "all" }
 
 function calcAge(birthdate: string | null | undefined): number | null {
   if (!birthdate) return null;
@@ -52,7 +55,7 @@ export function TeamTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({
-    email: "", full_name: "", role: "techniker", birthdate: "", hourly_wage_chf: "",
+    email: "", full_name: "", role: "techniker", birthdate: "", hourly_wage_chf: "", team_lead_id: "",
   });
   const [edit, setEdit] = useState<EditState>(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -68,7 +71,20 @@ export function TeamTab() {
     const all = (profRes.data as Profile[]) ?? [];
     setProfiles(all.filter((p) => p.role !== "partner"));
     if (rolesRes?.success) {
-      setRoles((rolesRes.roles as RoleOption[]).filter((r) => r.slug !== "partner").map((r) => ({ slug: r.slug, label: r.label })));
+      // scope wird nur zur Filterung der Teamleiter-Kandidaten gebraucht —
+      // falls die API-Antwort scope (noch) nicht liefert (aeltere Route),
+      // faellt der Fallback auf 'self' zurueck, dann werden schlicht keine
+      // Kandidaten angezeigt statt zu crashen.
+      const rawRoles = rolesRes.roles as Array<{ slug: string; label: string; scope?: string }>;
+      setRoles(
+        rawRoles
+          .filter((r) => r.slug !== "partner")
+          .map((r) => ({
+            slug: r.slug,
+            label: r.label,
+            scope: (r.scope === "team" || r.scope === "all" ? r.scope : "self") as RoleOption["scope"],
+          })),
+      );
     }
     setLoading(false);
   }
@@ -77,6 +93,25 @@ export function TeamTab() {
 
   function roleLabel(slug: string): string {
     return roles.find((r) => r.slug === slug)?.label ?? slug;
+  }
+
+  // Teamleiter-Kandidaten: alle aktiven Mitarbeiter deren Rolle scope='team'
+  // ODER scope='all' hat (Migration 208). Admin ist implizit scope='all'
+  // (siehe get_my_scope()), taucht daher ebenfalls auf. Wird als items an
+  // die SearchableSelect gegeben und pro Ort noch um den bearbeiteten User
+  // selbst gefiltert (Self-Ausschluss).
+  const teamLeadCandidates = useMemo(() => {
+    const teamRoleSlugs = new Set(
+      roles.filter((r) => r.scope === "team" || r.scope === "all").map((r) => r.slug),
+    );
+    return profiles.filter(
+      (p) => p.is_active && (p.role === "admin" || teamRoleSlugs.has(p.role)),
+    );
+  }, [profiles, roles]);
+
+  function profileName(id: string | null | undefined): string | null {
+    if (!id) return null;
+    return profiles.find((p) => p.id === id)?.full_name ?? null;
   }
 
   async function createUser(e: React.FormEvent) {
@@ -94,6 +129,9 @@ export function TeamTab() {
       const wage = parseFloat(createForm.hourly_wage_chf.replace(",", "."));
       if (Number.isFinite(wage) && wage >= 0) payload.hourly_wage_chf = wage;
     }
+    // Optional: Teamleiter beim Anlegen gleich mitgeben — API setzt
+    // profiles.team_lead_id nach dem Auth-Create.
+    if (createForm.team_lead_id) payload.team_lead_id = createForm.team_lead_id;
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,12 +142,18 @@ export function TeamTab() {
     if (!json.success) { TOAST.errorOr(json.error); return; }
     toast.success("Benutzer angelegt — Einladungs-Mail verschickt");
     setShowCreate(false);
-    setCreateForm({ email: "", full_name: "", role: "techniker", birthdate: "", hourly_wage_chf: "" });
+    setCreateForm({ email: "", full_name: "", role: "techniker", birthdate: "", hourly_wage_chf: "", team_lead_id: "" });
     load();
   }
 
   function openEdit(p: Profile) {
-    setEdit({ id: p.id, full_name: p.full_name, role: p.role, birthdate: p.birthdate ?? "" });
+    setEdit({
+      id: p.id,
+      full_name: p.full_name,
+      role: p.role,
+      birthdate: p.birthdate ?? "",
+      team_lead_id: p.team_lead_id ?? "",
+    });
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -123,6 +167,8 @@ export function TeamTab() {
         full_name: edit.full_name,
         role: edit.role,
         birthdate: edit.birthdate ? edit.birthdate : null,
+        // Leer-String = "kein Teamleiter" -> NULL in DB.
+        team_lead_id: edit.team_lead_id ? edit.team_lead_id : null,
       }),
     });
     const json = await res.json();
@@ -250,6 +296,18 @@ export function TeamTab() {
                     <span className={`inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full shrink-0 ${p.role === "admin" ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" : "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300"}`}>
                       {roleLabel(p.role)}
                     </span>
+                    {/* Teamleiter-Badge: nur wenn team_lead_id gesetzt UND
+                        wir den Namen aufloesen koennen (sonst zeigt der Badge
+                        eine verwaiste UUID, was verwirrender waere als nichts). */}
+                    {p.team_lead_id && profileName(p.team_lead_id) && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 shrink-0"
+                        data-tooltip="Teamleiter dieses Mitarbeiters"
+                      >
+                        <Users className="h-2.5 w-2.5" />
+                        TL: {profileName(p.team_lead_id)}
+                      </span>
+                    )}
                     {!p.is_active && (
                       <span className="inline-flex px-1.5 py-0 text-[10px] font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
                         Deaktiviert
@@ -339,6 +397,25 @@ export function TeamTab() {
               {roles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
             </select>
           </div>
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground/70 ml-1">Teamleiter (optional)</p>
+            <SearchableSelect
+              value={createForm.team_lead_id}
+              onChange={(id) => setCreateForm({ ...createForm, team_lead_id: id })}
+              items={teamLeadCandidates.map((c) => ({
+                id: c.id,
+                label: c.full_name,
+                sub: roleLabel(c.role),
+              }))}
+              placeholder={teamLeadCandidates.length === 0
+                ? "Noch keine Teamleiter (Rolle braucht Sichtbarkeit „Nur Team\")"
+                : "— kein Teamleiter —"}
+              clearable
+            />
+            <p className="text-[10px] text-muted-foreground/70 ml-1">
+              Nur Rollen mit Sichtbarkeit „Nur Team" oder „Alle" tauchen hier auf.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground/70 ml-1">Geburtsdatum (optional)</p>
@@ -405,6 +482,31 @@ export function TeamTab() {
               >
                 {roles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
               </select>
+            </div>
+            {/* Teamleiter — Kandidaten sind alle aktiven MA deren Rolle
+                scope='team'|'all' hat (Admin implizit). Self-Ausschluss: der
+                bearbeitete MA taucht in seiner eigenen Kandidatenliste nicht
+                auf, sonst koennte er sich selbst zuordnen. */}
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">Teamleiter (optional)</p>
+              <SearchableSelect
+                value={edit.team_lead_id}
+                onChange={(id) => setEdit({ ...edit, team_lead_id: id })}
+                items={teamLeadCandidates
+                  .filter((c) => c.id !== edit.id)
+                  .map((c) => ({
+                    id: c.id,
+                    label: c.full_name,
+                    sub: roleLabel(c.role),
+                  }))}
+                placeholder={teamLeadCandidates.filter((c) => c.id !== edit.id).length === 0
+                  ? "Noch keine Teamleiter (Rolle braucht Sichtbarkeit „Nur Team\")"
+                  : "— kein Teamleiter —"}
+                clearable
+              />
+              <p className="text-[10px] text-muted-foreground/70 ml-1">
+                Nur Rollen mit Sichtbarkeit „Nur Team" oder „Alle" tauchen hier auf.
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground/70 ml-1">Geburtsdatum (für Ferienanteil-Auto-Erkennung)</p>
