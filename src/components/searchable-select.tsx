@@ -78,10 +78,12 @@ export function SearchableSelect({
   const dropdownRef = useRef<HTMLUListElement>(null);
 
   // Wenn value von außen zurückgesetzt wird (z.B. durch Form-Reset oder Job-Type-Wechsel),
-  // synchronisiere die Anzeige.
+  // synchronisiere die Anzeige. Auch auf .label reagieren — sonst zeigt der
+  // Input weiterhin das alte Label wenn das Item selber umbenannt wurde
+  // (gleiche id, neuer label-Text).
   useEffect(() => {
     setSearch(selectedItem?.label ?? "");
-  }, [selectedItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedItem?.id, selectedItem?.label]);
 
   // Beim Oeffnen Suche leeren damit ALLE Items im Dropdown sichtbar sind.
   // Sonst filtert der Match-Algorithmus gegen das Label des aktuellen Werts
@@ -139,14 +141,21 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [search, selectedItem?.label]);
 
-  const filtered = useMemo(() => {
-    if (!open) return [];
-    if (!searchable) return items;
+  const CAP = 50;
+  const { filtered, hiddenCount } = useMemo(() => {
+    if (!open) return { filtered: [] as SelectItem[], hiddenCount: 0 };
+    if (!searchable) return { filtered: items, hiddenCount: 0 };
     // Cap auf 50 — der max-h-72-Container scrollt darunter, sodass der User
     // bei realistischen Mengen (~30-50 aktive Auftraege) alles per Scroll
-    // erreicht. Bei groesseren Listen filtert die Suche.
-    if (!search) return items.slice(0, 50);
-    return items.filter((i) => matchesWordStart(i.label, search)).slice(0, 50);
+    // erreicht. Bei groesseren Listen filtert die Suche. hiddenCount fuellt
+    // den "N weitere ausgeblendet"-Hinweis am Ende der Liste, damit der
+    // User nicht raetselt warum "Muster" nicht in einer 200er-Liste
+    // erscheint (Antwort: er ist ausserhalb der Top-50, feiner suchen).
+    const source = !search ? items : items.filter((i) => matchesWordStart(i.label, search));
+    return {
+      filtered: source.slice(0, CAP),
+      hiddenCount: Math.max(0, source.length - CAP),
+    };
   }, [items, search, open, searchable]);
 
   // "Neu anlegen"-Option: nur wenn vom Aufrufer gewuenscht UND Nutzer hat etwas getippt
@@ -203,10 +212,20 @@ export function SearchableSelect({
     }
   }
 
+  const listboxId = `${id ?? "combobox"}-listbox`;
+  const activeOptionId =
+    highlight < filtered.length
+      ? `${listboxId}-opt-${filtered[highlight]?.id}`
+      : showCreateOption && highlight === filtered.length
+        ? `${listboxId}-opt-create`
+        : undefined;
+
   const dropdown =
     open && pos ? (
       <ul
         ref={dropdownRef}
+        role="listbox"
+        id={listboxId}
         style={{
           position: "fixed",
           top: pos.top,
@@ -224,6 +243,7 @@ export function SearchableSelect({
             {filtered.map((item, i) => (
               <li
                 key={item.id}
+                id={`${listboxId}-opt-${item.id}`}
                 role="option"
                 aria-selected={i === highlight}
                 onMouseDown={(e) => {
@@ -249,6 +269,7 @@ export function SearchableSelect({
             ))}
             {showCreateOption && (
               <li
+                id={`${listboxId}-opt-create`}
                 role="option"
                 aria-selected={highlight === filtered.length}
                 onMouseDown={(e) => {
@@ -267,6 +288,14 @@ export function SearchableSelect({
                   <span className="text-muted-foreground">{createNewLabel}: </span>
                   <span className="font-medium">{trimmedSearch}</span>
                 </span>
+              </li>
+            )}
+            {hiddenCount > 0 && (
+              <li
+                aria-hidden="true"
+                className="px-2.5 pt-2 pb-1 text-[11px] text-muted-foreground italic border-t border-border/60 mt-1"
+              >
+                {hiddenCount} weitere ausgeblendet — bitte präziser suchen.
               </li>
             )}
           </>
@@ -298,6 +327,11 @@ export function SearchableSelect({
         autoComplete="off"
         spellCheck={false}
         aria-required={required}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-autocomplete={searchable ? "list" : "none"}
+        aria-activedescendant={open ? activeOptionId : undefined}
         className={`flex h-9 w-full rounded-xl border bg-background pl-3 pr-8 py-1 text-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 ${
           !searchable ? "cursor-pointer select-none" : ""
         } ${active ? "border-foreground/60 font-medium" : "hover:border-foreground/30"}`}

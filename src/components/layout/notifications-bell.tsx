@@ -64,21 +64,30 @@ const PREVIEW_LIMIT = 50;
 export function NotificationsBell() {
   const supabase = createClient();
   const router = useRouter();
-  const { role } = usePermissions();
-  // Techniker noch nicht freigeschaltet — Click zeigt Hinweis-Toast.
-  const isLocked = role === "techniker";
+  const { can, ready: permsReady } = usePermissions();
+  // Feature-Gate via Permission-Slug 'notifications:read' — jede Rolle die den
+  // Slug in ihrer roles.permissions-Liste hat, sieht die Glocke funktional.
+  // Admin passt in hasPermission() automatisch durch, damit die Rollen-Matrix
+  // die einzige Wahrheit fuer Freischaltung ist. Vorher: role === 'techniker'
+  // hardcoded → jede neue Rolle blieb still gesperrt.
+  //
+  // Waehrend Permissions noch laden (permsReady=false): NICHT locken, sonst
+  // sieht der User beim ersten Frame kurz eine deaktivierte Glocke.
+  const isLocked = permsReady && !can("notifications:read");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   // Default 'ungelesen': beim Oeffnen sieht man sofort was zu tun ist,
-  // nicht die Erledigt-Sektion. User kann manuell auf 'Alle' wechseln —
-  // wird beim erneuten Oeffnen aber wieder auf 'ungelesen' zurueckgesetzt
-  // (siehe useEffect unten).
-  const [filter, setFilter] = useState<"alle" | "ungelesen">("ungelesen");
-  // Bei jedem Open Filter auf 'ungelesen' zuruecksetzen damit nicht ein
-  // manueller 'Alle'-Wechsel zwischen den Sessions haengen bleibt.
+  // nicht die Erledigt-Sektion. User kann manuell umschalten — Filter
+  // wird in localStorage persistiert (§10) damit ein Reload den Filter
+  // nicht zurueckwirft.
+  const [filter, setFilter] = useState<"alle" | "ungelesen">(() =>
+    typeof window !== "undefined"
+      ? ((localStorage.getItem("notif-filter") as "alle" | "ungelesen" | null) || "ungelesen")
+      : "ungelesen"
+  );
   useEffect(() => {
-    if (open) setFilter("ungelesen");
-  }, [open]);
+    if (typeof window !== "undefined") localStorage.setItem("notif-filter", filter);
+  }, [filter]);
   const [unread, setUnread] = useState(0);
   const [pulse, setPulse] = useState(false);
   // Eingehende Notif als prominentes Popup oben rechts. Stack:
@@ -97,19 +106,33 @@ export function NotificationsBell() {
 
   async function load() {
     const nowIso = new Date().toISOString();
-    const [{ data }, { count }] = await Promise.all([
-      supabase
-        .from("notifications")
-        .select("*")
-        .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`)
-        .order("created_at", { ascending: false })
-        .limit(PREVIEW_LIMIT),
-      supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("is_read", false)
-        .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`),
-    ]);
+    let data: unknown[] | null = null;
+    let count: number | null = null;
+    try {
+      const [dataRes, countRes] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("*")
+          .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`)
+          .order("created_at", { ascending: false })
+          .limit(PREVIEW_LIMIT),
+        supabase
+          .from("notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("is_read", false)
+          .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`),
+      ]);
+      if (dataRes.error) throw dataRes.error;
+      if (countRes.error) throw countRes.error;
+      data = dataRes.data;
+      count = countRes.count;
+    } catch (err) {
+      // Load fehlgeschlagen (Netz/RLS/Auth) — Toast + Frueh-Exit statt
+      // still zerbrochener Glocke.
+      const msg = err instanceof Error ? err.message : "unbekannter Fehler";
+      toast.error(`Benachrichtigungen konnten nicht geladen werden: ${msg}`);
+      return;
+    }
     if (data) {
       const rows = data as Notification[];
       setNotifications(rows);
@@ -712,8 +735,11 @@ function SnoozeMenu({ onPick }: { onPick: (key: typeof SNOOZE_OPTIONS[number]["k
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-[80]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div className="absolute right-0 top-7 z-[90] w-40 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+          {/* z-Werte auf globalen Stack (Modal-Backdrop 1100, Modal 1110,
+              Popup-Overlay 1500). Vorher 80/90 → wurde vom Sheet-Overlay
+              (z-40+) verdeckt. */}
+          <div className="fixed inset-0 z-[1120]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="absolute right-0 top-7 z-[1130] w-40 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
             {SNOOZE_OPTIONS.map((o) => (
               <button
                 key={o.key}

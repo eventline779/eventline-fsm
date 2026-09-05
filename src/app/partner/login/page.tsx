@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -204,7 +205,7 @@ export default function PartnerLoginPage() {
         </CardContent>
       </Card>
       <div className="absolute bottom-4 left-0 right-0 text-center text-[11px] text-muted-foreground">
-        <a href="/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</a>
+        <Link href="/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</Link>
       </div>
     </div>
   );

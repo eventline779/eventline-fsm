@@ -25,37 +25,62 @@ export function StempelWidget() {
   // bei selten-genutzten Elementen).
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  // Desktop-Skip: das Widget ist per md:hidden nur auf Mobile sichtbar.
+  // Trotzdem lief die Komponente auf Desktop komplett durch (Job-Label-
+  // Query, Timer) — verschwendete Ressourcen. matchMedia (md-Breakpoint
+  // 768px) filtert das aus. SSR-safe via lazy-Init.
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : true
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setIsMobile(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
   const supabase = createClient();
 
-  // Live-Timer: 1s-Tick wenn eingestempelt. Sonst kein Interval (spart Strom).
+  // Live-Timer: 1s-Tick wenn eingestempelt UND mobile (Desktop rendert nichts).
   useEffect(() => {
-    if (!active) return;
+    if (!active || !isMobile) return;
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
-  }, [active]);
+  }, [active, isMobile]);
 
   // Job-Label nachladen wenn der active-Eintrag ein job_id hat —
-  // wird in der Pille als "INT-1234 · Titel" angezeigt.
+  // wird in der Pille als "INT-1234 · Titel" angezeigt. Nur auf Mobile
+  // (Desktop nutzt SidebarStempel und laedt sein Label separat).
   useEffect(() => {
     let cancelled = false;
-    if (!active?.job_id) {
+    if (!active?.job_id || !isMobile) {
       setJobLabel(null);
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("jobs")
-        .select("job_number, title")
-        .eq("id", active.job_id)
-        .maybeSingle();
-      if (!cancelled && data) {
-        setJobLabel(`INT-${data.job_number} · ${data.title}`);
+      try {
+        const { data, error } = await supabase
+          .from("jobs")
+          .select("job_number, title")
+          .eq("id", active.job_id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!cancelled && data) {
+          setJobLabel(`INT-${data.job_number} · ${data.title}`);
+        }
+      } catch {
+        // Silent-Fallback — die Pille zeigt "Auftrag laden…" (aus dem
+        // Render-Branch weiter unten). Kein Toast, das Widget ist Ambient.
+        if (!cancelled) setJobLabel(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [active?.job_id, supabase]);
+  }, [active?.job_id, supabase, isMobile]);
 
   if (loading) return null;
+  // Early-Return auf Desktop: spart DOM-Nodes, Timer und Job-Label-Fetch.
+  // SidebarStempel uebernimmt dort das Stempel-UI.
+  if (!isMobile) return null;
 
   async function handleStop() {
     const res = await clockOut();

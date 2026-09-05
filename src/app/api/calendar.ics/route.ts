@@ -21,6 +21,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse, type NextRequest } from "next/server";
 
 // pro User unterschiedlicher Inhalt → kein CDN-Cache. force-dynamic
@@ -83,8 +84,21 @@ export async function GET(request: NextRequest) {
       return new NextResponse("Token ungueltig", { status: 401 });
     }
 
+    // Rollen-Permissions laden — statt hardcoded role === 'admin' pruefen
+    // wir ueber hasPermission(), das die admin-Rolle als omnipotent behandelt
+    // und zukuenftige Slugs (z.B. 'kalender:view_all' fuer HR/Team-Leitung)
+    // ohne Route-Aenderung unterstuetzt. Admin-Client + Token-Auth heisst wir
+    // koennen die SQL-has_permission()-RPC nicht nutzen (kein auth.uid()) —
+    // deshalb der JS-Helper.
+    const { data: roleRow } = await supabase
+      .from("roles")
+      .select("permissions")
+      .eq("slug", profile.role)
+      .maybeSingle();
+    const perms = Array.isArray(roleRow?.permissions) ? (roleRow.permissions as string[]) : [];
+
     userId = profile.id;
-    isAdmin = profile.role === "admin";
+    isAdmin = hasPermission(perms, profile.role, "kalender:view_all");
     calendarName = `EVENTLINE — ${profile.full_name ?? "Mein Kalender"}`;
   }
 

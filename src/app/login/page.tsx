@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,10 @@ import { Logo } from "@/components/logo";
 import { ArrowLeft, Clock, Info, Fingerprint, Loader2 } from "lucide-react";
 import { appUrl } from "@/lib/app-url";
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
+
+// Deactivated-Message stand vorher zweimal wortgleich im File — Konstante
+// hier oben statt beim naechsten Copy-Edit auseinanderdriften.
+const MSG_USER_DEACTIVATED = "Dein Benutzer hat im Moment keinen Zugriff. Wende dich an einen Admin.";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -96,10 +101,19 @@ export default function LoginPage() {
     // ueberhaupt ein Auth-Versuch passiert. So braucht's kein signOut-Dance
     // und Partner haben einen klaren UX-Hint dass sie das falsche Portal
     // verwendet haben.
-    const { data: isPartner } = await supabase.rpc("is_partner_email", { p_email: email });
-    if (isPartner === true) {
-      router.push(`/partner/login?email=${encodeURIComponent(email)}&reason=wrong_portal`);
-      return;
+    //
+    // try/catch damit ein Netzfehler auf dem Pre-Flight-RPC den Login-
+    // Button nicht in "Anmelden…" stecken laesst — bei RPC-Fehler
+    // ignorieren wir den Pre-Check und lassen den normalen Auth-Flow
+    // laufen (der Backstop weiter unten faengt den Fall trotzdem ab).
+    try {
+      const { data: isPartner, error: rpcErr } = await supabase.rpc("is_partner_email", { p_email: email });
+      if (!rpcErr && isPartner === true) {
+        router.push(`/partner/login?email=${encodeURIComponent(email)}&reason=wrong_portal`);
+        return;
+      }
+    } catch {
+      // Silent — Backstop nach signInWithPassword faengt Partner auch dann ab.
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -115,7 +129,7 @@ export default function LoginPage() {
       const msg = (error.message ?? "").toLowerCase();
       const code = (error as { code?: string }).code;
       if (msg.includes("banned") || msg.includes("deactivated") || code === "user_banned") {
-        setError("Dein Benutzer hat im Moment keinen Zugriff. Wende dich an einen Admin.");
+        setError(MSG_USER_DEACTIVATED);
       } else {
         setError("E-Mail oder Passwort ist falsch.");
       }
@@ -134,7 +148,7 @@ export default function LoginPage() {
         .maybeSingle();
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut();
-        setError("Dein Benutzer hat im Moment keinen Zugriff. Wende dich an einen Admin.");
+        setError(MSG_USER_DEACTIVATED);
         setLoading(false);
         return;
       }
@@ -420,7 +434,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
       <div className="absolute bottom-4 left-0 right-0 text-center text-[11px] text-muted-foreground">
-        <a href="/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</a>
+        <Link href="/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</Link>
       </div>
     </div>
   );

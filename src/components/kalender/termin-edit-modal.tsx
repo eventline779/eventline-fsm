@@ -155,6 +155,11 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
       } : prev);
       setShowConfirm(false);
       onChanged();
+    } catch (e) {
+      // Netzfehler / offline / DNS-Fail — sonst schluckt der Modal den
+      // Fehler still und der User klickt ratlos nochmal.
+      logError("kalender.termin-edit.send-confirmation", e, { apptId: appt.id });
+      toast.error("Versand fehlgeschlagen — Netzverbindung prüfen");
     } finally {
       setConfSending(false);
     }

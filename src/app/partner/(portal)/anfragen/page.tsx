@@ -336,7 +336,7 @@ export default function PartnerAnfragenPage() {
             const rightSide = isUnassigned ? (
               <span className="text-xs font-medium whitespace-nowrap text-amber-700 dark:text-amber-300">Termin nicht zugewiesen</span>
             ) : isAssigned ? (
-              <span className="text-xs font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-300 truncate max-w-[180px]" title={assigneeNames.join(", ")}>
+              <span className="text-xs font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-300 truncate max-w-[180px]" data-tooltip={assigneeNames.join(", ")}>
                 {assigneeNames.join(", ")}
               </span>
             ) : null;
@@ -361,7 +361,7 @@ export default function PartnerAnfragenPage() {
                       {rightSide && <div className="shrink-0">{rightSide}</div>}
                     </div>
                     {a.status === "storniert" && a.partner_response_message && (
-                      <p className="text-[11px] text-red-700 dark:text-red-300 truncate" title={a.partner_response_message}>
+                      <p className="text-[11px] text-red-700 dark:text-red-300 truncate" data-tooltip={a.partner_response_message}>
                         Grund: {a.partner_response_message}
                       </p>
                     )}
@@ -383,7 +383,7 @@ export default function PartnerAnfragenPage() {
                     <div className="min-w-0">
                       <span className="auftrag-card-title font-medium text-sm truncate transition-colors block">{a.title}</span>
                       {a.status === "storniert" && a.partner_response_message && (
-                        <span className="text-[11px] text-red-700 dark:text-red-300 truncate block" title={a.partner_response_message}>
+                        <span className="text-[11px] text-red-700 dark:text-red-300 truncate block" data-tooltip={a.partner_response_message}>
                           Grund: {a.partner_response_message}
                         </span>
                       )}

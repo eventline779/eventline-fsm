@@ -39,31 +39,42 @@ export function IcalFeedBlock({ title, description, source = "user" }: Props) {
 
   async function loadToken() {
     if (typeof window === "undefined") return;
-    let token: string | null = null;
-    if (source === "company") {
-      // app_settings ist Singleton. RLS laesst nur Admins lesen — Block
-      // wird im IntegrationenTab ausserdem nur fuer Admins gerendert.
-      const { data } = await supabase
-        .from("app_settings")
-        .select("company_calendar_token")
-        .eq("id", 1)
-        .maybeSingle();
-      token = data?.company_calendar_token ?? null;
-    } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("calendar_feed_token")
-        .eq("id", user.id)
-        .maybeSingle();
-      token = profile?.calendar_feed_token ?? null;
-    }
-    if (token) {
-      // appUrl() statt window.location.origin — sonst kriegt der User die
-      // per-deployment URL ins Calendar-Abo (z.B. eventline-fsm-usyk-
-      // h69yfgtq1...) und bleibt fuer immer auf einem alten Build haengen.
-      setIcalUrl(`${appUrl()}/api/calendar.ics?token=${token}`);
+    try {
+      let token: string | null = null;
+      if (source === "company") {
+        // app_settings ist Singleton. RLS laesst nur Admins lesen — Block
+        // wird im IntegrationenTab ausserdem nur fuer Admins gerendert.
+        const { data, error } = await supabase
+          .from("app_settings")
+          .select("company_calendar_token")
+          .eq("id", 1)
+          .maybeSingle();
+        if (error) throw error;
+        token = data?.company_calendar_token ?? null;
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("calendar_feed_token")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (error) throw error;
+        token = profile?.calendar_feed_token ?? null;
+      }
+      if (token) {
+        // appUrl() statt window.location.origin — sonst kriegt der User die
+        // per-deployment URL ins Calendar-Abo (z.B. eventline-fsm-usyk-
+        // h69yfgtq1...) und bleibt fuer immer auf einem alten Build haengen.
+        setIcalUrl(`${appUrl()}/api/calendar.ics?token=${token}`);
+      }
+    } catch {
+      // Silent-fail wuerde die Card leer / broken aussehen lassen. Statt
+      // eines Toasts (der beim Mount unerwuenscht ist) lassen wir das Feld
+      // leer — Kopieren-Button ist dann disabled — und geben dem User bei
+      // manueller Interaktion (Copy/Rotate) einen Toast. Kein Log-Spam.
+      setIcalUrl("");
+      toast.error("Kalender-Link konnte nicht geladen werden");
     }
   }
 

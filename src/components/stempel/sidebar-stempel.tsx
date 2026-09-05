@@ -39,13 +39,20 @@ export function SidebarStempel() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("jobs")
-        .select("job_number, title")
-        .eq("id", active.job_id)
-        .maybeSingle();
-      if (!cancelled && data) {
-        setJobLabel(`INT-${data.job_number} · ${data.title}`);
+      try {
+        const { data, error } = await supabase
+          .from("jobs")
+          .select("job_number, title")
+          .eq("id", active.job_id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!cancelled && data) {
+          setJobLabel(`INT-${data.job_number} · ${data.title}`);
+        }
+      } catch {
+        // Silent-Fallback — die Pille zeigt "Auftrag laden…" (aus dem
+        // Render-Branch weiter unten). Kein Toast, Sidebar ist Ambient-UI.
+        if (!cancelled) setJobLabel(null);
       }
     })();
     return () => { cancelled = true; };

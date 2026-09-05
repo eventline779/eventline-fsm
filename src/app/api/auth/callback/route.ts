@@ -17,10 +17,16 @@ export async function GET(request: Request) {
   const next = safeNext(searchParams.get("next"));
 
   if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) {
+        return NextResponse.redirect(`${origin}${next}`);
+      }
+    } catch {
+      // Netz-/Supabase-Fehler beim Code-Exchange: statt 500 landet der
+      // User auf /login mit ?error=auth — die Login-Page zeigt bereits
+      // eine generische Fehler-Meldung und der User kann's neu versuchen.
     }
   }
 

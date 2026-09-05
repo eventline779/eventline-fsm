@@ -23,11 +23,15 @@ interface Props {
 }
 
 export function PartnerView({ embedded = false }: Props) {
-  const { role, ready } = usePermissions();
+  const { can, ready } = usePermissions();
   if (!ready) return null;
-  const isAdmin = role === "admin";
+  // can() nutzt hasPermission() — Admin passt automatisch durch, andere
+  // Rollen brauchen den Slug in ihrer Permissions-Liste. Vorher: role
+  // === "admin" hardcoded → laesst sich nicht ueber die Rollen-Matrix
+  // fuer eine dedizierte Partner-Verwalter-Rolle oeffnen.
+  const mayManage = can("partner:manage");
 
-  if (!isAdmin) {
+  if (!mayManage) {
     return (
       <div className="p-8 text-center">
         <p className="text-sm text-muted-foreground">Nur für Administratoren.</p>

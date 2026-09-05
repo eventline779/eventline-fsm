@@ -342,7 +342,7 @@ export function NeuerTerminModal({ open, onClose, onCreated, initialDate }: Prop
                   type="button"
                   onClick={() => setAssignedTo(selected ? assignedTo.filter((pid) => pid !== p.id) : [...assignedTo, p.id])}
                   className={selected ? "kasten-active" : "kasten-toggle-off"}
-                  title={conflict ? `${TYPE_LABEL[conflict.type]} ${formatDateShort(conflict.start_date)}–${formatDateShort(conflict.end_date)} (${conflict.status})` : undefined}
+                  data-tooltip={conflict ? `${TYPE_LABEL[conflict.type]} ${formatDateShort(conflict.start_date)}–${formatDateShort(conflict.end_date)} (${conflict.status})` : undefined}
                 >
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${selected ? "bg-background/20" : "bg-foreground/10 text-muted-foreground"}`}>
                     {p.full_name.charAt(0)}

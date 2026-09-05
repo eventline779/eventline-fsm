@@ -10,35 +10,34 @@
  * Wird in (app)/layout gemountet — also app-weit aktiv, nicht nur auf
  * einer bestimmten Seite. Der User soll's spaetestens nach 2 Sekunden
  * sehen egal wo er nach dem Login landet.
+ *
+ * FEATURES-Liste ist im Sync mit den echten Tabs unter /mein-konto:
+ * Profil / Sicherheit / Benachrichtigungen / Kalender. "Dokumente" ist
+ * unter /hr → Lohn umgezogen (2026-09) und "Admin-Space" wurde entfernt
+ * — beide sind bewusst NICHT mehr in dieser Liste.
  */
 
 import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
-import { usePermissions } from "@/lib/use-permissions";
-import { User, Bell, FileText, Calendar, Users, ArrowRight, Check } from "lucide-react";
+import { User, Bell, Fingerprint, Calendar, ArrowRight, Check } from "lucide-react";
 
 interface Feature {
   icon: React.ReactNode;
   label: string;
   desc: string;
-  adminOnly?: boolean;
 }
 
 const FEATURES: Feature[] = [
-  { icon: <User className="h-4 w-4" />,     label: "Profil",            desc: "Name, Email, Datenexport (DSG)" },
-  { icon: <Bell className="h-4 w-4" />,     label: "Benachrichtigungen", desc: "Push, Sound, Ruhezeiten" },
-  { icon: <FileText className="h-4 w-4" />, label: "Dokumente",         desc: "Lohnabrechnungen & Lohnausweise" },
-  { icon: <Calendar className="h-4 w-4" />, label: "Kalender",          desc: "iCal-Feed für Google/Apple/Outlook" },
-  { icon: <Users className="h-4 w-4" />,    label: "Admin-Space",       desc: "Geteilte Notizen aller Admins", adminOnly: true },
+  { icon: <User className="h-4 w-4" />,        label: "Profil",             desc: "Name, Email, Datenexport (DSG)" },
+  { icon: <Fingerprint className="h-4 w-4" />, label: "Sicherheit",         desc: "Passkeys / Face-ID / Passwort" },
+  { icon: <Bell className="h-4 w-4" />,        label: "Benachrichtigungen", desc: "Push, Sound, Ruhezeiten" },
+  { icon: <Calendar className="h-4 w-4" />,    label: "Kalender",           desc: "iCal-Feed für Google/Apple/Outlook" },
 ];
 
 export function MeinKontoIntroModal() {
   const { introDismissedAt, ready, dismissIntro } = useMeinKontoOnboarding();
-  const { role } = usePermissions();
   const open = ready && !introDismissedAt;
-  const isAdmin = role === "admin";
-  const visible = FEATURES.filter((f) => !f.adminOnly || isAdmin);
 
   function close() { void dismissIntro(); }
 
@@ -51,7 +50,7 @@ export function MeinKontoIntroModal() {
         </p>
 
         <div className="space-y-1.5">
-          {visible.map((f) => (
+          {FEATURES.map((f) => (
             <div key={f.label} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-foreground/[0.03] dark:bg-foreground/[0.05]">
               <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center text-foreground/70 shrink-0">
                 {f.icon}

@@ -23,6 +23,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 
 export interface PromptOptions {
   title: string;
@@ -71,7 +72,13 @@ export function usePrompt() {
 
   const handleConfirm = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed) return; // Pflichtfeld
+    if (!trimmed) {
+      // Pflichtfeld — Enter mit leerem Text silent-returned vorher. Der
+      // Confirm-Button ist zwar disabled, aber Enter loest die Handler
+      // ohne visuelles Signal aus. Toast holt den User zurueck.
+      toast.error("Bitte einen Text eingeben");
+      return;
+    }
     setState((s) => ({ ...s, open: false }));
     resolverRef.current?.(trimmed);
     resolverRef.current = null;

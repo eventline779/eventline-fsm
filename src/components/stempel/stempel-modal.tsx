@@ -311,7 +311,7 @@ export function StempelModal({ open, onClose }: Props) {
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all duration-150 ${
                       selectedJob?.id === job.id
                         ? "border-red-300 bg-red-50 dark:bg-red-500/10 dark:border-red-500/40 shadow-sm"
-                        : "border-border hover:border-foreground/30 hover:bg-foreground/[0.03] hover:translate-x-0.5"
+                        : "border-border hover:border-foreground/30 hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.06] hover:translate-x-0.5"
                     }`}
                   >
                     <span className="font-mono text-xs font-semibold text-muted-foreground shrink-0">INT-{job.job_number}</span>
