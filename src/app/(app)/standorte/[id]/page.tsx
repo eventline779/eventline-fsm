@@ -158,9 +158,30 @@ export default function StandortDetailPage() {
   }
 
   async function linkCustomer(customerId: string) {
-    await supabase.from("locations").update({ customer_id: customerId || null }).eq("id", id);
+    const { error } = await supabase.from("locations").update({ customer_id: customerId || null }).eq("id", id);
+    if (error) {
+      TOAST.supabaseError(error, "Kundenverknüpfung fehlgeschlagen");
+      return;
+    }
     toast.success(customerId ? "Kunde verknüpft" : "Kundenverknüpfung entfernt");
     loadAll();
+  }
+
+  // Speichert die Dokumenten-Liste in locations.technical_details (JSON-Array).
+  // Gibt true zurueck wenn erfolgreich — sonst wird lokaler State nicht aktualisiert.
+  async function saveDocsList(newDocs: { name: string; path: string; uploaded_at: string }[]): Promise<boolean> {
+    const res = await fetch(`/api/locations/${id}/docs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docs: newDocs }),
+    });
+    if (!res.ok) {
+      let msg: string | undefined;
+      try { msg = (await res.json())?.error; } catch { /* keine strukturierte Antwort */ }
+      TOAST.errorOr(msg, "Dokumente konnten nicht gespeichert werden");
+      return false;
+    }
+    return true;
   }
 
   async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
@@ -168,7 +189,6 @@ export default function StandortDetailPage() {
     if (!file) return;
     if (!validateFileSize(file)) return;
     setUploadingDoc(true);
-    const ext = file.name.split(".").pop() || "pdf";
     const path = `standorte/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
     if (error) {
@@ -178,14 +198,14 @@ export default function StandortDetailPage() {
       return;
     }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    // Save docs list via admin API
-    await fetch(`/api/locations/${id}/docs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ docs: newDocs }),
-    });
-    setDocs(newDocs);
-    toast.success("Dokument hochgeladen");
+    const saved = await saveDocsList(newDocs);
+    if (saved) {
+      setDocs(newDocs);
+      toast.success("Dokument hochgeladen");
+    } else {
+      // Metadaten konnten nicht persistiert werden — Datei im Storage wieder aufraeumen.
+      await supabase.storage.from("documents").remove([path]);
+    }
     setUploadingDoc(false);
     e.target.value = "";
   }
@@ -198,15 +218,17 @@ export default function StandortDetailPage() {
       variant: "red",
     });
     if (!ok) return;
-    await supabase.storage.from("documents").remove([doc.path]);
+    const { error: storageErr } = await supabase.storage.from("documents").remove([doc.path]);
+    if (storageErr) {
+      TOAST.supabaseError(storageErr, "Dokument konnte nicht gelöscht werden");
+      return;
+    }
     const newDocs = docs.filter((d) => d.path !== doc.path);
-    await fetch(`/api/locations/${id}/docs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ docs: newDocs }),
-    });
-    setDocs(newDocs);
-    toast.success("Dokument gelöscht");
+    const saved = await saveDocsList(newDocs);
+    if (saved) {
+      setDocs(newDocs);
+      toast.success("Dokument gelöscht");
+    }
   }
 
   // Bucket 'documents' ist private — getPublicUrl() liefert eine URL die
@@ -236,7 +258,11 @@ export default function StandortDetailPage() {
 
   async function addContact(e: React.FormEvent) {
     e.preventDefault();
-    await supabase.from("location_contacts").insert({ location_id: id, name: contactForm.name, role: contactForm.role || null, email: contactForm.email || null, phone: contactForm.phone || null });
+    const { error } = await supabase.from("location_contacts").insert({ location_id: id, name: contactForm.name, role: contactForm.role || null, email: contactForm.email || null, phone: contactForm.phone || null });
+    if (error) {
+      TOAST.supabaseError(error, "Kontakt konnte nicht hinzugefügt werden");
+      return;
+    }
     setContactForm({ name: "", role: "", email: "", phone: "" });
     setShowContactForm(false);
     loadAll();
@@ -244,7 +270,11 @@ export default function StandortDetailPage() {
   }
 
   async function deleteContact(contactId: string) {
-    await deleteRow("location_contacts", contactId);
+    const res = await deleteRow("location_contacts", contactId);
+    if (!res.ok) {
+      TOAST.deleteError(res.error);
+      return;
+    }
     loadAll();
   }
 
@@ -423,7 +453,7 @@ export default function StandortDetailPage() {
           {linkedCustomer ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold text-sm">{linkedCustomer.name.charAt(0)}</div>
+                <div className="h-10 w-10 rounded-xl bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300 flex items-center justify-center font-bold text-sm">{linkedCustomer.name.charAt(0)}</div>
                 <div>
                   <p className="font-medium text-sm">{linkedCustomer.name}</p>
                   {linkedCustomer.address_city && <p className="text-xs text-muted-foreground">{linkedCustomer.address_zip} {linkedCustomer.address_city}</p>}

@@ -31,6 +31,7 @@ import {
 import { usePermissions } from "@/lib/use-permissions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { logError } from "@/lib/log";
+import { TOAST } from "@/lib/messages";
 
 type OrtType = "standort" | "raum";
 
@@ -125,6 +126,8 @@ export function LocationsView() {
       setForm({ name: "", address_street: "", address_zip: "", address_city: "Basel", capacity: "", technical_details: "" });
       setShowForm(null);
       loadAll();
+    } else {
+      TOAST.supabaseError(error, showForm === "standort" ? "Verwaltung konnte nicht erstellt werden" : "Raum konnte nicht erstellt werden");
     }
     setSaving(false);
   }
@@ -172,7 +175,7 @@ export function LocationsView() {
 
       {/* Inline Form — gleiche Felder, nur Header/Submit-Label wechseln. */}
       {showForm && (
-        <Card className="bg-card border-red-100">
+        <Card className="bg-card border-red-100 dark:border-red-500/25">
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <h3 className="font-semibold">
@@ -185,7 +188,7 @@ export function LocationsView() {
                     placeholder={showForm === "standort" ? "z.B. Theater BAU3" : "z.B. Volkshaus Basel"}
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="mt-1.5 bg-gray-50"
+                    className="mt-1.5 bg-muted/40"
                     required
                   />
                 </div>
@@ -196,7 +199,7 @@ export function LocationsView() {
                     placeholder={showForm === "standort" ? "z.B. 100" : "z.B. 200"}
                     value={form.capacity}
                     onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                    className="mt-1.5 bg-gray-50"
+                    className="mt-1.5 bg-muted/40"
                   />
                 </div>
               </div>
@@ -224,7 +227,7 @@ export function LocationsView() {
                     placeholder="4052"
                     value={form.address_zip}
                     onChange={(e) => setForm({ ...form, address_zip: e.target.value })}
-                    className="mt-1.5 bg-gray-50"
+                    className="mt-1.5 bg-muted/40"
                   />
                 </div>
                 <div className="col-span-2">
@@ -233,7 +236,7 @@ export function LocationsView() {
                     placeholder="Basel"
                     value={form.address_city}
                     onChange={(e) => setForm({ ...form, address_city: e.target.value })}
-                    className="mt-1.5 bg-gray-50"
+                    className="mt-1.5 bg-muted/40"
                   />
                 </div>
               </div>
@@ -243,7 +246,7 @@ export function LocationsView() {
                   placeholder={showForm === "standort" ? "Licht, Ton, Beamer, Strom etc." : "Bühne, Licht, Ton, Strom etc."}
                   value={form.technical_details}
                   onChange={(e) => setForm({ ...form, technical_details: e.target.value })}
-                  className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/40 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                   rows={2}
                 />
               </div>
@@ -276,7 +279,7 @@ export function LocationsView() {
             placeholder="Name oder Ort suchen…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-card border-gray-200"
+            className="pl-10 bg-card border-border"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -310,8 +313,8 @@ export function LocationsView() {
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse bg-card">
               <CardContent className="p-5">
-                <div className="h-5 bg-gray-200 rounded w-2/3 mb-3" />
-                <div className="h-4 bg-gray-100 rounded w-1/2" />
+                <div className="h-5 bg-muted rounded w-2/3 mb-3" />
+                <div className="h-4 bg-muted/60 rounded w-1/2" />
               </CardContent>
             </Card>
           ))}

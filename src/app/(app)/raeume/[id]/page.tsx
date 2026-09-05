@@ -10,18 +10,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Room, RoomContact, RoomPrice } from "@/types";
 import {
   Plus, UserPlus, Users, Phone, Mail, Trash2,
-  DoorOpen, X, Banknote, Wrench, FileText, Upload, Download, Pencil, Eye,
+  X, Banknote, Wrench, FileText, Upload, Download, Pencil, Eye,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { Loading } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { PdfPopup } from "@/components/pdf-popup";
+import { usePermissions } from "@/lib/use-permissions";
+import { useConfirm } from "@/components/ui/use-confirm";
 
 export default function RaumDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { can } = usePermissions();
+  const { confirm, ConfirmModalElement } = useConfirm();
   const [room, setRoom] = useState<Room | null>(null);
   const [contacts, setContacts] = useState<RoomContact[]>([]);
   const [prices, setPrices] = useState<RoomPrice[]>([]);
@@ -34,20 +38,14 @@ export default function RaumDetailPage() {
   const [showPriceForm, setShowPriceForm] = useState(false);
   const [priceForm, setPriceForm] = useState({ label: "", amount: "", notes: "" });
 
-  // Notes
-
   // Docs
   const [docs, setDocs] = useState<{ name: string; path: string; uploaded_at: string }[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docRef = useRef<HTMLInputElement>(null);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
-  // Löschen
-  const [showDelete, setShowDelete] = useState(false);
-  const [deleteCode, setDeleteCode] = useState("");
-  const [deleteError, setDeleteError] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   // Doppel-Klick-Guards
+  const [deleting, setDeleting] = useState(false);
   const [addingContact, setAddingContact] = useState(false);
   const [addingPrice, setAddingPrice] = useState(false);
 
@@ -78,15 +76,25 @@ export default function RaumDetailPage() {
     if (priceRes.data) setPrices(priceRes.data as RoomPrice[]);
   }
 
-  async function saveDocs(documents: { name: string; path: string; uploaded_at: string }[]) {
+  async function saveDocs(documents: { name: string; path: string; uploaded_at: string }[]): Promise<boolean> {
     let data: { _docs?: unknown } = {};
     try { data = JSON.parse(room?.notes || "{}"); } catch { data = {}; }
     data._docs = documents;
-    await supabase.from("rooms").update({ notes: JSON.stringify(data) }).eq("id", id);
+    const { error } = await supabase.from("rooms").update({ notes: JSON.stringify(data) }).eq("id", id);
+    if (error) {
+      TOAST.supabaseError(error, "Dokumente konnten nicht gespeichert werden");
+      loadAll();
+      return false;
+    }
+    return true;
   }
 
   async function saveTech() {
-    await supabase.from("rooms").update({ technical_details: techText || null }).eq("id", id);
+    const { error } = await supabase.from("rooms").update({ technical_details: techText || null }).eq("id", id);
+    if (error) {
+      TOAST.supabaseError(error, "Technische Details konnten nicht gespeichert werden");
+      return;
+    }
     setEditingTech(false);
     loadAll();
     toast.success("Technische Details gespeichert");
@@ -98,7 +106,11 @@ export default function RaumDetailPage() {
     if (addingContact) return;
     setAddingContact(true);
     try {
-      await supabase.from("room_contacts").insert({ room_id: id, name: contactForm.name, role: contactForm.role || null, email: contactForm.email || null, phone: contactForm.phone || null });
+      const { error } = await supabase.from("room_contacts").insert({ room_id: id, name: contactForm.name, role: contactForm.role || null, email: contactForm.email || null, phone: contactForm.phone || null });
+      if (error) {
+        TOAST.supabaseError(error, "Kontakt konnte nicht hinzugefügt werden");
+        return;
+      }
       setContactForm({ name: "", role: "", email: "", phone: "" });
       setShowContactForm(false);
       loadAll();
@@ -109,7 +121,11 @@ export default function RaumDetailPage() {
   }
 
   async function deleteContact(contactId: string) {
-    await deleteRow("room_contacts", contactId);
+    const res = await deleteRow("room_contacts", contactId);
+    if (!res.ok) {
+      TOAST.deleteError(res.error);
+      return;
+    }
     loadAll();
   }
 
@@ -119,7 +135,11 @@ export default function RaumDetailPage() {
     if (addingPrice) return;
     setAddingPrice(true);
     try {
-      await supabase.from("room_prices").insert({ room_id: id, label: priceForm.label, amount: parseFloat(priceForm.amount), notes: priceForm.notes || null });
+      const { error } = await supabase.from("room_prices").insert({ room_id: id, label: priceForm.label, amount: parseFloat(priceForm.amount), notes: priceForm.notes || null });
+      if (error) {
+        TOAST.supabaseError(error, "Preis konnte nicht hinzugefügt werden");
+        return;
+      }
       setPriceForm({ label: "", amount: "", notes: "" });
       setShowPriceForm(false);
       loadAll();
@@ -130,7 +150,11 @@ export default function RaumDetailPage() {
   }
 
   async function deletePrice(priceId: string) {
-    await deleteRow("room_prices", priceId);
+    const res = await deleteRow("room_prices", priceId);
+    if (!res.ok) {
+      TOAST.deleteError(res.error);
+      return;
+    }
     loadAll();
   }
 
@@ -151,19 +175,34 @@ export default function RaumDetailPage() {
       if (!json.success) { TOAST.uploadError(json.error); setUploadingDoc(false); e.target.value = ""; return; }
     } catch { TOAST.networkError("Upload"); setUploadingDoc(false); e.target.value = ""; return; }
     const newDocs = [...docs, { name: file.name, path, uploaded_at: new Date().toISOString() }];
-    await saveDocs(newDocs);
-    setDocs(newDocs);
-    toast.success("Dokument hochgeladen");
+    const ok = await saveDocs(newDocs);
+    if (ok) {
+      setDocs(newDocs);
+      toast.success("Dokument hochgeladen");
+    }
     setUploadingDoc(false);
     e.target.value = "";
   }
 
   async function deleteDoc(doc: { name: string; path: string }) {
-    await supabase.storage.from("documents").remove([doc.path]);
+    const ok = await confirm({
+      title: "Dokument löschen?",
+      message: `"${doc.name}" wird entfernt.`,
+      confirmLabel: "Löschen",
+      variant: "red",
+    });
+    if (!ok) return;
+    const { error: storageErr } = await supabase.storage.from("documents").remove([doc.path]);
+    if (storageErr) {
+      TOAST.supabaseError(storageErr, "Dokument konnte nicht gelöscht werden");
+      return;
+    }
     const newDocs = docs.filter((d) => d.path !== doc.path);
-    await saveDocs(newDocs);
-    setDocs(newDocs);
-    toast.success("Dokument gelöscht");
+    const saved = await saveDocs(newDocs);
+    if (saved) {
+      setDocs(newDocs);
+      toast.success("Dokument gelöscht");
+    }
   }
 
   // Bucket 'documents' ist private — getPublicUrl() liefert eine URL die
@@ -192,20 +231,27 @@ export default function RaumDetailPage() {
   }
 
   async function deleteRoom() {
-    if (!deleteCode) return;
+    const ok = await confirm({
+      title: "Raum unwiderruflich löschen?",
+      message: `"${room?.name ?? "Dieser Raum"}" wird inkl. Kontakte, Preise und Dokumente entfernt.`,
+      confirmLabel: "Endgültig löschen",
+      variant: "red",
+      confirmDelaySec: 3,
+    });
+    if (!ok || deleting) return;
     setDeleting(true);
     try {
       const res = await fetch("/api/rooms/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, code: deleteCode }),
+        body: JSON.stringify({ id }),
       });
       const json = await res.json();
       if (json.success) {
         toast.success("Raum gelöscht");
-        router.push("/raeume");
+        router.push("/locations");
       } else {
-        setDeleteError(true);
+        TOAST.deleteError(json.error);
         setDeleting(false);
       }
     } catch {
@@ -220,7 +266,7 @@ export default function RaumDetailPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <BackButton fallbackHref="/raeume" />
+        <BackButton fallbackHref="/locations" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -228,17 +274,19 @@ export default function RaumDetailPage() {
             {room.capacity ? ` · ${room.capacity} Personen` : ""}
           </p>
         </div>
-        <button type="button" className="kasten kasten-red ml-auto" onClick={() => { setShowDelete(true); setDeleteCode(""); setDeleteError(false); }}>
-          <Trash2 className="h-3.5 w-3.5" />
-          Löschen
-        </button>
+        {can("locations:delete") && (
+          <button type="button" className="kasten kasten-red ml-auto" onClick={deleteRoom} disabled={deleting}>
+            <Trash2 className="h-3.5 w-3.5" />
+            {deleting ? "Löschen…" : "Löschen"}
+          </button>
+        )}
       </div>
 
       {/* Technische Details */}
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" />Technische Details</CardTitle>
-          {!editingTech && <button type="button" onClick={() => setEditingTech(true)} className="kasten kasten-purple"><Pencil className="h-3.5 w-3.5" />Bearbeiten</button>}
+          {!editingTech && can("locations:edit") && <button type="button" onClick={() => setEditingTech(true)} className="kasten kasten-purple"><Pencil className="h-3.5 w-3.5" />Bearbeiten</button>}
         </CardHeader>
         <CardContent>
           {editingTech ? (
@@ -259,10 +307,12 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4" />Preise ({prices.length})</CardTitle>
-          <button type="button" onClick={() => setShowPriceForm(!showPriceForm)} className="kasten kasten-muted">
-            {showPriceForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {showPriceForm ? "Abbrechen" : "Preis hinzufügen"}
-          </button>
+          {can("locations:edit") && (
+            <button type="button" onClick={() => setShowPriceForm(!showPriceForm)} className="kasten kasten-muted">
+              {showPriceForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              {showPriceForm ? "Abbrechen" : "Preis hinzufügen"}
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {showPriceForm && (
@@ -288,7 +338,9 @@ export default function RaumDetailPage() {
                 </div>
                 {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
               </div>
-              <button onClick={() => deletePrice(p.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+              {can("locations:edit") && (
+                <button onClick={() => deletePrice(p.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+              )}
             </div>
           ))}
         </CardContent>
@@ -298,10 +350,12 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4" />Ansprechpartner ({contacts.length})</CardTitle>
-          <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
-            <UserPlus className="h-3.5 w-3.5" />
-            Hinzufügen
-          </button>
+          {can("locations:edit") && (
+            <button type="button" onClick={() => setShowContactForm(!showContactForm)} className="kasten kasten-muted">
+              <UserPlus className="h-3.5 w-3.5" />
+              Hinzufügen
+            </button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {showContactForm && (
@@ -333,7 +387,9 @@ export default function RaumDetailPage() {
                   {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-blue-600 transition-colors"><Phone className="h-3 w-3" />{c.phone}</a>}
                 </div>
               </div>
-              <button onClick={() => deleteContact(c.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+              {can("locations:edit") && (
+                <button onClick={() => deleteContact(c.id)} className="icon-btn icon-btn-red"><Trash2 className="h-4 w-4" /></button>
+              )}
             </div>
           ))}
         </CardContent>
@@ -343,10 +399,12 @@ export default function RaumDetailPage() {
       <Card className="bg-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4" />Dokumente ({docs.length})</CardTitle>
-          <button type="button" onClick={() => docRef.current?.click()} disabled={uploadingDoc} className="kasten kasten-muted">
-            <Upload className="h-3.5 w-3.5" />
-            {uploadingDoc ? "Hochladen…" : "PDF hochladen"}
-          </button>
+          {can("locations:edit") && (
+            <button type="button" onClick={() => docRef.current?.click()} disabled={uploadingDoc} className="kasten kasten-muted">
+              <Upload className="h-3.5 w-3.5" />
+              {uploadingDoc ? "Hochladen…" : "PDF hochladen"}
+            </button>
+          )}
           <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={uploadDoc} className="hidden" />
         </CardHeader>
         <CardContent className="space-y-3">
@@ -363,44 +421,16 @@ export default function RaumDetailPage() {
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
                 <button onClick={() => openDocPreview(d)} className="icon-btn icon-btn-blue" data-tooltip="Vorschau"><Eye className="h-4 w-4" /></button>
                 <button onClick={() => downloadDoc(d)} className="icon-btn icon-btn-muted" data-tooltip="Herunterladen"><Download className="h-4 w-4" /></button>
-                <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" data-tooltip="Löschen"><Trash2 className="h-4 w-4" /></button>
+                {can("locations:edit") && (
+                  <button onClick={() => deleteDoc(d)} className="icon-btn icon-btn-red" data-tooltip="Löschen"><Trash2 className="h-4 w-4" /></button>
+                )}
               </div>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Löschen Modal */}
-      {showDelete && (
-        <>
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-lg" onClick={() => setShowDelete(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-gray-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">Raum löschen</h2>
-                <button onClick={() => setShowDelete(false)} className="icon-btn icon-btn-muted"><X className="h-4 w-4" /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
-                  <Trash2 className="h-5 w-5 text-red-600 shrink-0" />
-                  <p className="text-sm text-red-800">Dieser Raum wird unwiderruflich gelöscht — inkl. Kontakte, Preise und Dokumente.</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Code eingeben</label>
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="4-stelliger Code" value={deleteCode} onChange={(e) => { setDeleteCode(e.target.value); setDeleteError(false); }} className={`mt-1.5 w-full h-10 px-3 text-lg tracking-widest text-center rounded-lg border bg-card dark:bg-gray-800 outline-none focus:ring-2 ${deleteError ? "border-red-500 focus:ring-red-500" : "border-border focus:ring-blue-500 focus:border-blue-500"}`} />
-                  {deleteError && <p className="text-xs text-red-600 mt-1">Falscher Code</p>}
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowDelete(false)} className="kasten kasten-muted flex-1">Abbrechen</button>
-                  <button onClick={deleteRoom} disabled={!deleteCode || deleting} className="kasten kasten-red flex-1">
-                    <Trash2 className="h-4 w-4" />{deleting ? "Löschen..." : "Endgültig löschen"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {ConfirmModalElement}
       {previewDoc && (
         <PdfPopup
           url={previewDoc.url}

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CustomerType } from "@/types";
-import { Save, Building2, User, Globe, ArrowLeftRight } from "lucide-react";
+import { Save, Building2, User, Globe, ArrowLeftRight, Loader2 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -174,8 +174,8 @@ function NeuerKundeContent() {
                   onClick={() => update("type", opt.value)}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                     form.type === opt.value
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200"
+                      ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+                      : "border-border bg-muted/40 text-muted-foreground hover:border-foreground/20"
                   }`}
                 >
                   {opt.icon}
@@ -199,7 +199,7 @@ function NeuerKundeContent() {
                 placeholder={form.type === "company" ? "Firmenname" : "Vor- und Nachname"}
                 value={form.name}
                 onChange={(e) => update("name", e.target.value)}
-                className="mt-1.5 bg-gray-50 border-gray-200"
+                className="mt-1.5 bg-muted/40 border-border"
                 required
               />
             </div>
@@ -212,7 +212,7 @@ function NeuerKundeContent() {
                   placeholder="mail@beispiel.ch"
                   value={form.email}
                   onChange={(e) => update("email", e.target.value)}
-                  className="mt-1.5 bg-gray-50 border-gray-200"
+                  className="mt-1.5 bg-muted/40 border-border"
                   required
                 />
               </div>
@@ -223,7 +223,7 @@ function NeuerKundeContent() {
                   placeholder="+41 ..."
                   value={form.phone}
                   onChange={(e) => update("phone", e.target.value)}
-                  className="mt-1.5 bg-gray-50 border-gray-200"
+                  className="mt-1.5 bg-muted/40 border-border"
                   required
                 />
               </div>
@@ -258,7 +258,7 @@ function NeuerKundeContent() {
                   placeholder="4052"
                   value={form.address_zip}
                   onChange={(e) => update("address_zip", e.target.value)}
-                  className="mt-1.5 bg-gray-50 border-gray-200"
+                  className="mt-1.5 bg-muted/40 border-border"
                   required
                 />
               </div>
@@ -269,7 +269,7 @@ function NeuerKundeContent() {
                   placeholder="Basel"
                   value={form.address_city}
                   onChange={(e) => update("address_city", e.target.value)}
-                  className="mt-1.5 bg-gray-50 border-gray-200"
+                  className="mt-1.5 bg-muted/40 border-border"
                   required
                 />
               </div>
@@ -299,7 +299,7 @@ function NeuerKundeContent() {
               placeholder="Optionale Notizen zum Kunden..."
               value={form.notes}
               onChange={(e) => update("notes", e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/40 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
               rows={3}
             />
           </CardContent>
@@ -319,7 +319,7 @@ function NeuerKundeContent() {
             disabled={!form.name || saving}
             className="kasten kasten-red flex-1"
           >
-            <Save className="h-3.5 w-3.5" />
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {saving ? "Speichern…" : "Kunde erstellen"}
           </button>
         </div>

@@ -404,7 +404,7 @@ export default function KundenDetailPage() {
           {editing ? (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1.5 bg-gray-50" required /></div>
+                <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1.5 bg-muted/40" required /></div>
                 <div>
                   <Label>Typ</Label>
                   <div className="mt-1.5">
@@ -418,8 +418,8 @@ export default function KundenDetailPage() {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div><Label>E-Mail *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
-                <div><Label>Telefon *</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div><Label>E-Mail *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 bg-muted/40" /></div>
+                <div><Label>Telefon *</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1.5 bg-muted/40" /></div>
               </div>
               <div>
                 <Label>Strasse *</Label>
@@ -434,8 +434,8 @@ export default function KundenDetailPage() {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <div><Label>PLZ *</Label><Input value={form.address_zip} onChange={(e) => setForm({ ...form, address_zip: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
-                <div className="md:col-span-2"><Label>Ort *</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-gray-50" /></div>
+                <div><Label>PLZ *</Label><Input value={form.address_zip} onChange={(e) => setForm({ ...form, address_zip: e.target.value })} className="mt-1.5 bg-muted/40" /></div>
+                <div className="md:col-span-2"><Label>Ort *</Label><Input value={form.address_city} onChange={(e) => setForm({ ...form, address_city: e.target.value })} className="mt-1.5 bg-muted/40" /></div>
               </div>
               <div>
                 <Label>Land</Label>
@@ -448,7 +448,7 @@ export default function KundenDetailPage() {
                   />
                 </div>
               </div>
-              <div><Label>Notizen</Label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 resize-none" rows={3} /></div>
+              <div><Label>Notizen</Label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1.5 w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/40 resize-none focus:outline-none focus:ring-2 focus:ring-ring/40" rows={3} /></div>
               <button
                 type="button"
                 onClick={handleSave}
@@ -537,7 +537,7 @@ export default function KundenDetailPage() {
             <>
               {(showAllJobs ? sortedJobs : sortedJobs.slice(0, 2)).map((j) => (
                 <Link key={j.id} href={`/auftraege/${j.id}`}>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border hover:border-foreground/20 transition-colors cursor-pointer">
                     <div>
                       <div className="flex items-center gap-2">
                         <JobNumber number={j.job_number} />
@@ -581,8 +581,11 @@ function FieldRow({
   children: React.ReactNode;
   align?: "center" | "start";
 }) {
+  // Tailwind-JIT scannt Klassen-Strings statisch; `items-${align}` wuerde
+  // nie zu einer echten Klasse werden. Deshalb statisch mappen.
+  const alignClass = align === "start" ? "items-start" : "items-center";
   return (
-    <div className={`grid grid-cols-[auto_80px_1fr] gap-3 text-sm items-${align}`}>
+    <div className={`grid grid-cols-[auto_80px_1fr] gap-3 text-sm ${alignClass}`}>
       <Icon className={`h-4 w-4 text-muted-foreground/60 shrink-0 ${align === "start" ? "mt-0.5" : ""}`} />
       <span className="text-muted-foreground/80">{label}</span>
       <span className="min-w-0 break-words">{children}</span>
