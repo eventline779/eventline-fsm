@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
-import { ArrowLeft, Clock, Info } from "lucide-react";
+import { ArrowLeft, Clock, Info, Fingerprint, Loader2 } from "lucide-react";
 import { appUrl } from "@/lib/app-url";
+import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -20,8 +21,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    // Nur wenn der Browser WebAuthn kann — sonst Button gar nicht erst zeigen.
+    setPasskeySupported(browserSupportsWebAuthn());
+  }, []);
   // ?reason=inactive — Login-Page wurde nach Inaktivitaets-Logout angesteuert.
   // Hinweis fuer den User damit er weiss warum er ausgeloggt wurde.
   const reason = searchParams.get("reason");
@@ -94,6 +102,73 @@ export default function LoginPage() {
 
     router.push("/dashboard");
     router.refresh();
+  }
+
+  async function handlePasskeyLogin() {
+    setError("");
+    setPasskeyLoading(true);
+    try {
+      // Optional Email vom Feld nehmen — engt die Passkey-Auswahl im
+      // Browser-Dialog ein. Ohne Email zeigt der Browser ALLE für die
+      // Domain registrierten Passkeys (discoverable-flow).
+      const chRes = await fetch("/api/auth/passkey/auth-challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() || undefined }),
+      });
+      const chJson = await chRes.json();
+      if (!chRes.ok || !chJson.success) {
+        setError(chJson.error ?? "Passkey-Login konnte nicht gestartet werden.");
+        return;
+      }
+
+      let authResp;
+      try {
+        authResp = await startAuthentication({ optionsJSON: chJson.options });
+      } catch (e) {
+        // Abbruch durch User oder kein passender Passkey am Gerät.
+        const msg = e instanceof Error ? e.message : "Abgebrochen";
+        if (/cancel|abort/i.test(msg)) return;
+        setError(msg);
+        return;
+      }
+
+      const verifyRes = await fetch("/api/auth/passkey/auth-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: authResp }),
+      });
+      const verifyJson = await verifyRes.json();
+      if (!verifyRes.ok || !verifyJson.success) {
+        setError(verifyJson.error ?? "Passkey-Verifikation fehlgeschlagen.");
+        return;
+      }
+
+      // Session erzeugen via magic-link-Token, das der Server nach dem
+      // erfolgreichen Passkey-Verify ausliefert (siehe auth-verify/route.ts).
+      const { error: otpErr } = await supabase.auth.verifyOtp({
+        type: "email",
+        token_hash: verifyJson.token_hash as string,
+      });
+      if (otpErr) {
+        setError("Session-Erzeugung fehlgeschlagen: " + otpErr.message);
+        return;
+      }
+
+      // Partner-Backstop: analog zum Passwort-Flow. Wenn ein Partner-
+      // Account sich hier eingeloggt hat → wieder aus + Redirect.
+      if (verifyJson.role === "partner") {
+        const partnerEmail = (verifyJson.email as string) ?? email;
+        await supabase.auth.signOut();
+        router.push(`/partner/login?email=${encodeURIComponent(partnerEmail)}&reason=wrong_portal`);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } finally {
+      setPasskeyLoading(false);
+    }
   }
 
   async function handleReset(e: React.FormEvent) {
@@ -193,6 +268,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="username"
                     className="h-10"
                   />
                 </div>
@@ -225,6 +301,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus={!fromWrongPortal}
+                  autoComplete="username webauthn"
                   className="h-10"
                 />
               </div>
@@ -238,6 +315,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   className="h-10"
                 />
               </div>
@@ -247,10 +325,37 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className="kasten kasten-red w-full !py-2.5 !text-sm"
-                disabled={loading}
+                disabled={loading || passkeyLoading}
               >
                 {loading ? "Anmelden..." : "Anmelden"}
               </button>
+
+              {passkeySupported && (
+                <>
+                  {/* Trenner + Passkey-Button. Nur wenn der Browser
+                      WebAuthn kann — sonst verwirrend fuer User die keinen
+                      Passkey einrichten koennen. */}
+                  <div className="flex items-center gap-3 py-0.5">
+                    <div className="h-px flex-1 bg-foreground/10" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">oder</span>
+                    <div className="h-px flex-1 bg-foreground/10" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePasskeyLogin}
+                    disabled={loading || passkeyLoading}
+                    className="kasten kasten-muted w-full !py-2.5 !text-sm"
+                  >
+                    {passkeyLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Fingerprint className="h-4 w-4" />
+                    )}
+                    {passkeyLoading ? "Wird geprüft…" : "Mit Passkey einloggen"}
+                  </button>
+                </>
+              )}
+
               <button
                 type="button"
                 onClick={() => { setResetMode(true); setError(""); }}
