@@ -30,19 +30,31 @@ import { toast } from "sonner";
 import { CalendarCheck, ChevronLeft, ChevronRight, Check, Plus, X, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { todayLocalIso, weekdayForDateIso } from "@/lib/swiss-time";
 
 type Person = { id: string; full_name: string | null };
 type Entry = { user_id: string; date: string; from_time: string; to_time: string };
+type Day = { iso: string; weekday: number; dayLabel: string };
 const DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
-// Ansicht startet IMMER mit HEUTE (ganz links) → 7 Tage im Voraus.
-// offset verschiebt das 7-Tage-Fenster in Wochenschritten.
-function viewStart(offset: number): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset * 7);
+// YYYY-MM-DD + Tages-Offset -> YYYY-MM-DD (rein string-basiert, DST-immun).
+function addDaysIso(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + delta));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
 }
-function isoDate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Ansicht startet IMMER mit HEUTE (ganz links, Zurich-Kalender) → 7 Tage im Voraus.
+// offset verschiebt das 7-Tage-Fenster in Wochenschritten.
+function buildDay(iso: string): Day {
+  const [, m, d] = iso.split("-").map(Number);
+  // weekdayForDateIso: 0=So..6=Sa. Wir wollen 0=Mo..6=So fuer DAYS[].
+  const weekday = (weekdayForDateIso(iso) + 6) % 7;
+  return {
+    iso,
+    weekday,
+    dayLabel: `${String(d).padStart(2, "0")}.${String(m).padStart(2, "0")}`,
+  };
 }
 function hm(t: string | null | undefined) {
   return (t ?? "").slice(0, 5);
@@ -59,11 +71,11 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
   const [edit, setEdit] = useState<{ date: string; from: string; to: string } | null>(null);
 
   const days = useMemo(() => {
-    const start = viewStart(week);
-    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    const startIso = addDaysIso(todayLocalIso(), week * 7);
+    return Array.from({ length: 7 }, (_, i) => buildDay(addDaysIso(startIso, i)));
   }, [week]);
-  const weekStart = isoDate(days[0]);
-  const weekEnd = isoDate(days[6]);
+  const weekStart = days[0].iso;
+  const weekEnd = days[6].iso;
 
   // Auth-User laden — braucht's fuer "mine"-Vergleich und Berechtigungscheck.
   useEffect(() => {
@@ -91,11 +103,18 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
   }, [supabase, uid]);
 
   const loadEntries = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("office_attendance")
       .select("user_id, date, from_time, to_time")
       .gte("date", weekStart)
       .lte("date", weekEnd);
+    if (error) {
+      // Ohne Toast wuerde die Kalender-Ansicht still leer bleiben und der
+      // Nutzer denkt "niemand da". Lieber sichtbar melden.
+      toast.error(`Anwesenheit konnte nicht geladen werden: ${error.message}`);
+      setEntries([]);
+      return;
+    }
     // Legacy-Rows koennen from_time/to_time = NULL haben — filtere die raus,
     // sonst zeigt das UI "00:00–00:00". Migration 204 backfilled sie, aber
     // ein Fallback bleibt drin.
@@ -108,7 +127,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
   if (meLoading || allowed === null) return null;
   if (!allowed) return null;
 
-  const todayIso = isoDate(new Date());
+  const todayIso = todayLocalIso();
   const entryOf = (userId: string, date: string) => entries.find((e) => e.user_id === userId && e.date === date);
 
   async function save() {
@@ -156,8 +175,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="text-xs font-medium tabular-nums min-w-[130px] text-center">
-            {days[0].toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit" })}{" "}
-            – {days[6].toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit" })}
+            {days[0].dayLabel} – {days[6].dayLabel}
           </span>
           <button onClick={() => setWeek((w) => w + 1)} className="icon-btn" aria-label="Nächste Woche">
             <ChevronRight className="h-4 w-4" />
@@ -178,16 +196,16 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                   Person
                 </th>
                 {days.map((d) => {
-                  const today = isoDate(d) === todayIso;
+                  const today = d.iso === todayIso;
                   return (
                     <th
-                      key={isoDate(d)}
+                      key={d.iso}
                       className={cn("px-1 py-1 text-center font-medium w-24 sticky top-0 z-10 bg-card", today && "bg-accent/[0.07]")}
                     >
                       <span className={cn("inline-flex flex-col items-center leading-tight px-2 py-0.5 rounded-md", today && "bg-accent text-white shadow-sm")}>
-                        <span>{DAYS[(d.getDay() + 6) % 7]}</span>
+                        <span>{DAYS[d.weekday]}</span>
                         <span className={cn("text-[11px] font-normal tabular-nums", today ? "text-white/90" : "text-muted-foreground")}>
-                          {String(d.getDate()).padStart(2, "0")}.{String(d.getMonth() + 1).padStart(2, "0")}
+                          {d.dayLabel}
                         </span>
                       </span>
                     </th>
@@ -203,7 +221,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                     {p.id === uid && <span className="text-[10px] text-muted-foreground"> (du)</span>}
                   </td>
                   {days.map((d) => {
-                    const date = isoDate(d);
+                    const date = d.iso;
                     const e = entryOf(p.id, date);
                     const mine = p.id === uid;
                     const isEditing = mine && edit?.date === date;

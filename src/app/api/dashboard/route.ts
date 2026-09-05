@@ -214,7 +214,13 @@ async function loadMaData(userId: string): Promise<MaPayload> {
     wage_exempt?: boolean | null;
   } | null;
   const wageExempt = comp?.wage_exempt === true;
-  const hourlyWage = comp?.hourly_wage_chf == null ? null : Number(comp.hourly_wage_chf);
+  // NaN-Guard: DB koennte Muell liefern (String, "N/A", etc.). Nicht-endliche
+  // Werte fallback auf null — ist-Lohn/Prognose gehen dann sauber auf 0.
+  const hourlyWage = (() => {
+    if (comp?.hourly_wage_chf == null) return null;
+    const n = Number(comp.hourly_wage_chf);
+    return Number.isFinite(n) ? n : null;
+  })();
   const pcts = effectivePcts(comp, defaults);
   const employeeDeductionPct = sumEmployeePct(pcts);
   const nettoFactor = 1 - employeeDeductionPct / 100;
@@ -529,6 +535,16 @@ const WIDGET_CATALOG = DASHBOARD_WIDGETS.map((w) => ({
   requires: w.requires,
 }));
 
+/** Subtitle unter dem Gruss. Serverseitig weil hier die Rolle bekannt ist —
+ *  frueher hat der Client hardcoded auf "admin"/"techniker"/"partner"-Slugs
+ *  gematcht, was mit dem frei-definierbaren Rollen-System bricht. */
+function subtitleForRole(role: string): string {
+  if (role === "admin") return "Was jetzt wichtig ist";
+  if (role === "techniker") return "Dein Monat auf einen Blick";
+  if (role === "partner") return "Willkommen im Portal";
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------------
@@ -622,14 +638,18 @@ export async function GET() {
       success: true,
       role,
       first_name: firstName,
+      subtitle: subtitleForRole(role),
       widgets,
       widget_catalog: WIDGET_CATALOG,
     };
     if (adminData) body.admin = adminData;
     if (maData) body.ma = maData;
 
+    // no-store: Dashboard-Payload enthaelt live-Zaehler (offene Auftraege,
+    // Stempel-Status). 60s stale hiess: neuer Beleg -> Widget zeigt bis zu
+    // 60s alten Count. Kein Grund zu cachen — die Requests sind billig.
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "private, max-age=60" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";

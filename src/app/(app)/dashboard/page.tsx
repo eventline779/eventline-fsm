@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobNumber } from "@/components/job-number";
+import { localHour } from "@/lib/swiss-time";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
 import { StempelStatusCard } from "@/components/dashboard/stempel-status-card";
@@ -89,6 +90,7 @@ interface DashboardResponse {
   success: true;
   role: "admin" | "techniker" | "partner" | string;
   first_name: string;
+  subtitle: string;
   widgets: string[];
   widget_catalog: WidgetCatalogEntry[];
   admin?: AdminData;
@@ -120,6 +122,7 @@ function fmtDateTime(iso: string): string {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
+    year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -241,7 +244,10 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  const greeting = greetingForHour(new Date().getHours());
+  // localHour = Zurich-Stunde via Intl (DST-safe). Browser-Stunde (getHours)
+  // waere abhaengig vom Endgeraet-TZ und wuerde in fremden Zeitzonen "Guten
+  // Morgen" um Zurich-Mitternacht zeigen.
+  const greeting = greetingForHour(localHour(new Date()));
   const name = data?.first_name?.trim() ?? "";
 
   if (loading) {
@@ -278,13 +284,9 @@ export default function DashboardPage() {
   const ctx: RenderContext = { admin: data?.admin ?? null, ma: data?.ma ?? null };
   const widgets = data?.widgets ?? [];
   const catalog = data?.widget_catalog ?? [];
-  const subtitle = data?.role === "admin"
-    ? "Was jetzt wichtig ist"
-    : data?.role === "techniker"
-    ? "Dein Monat auf einen Blick"
-    : data?.role === "partner"
-    ? "Willkommen im Portal"
-    : "";
+  // Subtitle kommt vom Server — die Rollen-Semantik lebt dort (roles-Tabelle,
+  // frei-definierbare Slugs), nicht in einem hardcoded Client-Match.
+  const subtitle = data?.subtitle ?? "";
 
   return (
     <div className="page-enter space-y-6">
