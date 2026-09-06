@@ -377,8 +377,43 @@ export async function DELETE(
   }
 
   // Sicherheits-Netz: falls profile-Cascade nicht griff (z.B. weil FK
-  // damals nicht angelegt wurde) — explizit nachloeschen.
-  await admin.from("profiles").delete().eq("id", id);
+  // damals nicht angelegt wurde) — explizit nachloeschen. FEHLER JETZT
+  // AUSWERTEN (frueher verschluckt): wenn ein FK-Constraint oder eine
+  // andere Referenz blockt, war der Frontend-Toast 'geloescht' trotzdem
+  // gruen und die Row blieb sichtbar. Jetzt gibt der Endpoint einen
+  // klaren Fehler zurueck damit der Admin weiss was ihn blockt.
+  const { error: profDelErr } = await admin
+    .from("profiles")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (profDelErr) {
+    logError("admin.users.delete.profile", { error: profDelErr.message }, { userId: id });
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Profile-Löschung fehlgeschlagen: ${profDelErr.message}. Möglicherweise gibt es noch Referenzen (z.B. Aufträge, Anfragen).`,
+      },
+      { status: 500 },
+    );
+  }
+
+  // Verify: Row wirklich weg? Manche FK-Konstellationen fangen den
+  // Fehler nicht ab, hinterlassen aber die Row.
+  const { data: still } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (still) {
+    logError("admin.users.delete.orphaned", { userId: id }, { userId: id });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Löschung nicht abgeschlossen — Profile ist noch vorhanden. Vermutlich blockieren FK-Constraints (siehe Server-Log).",
+      },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ success: true });
 }
