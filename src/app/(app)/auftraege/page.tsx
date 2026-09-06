@@ -21,6 +21,7 @@ import {
   ExternalLink,
   UserPlus,
   Download,
+  PhoneCall,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
@@ -35,6 +36,8 @@ const ACTIVE_PAGE_SIZE = 30;
 // Location wird mit dem Verwaltungs-Kunden gejoint, sodass Standort-Auftraege
 // (jobs.customer_id = null) trotzdem einen Kundennamen anzeigen koennen.
 // Room wird ebenfalls gejoint fuer extern-Auftraege mit bekanntem Raum.
+// `*` deckt bereits `customer_contacted_at` mit ab (jobs-Spalte, Migration 211) —
+// wird fuer den "Kontaktiert"-Chip in der Liste verwendet.
 const JOBS_SELECT = "*, customer:customers(name, email), location:locations(name, customer:customers(id, name)), room:rooms(id, name), project_lead_id, appointments:job_appointments(id, start_time, assigned_to), service_reports(status)";
 import { SearchableSelect } from "@/components/searchable-select";
 import { JobNumber } from "@/components/job-number";
@@ -665,6 +668,13 @@ export default function AuftraegePage() {
             // abgeschlossenen Auftrag ist unmoeglich per DB-Trigger, aber wir
             // filtern trotzdem defensiv).
             const hasRapportDraft = isActive && !!job.service_reports?.some((r) => r.status === "entwurf");
+            // "Kontaktiert"-Chip: Kunde wurde von Team bereits kontaktiert
+            // (Follow-up-Tracking, Migration 211). Tooltip zeigt Zeitpunkt
+            // in CH-Zeit (§4 CLAUDE.md — nie ohne timeZone).
+            const contactedAt = job.customer_contacted_at;
+            const contactedTooltip = contactedAt
+              ? "Kontaktiert am " + new Date(contactedAt).toLocaleString("de-CH", { timeZone: "Europe/Zurich" })
+              : "";
             const dateText = job.start_date
               ? new Date(job.start_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })
                 + (job.end_date && job.end_date !== job.start_date ? " – " + new Date(job.end_date).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }) : "")
@@ -773,6 +783,15 @@ export default function AuftraegePage() {
                           Rapport-Entwurf
                         </span>
                       )}
+                      {contactedAt && (
+                        <span
+                          className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                          data-tooltip={contactedTooltip}
+                          aria-label={contactedTooltip}
+                        >
+                          <PhoneCall className="h-2.5 w-2.5" />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -849,6 +868,15 @@ export default function AuftraegePage() {
                         data-tooltip="Es existiert ein Rapport-Entwurf für diesen Auftrag"
                       >
                         Rapport-Entwurf
+                      </span>
+                    )}
+                    {contactedAt && (
+                      <span
+                        className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 shrink-0"
+                        data-tooltip={contactedTooltip}
+                        aria-label={contactedTooltip}
+                      >
+                        <PhoneCall className="h-2.5 w-2.5" />
                       </span>
                     )}
                   </div>

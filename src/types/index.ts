@@ -149,6 +149,11 @@ export interface Job {
   invoice_skipped_at: string | null;
   invoice_skipped_reason: string | null;
   invoice_skipped_by: string | null;
+  // Follow-up-Kontakt-Tracking (Migration 211): Team-Member markiert
+  // "Kunde wurde bereits kontaktiert" damit niemand doppelt anruft.
+  // NULL = noch nicht kontaktiert. Timestamp + User fuer Audit.
+  customer_contacted_at: string | null;
+  customer_contacted_by: string | null;
   // Partner-Anfrage Custom-Felder (Block-Antworten ohne mapTo, jsonb keyed by block.id).
   // Wird via PartnerFormAnswersCard auf der Detail-Page gerendert.
   form_answers: Record<string, unknown> | null;
