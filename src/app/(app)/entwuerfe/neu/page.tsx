@@ -176,18 +176,26 @@ export default function EntwurfNeuPage() {
 
         <hr className="border-border/50" />
 
-        {/* Kunde — SearchableSelect ODER Freitext-Fallback.
-            "Neu anlegen: X"-Option im Dropdown legt den Namen als Freitext ab
-            (customer_name); der eigentliche customers-Datensatz entsteht erst
-            beim Umwandeln in einen Auftrag (Leo 2026-09-06). */}
+        {/* Kunde — EIN Feld: Dropdown mit Freitext-Fallback im gleichen
+            Trigger. "Neu anlegen: X" legt den Namen als Freitext ab
+            (customer_name), der Text bleibt via freeTextDisplay im Trigger
+            sichtbar. Kein zweites "Firma / Kundenname"-Feld daneben — das
+            hat User verwirrt, wenn der getippte Text nach Enter aus dem
+            Dropdown ins Freitext-Feld hopste (Leo 2026-09-06). */}
         <div className="space-y-2">
           <SectionLabel>Kunde</SectionLabel>
           <SearchableSelect
             value={form.customer_id}
-            onChange={(id) => update("customer_id", id)}
+            onChange={(id) =>
+              // Bei jeder Auswahl-Aenderung (Item picken ODER X-Button):
+              // Freitext raeumen. Sonst haetten wir wieder zwei Wahrheiten
+              // in einem Feld.
+              setForm((p) => ({ ...p, customer_id: id, customer_name: "" }))
+            }
             items={customers.map((c) => ({ id: c.id, label: c.name }))}
             placeholder="Bestehenden Kunden wählen oder eintippen…"
             clearable
+            freeTextDisplay={form.customer_name}
             onCreateNew={(q) => {
               setForm((p) => ({ ...p, customer_id: "", customer_name: q }));
             }}
@@ -196,16 +204,6 @@ export default function EntwurfNeuPage() {
           />
           {!form.customer_id && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">
-                  Firma / Kundenname (falls neu)
-                </p>
-                <Input
-                  placeholder="z.B. Firma XY"
-                  value={form.customer_name}
-                  onChange={(e) => update("customer_name", e.target.value)}
-                />
-              </div>
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground/70 ml-1">Ansprechperson</p>
                 <Input
@@ -238,15 +236,18 @@ export default function EntwurfNeuPage() {
 
         <hr className="border-border/50" />
 
-        {/* Location — SearchableSelect ODER Freitext (analog Kunde).
-            "Neu anlegen: X" legt den Namen als Freitext ab; bei Umwandlung
-            landet der Text in jobs.external_address — es wird KEINE
-            locations-Row angelegt (Leo 2026-09-06). */}
+        {/* Location — EIN Feld (analog Kunde): Dropdown mit Freitext-
+            Fallback im gleichen Trigger. "Neu anlegen: X" legt den Namen
+            als Freitext ab; bei Umwandlung landet der Text in
+            jobs.external_address — es wird KEINE locations-Row angelegt
+            (Leo 2026-09-06). Text bleibt via freeTextDisplay sichtbar. */}
         <div className="space-y-2">
           <SectionLabel>Location</SectionLabel>
           <SearchableSelect
             value={form.location_id}
-            onChange={(id) => update("location_id", id)}
+            onChange={(id) =>
+              setForm((p) => ({ ...p, location_id: id, location_name: "" }))
+            }
             items={locations.map((l) => ({
               id: l.id,
               label: l.name,
@@ -254,24 +255,13 @@ export default function EntwurfNeuPage() {
             }))}
             placeholder="Location wählen oder eintippen…"
             clearable
+            freeTextDisplay={form.location_name}
             onCreateNew={(q) => {
               setForm((p) => ({ ...p, location_id: "", location_name: q }));
             }}
             createNewLabel="Externer Ort"
             commitFreeTextOnBlur
           />
-          {!form.location_id && (
-            <div className="space-y-1 pt-1">
-              <p className="text-[10px] text-muted-foreground/70 ml-1">
-                Externer Ort / Adresse (Freitext, wird nicht als Location gespeichert)
-              </p>
-              <Input
-                placeholder="z.B. Restaurant Krone, Basel"
-                value={form.location_name}
-                onChange={(e) => update("location_name", e.target.value)}
-              />
-            </div>
-          )}
         </div>
 
         <hr className="border-border/50" />

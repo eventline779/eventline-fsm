@@ -529,21 +529,27 @@ export default function EntwurfDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                    Bestehender Kunde
+                    Kunde
                   </label>
+                  {/* EIN Feld: Dropdown zeigt gewaehlten Kunden ODER
+                      Freitext (customer_name) im selben Trigger. Das
+                      separate Freitext-Input darunter war verwirrend —
+                      User dachte Text sei verloren (Leo 2026-09-06). */}
                   <SearchableSelect
                     value={draft.customer_id ?? ""}
                     onChange={(id) =>
+                      // Auswahl-Aenderung raeumt Freitext IMMER: Item picken
+                      // ODER X-Button = beide Wahrheiten koennen nicht
+                      // gleichzeitig gelten.
                       patch({
                         customer_id: id || null,
-                        // Wenn ein Kunde gewaehlt wird, koennen wir customer_name
-                        // leeren — der name kommt jetzt aus der customers-Row.
-                        customer_name: id ? null : draft.customer_name,
+                        customer_name: null,
                       })
                     }
                     items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                    placeholder="— kein Kunden-Datensatz — oder Freitext eintippen…"
+                    placeholder="Kunde wählen oder eintippen…"
                     clearable
+                    freeTextDisplay={draft.customer_name ?? ""}
                     onCreateNew={(q) =>
                       patch({ customer_id: null, customer_name: q })
                     }
@@ -551,26 +557,6 @@ export default function EntwurfDetailPage() {
                     commitFreeTextOnBlur
                   />
                 </div>
-                {!draft.customer_id && (
-                  <div>
-                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                      Firma / Kundenname (Freitext)
-                    </label>
-                    <Input
-                      // key sorgt dafuer, dass der uncontrolled Input remountet,
-                      // wenn customer_name von aussen aktualisiert wird (z.B. per
-                      // Auto-Commit aus dem SearchableSelect oben). Ohne key
-                      // wuerde die defaultValue-Aktualisierung ignoriert.
-                      key={`cust-name-${draft.customer_name ?? ""}`}
-                      defaultValue={draft.customer_name ?? ""}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== (draft.customer_name ?? "")) patch({ customer_name: v || null });
-                      }}
-                      placeholder="z.B. Firma XY"
-                    />
-                  </div>
-                )}
                 <div>
                   <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
                     Ansprechperson
@@ -622,14 +608,16 @@ export default function EntwurfDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* EIN Feld (analog Kunde): Dropdown zeigt gewaehlte Location
+                  ODER Freitext (location_name) im gleichen Trigger. Text
+                  bleibt via freeTextDisplay nach Enter/Blur sichtbar. */}
               <SearchableSelect
                 value={draft.location_id ?? ""}
                 onChange={(id) =>
                   patch({
                     location_id: id || null,
-                    // Analog Kunde: bei Auswahl einer echten Location
-                    // location_name leeren.
-                    location_name: id ? null : draft.location_name,
+                    // Item picken ODER X-Button raeumt Freitext IMMER.
+                    location_name: null,
                   })
                 }
                 items={locations.map((l) => ({
@@ -639,32 +627,15 @@ export default function EntwurfDetailPage() {
                     .filter(Boolean)
                     .join(", "),
                 }))}
-                placeholder="— keine Location — oder Freitext eintippen…"
+                placeholder="Location wählen oder eintippen…"
                 clearable
+                freeTextDisplay={draft.location_name ?? ""}
                 onCreateNew={(q) =>
                   patch({ location_id: null, location_name: q })
                 }
                 createNewLabel="Externer Ort"
                 commitFreeTextOnBlur
               />
-              {!draft.location_id && (
-                <div className="pt-1">
-                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                    Externer Ort / Adresse (Freitext, wird nicht als Location gespeichert)
-                  </label>
-                  <Input
-                    // key analog zu customer_name-Input: Remount bei externem
-                    // location_name-Update (z.B. Auto-Commit aus dem Select).
-                    key={`loc-name-${draft.location_name ?? ""}`}
-                    defaultValue={draft.location_name ?? ""}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v !== (draft.location_name ?? "")) patch({ location_name: v || null });
-                    }}
-                    placeholder="z.B. Restaurant Krone, Basel"
-                  />
-                </div>
-              )}
               {draft.location && (
                 <p className="text-xs text-muted-foreground">
                   {[draft.location.address_street, draft.location.address_zip, draft.location.address_city]

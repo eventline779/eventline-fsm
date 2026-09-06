@@ -50,6 +50,14 @@ interface Props {
    *  Nur einsetzen wenn onCreateNew billig ist (State-Set / Patch),
    *  NICHT wenn onCreateNew navigiert oder ein Modal oeffnet. Default false. */
   commitFreeTextOnBlur?: boolean;
+  /** Committed Freitext, den der Parent aus einem separaten Feld (z.B.
+   *  draft.customer_name) verwaltet. Wenn KEIN Item ueber `value` gewaehlt
+   *  ist, wird dieser Text im Trigger angezeigt — der User sieht also
+   *  seinen "Neu anlegen"-Eintrag weiterhin im gleichen Feld statt in
+   *  einem zweiten daneben. So werden Dropdown + Freitext-Fallback zu
+   *  EINEM Feld verschmolzen. Visuell wird der Freitext leicht kursiv
+   *  gerendert, damit "nicht in DB" erkennbar bleibt. */
+  freeTextDisplay?: string;
 }
 
 function matchesWordStart(text: string, q: string): boolean {
@@ -72,9 +80,15 @@ export function SearchableSelect({
   onCreateNew,
   createNewLabel = "Neu anlegen",
   commitFreeTextOnBlur = false,
+  freeTextDisplay,
 }: Props) {
   const selectedItem = items.find((i) => i.id === value) ?? null;
-  const [search, setSearch] = useState(selectedItem?.label ?? "");
+  // Anzeige-Fallback wenn KEIN Item gewaehlt ist: der vom Parent
+  // verwaltete Freitext (siehe Props-Doku freeTextDisplay). So bleibt der
+  // "Neu anlegen"-Text nach dem Commit im Trigger sichtbar — der User
+  // sieht sein Getipptes weiterhin im gleichen Feld.
+  const displayFallback = selectedItem?.label ?? freeTextDisplay ?? "";
+  const [search, setSearch] = useState(displayFallback);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -88,10 +102,12 @@ export function SearchableSelect({
   // Wenn value von außen zurückgesetzt wird (z.B. durch Form-Reset oder Job-Type-Wechsel),
   // synchronisiere die Anzeige. Auch auf .label reagieren — sonst zeigt der
   // Input weiterhin das alte Label wenn das Item selber umbenannt wurde
-  // (gleiche id, neuer label-Text).
+  // (gleiche id, neuer label-Text). freeTextDisplay in den Deps damit ein
+  // frisch committeter Freitext (parent hat customer_name gesetzt) sofort
+  // im Trigger erscheint statt "" anzuzeigen.
   useEffect(() => {
-    setSearch(selectedItem?.label ?? "");
-  }, [selectedItem?.id, selectedItem?.label]);
+    setSearch(selectedItem?.label ?? freeTextDisplay ?? "");
+  }, [selectedItem?.id, selectedItem?.label, freeTextDisplay]);
 
   // Beim Oeffnen Suche leeren damit ALLE Items im Dropdown sichtbar sind.
   // Sonst filtert der Match-Algorithmus gegen das Label des aktuellen Werts
@@ -161,24 +177,28 @@ export function SearchableSelect({
         const anyPartialMatch =
           trimmed.length > 0 &&
           latestItems.some((i) => matchesWordStart(i.label, trimmed));
+        const currentFallback = selectedItem?.label ?? freeTextDisplay ?? "";
         if (
           latestCommit &&
           latestOnCreateNew &&
           trimmed.length > 0 &&
           !anyPartialMatch &&
-          trimmed !== (selectedItem?.label ?? "")
+          trimmed !== currentFallback
         ) {
           latestOnCreateNew(trimmed);
-        }
-        // Wenn beim Verlassen kein Match, Anzeige auf letzten gültigen Wert zurücksetzen
-        if (search !== (selectedItem?.label ?? "")) {
-          setSearch(selectedItem?.label ?? "");
+          // Text im Trigger sichtbar lassen — der Parent schreibt gleich
+          // freeTextDisplay=trimmed zurueck, aber bis dahin nicht "" zeigen.
+          if (search !== trimmed) setSearch(trimmed);
+        } else if (search !== currentFallback) {
+          // Kein Commit noetig / moeglich — Anzeige auf letzten gueltigen
+          // Wert (Item-Label oder Freitext) zuruecksetzen.
+          setSearch(currentFallback);
         }
       }
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [search, selectedItem?.label]);
+  }, [search, selectedItem?.label, freeTextDisplay]);
 
   const CAP = 50;
   const { filtered, hiddenCount } = useMemo(() => {
@@ -247,7 +267,7 @@ export function SearchableSelect({
       }
     } else if (e.key === "Escape") {
       setOpen(false);
-      setSearch(selectedItem?.label ?? "");
+      setSearch(selectedItem?.label ?? freeTextDisplay ?? "");
     }
   }
 
@@ -373,7 +393,14 @@ export function SearchableSelect({
         aria-activedescendant={open ? activeOptionId : undefined}
         className={`flex h-9 w-full rounded-xl border bg-background pl-3 pr-8 py-1 text-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 ${
           !searchable ? "cursor-pointer select-none" : ""
-        } ${active ? "border-foreground/60 font-medium" : "hover:border-foreground/30"}`}
+        } ${active ? "border-foreground/60 font-medium" : "hover:border-foreground/30"} ${
+          // Kursiv wenn der Trigger geschlossen ist UND kein Item gewaehlt
+          // ist UND Text angezeigt wird — dann ist der Text ein
+          // "Neu anlegen"-Freitext (kein DB-Eintrag). Visueller Hinweis:
+          // "das ist noch nicht verknuepft". Waehrend der User tippt (open)
+          // greift die Regel bewusst nicht.
+          !open && !selectedItem && !!search ? "italic" : ""
+        }`}
       />
       {clearable && value ? (
         <button
