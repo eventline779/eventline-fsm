@@ -22,13 +22,41 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
 import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
-import { localDateIso } from "@/lib/swiss-time";
+import { localDateIso, localTimeHM } from "@/lib/swiss-time";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus } from "lucide-react";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, LogIn, LogOut, Coffee, PencilLine } from "lucide-react";
 import type { TicketType } from "@/types";
 
 type Step = "pick" | "form";
 type StempelMode = "korrektur" | "vergessen";
+/** Preset-Slots fuer Stempel-Aenderungs-Tickets — jeder Slot steuert Modus + Prefill. */
+type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
+
+/** Preset-Definitionen: Icon, Label, Kurzbeschreibung. */
+const STEMPEL_PRESETS: Array<{ id: StempelPreset; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { id: "no_in",      label: "Vergessen einzustempeln", desc: "Zu Schichtbeginn nicht gestempelt",     icon: LogIn      },
+  { id: "no_out",     label: "Vergessen auszustempeln", desc: "Am Ende der Schicht nicht gestempelt",  icon: LogOut     },
+  { id: "wrong_time", label: "Zeit war falsch",         desc: "Start- oder Endzeit stimmt nicht",       icon: PencilLine },
+  { id: "no_break",   label: "Pause vergessen",         desc: "30-min Pause wurde nicht abgezogen",    icon: Coffee     },
+];
+
+/** Klick-Vorschlaege fuer das Grund-Textfeld. */
+const STEMPEL_TEXTBAUSTEINE: string[] = [
+  "Vergessen einzustempeln",
+  "Zeit falsch eingegeben",
+  "Schicht länger gedauert",
+];
+
+/** ISO-timestamptz (UTC) → 'YYYY-MM-DDTHH:MM' in Europe/Zurich, kompatibel
+ *  mit den datetime-local-Helpers (dtDate/dtTime) im Stempel-Form. Wird zum
+ *  Vorbelegen beim Inline-"Korrigieren"-Button genutzt — nach Zurich lokal,
+ *  damit der User exakt "seine" Zeiten sieht wie in der Liste. */
+function isoToZurichDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-CA", { timeZone: "Europe/Zurich" }); // YYYY-MM-DD
+  const time = d.toLocaleTimeString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit", hour12: false }); // HH:MM
+  return `${date}T${time}`;
+}
 
 interface Props {
   open: boolean;
@@ -39,6 +67,18 @@ interface Props {
    *  Aenderung-Form zu springen, ohne dass der User erst die Karte
    *  klicken muss. */
   initialType?: TicketType;
+  /** Optional: Stempel-Aenderung-Form direkt mit einem bestehenden
+   *  time_entry vorbelegen (Inline-Context von /stempelzeiten aus dem
+   *  Row-"Korrigieren"-Button). Setzt mode='korrektur', waehlt den
+   *  Eintrag, und legt clock_in/clock_out als vorgeschlagene
+   *  Start-/End-Zeit ins Formular. User aendert nur die falschen
+   *  Minuten und tippt den Grund. */
+  initialData?: {
+    timeEntryId?: string;
+    clockIn?: string;         // ISO
+    clockOut?: string | null; // ISO oder null (Preset='no_out': Ende leer)
+    jobId?: string | null;
+  };
 }
 
 const TYPES: { id: TicketType; label: string; description: string; icon: React.ComponentType<{ className?: string }>; tone: TypePickerTone }[] = [
@@ -48,7 +88,7 @@ const TYPES: { id: TicketType; label: string; description: string; icon: React.C
   { id: "material",          label: "Material",         description: "Etwas einkaufen — Genehmigung",      icon: Package, tone: "red"    },
 ];
 
-export function NewTicketModal({ open, onClose, onCreated, initialType }: Props) {
+export function NewTicketModal({ open, onClose, onCreated, initialType, initialData }: Props) {
   const supabase = createClient();
   const [step, setStep] = useState<Step>(initialType ? "form" : "pick");
   const [type, setType] = useState<TicketType | null>(initialType ?? null);
@@ -77,7 +117,13 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
 
   // Stempel-Aenderung-spezifisch.
   const [stempelMode, setStempelMode] = useState<StempelMode>("korrektur");
-  const [timeEntries, setTimeEntries] = useState<Array<{ id: string; clock_in: string; clock_out: string | null; job_label: string | null }>>([]);
+  // Preset-Slot: welche der 4 Kacheln oben ist gewaehlt. null = noch nichts
+  // ausgewaehlt, Formular wartet auf User-Klick. Der Preset bestimmt Modus
+  // + Prefills; nach Klick kann der User Felder frei anpassen. Wird von
+  // initialData/initialType-Prefill (z.B. /stempelzeiten "Korrigieren"-Row-
+  // Button) als 'wrong_time' vorbelegt.
+  const [stempelPreset, setStempelPreset] = useState<StempelPreset | null>(null);
+  const [timeEntries, setTimeEntries] = useState<Array<{ id: string; clock_in: string; clock_out: string | null; job_id: string | null; job_label: string | null }>>([]);
   const [stempel, setStempel] = useState({
     time_entry_id: "",
     neu_start: "",        // datetime-local
@@ -101,7 +147,11 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
 
   // Beim Oeffnen Reset; bei Stempel-Auswahl die letzten Stempel-Eintraege laden.
   // Wenn initialType gesetzt ist, ueberspringen wir den Picker und landen
-  // direkt im Form fuer den Type.
+  // direkt im Form fuer den Type. Wenn initialData einen time_entry mitliefert
+  // (Inline-Context von /stempelzeiten Row-"Korrigieren"), wird der
+  // Korrektur-Modus vorausgewaehlt und Start/Ende bereits mit den bestehenden
+  // Zeiten befuellt — User muss nur die falschen Minuten korrigieren und den
+  // Grund tippen.
   useEffect(() => {
     if (!open) {
       setStep(initialType ? "form" : "pick");
@@ -119,11 +169,31 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
       setAnalysisIssues([]);
       setAnalysisDone(false);
       setStempelMode("korrektur");
+      setStempelPreset(null);
       setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", beschreibung: "", grund: "" });
       setMaterialItems([{ artikel: "", menge: "1", betrag_chf: "" }]);
       setMaterialAuftrag("");
       setDevice("");
+      return;
     }
+    // open===true — Prefill fuer Stempel-Aenderung wenn initialData mitkommt.
+    // Ein direkt uebergebener time_entry ist per Definition ein "Zeit war
+    // falsch"-Flow (Inline-Row-Button in /stempelzeiten). Preset markieren
+    // damit die Preset-Kachel oben visuell aktiv ist und der User sofort
+    // in den Ende-Zeit-Feldern anpasst.
+    if (initialType === "stempel_aenderung" && initialData?.timeEntryId) {
+      setStempelMode("korrektur");
+      setStempelPreset("wrong_time");
+      setStempel({
+        time_entry_id: initialData.timeEntryId,
+        neu_start: initialData.clockIn ? isoToZurichDatetimeLocal(initialData.clockIn) : "",
+        neu_end: initialData.clockOut ? isoToZurichDatetimeLocal(initialData.clockOut) : "",
+        job_id: initialData.jobId ?? "",
+        beschreibung: "",
+        grund: "",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Stempel-Eintraege laden wenn Typ Stempel-Aenderung gewaehlt wird.
@@ -177,6 +247,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
             id: e.id,
             clock_in: e.clock_in,
             clock_out: e.clock_out,
+            job_id: e.job_id ?? null,
             job_label: job ? `INT-${job.job_number}` : (e.description || "Andere Arbeit"),
           };
         }),
@@ -237,6 +308,106 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
     if (t === "beleg") setTitle("Beleg-Erstattung");
     if (t === "stempel_aenderung") setTitle("Stempelzeit-Änderung");
     if (t === "material") setTitle("Material-Anfrage");
+  }
+
+  /**
+   * Preset waehlen — setzt Modus + Prefill fuer den entsprechenden Flow.
+   * Wird von den 4 Preset-Kacheln oben im Stempel-Form aufgerufen. Presets
+   * sind smart: sie suchen den passenden time_entry (juengster offener,
+   * letzter geschlossener) und fuellen die Felder mit sinnvollen Defaults —
+   * User muss idealerweise nur den Grund tippen + evtl. Minuten korrigieren.
+   *
+   * WICHTIG: Titel/Grund werden mit Preset-spezifischem Textbaustein
+   * vorbelegt, aber nur wenn der User noch nichts eingetippt hat (nicht
+   * ueberschreiben wenn Preset gewechselt wird).
+   */
+  function applyPreset(preset: StempelPreset) {
+    setStempelPreset(preset);
+    const now = new Date();
+    const todayIso = localDateIso(now);
+    const nowTime = localTimeHM(now);
+    const nowLocal = `${todayIso}T${nowTime}`;
+
+    if (preset === "no_in") {
+      // Vergessen einzustempeln: Modus 'vergessen', Datum=heute, Start=00:00
+      // (User muss Zeit korrigieren), Ende=jetzt. Auftrag-Preselect via
+      // letztem Job (falls verfuegbar). '00:00' als Start-Default statt leer,
+      // damit new Date(...).toISOString() beim Submit nicht Invalid Date
+      // wirft — User sieht 00:00 und aendert auf tatsaechliche Start-Zeit.
+      setStempelMode("vergessen");
+      const lastJobId = timeEntries[0]?.job_id ?? "";
+      setStempel({
+        time_entry_id: "",
+        neu_start: `${todayIso}T00:00`,
+        neu_end: nowLocal,
+        job_id: lastJobId,
+        beschreibung: "",
+        grund: "Vergessen einzustempeln",
+      });
+      return;
+    }
+
+    if (preset === "no_out") {
+      // Vergessen auszustempeln: juengster OFFENER Eintrag (clock_out=null).
+      // Faellt auf 'no_in' zurueck wenn kein offener Eintrag existiert.
+      const openEntry = timeEntries.find((e) => e.clock_out === null);
+      if (!openEntry) {
+        toast.info("Kein offener Stempel-Eintrag — nutze stattdessen 'Vergessen einzustempeln'");
+        applyPreset("no_in");
+        return;
+      }
+      setStempelMode("korrektur");
+      setStempel({
+        time_entry_id: openEntry.id,
+        neu_start: isoToZurichDatetimeLocal(openEntry.clock_in),
+        neu_end: nowLocal,
+        job_id: openEntry.job_id ?? "",
+        beschreibung: "",
+        grund: "Vergessen auszustempeln",
+      });
+      return;
+    }
+
+    if (preset === "wrong_time") {
+      // Zeit war falsch: Modus 'korrektur', User waehlt Eintrag; die
+      // neu_start/neu_end werden beim Eintrag-Wechsel unten in der
+      // SearchableSelect-onChange mit dem AKTUELLEN clock_in/clock_out
+      // des gewaehlten Eintrags vorbelegt — User muss nur die falschen
+      // Minuten aendern.
+      setStempelMode("korrektur");
+      setStempel({
+        time_entry_id: "",
+        neu_start: "",
+        neu_end: "",
+        job_id: "",
+        beschreibung: "",
+        grund: "Zeit falsch eingegeben",
+      });
+      return;
+    }
+
+    if (preset === "no_break") {
+      // Pause vergessen: letzter geschlossener Eintrag, neu_end um 30 Minuten
+      // gekuerzt (Pause abziehen). RPC koennte spaeter in zwei Rows
+      // splitten — fuer jetzt reduzieren wir nur die Gesamtzeit.
+      const closedEntry = timeEntries.find((e) => e.clock_out !== null);
+      if (!closedEntry || !closedEntry.clock_out) {
+        toast.info("Kein abgeschlossener Stempel-Eintrag gefunden");
+        setStempelPreset(null);
+        return;
+      }
+      const endMinus30Ms = new Date(closedEntry.clock_out).getTime() - 30 * 60_000;
+      setStempelMode("korrektur");
+      setStempel({
+        time_entry_id: closedEntry.id,
+        neu_start: isoToZurichDatetimeLocal(closedEntry.clock_in),
+        neu_end: isoToZurichDatetimeLocal(new Date(endMinus30Ms).toISOString()),
+        job_id: closedEntry.job_id ?? "",
+        beschreibung: "",
+        grund: "Pause (30 min) nicht abgezogen",
+      });
+      return;
+    }
   }
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -731,42 +902,95 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
 
           {type === "stempel_aenderung" && (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStempelMode("korrektur")}
-                  className={stempelMode === "korrektur" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
-                >
-                  Bestehenden Eintrag korrigieren
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStempelMode("vergessen")}
-                  className={stempelMode === "vergessen" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
-                >
-                  Vergessen einzustempeln
-                </button>
+              {/* Preset-Row (4 Kacheln): steuert Modus + Prefills. Statt
+                  binaerem korrektur/vergessen-Toggle kann der User direkt
+                  in Klartext sagen was schief lief — das Formular macht
+                  den Rest. */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Was ist passiert? *</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {STEMPEL_PRESETS.map((p) => {
+                    const Icon = p.icon;
+                    const active = stempelPreset === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPreset(p.id)}
+                        aria-pressed={active}
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                          active
+                            ? "border-red-500/50 bg-red-500/[0.08]"
+                            : "border-border bg-card hover:border-foreground/30 hover:bg-muted/40"
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${active ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium leading-tight">{p.label}</p>
+                          <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-tight">{p.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {stempelMode === "korrektur" && (
+              {/* Bis der User einen Preset waehlt, freundlicher Hinweis
+                  statt leerer Fels-Wand. */}
+              {!stempelPreset && (
+                <div className="px-4 py-5 rounded-xl border border-dashed bg-muted/20 text-center">
+                  <Clock className="h-6 w-6 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-sm font-medium">Wähle oben aus, was passiert ist</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Wir füllen dann die passenden Felder automatisch aus.
+                  </p>
+                </div>
+              )}
+
+              {/* Korrektur-Formular (mode=korrektur) — aktiv bei
+                  'no_out' / 'wrong_time' / 'no_break'. */}
+              {stempelPreset && stempelMode === "korrektur" && (
                 <>
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground/70 ml-1">Welcher Eintrag? *</p>
                     {timeEntries.length === 0 ? (
                       <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
-                        Keine Stempel-Einträge in den letzten 30 Tagen — nutze stattdessen „Vergessen einzustempeln".
+                        Keine Stempel-Einträge gefunden — nutze „Vergessen einzustempeln".
                       </div>
                     ) : (
                       <SearchableSelect
                         value={stempel.time_entry_id}
-                        onChange={(v) => setStempel({ ...stempel, time_entry_id: v })}
-                        items={timeEntries.map((e) => ({
-                          id: e.id,
-                          // timeZone Europe/Zurich zwingend — SSR (UTC) wuerde
-                          // sonst Schichten kurz nach Mitternacht als Vortag
-                          // labeln, was die Stempel-Auswahl irrefuehrt.
-                          label: `${new Date(e.clock_in).toLocaleString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} — ${e.job_label ?? "—"}`,
-                        }))}
+                        onChange={(v) => {
+                          // Bei Wechsel: neu_start/neu_end mit den AKTUELLEN
+                          // Werten des Eintrags vorbelegen — User aendert nur
+                          // die falschen Minuten, statt Datum + Zeit komplett
+                          // neu zu tippen. Fuer 'no_out' (clock_out=null)
+                          // bleibt das bereits gesetzte 'jetzt' als Ende
+                          // erhalten.
+                          const entry = timeEntries.find((e) => e.id === v);
+                          setStempel((prev) => ({
+                            ...prev,
+                            time_entry_id: v,
+                            neu_start: entry ? isoToZurichDatetimeLocal(entry.clock_in) : prev.neu_start,
+                            neu_end: entry?.clock_out
+                              ? isoToZurichDatetimeLocal(entry.clock_out)
+                              : prev.neu_end,
+                            job_id: entry?.job_id ?? prev.job_id,
+                          }));
+                        }}
+                        items={timeEntries.map((e) => {
+                          const inLabel = new Date(e.clock_in).toLocaleString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                          const outLabel = e.clock_out
+                            ? " – " + new Date(e.clock_out).toLocaleString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
+                            : " (noch offen)";
+                          return {
+                            id: e.id,
+                            // timeZone Europe/Zurich zwingend — SSR (UTC) wuerde
+                            // sonst Schichten kurz nach Mitternacht als Vortag
+                            // labeln, was die Stempel-Auswahl irrefuehrt.
+                            label: `${inLabel}${outLabel} — ${e.job_label ?? "—"}`,
+                          };
+                        })}
                         placeholder="Stempel-Eintrag auswählen…"
                         clearable={false}
                       />
@@ -791,8 +1015,51 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
                 </>
               )}
 
-              {stempelMode === "vergessen" && (
+              {/* Vergessen-Formular (mode=vergessen) — aktiv bei 'no_in'. */}
+              {stempelPreset && stempelMode === "vergessen" && (
                 <>
+                  {/* Zeitraum-Autofill: letzte bis zu 3 Time-Entries als
+                      Klick-Chips ("Heute 06.09 09:00–17:00 · INT-1234").
+                      Klick uebernimmt Datum + Start/End + Job. Loeschen von
+                      Tippen. Nur zeigen wenn Eintraege vorhanden. */}
+                  {timeEntries.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/70 ml-1">Von letzter Schicht übernehmen</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {timeEntries.slice(0, 3).map((e) => {
+                          const inDate = new Date(e.clock_in);
+                          const iso = localDateIso(inDate);
+                          const inTime = localTimeHM(inDate);
+                          const outTime = e.clock_out ? localTimeHM(new Date(e.clock_out)) : null;
+                          const today = localDateIso(new Date());
+                          const yesterday = localDateIso(new Date(Date.now() - 86_400_000));
+                          const dayLabel = iso === today
+                            ? "Heute"
+                            : iso === yesterday
+                              ? "Gestern"
+                              : inDate.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit" });
+                          return (
+                            <button
+                              key={e.id}
+                              type="button"
+                              onClick={() => {
+                                setStempel((prev) => ({
+                                  ...prev,
+                                  neu_start: isoToZurichDatetimeLocal(e.clock_in),
+                                  neu_end: e.clock_out ? isoToZurichDatetimeLocal(e.clock_out) : prev.neu_end,
+                                  job_id: e.job_id ?? prev.job_id,
+                                }));
+                              }}
+                              className="px-2.5 py-1 rounded-lg border border-border bg-muted/30 text-[11px] hover:bg-muted/60 hover:border-foreground/30 transition-colors"
+                            >
+                              {dayLabel} {inTime}{outTime ? `–${outTime}` : ""} · {e.job_label ?? "—"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
@@ -851,16 +1118,33 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
                 </>
               )}
 
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Grund der Änderung *</p>
-                <textarea
-                  value={stempel.grund}
-                  onChange={(e) => setStempel({ ...stempel, grund: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
-                  placeholder="warum gehört das angepasst…"
-                />
-              </div>
+              {/* Grund-Textarea + 3 Textbaustein-Klick-Vorschlaege (nur
+                  wenn Preset gewaehlt — sonst hat der User noch nichts
+                  ausgewaehlt und die Textarea waere verwirrend). */}
+              {stempelPreset && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Grund der Änderung *</p>
+                  <textarea
+                    value={stempel.grund}
+                    onChange={(e) => setStempel({ ...stempel, grund: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
+                    placeholder="warum gehört das angepasst…"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {STEMPEL_TEXTBAUSTEINE.map((tb) => (
+                      <button
+                        key={tb}
+                        type="button"
+                        onClick={() => setStempel((prev) => ({ ...prev, grund: tb }))}
+                        className="px-2 py-0.5 rounded-md border border-border bg-muted/30 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+                      >
+                        {tb}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -993,7 +1277,12 @@ export function NewTicketModal({ open, onClose, onCreated, initialType }: Props)
               </button>
             )}
             <button type="button" onClick={submit} disabled={saving} className="kasten kasten-red flex-1">
-              {saving ? "Erstellt…" : "Ticket einreichen"}
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving
+                ? "Wird gesendet…"
+                : type === "stempel_aenderung"
+                  ? "Ticket senden"
+                  : "Ticket einreichen"}
             </button>
           </div>
         </div>
