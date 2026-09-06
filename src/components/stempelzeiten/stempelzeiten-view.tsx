@@ -21,18 +21,24 @@
  *   - Teamleiter (roles.scope='team'|'all'): nur die eigenen Team-Mitglieder
  *     (profiles.team_lead_id = current_user).
  *   - Normal-User (scope='self'): kein Dropdown, nur eigene Ansicht.
+ * Erste Dropdown-Option ist "Alle Personen" (Sentinel-Id ALL_USERS_SENTINEL,
+ * URL-Value `?user=all`) — laesst die time_entries-Query ohne user_id-Filter
+ * los und ueberlaesst die Sichtbarkeit strikt RLS: Admin sieht alle Rows,
+ * Teamleiter nur eigenes Team (sees_user()), Normal-User nur eigene.
  * Sobald ein Fremd-User gewaehlt ist, filtert die Query strikt auf
  * `user_id = selectedUserId`. RLS (time_entries_select_team via sees_user())
  * haerte das serverseitig ab; ein Teamleiter, der jemanden ausserhalb seines
  * Teams anfragt, bekommt eine leere Liste. Fremd-User-Zeilen zeigen den
- * Namen des MA (Avatar + Farbcode).
+ * Namen des MA (Avatar + Farbcode) — im "Alle"-Modus gilt das analog fuer
+ * jede Row.
  *
- * Persistenz: URL `?user=<uuid>` + localStorage `stempelzeiten-user`.
+ * Persistenz: URL `?user=<uuid|all>` + localStorage `stempelzeiten-user`.
  * Eigene hat kein URL-Param (Default). Legacy `?scope=team|alle` wird
  * toleriert (ignoriert). Ein sanitizer-Effect entfernt ungueltige
  * selectedUserId-Werte (z.B. alte Links ohne aktuelle Rechte), sobald die
  * Rolle geladen ist — sonst wuerde der User auf einer leeren Liste ohne
- * Ausweg festhaengen (kein Dropdown-Button zum Zurueckwechseln).
+ * Ausweg festhaengen (kein Dropdown-Button zum Zurueckwechseln). "Alle"
+ * ohne canSelectOther-Recht wird ebenso ausgemistet.
  *
  * DST-Safety: KPI-Tages-Buckets via per-Minute-Bucketize (Europe/Zurich),
  * damit Nacht-Schichten korrekt auf zwei Tage verteilt werden. Die
@@ -135,6 +141,12 @@ interface NormalizedEntry {
 /** Range-Fenster in Tagen — hart. Wer weiter zurueck schauen will, nutzt
  *  die Lohn-Monatsstunden oder /hr?tab=loehne. */
 const DEFAULT_RANGE_DAYS = 30;
+
+/** Sentinel-Id fuer "Alle Personen" im Person-Dropdown. Kein UUID → kann
+ *  nicht mit einem realen Profil kollidieren. Der URL-Param verwendet den
+ *  kompakten Alias `all` (schoenere Shareable-Links: `?user=all`). */
+const ALL_USERS_SENTINEL = "__all__";
+const ALL_USERS_URL_VALUE = "all";
 
 function pad2(n: number): string { return String(n).padStart(2, "0"); }
 
@@ -399,25 +411,32 @@ export function StempelzeitenView() {
   const canSelectOther = canSeeAll
     || ((roleScope === "team" || roleScope === "all") && teamMemberIds.length > 0);
 
-  // URL-Param `?user=<uuid>`, Fallback localStorage, Default null (= eigene).
+  // URL-Param `?user=<uuid|all>`, Fallback localStorage, Default null (= eigene).
   // `useState`-Initializer lest die URL SYNCHRON, damit der erste Load
   // gleich die richtige Query feuert (kein Flicker "eigen → Fremd").
   // Legacy `?scope=team|alle` wird ignoriert — der User-Dropdown loest die
   // frueheren Segmente ab.
+  // Sentinel `__all__` (URL: `all`) → "Alle Personen"-Modus: kein user_id-
+  // Filter in der Query, RLS entscheidet welche Rows sichtbar sind.
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const [selectedUserId, setSelectedUserId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const fromUrl = searchParams.get("user");
+    if (fromUrl === ALL_USERS_URL_VALUE) return ALL_USERS_SENTINEL;
     if (fromUrl && UUID_RE.test(fromUrl)) return fromUrl;
     try {
       const stored = localStorage.getItem("stempelzeiten-user");
+      if (stored === ALL_USERS_SENTINEL) return ALL_USERS_SENTINEL;
       if (stored && UUID_RE.test(stored)) return stored;
     } catch { /* SSR/private mode → ignorieren */ }
     return null;
   });
 
+  // isAllUsersView: Sentinel gewaehlt → RLS-basierte "alle sichtbaren".
   // isOwnView: keine Fremd-Auswahl (oder man selbst gewaehlt → normalisiert).
-  const isOwnView = !selectedUserId || selectedUserId === currentUserId;
+  // Sentinel ist per Definition weder currentUserId noch null → isOwnView=false.
+  const isAllUsersView = selectedUserId === ALL_USERS_SENTINEL;
+  const isOwnView = !isAllUsersView && (!selectedUserId || selectedUserId === currentUserId);
 
   // Auftragsnummer-Filter (URL-persistent via ?auftrag=XXXXX). Der Text im
   // Input ist entkoppelt vom "committeten" Filter — Live-Suche mit 300ms
@@ -519,13 +538,17 @@ export function StempelzeitenView() {
 
   // User-Auswahl setzen + persistieren (URL + localStorage).
   // - null / self → kein URL-Param (haelt die URL clean, "Eigene" ist default).
+  // - Sentinel (Alle) → URL-Param `?user=all`, localStorage = Sentinel.
   // - `history.replaceState` (nicht router.replace) — reiner visueller Update,
   //   kein Next.js Route-Transition (spart Re-Mount und respektiert den
   //   Ticket-System-Workflow der parallel laufen kann).
   // - Legacy `?scope=`-Param wird bei jedem Wechsel gleich mitentfernt.
   const setSelectedUserIdAndPersist = useCallback((next: string | null) => {
     // Selbst gewaehlt = eigene Ansicht → auf null normalisieren.
-    const normalized = next && next !== currentUserId ? next : null;
+    // Sentinel (Alle) bleibt als-is (kein Normalisierungs-Fall).
+    const normalized = next === ALL_USERS_SENTINEL
+      ? ALL_USERS_SENTINEL
+      : next && next !== currentUserId ? next : null;
     setSelectedUserId(normalized);
     try {
       if (normalized) localStorage.setItem("stempelzeiten-user", normalized);
@@ -533,13 +556,19 @@ export function StempelzeitenView() {
     } catch { /* private mode */ }
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    if (normalized) url.searchParams.set("user", normalized);
-    else url.searchParams.delete("user");
+    if (normalized === ALL_USERS_SENTINEL) {
+      url.searchParams.set("user", ALL_USERS_URL_VALUE);
+    } else if (normalized) {
+      url.searchParams.set("user", normalized);
+    } else {
+      url.searchParams.delete("user");
+    }
     url.searchParams.delete("scope"); // Legacy-Param mitentfernen.
     window.history.replaceState({}, "", url.toString());
   }, [currentUserId]);
 
   // Sanitizer: ungueltige selectedUserId aufraeumen, sobald Rolle geladen ist.
+  //  - Sentinel (Alle) → nur behalten wenn User Fremd-Ansicht darf, sonst raus.
   //  - self → auf null normalisieren (isOwnView deckt das ohnehin ab, aber
   //    URL/Storage sauber halten).
   //  - Admin: alle usersMap-Ids OK (wenn usersMap noch leer, warten).
@@ -549,6 +578,10 @@ export function StempelzeitenView() {
   useEffect(() => {
     if (!roleLoaded) return;
     if (!selectedUserId) return;
+    if (selectedUserId === ALL_USERS_SENTINEL) {
+      if (!canSelectOther) setSelectedUserIdAndPersist(null);
+      return;
+    }
     if (selectedUserId === currentUserId) {
       setSelectedUserIdAndPersist(null);
       return;
@@ -564,8 +597,8 @@ export function StempelzeitenView() {
       return;
     }
     setSelectedUserIdAndPersist(null);
-  }, [roleLoaded, selectedUserId, currentUserId, canSeeAll, roleScope,
-      teamMemberIds, usersMap, setSelectedUserIdAndPersist]);
+  }, [roleLoaded, selectedUserId, currentUserId, canSeeAll, canSelectOther,
+      roleScope, teamMemberIds, usersMap, setSelectedUserIdAndPersist]);
 
   // 30-Tage-Cutoff hart — kein UI-Umschalter. Aus dem Render heraus stabil.
   const fromIso = useMemo(
@@ -619,6 +652,25 @@ export function StempelzeitenView() {
     setJobFilterEntries([]);
     setJobLookupState("idle");
 
+    // "Alle Personen" — Sentinel gewaehlt. Query bewusst OHNE user_id-Filter:
+    // RLS entscheidet welche Rows sichtbar sind (Admin=alle, Teamleiter=Team
+    // + self via sees_user(), Normal-User=nur eigene — letzterer landet hier
+    // faktisch nicht, weil Sanitizer + canSelectOther-Gate den Sentinel-Modus
+    // fuer scope='self' unterbinden). user_id kommt mit, damit die Row-
+    // Darstellung ueber usersMap wie im Fremd-User-Modus den MA-Namen zeigt.
+    if (isAllUsersView) {
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
+        .gte("clock_in", fromTs)
+        .order("clock_in", { ascending: false });
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
+      setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
+      setOwnEntries([]);
+      setLoading(false);
+      return;
+    }
+
     // Eigene Ansicht (Default oder Selbst-Auswahl im Dropdown).
     // RLS-Bug-Schutz: Admins haetten via RLS Zugriff auf ALLE time_entries —
     // ohne expliziten user_id-Filter zeigt "Eigene Sicht" auch fremde.
@@ -656,7 +708,7 @@ export function StempelzeitenView() {
     setLoading(false);
   }, [
     supabase, currentUserId, fromIso, jobFilterActive, jobFilterNumber,
-    isOwnView, selectedUserId,
+    isAllUsersView, isOwnView, selectedUserId,
   ]);
 
   // Legitimer cascading-Effect: `load` haengt an isOwnView + selectedUserId
@@ -792,21 +844,29 @@ export function StempelzeitenView() {
 
   // Sub-Header-Text pro Ansicht. Aussagekraeftig genug, dass der Nutzer beim
   // Aufmachen sofort weiss "was schaue ich hier gerade an".
-  const viewedUserName: string | null = !isOwnView && selectedUserId
+  const viewedUserName: string | null = !isOwnView && !isAllUsersView && selectedUserId
     ? (usersMap.get(selectedUserId) ?? null)
     : null;
-  const scopeSubLabel: string = viewedUserName
-    ? `Einträge von ${viewedUserName}`
-    : "Deine Einträge";
+  const scopeSubLabel: string = isAllUsersView
+    ? "Alle Personen"
+    : viewedUserName
+      ? `Einträge von ${viewedUserName}`
+      : "Deine Einträge";
 
-  // Dropdown-Options: Admin bekommt alle aktiven MA (ausser Partner) via
-  // usersMap. Teamleiter bekommt nur die eigenen Team-Mitglieder.
-  // Eigener Name steht oben mit "(du)"-Marker damit der User visuell sieht,
-  // welche Person aktuell "man selbst" ist — Auswahl darauf normalisiert
-  // aber auf null (isOwnView), s.o. setSelectedUserIdAndPersist.
+  // Dropdown-Options: Erste Option "Alle Personen" (Sentinel-Id) — zeigt
+  // dann alle Rows die der User via RLS sehen darf. Danach der eigene Name
+  // mit "(du)"-Marker (Auswahl normalisiert auf null / isOwnView, s.o.
+  // setSelectedUserIdAndPersist). Danach die Kollegen: Admin bekommt alle
+  // aktiven MA (ausser Partner) via usersMap, Teamleiter nur die eigenen
+  // Team-Mitglieder.
   const dropdownItems = useMemo<SelectItem[]>(() => {
     if (!currentUserId || !canSelectOther) return [];
     const items: SelectItem[] = [];
+    items.push({
+      id: ALL_USERS_SENTINEL,
+      label: "Alle Personen",
+      sub: canSeeAll ? "Alle Mitarbeiter" : "Dein Team",
+    });
     const selfName = usersMap.get(currentUserId);
     if (selfName) items.push({ id: currentUserId, label: `${selfName} (du)` });
     const others: SelectItem[] = [];
@@ -1012,9 +1072,11 @@ export function StempelzeitenView() {
             <p className="text-sm text-muted-foreground mt-1">
               {jobFilterActive
                 ? `Auf INT-${jobFilterNumber} wurde bisher nicht gestempelt.`
-                : isOwnView
-                  ? `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
-                  : `${viewedUserName ?? "Dieser Mitarbeiter"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
+                : isAllUsersView
+                  ? `In den letzten ${DEFAULT_RANGE_DAYS} Tagen wurde nicht gestempelt.`
+                  : isOwnView
+                    ? `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
+                    : `${viewedUserName ?? "Dieser Mitarbeiter"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
             </p>
           </CardContent>
         </Card>
