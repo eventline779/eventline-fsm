@@ -36,6 +36,20 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isApi = pathname.startsWith("/api/");
 
+  // NOTBREMSE — /dev-exit: Impersonation-Cookie direkt in der Middleware
+  // loeschen und zum Dashboard umleiten. Vor allen anderen Handlern, damit
+  // ein Redirect-Loop zwischen (app) und /partner sicher aufgebrochen wird.
+  // URL im Browser tippen: /dev-exit
+  if (pathname === "/dev-exit") {
+    const res = NextResponse.redirect(new URL("/dashboard", req.url));
+    res.cookies.set(IMPERSONATE_COOKIE, "", {
+      path: "/",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+    return res;
+  }
+
   // Write-Guard: nur fuer API + mutierende Methoden + wenn Cookie gesetzt.
   if (isApi && WRITE_METHODS.has(req.method)) {
     const impersonating = req.cookies.get(IMPERSONATE_COOKIE)?.value;
