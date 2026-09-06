@@ -26,6 +26,13 @@ import { cookies } from "next/headers";
 
 export const TRUSTED_DEVICE_COOKIE = "eventline_trusted_device";
 
+/** Developer-Mode / View-As Cookie. Enthaelt die auth-user-id des User-
+ *  Kontos, in dessen Perspektive der aktive Admin gerade agiert. Wird nur
+ *  akzeptiert wenn (a) der echte User Admin ist UND (b) sein Profile-Flag
+ *  developer_mode_enabled=true ist. Sonst ignoriert der Server das Cookie
+ *  und behandelt die Session als normal. */
+export const IMPERSONATE_COOKIE = "eventline_impersonate_user_id";
+
 /** SHA-256-Hash eines Tokens — Server vergleicht damit gegen die DB. Wir
  *  speichern niemals raw Tokens (nur Hashes), damit ein DB-Leak nicht
  *  alle Geraete kompromittiert. */
@@ -47,19 +54,91 @@ export function deviceFingerprint(ua: string | null | undefined, userId: string)
   return hashToken((normalizeUserAgent(ua ?? "") || "unknown") + "|" + userId);
 }
 
-export async function requireUser() {
+/** Liest das Impersonation-Cookie und validiert es gegen die DB. Nur wenn
+ *  der ECHTE User Admin ist UND sein Profile developer_mode_enabled=true
+ *  hat, gilt die Impersonation. Alles andere → null (Cookie wird ignoriert).
+ *
+ *  Zurueck: {impersonatedUserId, isImpersonating}. impersonatedUserId ist
+ *  die auth-user-id des Ziel-Kontos, in dessen Perspektive der Admin
+ *  gerade sehen will. */
+async function resolveImpersonation(realUserId: string): Promise<{
+  impersonatedUserId: string | null;
+  isImpersonating: boolean;
+}> {
+  const store = await cookies();
+  const targetId = store.get(IMPERSONATE_COOKIE)?.value ?? null;
+  if (!targetId || targetId === realUserId) {
+    return { impersonatedUserId: null, isImpersonating: false };
+  }
+  // Real user muss Admin + developer_mode_enabled sein — sonst ist der
+  // Cookie fake und wir ignorieren ihn. Nutzt Admin-Client damit RLS die
+  // Profile-Lookup nicht kaputt macht.
+  const admin = createAdminClient();
+  const { data: realProfile } = await admin
+    .from("profiles")
+    .select("role, developer_mode_enabled")
+    .eq("id", realUserId)
+    .maybeSingle();
+  if (
+    !realProfile ||
+    realProfile.role !== "admin" ||
+    realProfile.developer_mode_enabled !== true
+  ) {
+    return { impersonatedUserId: null, isImpersonating: false };
+  }
+  // Target muss existieren.
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", targetId)
+    .maybeSingle();
+  if (!targetProfile) {
+    return { impersonatedUserId: null, isImpersonating: false };
+  }
+  return { impersonatedUserId: targetId, isImpersonating: true };
+}
+
+type RequireUserOk = {
+  user: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>["auth"]["getUser"]>>["data"]["user"]>;
+  /** Die id die der Endpoint fuer User-scoped Queries nutzen SOLL —
+   *  impersoniert wenn Dev-Mode aktiv, sonst = user.id. */
+  effectiveUserId: string;
+  isImpersonating: boolean;
+  error: null;
+};
+type RequireUserFail = {
+  user: null;
+  effectiveUserId: null;
+  isImpersonating: false;
+  error: NextResponse;
+};
+type RequireUserResult = RequireUserOk | RequireUserFail;
+
+export async function requireUser(): Promise<RequireUserResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "Nicht authentifiziert" },
         { status: 401 },
       ),
     };
   }
-  return { user, error: null };
+  const { impersonatedUserId, isImpersonating } = await resolveImpersonation(user.id);
+  // BACKWARD-COMPAT: user bleibt der ECHTE eingeloggte User (RLS-Kontext
+  // stimmt weiterhin, kein Cascading-Bruch in bestehenden Endpoints).
+  // NEU: effectiveUserId ist die id die der Endpoint fuer User-scoped
+  // Queries nutzen SOLL — impersoniert wenn Dev-Mode aktiv, sonst = user.id.
+  return {
+    user,
+    effectiveUserId: impersonatedUserId ?? user.id,
+    isImpersonating,
+    error: null,
+  };
 }
 
 export async function requireAdmin() {

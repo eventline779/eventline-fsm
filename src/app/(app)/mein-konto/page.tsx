@@ -31,6 +31,7 @@ import { MeinKontoCard } from "@/components/einstellungen/mein-konto-card";
 import { BenachrichtigungenTab } from "@/components/einstellungen/benachrichtigungen-tab";
 import { IcalFeedBlock } from "@/components/kalender/ical-feed-block";
 import { PasskeysCard } from "@/components/einstellungen/passkeys-card";
+import { DeveloperModeCard } from "@/components/einstellungen/developer-mode-card";
 import { TabsNav } from "@/components/ui/tabs-nav";
 
 type Tab = "profil" | "sicherheit" | "benachrichtigungen" | "kalender";
@@ -113,6 +114,8 @@ export default function MeinKontoPage() {
       {tab === "sicherheit" && (
         <div className="max-w-3xl mx-auto">
           <PasskeysCard />
+          {/* Admin-only — self-renders null wenn nicht Admin. */}
+          <DeveloperModeCard />
         </div>
       )}
 

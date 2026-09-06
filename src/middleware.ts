@@ -2,34 +2,69 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Cache-Control fuer authenticated App-Pages.
+ * Zwei Aufgaben in einer Middleware:
  *
- * Problem: Vercel-Edge cached prerendered HTML der "use client"-Pages
- * (~5min Stale-Time). Nach einem Deploy sieht ein User die alte HTML
- * mit alten Chunk-Hashes → laedt aus dem SW-Cache die alten JS-Chunks
- * → sieht alte App-Version bis er manuell hart-reloaded.
+ * 1) Cache-Control fuer authenticated App-Pages (Non-API).
+ *    Verhindert dass Vercel-Edge prerendered HTML der "use client"-Pages
+ *    cached und User nach Deploy die alte HTML mit alten Chunk-Hashes
+ *    sehen. 'private, no-store' zwingt jeden Request zum Origin.
  *
- * Fix: 'private, no-store' wins gegenueber Vercel-Edge-Caching. Die
- * Edge speichert NICHT — jeder Request geht zum Origin und holt die
- * aktuelle HTML mit Chunk-Verweisen zum aktuellen Build. Browser cached
- * sie pro Tab kurz, aber bei Reload (egal ob User-trigger oder
- * SW-Auto-Reload) wird die aktuelle HTML geholt.
+ * 2) Write-Guard fuer Developer-Mode / View-As.
+ *    Wenn der Impersonation-Cookie gesetzt ist, blockiert die Middleware
+ *    ALLE mutierenden HTTP-Methoden (POST/PUT/PATCH/DELETE) — sonst
+ *    koennte der Admin waehrend Impersonation echte Daten des simulierten
+ *    Users veraendern. Nur die Impersonation-Steuer-Endpoints selbst
+ *    bleiben schreibbar (sonst kaeme man nicht mehr raus).
  *
- * Ausschluesse via matcher:
- *  - /_next/static/*  : content-hashed, eigene Cache-Policy
- *  - /api/* + /auth/* : Server haben eigene Cache-Headers
- *  - sw.js, manifest.json, favicon, Bilder/Fonts : eigene Cache-Policy
- *    bzw. statisch im /public-Bundle
- *  - /offline         : statische Fallback-Page, darf gecached werden
+ * Der matcher deckt jetzt AUCH /api/* ab (frueher ausgeschlossen), damit
+ * der Write-Guard greift. Cache-Control wird nur fuer Non-API-Requests
+ * gesetzt.
  */
-export function middleware(_req: NextRequest) {
+
+const IMPERSONATE_COOKIE = "eventline_impersonate_user_id";
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+// Endpoints die auch WAEHREND Impersonation schreiben duerfen:
+//   - /api/dev/impersonate (stop/switch selber)
+//   - /api/auth/* (nicht ausschliessen — Login/Logout darf immer)
+const WRITE_ALLOWLIST = [
+  "/api/dev/impersonate",
+  "/api/auth/",
+];
+
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const isApi = pathname.startsWith("/api/");
+
+  // Write-Guard: nur fuer API + mutierende Methoden + wenn Cookie gesetzt.
+  if (isApi && WRITE_METHODS.has(req.method)) {
+    const impersonating = req.cookies.get(IMPERSONATE_COOKIE)?.value;
+    if (impersonating) {
+      const allowed = WRITE_ALLOWLIST.some((p) => pathname.startsWith(p));
+      if (!allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Im Developer-Mode gesperrt (View-As aktiv) — Aenderungen werden nicht in die DB geschrieben. Impersonation beenden um wieder zu schreiben.",
+            code: "developer_mode_write_blocked",
+          },
+          { status: 423 }, // 423 Locked
+        );
+      }
+    }
+  }
+
   const res = NextResponse.next();
-  res.headers.set("Cache-Control", "private, no-store, must-revalidate");
+  if (!isApi) {
+    res.headers.set("Cache-Control", "private, no-store, must-revalidate");
+  }
   return res;
 }
 
 export const config = {
   matcher: [
-    "/((?!api|auth|_next/static|_next/image|sw\\.js|manifest\\.json|favicon\\.ico|offline|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf)).*)",
+    // Deckt Non-API-Pages ab (fuer Cache-Control) und /api/* (fuer
+    // Write-Guard). Statische Assets bleiben aussen vor.
+    "/((?!_next/static|_next/image|sw\\.js|manifest\\.json|favicon\\.ico|offline|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf)).*)",
   ],
 };
