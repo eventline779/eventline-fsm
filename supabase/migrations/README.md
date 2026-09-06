@@ -3,6 +3,25 @@
 Nummerierte SQL-Migrations. Neu = grösste vorhandene Nummer +1. Supabase
 CLI führt sie in aufsteigender Reihenfolge aus.
 
+## Namens-Konvention
+
+Format: `NNN_kebab-case-name.sql`
+
+- **`NNN`** — dreistellige, strikt inkrementelle Nummer (führende Nullen bis 099).
+- **`_`** — genau ein Unterstrich als Trenner.
+- **`kebab-case-name`** — kurzer, sprechender Name in Kleinbuchstaben, Wörter mit `_` getrennt (SQL-üblich).
+- **`.sql`** — Endung.
+
+Keine Suffix-Buchstaben (`126b`), keine Datums-Prefixe, keine doppelten Nummern. Die Nummer ist die einzige Ordnungs-Achse — Supabase sortiert lexikografisch, und `supabase_migrations.schema_migrations` speichert genau diesen Dateinamen.
+
+### Ausnahme: `126b_partner_form_template.sql`
+
+Diese Migration bricht die Konvention (Suffix `b` statt reiner Nummer). Sie wurde **nachträglich** zwischen die bereits auf Prod applied-en Migrationen `126_documents_visible_to_job_members.sql` und `127_...` eingezogen, um das `partner_form_template`-Schema anzulegen.
+
+Ein nachträgliches Umbenennen (z. B. auf `218_...`) wurde bewusst **nicht** gemacht: der alte Dateiname steht bereits in der `supabase_migrations.schema_migrations`-Historie auf Prod. Ein Rename würde die Historie inkonsistent machen (CLI würde die Migration erneut anwenden zu wollen bzw. den alten Eintrag als „verwaist" führen), und ein manuelles Umschreiben der Historie ist destruktiv und über mehrere Environments (Prod / Backup-Region / Dev) fehleranfällig.
+
+Deshalb: **`126b` bleibt so stehen**, ist die einzige dokumentierte Ausnahme, und **künftige Migrationen sind strikt inkrementell nach obiger Konvention** (`NNN_name.sql`). Keine weiteren Buchstaben-Suffixe, auch nicht „nur diesmal".
+
 ## Idempotenz (Pflicht)
 
 Jede Migration muss re-runnable sein — CI wendet sie auf frische DBs an,
