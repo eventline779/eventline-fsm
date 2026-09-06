@@ -82,8 +82,8 @@ export default function MeinKontoPage() {
   ];
 
   return (
-    <div className="space-y-10">
-      <div>
+    <div>
+      <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Mein Konto</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Persönliche Einstellungen — gilt nur für dich, nicht für die ganze Firma.
@@ -95,6 +95,7 @@ export default function MeinKontoPage() {
         active={tab}
         onChange={(k) => selectTab(k as Tab)}
         ariaLabel="Konto-Bereiche"
+        className="mb-12"
       />
 
       {tab === "profil" && (
