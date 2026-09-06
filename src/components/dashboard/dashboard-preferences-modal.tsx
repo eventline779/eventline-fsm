@@ -207,9 +207,12 @@ interface EmptySlot {
 }
 
 /** Berechnet leere Slots in einem 12-col-Grid basierend auf der aktuellen
- *  items-Reihenfolge und den Span-Overrides. `draggedId` wird vor der
- *  Berechnung rausgefiltert — die Slots zeigen also wo der User seine
- *  Kachel HINLEGEN kann (Zustand NACH dem Drop, ohne die dragged Kachel).
+ *  items-Reihenfolge und den Span-Overrides. Slots zeigen wo im AKTUELLEN
+ *  Layout Platz ist — die dragged Kachel bleibt sichtbar an ihrer alten
+ *  Position (Placeholder), damit das Grid beim Anheben STABIL bleibt und
+ *  nicht sofort nachrutscht. Der User zieht seine Kachel dann bewusst
+ *  entweder auf eine andere Kachel (Swap/Move) oder in einen der wirklich
+ *  freien Slots.
  *
  *  Algorithmus:
  *   - Zeilen-Position `colPos` mod 12 trackt wo wir in der aktuellen Zeile
@@ -219,14 +222,17 @@ interface EmptySlot {
  *   - Nach der Schleife: wenn die letzte Zeile nicht voll ist, emit
  *     trailing slot.
  *   - Slots mit span < 4 werden gedroppt (kein Widget kann rein).
+ *
+ *  `beforeIndex` bezieht sich auf den Index im uebergebenen items-Array
+ *  (NICHT auf ein gefiltertes Array). Der Drop-Handler muss dann ggf.
+ *  einen off-by-one Adjust machen (siehe handleDragEnd).
  */
 function computeEmptySlots(
   items: PreferenceItem[],
   spanOverrides: Record<string, number>,
   mobile: boolean,
-  draggedId: string | null,
 ): EmptySlot[] {
-  const src = draggedId ? items.filter((i) => i.id !== draggedId) : items;
+  const src = items;
   const slots: EmptySlot[] = [];
   let colPos = 0;
   src.forEach((item, idx) => {
@@ -486,9 +492,11 @@ export function DashboardPreferencesModal({
         let newVisible: PreferenceItem[];
 
         // (1) Drop auf leeren Slot: `slot:before-<N>` oder `slot:end`.
-        //     beforeIndex ist im VISIBLE-GEFILTERTEN Array (ohne dragged),
-        //     kommt aus computeEmptySlots das mit visibleItems arbeitet.
-        //     Also splice-out dragged, splice-in an beforeIndex direkt.
+        //     beforeIndex kommt aus computeEmptySlots(visible) OHNE Dragged-
+        //     Filter (Grid ist waehrend Drag stabil, dragged bleibt drin).
+        //     Nach splice-out dragged muss insertAt off-by-one adjustet
+        //     werden wenn oldIdx < beforeIndex — sonst landet dragged eine
+        //     Position zu weit rechts.
         if (overStr.startsWith("slot:")) {
           const filtered = visible.filter((i) => i.id !== activeStr);
           let insertAt = filtered.length;
@@ -497,7 +505,8 @@ export function DashboardPreferencesModal({
             if (m) {
               const parsed = parseInt(m[1], 10);
               if (Number.isFinite(parsed)) {
-                insertAt = Math.max(0, Math.min(filtered.length, parsed));
+                const adjusted = oldIdx < parsed ? parsed - 1 : parsed;
+                insertAt = Math.max(0, Math.min(filtered.length, adjusted));
               }
             }
           }
@@ -631,20 +640,21 @@ export function DashboardPreferencesModal({
 
   const renderList = useMemo<Array<PreferenceItem | EmptySlot>>(() => {
     if (!activeId) return visibleItems;
-    const filtered = visibleItems.filter((i) => i.id !== activeId);
-    // Slots computen (basierend auf visible-items ohne dragged) und filtern:
-    // nur Slots die MINDESTENS die dragged-Breite haben, sonst wuerde
-    // der User in einen zu kleinen Slot droppen und die Kachel wuerde
-    // beim Reflow in eine ganz andere Zeile fallen.
+    // WICHTIG: dragged Kachel wird NICHT rausgefiltert — sie bleibt visuell
+    // als Placeholder an ihrer alten Position, damit das Grid beim Anheben
+    // stabil bleibt (Leo-Feedback: 'andere sachen die man gar nicht drueber
+    // hovert werden reingeschoben'). Slots werden gegen das AKTUELLE Layout
+    // (mit dragged drin) berechnet — sie zeigen also nur wirklich freie
+    // Positionen.
     const draggedSpan = spanNumberFor(activeId, spanOverrides, mobilePreview);
-    const slots = computeEmptySlots(visibleItems, spanOverrides, mobilePreview, activeId)
+    const slots = computeEmptySlots(visibleItems, spanOverrides, mobilePreview)
       .filter((s) => s.span >= draggedSpan);
-    if (slots.length === 0) return filtered;
-    // Slots werden vor `beforeIndex` (im gefilterten Array) eingefuegt.
-    // Sortiere absteigend nach beforeIndex, damit ein splice-insert die
-    // Indizes der noch-nicht-eingefuegten Slots nicht verschiebt.
+    if (slots.length === 0) return visibleItems;
+    // Slots werden vor `beforeIndex` im items-Array eingefuegt. Absteigend
+    // sortieren damit splice-insert die noch-nicht-eingefuegten Indizes
+    // nicht verschiebt.
     const sortedSlots = [...slots].sort((a, b) => b.beforeIndex - a.beforeIndex);
-    const arr: Array<PreferenceItem | EmptySlot> = [...filtered];
+    const arr: Array<PreferenceItem | EmptySlot> = [...visibleItems];
     for (const slot of sortedSlots) {
       arr.splice(slot.beforeIndex, 0, slot);
     }
