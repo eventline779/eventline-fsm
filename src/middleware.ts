@@ -9,12 +9,13 @@ import type { NextRequest } from "next/server";
  *    cached und User nach Deploy die alte HTML mit alten Chunk-Hashes
  *    sehen. 'private, no-store' zwingt jeden Request zum Origin.
  *
- * 2) Write-Guard fuer Developer-Mode / View-As.
- *    Wenn der Impersonation-Cookie gesetzt ist, blockiert die Middleware
- *    ALLE mutierenden HTTP-Methoden (POST/PUT/PATCH/DELETE) — sonst
- *    koennte der Admin waehrend Impersonation echte Daten des simulierten
- *    Users veraendern. Nur die Impersonation-Steuer-Endpoints selbst
- *    bleiben schreibbar (sonst kaeme man nicht mehr raus).
+ * 2) NOTBREMSE /dev-exit: Impersonation-Cookie loeschen + redirect.
+ *
+ * (Frueher gab es hier einen Write-Guard der alle POST/PUT/PATCH/DELETE
+ *  waehrend Impersonation mit 423 blockte. Leo hat das entfernt: Admins
+ *  duerfen sowieso alle Daten sehen und aendern — wenn er als User X
+ *  arbeitet und dort einen Fehler direkt korrigieren will, soll das
+ *  gehen, nicht mit 423 abgewiesen werden.)
  *
  * Der matcher deckt jetzt AUCH /api/* ab (frueher ausgeschlossen), damit
  * der Write-Guard greift. Cache-Control wird nur fuer Non-API-Requests
@@ -22,15 +23,6 @@ import type { NextRequest } from "next/server";
  */
 
 const IMPERSONATE_COOKIE = "eventline_impersonate_user_id";
-const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-// Endpoints die auch WAEHREND Impersonation schreiben duerfen:
-//   - /api/dev/impersonate (stop/switch selber)
-//   - /api/auth/* (nicht ausschliessen — Login/Logout darf immer)
-const WRITE_ALLOWLIST = [
-  "/api/dev/impersonate",
-  "/api/auth/",
-];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -48,24 +40,6 @@ export function middleware(req: NextRequest) {
       expires: new Date(0),
     });
     return res;
-  }
-
-  // Write-Guard: nur fuer API + mutierende Methoden + wenn Cookie gesetzt.
-  if (isApi && WRITE_METHODS.has(req.method)) {
-    const impersonating = req.cookies.get(IMPERSONATE_COOKIE)?.value;
-    if (impersonating) {
-      const allowed = WRITE_ALLOWLIST.some((p) => pathname.startsWith(p));
-      if (!allowed) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Im Developer-Mode gesperrt (View-As aktiv) — Aenderungen werden nicht in die DB geschrieben. Impersonation beenden um wieder zu schreiben.",
-            code: "developer_mode_write_blocked",
-          },
-          { status: 423 }, // 423 Locked
-        );
-      }
-    }
   }
 
   const res = NextResponse.next();

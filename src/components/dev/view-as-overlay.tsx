@@ -24,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, ChevronDown, LogOut, Loader2, Search } from "lucide-react";
+import { Eye, ChevronDown, LogOut, Loader2, Search, Power } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Candidate {
@@ -164,6 +164,31 @@ export function ViewAsOverlay() {
       window.location.reload();
     } catch {
       toast.error("Beenden fehlgeschlagen");
+      setLoading(false);
+    }
+  }
+
+  /** Developer Mode komplett ausschalten — auch von hier aus, damit der
+   *  Admin nicht zurueck in die Team-Einstellungen navigieren muss. Server
+   *  loescht dabei auch das Impersonation-Cookie (siehe /api/dev/toggle).
+   *  Danach: reload damit Overlay + evtl. Portal-Zustand sauber sind. */
+  async function disableDevMode() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/dev/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
+      const json = (await res.json()) as { success?: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? "Fehler");
+      if (window.location.pathname.startsWith("/partner")) {
+        window.location.href = "/dashboard";
+        return;
+      }
+      window.location.reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Fehler");
       setLoading(false);
     }
   }
@@ -343,6 +368,24 @@ export function ViewAsOverlay() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Footer — Developer Mode direkt vom Panel aus komplett
+                ausschalten. Kein Umweg ueber die Team-Einstellungen. */}
+            <div
+              className="px-3 py-2 border-t"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <button
+                type="button"
+                onClick={disableDevMode}
+                disabled={loading}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground rounded-md transition-colors"
+                style={{ cursor: loading ? "wait" : "pointer" }}
+              >
+                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Power className="h-3 w-3" />}
+                Developer Mode ausschalten
+              </button>
             </div>
           </div>
         ) : (
