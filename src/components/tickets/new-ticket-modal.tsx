@@ -298,7 +298,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
         .order("clock_in", { ascending: false })
         .limit(100);
       if (entriesErr) {
-        toast.error("Stempel-Eintraege konnten nicht geladen werden: " + entriesErr.message);
+        toast.error("Stempel-Einträge konnten nicht geladen werden: " + entriesErr.message);
         return;
       }
       if (!entries || entries.length === 0) {
@@ -1186,7 +1186,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                       <p className="text-[10px] text-muted-foreground/70 ml-1">Projekt *</p>
                       {projects.length === 0 ? (
                         <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
-                          Keine genehmigten Projekte vorhanden — waehle stattdessen Auftrag oder Andere Arbeit.
+                          Keine genehmigten Projekte vorhanden — wähle stattdessen Auftrag oder Andere Arbeit.
                         </div>
                       ) : (
                         <SearchableSelect
@@ -1299,9 +1299,9 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                       <div className="text-xs text-amber-800 dark:text-amber-200">
                         <p className="font-semibold">Zeitraum bereits abgerechnet</p>
                         <p className="mt-0.5">
-                          Der gewaehlte Tag liegt nach der Abrechnungs-Deadline
-                          (5. des Folgemonats). Nachtraege sind hier nicht mehr
-                          moeglich — bitte an die Buchhaltung wenden.
+                          Der gewählte Tag liegt nach der Abrechnungs-Deadline
+                          (5. des Folgemonats). Nachträge sind hier nicht mehr
+                          möglich — bitte an die Buchhaltung wenden.
                         </p>
                       </div>
                     </div>
