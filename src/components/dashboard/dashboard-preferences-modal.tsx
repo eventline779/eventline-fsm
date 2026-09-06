@@ -28,11 +28,16 @@
  *   2) Hidden Widgets (aus overrides.hidden ∩ catalog) am Ende, in
  *      overrides.widget_order-Reihenfolge, danach Registry-Reihenfolge.
  *
- * Steuerung:
- *   - Reihenfolge via echtem Drag-and-Drop (@dnd-kit/core + sortable).
- *     PointerSensor + KeyboardSensor -> Touch/Maus/Screenreader out of
- *     the box (CLAUDE.md § "robust by default"). Fallback ohne Maus:
- *     Tastatur-Pfeile ueber den Drag-Handle des fokussierten Widgets.
+ * Steuerung (Smooth-DnD, refactored 2026-09):
+ *   - Reihenfolge via @dnd-kit/core + sortable MIT DragOverlay. Grund:
+ *     das Preview-Grid hat variable Spans (col-span-4/6/12); ohne Overlay
+ *     springt das gezogene Element beim Layout-Reflow — mit Overlay bleibt
+ *     ein blasser Platzhalter an der Ursprungsposition und ein Ghost folgt
+ *     dem Cursor. Alle anderen Kacheln gleiten in ihre neue Position
+ *     (cubic-bezier(0.25, 1, 0.5, 1), 220ms).
+ *   - PointerSensor (activation-distance 6px, sonst wuerde ein Klick auf
+ *     den Auge-Button faelschlicherweise als Drag gewertet) + KeyboardSensor
+ *     fuer Screenreader/Tastatur-Nutzer.
  *   - Sichtbarkeit via Eye/EyeOff-icon-btn im Widget-Kopf; hidden Widgets
  *     bleiben in der Reihenfolge, werden aber ausgegraut + mit Overlay
  *     markiert (User sieht wo sie wieder auftauchen wuerden).
@@ -41,16 +46,17 @@
  *   - Auto-Save debounced 400ms bei Aenderung — kein "Speichern"-Button;
  *     Server-Fehler landen als Toast (CLAUDE.md § "sofortiges Ladefeedback").
  *   - "Auf Standard zuruecksetzen" = DELETE /api/dashboard/overrides.
- *   - "Fertig" flusht pending Save und triggert Parent-Refetch.
+ *   - "Fertig" schliesst das Modal SOFORT und flusht pending Save im
+ *     Hintergrund; onSaved() feuert erst nach abgeschlossenem PUT damit
+ *     der Parent-Refetch die aktuellen Overrides sieht.
  *
  * Vorschau vs. echtes Dashboard:
  *   Die Preview-Bausteine sind Layout-Vorschauen: Titel + Icon + Span-
  *   Groesse (col-span-4 / col-span-6 / col-span-12), NICHT die volle
  *   Widget-Renderung. Damit bleibt das Modal schnell (keine API-Requests
  *   pro Widget) und passt auch bei kleinem Viewport in den Modal-Rahmen.
- *   Die Span-Klassen sind eine 1:1-Kopie aus dashboard/page.tsx —
- *   Aenderungen dort muessen hier mit-nachgezogen werden (Konstante
- *   PREVIEW_SPAN, siehe unten).
+ *   Die Span-Klassen kommen aus dashboard-widgets.ts — Single-Source-of-
+ *   Truth, dieselbe Konstante die dashboard/page.tsx nutzt.
  *
  * Server-Roundtrips:
  *   - GET  /api/dashboard/overrides  (nur beim Oeffnen)
@@ -81,12 +87,15 @@ import {
 } from "lucide-react";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -155,6 +164,15 @@ function spanFor(id: string, mobile: boolean): string {
   return widgetSpanClass(id);
 }
 
+/** Gemeinsame Transition-Kurve fuer DnD-Reflow + Drop-Animation. Cubic-Bezier
+ *  ist ease-out (schnell raus, sanft rein) — matcht wie Notion/Linear ihre
+ *  Sortable-Elemente animieren. Duration bewusst kurz (220ms), damit der
+ *  Reflow direkt reagiert, aber nicht ruckelt. */
+const DND_TRANSITION = {
+  duration: 220,
+  easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+} as const;
+
 export function DashboardPreferencesModal({
   open,
   onClose,
@@ -166,6 +184,13 @@ export function DashboardPreferencesModal({
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mobilePreview, setMobilePreview] = useState(false);
+  // activeId + activeSize werden waehrend Drag gesetzt, damit die DragOverlay-
+  // Ghost-Kachel die exakte Groesse der Ursprungskachel bekommt (sonst rendert
+  // Overlay in einer beliebigen Default-Groesse und "hopst" beim Drag-Start).
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeSize, setActiveSize] = useState<{ w: number; h: number } | null>(
+    null,
+  );
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -304,7 +329,19 @@ export function DashboardPreferencesModal({
     });
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    const id = event.active.id as string;
+    setActiveId(id);
+    // Ursprungs-Rect merken → DragOverlay-Ghost hat exakt die Zielgroesse
+    // (initial = vor Layout-Shift, sonst waere die Groesse schon 0 wenn
+    // andere Kacheln in die Luecke rutschen).
+    const rect = event.active.rect.current.initial;
+    if (rect) setActiveSize({ w: rect.width, h: rect.height });
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
+    setActiveSize(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setItems((prev) => {
@@ -315,6 +352,11 @@ export function DashboardPreferencesModal({
       scheduleSave(next);
       return next;
     });
+  }
+
+  function handleDragCancel(_event: DragCancelEvent) {
+    setActiveId(null);
+    setActiveSize(null);
   }
 
   async function resetToDefault() {
@@ -340,16 +382,23 @@ export function DashboardPreferencesModal({
     }
   }
 
-  async function handleFinish() {
-    // Pending Save flushen, danach Parent-Refetch triggern und schliessen.
+  function handleFinish() {
+    // Modal SOFORT schliessen (kein blockierender Spinner). Wenn noch ein
+    // debounced Save pending ist, schicken wir ihn im Hintergrund und
+    // triggern onSaved erst NACH dem PUT — sonst refetcht der Parent
+    // /api/dashboard vor dem Update und sieht kurz die alten Overrides.
+    const flush = saveTimer.current !== null;
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
       dirtyRef.current = false;
-      await persist(items);
     }
-    onSaved();
     onClose();
+    if (flush) {
+      void persist(items).then(() => onSaved());
+    } else {
+      onSaved();
+    }
   }
 
   // dnd-kit Sensoren: PointerSensor mit kleiner Aktivierungs-Distanz, damit
@@ -361,9 +410,13 @@ export function DashboardPreferencesModal({
   );
 
   const sortableIds = useMemo(() => items.map((i) => i.id), [items]);
+  const activeItem = useMemo(
+    () => (activeId ? items.find((i) => i.id === activeId) ?? null : null),
+    [activeId, items],
+  );
 
   return (
-    <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="3xl">
+    <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="4xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           Widgets verschieben, ausblenden oder Reihenfolge ändern — nur für dich sichtbar.
@@ -389,8 +442,15 @@ export function DashboardPreferencesModal({
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          // pointerWithin ist praeziser als closestCenter bei variablen
+          // Grid-Spans (col-span-4 vs col-span-12): das Hover-Target ist
+          // immer die Kachel unter dem Pointer, nicht die naechstliegende
+          // Mitte — sonst schwankt das Drop-Target waehrend der User
+          // ueber eine breite Kachel hinweg zieht.
+          collisionDetection={pointerWithin}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
             <div
@@ -407,11 +467,38 @@ export function DashboardPreferencesModal({
                     item={it}
                     spanClass={spanFor(it.id, mobilePreview)}
                     onToggle={() => toggleHidden(it.id)}
+                    isActive={activeId === it.id}
                   />
                 ))}
               </div>
             </div>
           </SortableContext>
+
+          {/* DragOverlay = die frei schwebende Ghost-Kachel. Sie erbt Groesse
+              der Original-Kachel (via activeSize) und rendert mit Lift-Shadow
+              + leichter Scale — signalisiert "wird bewegt". dropAnimation
+              gleitet die Ghost sanft in die Zielposition, danach uebernimmt
+              die echte Kachel (die dann bereits an der neuen Position steht). */}
+          <DragOverlay
+            zIndex={1200}
+            dropAnimation={{
+              duration: DND_TRANSITION.duration,
+              easing: DND_TRANSITION.easing,
+            }}
+          >
+            {activeItem && activeSize ? (
+              <PreviewTileVisual
+                item={activeItem}
+                style={{
+                  width: activeSize.w,
+                  height: activeSize.h,
+                  cursor: "grabbing",
+                  transform: "scale(1.03)",
+                  boxShadow: "0 18px 42px rgba(0, 0, 0, 0.28)",
+                }}
+              />
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -430,7 +517,6 @@ export function DashboardPreferencesModal({
           Auf Standard zurücksetzen
         </button>
         <button type="button" onClick={handleFinish} className="kasten kasten-red">
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Fertig
         </button>
       </div>
@@ -439,63 +525,36 @@ export function DashboardPreferencesModal({
 }
 
 // ---------------------------------------------------------------------------
-// Preview-Kachel — sortierbar via dnd-kit; state-driven Hover (CLAUDE.md §3).
-// Die Kachel bildet die Groesse des echten Widgets nach (col-span…), zeigt
-// Icon + Titel und den Sichtbarkeits-Toggle. Der Drag-Handle ist die ganze
-// Kachel-Oberflaeche minus des Auge-Buttons — so kann der User intuitiv
-// irgendwo auf das Widget greifen.
+// PreviewTileVisual — reine Darstellungs-Kachel. Wird sowohl von der
+// sortable Wrapper-Component als auch vom DragOverlay verwendet, damit
+// Ghost + Original 1:1 identisch aussehen (keine "Sprung"-Effekte beim
+// Wechsel zwischen Sortable-Kachel und Overlay-Kachel).
 // ---------------------------------------------------------------------------
 
-function SortablePreviewTile({
+function PreviewTileVisual({
   item,
-  spanClass,
-  onToggle,
+  style,
+  className,
+  extraTop,
 }: {
   item: PreferenceItem;
-  spanClass: string;
-  onToggle: () => void;
+  style?: React.CSSProperties;
+  className?: string;
+  /** Slot fuer die Sortable-Wrapper — z.B. dnd-kit listeners auf dem
+   *  Kachel-Body. Overlay laesst das leer. */
+  extraTop?: React.ReactNode;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
-  const [hover, setHover] = useState(false);
-
-  // CSS.Transform.toString liefert translate3d(...) mit korrekten Werten,
-  // inkl. Fallback wenn transform=null (kein aktives Dragging).
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 20 : undefined,
-    opacity: isDragging ? 0.85 : 1,
-    // Kachel-Hintergrund: hidden = ausgegraut, hover = leichter Boost.
-    backgroundColor: item.hidden
-      ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
-      : hover
-        ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
-        : "var(--card)",
-    // Grip-Cursor nur wenn nicht gerade geklickt (Auge etc handelt eigenen Cursor).
-    cursor: isDragging ? "grabbing" : "grab",
-    // Touch-Action: pan-y ist Standard-Scroll; wir muessen es hier
-    // deaktivieren, sonst schluckt der Browser den Drag-Gesture auf Mobile.
-    touchAction: "none",
-    boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.18)" : undefined,
-  };
-
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className={`${spanClass} relative rounded-lg border transition-colors select-none`}
-      {...attributes}
-      {...listeners}
+      className={`relative rounded-lg border select-none ${className ?? ""}`}
+      style={{
+        backgroundColor: item.hidden
+          ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
+          : "var(--card)",
+        ...style,
+      }}
     >
+      {extraTop}
       <div className="flex items-start gap-2 p-2.5 min-h-16">
         <span
           className="mt-0.5 shrink-0 text-muted-foreground/60"
@@ -514,24 +573,6 @@ function SortablePreviewTile({
           <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
           <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
         </div>
-        {/* Auge-Button: eigenes Pointer-Handling, damit Klick NICHT als
-            Drag-Start missinterpretiert wird. stopPropagation reicht,
-            weil der Sensor am Container haengt. */}
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className={item.hidden ? "icon-btn" : "icon-btn icon-btn-green"}
-          aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
-          data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
-          style={{ cursor: "pointer" }}
-        >
-          {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
       </div>
 
       {item.hidden && (
@@ -547,6 +588,127 @@ function SortablePreviewTile({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SortablePreviewTile — dnd-kit-Wrapper. Rendert die Kachel im Grid, haengt
+// Drag-Listener aufs Body (nicht auf den Auge-Button — sonst wuerde ein
+// Klick als Drag-Start missinterpretiert). Waehrend Drag: Body ist ein
+// blasser Platzhalter, echter Inhalt wird per DragOverlay gerendert.
+// ---------------------------------------------------------------------------
+
+function SortablePreviewTile({
+  item,
+  spanClass,
+  onToggle,
+  isActive,
+}: {
+  item: PreferenceItem;
+  spanClass: string;
+  onToggle: () => void;
+  isActive: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: item.id,
+    // Explizite Transition-Kurve fuer den Layout-Reflow der NICHT-gezogenen
+    // Kacheln. dnd-kit-Default (250ms cubic-bezier) waere ok, aber wir
+    // teilen die Konstante mit der DragOverlay-Drop-Animation — konsistente
+    // Bewegung ueber alle Elemente hinweg.
+    transition: {
+      duration: DND_TRANSITION.duration,
+      easing: DND_TRANSITION.easing,
+    },
+  });
+  const [hover, setHover] = useState(false);
+
+  // Waehrend Drag ist die Kachel nur ein Platzhalter: 0-Opacity, KEIN
+  // Transform, KEIN Shadow (der Ghost uebernimmt beides). Ohne Transform-
+  // /Shadow gibt es keine "doppelte Kachel"-Optik neben dem Ghost. Das
+  // Grid haelt den Slot layout-technisch weiterhin frei.
+  const wrapperStyle: React.CSSProperties = isDragging
+    ? {
+        opacity: 0,
+        transition,
+      }
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+      };
+
+  // Innerer Look: Hover-Boost nur wenn NICHT gerade gedraggt — ansonsten
+  // wuerde der State-Reset am Drag-Ende einen kurzen Farb-Flash geben.
+  const innerStyle: React.CSSProperties = {
+    backgroundColor:
+      !isDragging && hover
+        ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
+        : undefined,
+    cursor: isActive ? "grabbing" : "grab",
+    // Touch-Action: pan-y ist Standard-Scroll; wir muessen es hier
+    // deaktivieren, sonst schluckt der Browser den Drag-Gesture auf Mobile.
+    touchAction: "none",
+    // Farb-Transition sauber trennen von der dnd-transform-Transition — die
+    // wird oben inline gesetzt und darf nicht ueberschrieben werden.
+    transition: "background-color 140ms ease",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={spanClass}
+      style={wrapperStyle}
+    >
+      <PreviewTileVisual
+        item={item}
+        style={innerStyle}
+        className="h-full"
+        extraTop={
+          <>
+            {/* Drag-Handle-Layer: fuellt die ganze Kachel, faengt Pointer/Key-
+                Events fuer dnd-kit. Absolut positioniert damit der Auge-Button
+                DARUEBER stehen kann (button liegt in einer eigenen Layer und
+                stopt Propagation). */}
+            <div
+              className="absolute inset-0 rounded-lg"
+              onMouseEnter={() => setHover(true)}
+              onMouseLeave={() => setHover(false)}
+              {...attributes}
+              {...listeners}
+              aria-label={`${item.title} verschieben`}
+            />
+            {/* Auge-Button: eigene Layer ueber dem Drag-Handle, damit Klick
+                den Handle nicht triggert. stopPropagation reicht, weil der
+                Sensor am Handle-Layer haengt. */}
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              className={
+                item.hidden
+                  ? "icon-btn absolute right-2 top-2 z-10"
+                  : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
+              }
+              aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
+              data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
+              style={{ cursor: "pointer" }}
+            >
+              {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }
