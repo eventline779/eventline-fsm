@@ -31,6 +31,21 @@ interface PartnerProfile {
   datenschutz_akzeptiert_version: string | null;
 }
 
+/** Liest einen non-httpOnly Cookie im Client. Wird fuer das View-As-Cookie
+ *  gebraucht — der Partner-Layout muss wissen ob eine Impersonation aktiv
+ *  ist, um das richtige Profile zu laden. */
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const parts = document.cookie.split(";").map((s) => s.trim());
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq === -1) continue;
+    const k = p.slice(0, eq);
+    if (k === name) return decodeURIComponent(p.slice(eq + 1));
+  }
+  return null;
+}
+
 export default function PartnerPortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -49,18 +64,35 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
         router.replace("/partner/login");
         return;
       }
+      // Developer-Mode / View-As: wenn der eingeloggte User ein Admin ist
+      // der gerade einen Partner impersoniert, liefert das Cookie die
+      // target-user-id. Der Layout laedt dann das PARTNER-Profile statt
+      // das echte Admin-Profile — sonst wuerde die role-Pruefung unten
+      // den Admin rauswerfen (→ (app)-Layout sieht effective='partner' via
+      // usePermissions → wieder hierher → LOOP).
+      const impersonateId = readCookie("eventline_impersonate_user_id");
+      const profileId = impersonateId || user.id;
       const { data } = await supabase
         .from("profiles")
         .select("id, full_name, role, partner_location_id, is_active, datenschutz_akzeptiert_at, datenschutz_akzeptiert_version, location:locations!profiles_partner_location_id_fkey(name)")
-        .eq("id", user.id)
+        .eq("id", profileId)
         .maybeSingle();
       if (!data) {
+        // Bei aktiver Impersonation KEIN signOut() — sonst kickt sich der
+        // Admin unabsichtlich raus. Stattdessen zurueck zum Firmen-Dashboard,
+        // dort kann er die Impersonation via Overlay beenden.
+        if (impersonateId) {
+          router.replace("/dashboard");
+          return;
+        }
         await supabase.auth.signOut();
         router.replace("/partner/login");
         return;
       }
       if (data.role !== "partner") {
-        // Eventline-Interner User auf falschem Pfad — zurueck zur Haupt-App
+        // Ohne Impersonation: Eventline-User falsch abgebogen → Haupt-App.
+        // Mit Impersonation (Admin sieht als jemand): der impersonierte User
+        // ist kein Partner → Impersonation aufloesen und ins Firmen-Portal.
         router.replace("/dashboard");
         return;
       }
