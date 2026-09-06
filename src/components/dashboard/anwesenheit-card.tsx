@@ -61,6 +61,22 @@ function hm(t: string | null | undefined) {
   return (t ?? "").slice(0, 5);
 }
 
+// Leo will nur 15-Min-Schritte im UI. `step="900"` am <input type="time">
+// erzwingt das im Browser-Picker, aber getippte Werte kommen trotzdem
+// minutengenau durch — deshalb defensiv beim Speichern / Öffnen runden.
+// Rundet auf nächste :00/:15/:30/:45 und clampt 24:00 auf 23:45.
+function snapTo15(hhmm: string): string {
+  if (!/^\d{2}:\d{2}$/.test(hhmm)) return hhmm;
+  const h = Number(hhmm.slice(0, 2));
+  const m = Number(hhmm.slice(3, 5));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  const total = h * 60 + m;
+  const snapped = Math.min(23 * 60 + 45, Math.max(0, Math.round(total / 15) * 15));
+  const H = String(Math.floor(snapped / 60)).padStart(2, "0");
+  const M = String(snapped % 60).padStart(2, "0");
+  return `${H}:${M}`;
+}
+
 export function AnwesenheitskalenderCard({ className }: { className?: string }) {
   const supabase = createClient();
   const [uid, setUid] = useState<string | null>(null);
@@ -164,20 +180,25 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
 
   async function save() {
     if (!edit || !uid) return;
-    if (edit.to <= edit.from) return void toast.error("Bis-Zeit muss nach Von-Zeit sein");
+    // Defensiv auf 15-Min-Raster snappen — der Browser-Picker respektiert
+    // step="900", getippte Werte (Firefox / mobile Keyboards) kommen aber
+    // minutengenau durch. So bleibt die DB garantiert auf :00/:15/:30/:45.
+    const from = snapTo15(edit.from);
+    const to = snapTo15(edit.to);
+    if (to <= from) return void toast.error("Bis-Zeit muss nach Von-Zeit sein");
     // start_hour/end_hour spiegeln fuer Read-Kompat mit dem alten Widget-Code
     // (Migration 125 legt die Constraint auf 0..23 / 1..24). Wir schreiben
     // hh aus edit.from/to — end=24 vermeiden wir, indem >23:59 auf 24 mapt.
-    const startH = Number(edit.from.slice(0, 2));
-    const endH = Math.min(24, Math.max(startH + 1, Math.ceil(Number(edit.to.slice(0, 2)) + Number(edit.to.slice(3, 5)) / 60)));
+    const startH = Number(from.slice(0, 2));
+    const endH = Math.min(24, Math.max(startH + 1, Math.ceil(Number(to.slice(0, 2)) + Number(to.slice(3, 5)) / 60)));
     const { error } = await supabase
       .from("office_attendance")
       .upsert(
         {
           user_id: uid,
           date: edit.date,
-          from_time: edit.from,
-          to_time: edit.to,
+          from_time: from,
+          to_time: to,
           start_hour: startH,
           end_hour: endH,
         },
@@ -265,6 +286,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                             <div className="flex items-center gap-1">
                               <input
                                 type="time"
+                                step={900}
                                 value={edit!.from}
                                 onChange={(ev) => setEdit({ ...edit!, from: ev.target.value })}
                                 className="h-6 w-[4.2rem] text-[11px] rounded border bg-background px-1"
@@ -272,6 +294,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                               <span className="text-[10px] text-muted-foreground">–</span>
                               <input
                                 type="time"
+                                step={900}
                                 value={edit!.to}
                                 onChange={(ev) => setEdit({ ...edit!, to: ev.target.value })}
                                 className="h-6 w-[4.2rem] text-[11px] rounded border bg-background px-1"
@@ -294,7 +317,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                         ) : e ? (
                           <button
                             disabled={!mine}
-                            onClick={() => mine && setEdit({ date, from: hm(e.from_time), to: hm(e.to_time) })}
+                            onClick={() => mine && setEdit({ date, from: snapTo15(hm(e.from_time)), to: snapTo15(hm(e.to_time)) })}
                             className={cn(
                               "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium tabular-nums bg-green-500/15 text-green-700 dark:text-green-300",
                               mine && "hover:bg-green-500/25 transition-colors cursor-pointer",
