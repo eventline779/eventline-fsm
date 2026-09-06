@@ -115,7 +115,12 @@ export function SearchableSelect({
   // dann nur den schon ausgewaehlten Eintrag selbst. Bei Schliessen ohne
   // Auswahl setzt onDocClick die Anzeige zurueck auf selectedItem.label.
   useEffect(() => {
-    if (open && searchable) setSearch("");
+    if (open && searchable) {
+      // Wenn Freitext (kein Item gewaehlt, aber freeTextDisplay gesetzt):
+      // Search-State mit dem Freitext vorbelegen, damit User editieren kann
+      // statt komplett neu tippen zu muessen. Sonst leer (Filter zeigt alles).
+      setSearch(!selectedItem && freeTextDisplay ? freeTextDisplay : "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
