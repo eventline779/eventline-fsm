@@ -173,6 +173,11 @@ export default function EinstellungenPage() {
     { key: "partner", label: "Partnerportal", icon: <Handshake className="h-4 w-4" /> },
   ];
 
+  // Solange Rolle nicht ready ist rendern wir NICHTS — sonst blitzt fuer den
+  // Non-Admin kurz der leere „firma"-Tab-Content auf, bevor der useEffect
+  // oben ihn auf „integrationen" umleitet.
+  if (!ready) return null;
+
   return (
     <div className="space-y-8">
       {/* Header — konsistent mit /auftraege etc. (h1 + Subtitle-Spacer),

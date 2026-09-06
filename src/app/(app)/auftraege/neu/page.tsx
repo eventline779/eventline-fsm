@@ -36,7 +36,10 @@ function NeuerAuftragPageContent() {
   const { role } = usePermissions();
   const isAdmin = role === "admin";
   // Aus Instandhaltung kommend: Titel/Location/Veranstalter-Kontakt fallen weg.
-  const fromMaintenance = !!searchParams.get("from_maintenance");
+  // ID separat halten fuer den maintenance_tasks-Rueckverweis nach Insert
+  // (§1: single-source-of-truth statt inner shadowing im submit()).
+  const fromMaintenanceId = searchParams.get("from_maintenance");
+  const fromMaintenance = !!fromMaintenanceId;
   // "Entwurf"-Pfad ist 2026-09 aus /auftraege/neu weg — Auftrags-Entwuerfe
   // leben ab Migration 206 in job_drafts (/entwuerfe/neu).
   const [saving, setSaving] = useState<boolean>(false);
@@ -231,9 +234,8 @@ function NeuerAuftragPageContent() {
     // Wenn der Auftrag aus einer Instandhaltungsarbeit erstellt wurde,
     // verknuepfen wir hier zurueck. Sobald der Auftrag spaeter abgeschlossen
     // wird, gilt die Instandhaltung als erledigt.
-    const fromMaintenance = searchParams.get("from_maintenance");
-    if (fromMaintenance) {
-      await supabase.from("maintenance_tasks").update({ job_id: inserted.id }).eq("id", fromMaintenance);
+    if (fromMaintenanceId) {
+      await supabase.from("maintenance_tasks").update({ job_id: inserted.id }).eq("id", fromMaintenanceId);
     }
 
     // Stage-Files hochladen falls vorhanden — Fehler werden gesammelt und
@@ -282,13 +284,21 @@ function NeuerAuftragPageContent() {
       action: {
         label: "Rückgängig",
         onClick: async () => {
+          // Idempotenz: nur soft-loeschen wenn noch nicht geloescht (§6).
+          // Verhindert Doppelklicks innerhalb der 5s Toast-Duration und
+          // erlaubt eindeutige Fehlerdiagnose (updated=[] → schon weg).
           const { data: updated, error: delErr } = await supabase
             .from("jobs")
             .update({ is_deleted: true })
             .eq("id", inserted.id)
+            .eq("is_deleted", false)
             .select("id");
-          if (delErr || !updated || updated.length === 0) {
+          if (delErr) {
             toast.error("Konnte nicht rückgängig gemacht werden");
+            return;
+          }
+          if (!updated || updated.length === 0) {
+            // schon vorher rueckgaengig gemacht — kein Error, kein Toast noise.
             return;
           }
           toast.success(`INT-${inserted.job_number} verworfen`);

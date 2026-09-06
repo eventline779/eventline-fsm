@@ -16,7 +16,7 @@
  * jederzeit was aendern koennen ohne Modal-Overhead.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -200,10 +200,16 @@ export default function EntwurfDetailPage() {
     [router, searchParams, draftId],
   );
 
+  // Reload-Counter fuer Race-Sicherheit: schnelle onBlur-Autosaves
+  // triggern mehrere load()-Aufrufe kurz nacheinander — nur die zuletzt
+  // gestartete Antwort darf den State ueberschreiben.
+  const loadReqIdRef = useRef(0);
   const load = useCallback(async () => {
+    const myId = ++loadReqIdRef.current;
     try {
       const res = await fetch(`/api/entwuerfe/${draftId}`, { cache: "no-store" });
       const json = await res.json();
+      if (loadReqIdRef.current !== myId) return;
       if (!json.success) {
         toast.error(json.error ?? "Konnte Entwurf nicht laden");
         setDraft(null);
@@ -212,9 +218,10 @@ export default function EntwurfDetailPage() {
       setDraft(json.draft as DraftDetail);
       setNotes(json.notes as DraftNote[]);
     } catch (err) {
+      if (loadReqIdRef.current !== myId) return;
       toast.error(err instanceof Error ? err.message : "Netzwerk-Fehler");
     } finally {
-      setLoading(false);
+      if (loadReqIdRef.current === myId) setLoading(false);
     }
   }, [draftId]);
 
@@ -249,6 +256,10 @@ export default function EntwurfDetailPage() {
   const patch = useCallback(
     async (fields: Record<string, unknown>) => {
       if (!draft) return;
+      // Optimistischer Merge auf den flachen Feldern → onBlur-Autosave
+      // flackert nicht. Nested Refs (customer/location/owner) werden
+      // durch das nachfolgende race-safe load() aufgefrischt.
+      setDraft((prev) => (prev ? ({ ...prev, ...fields } as DraftDetail) : prev));
       setSaving(true);
       try {
         const res = await fetch(`/api/entwuerfe/${draft.id}`, {
@@ -259,7 +270,6 @@ export default function EntwurfDetailPage() {
         const json = await res.json();
         if (!json.success) {
           toast.error(json.error ?? "Speichern fehlgeschlagen");
-          return;
         }
         await load();
       } finally {

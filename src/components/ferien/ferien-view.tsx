@@ -165,25 +165,33 @@ export function FerienView() {
       return;
     }
     setSubmitting(true);
-    const res = await fetch("/api/time-off", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        start_date: newStart,
-        end_date: newEnd,
-        type: newType,
-        note: newNote.trim() || null,
-      }),
-    });
-    const json = await res.json();
-    setSubmitting(false);
-    if (!json.success) {
-      TOAST.errorOr(json.error, "Anlegen fehlgeschlagen");
-      return;
+    try {
+      const res = await fetch("/api/time-off", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start_date: newStart,
+          end_date: newEnd,
+          type: newType,
+          note: newNote.trim() || null,
+        }),
+      });
+      // §7: 502/HTML-Response wuerde res.json() werfen — Modal blieb
+      // ohne Feedback offen. try/catch faengt es ab und der Button
+      // wird per finally wieder freigegeben.
+      const json = await res.json();
+      if (!json.success) {
+        TOAST.errorOr(json.error, "Anlegen fehlgeschlagen");
+        return;
+      }
+      toast.success("Antrag eingereicht");
+      setCreating(false);
+      load();
+    } catch (err) {
+      TOAST.error(err instanceof Error ? err.message : "Netzwerk-Fehler");
+    } finally {
+      setSubmitting(false);
     }
-    toast.success("Antrag eingereicht");
-    setCreating(false);
-    load();
   }
 
   async function deleteEntry(entry: TimeOffWithUser) {
@@ -194,9 +202,27 @@ export function FerienView() {
       variant: "red",
     });
     if (!ok) return;
-    const { error } = await supabase.from("time_off").delete().eq("id", entry.id);
+    // §6/§14: count:'exact' + explizite Filter — sonst schluckt eine RLS-
+    // Silence den Fehlversuch als scheinbaren Erfolg. user_id gaten damit
+    // der Nutzer wirklich nur eigene Antraege loeschen kann (Non-Admin).
+    // Status-Gate: bereits entschiedene Antraege duerfen nicht mehr weg.
+    const uid = userId;
+    if (!uid) {
+      TOAST.error("Nicht eingeloggt");
+      return;
+    }
+    const { error, count } = await supabase
+      .from("time_off")
+      .delete({ count: "exact" })
+      .eq("id", entry.id)
+      .eq("user_id", uid)
+      .eq("status", "beantragt");
     if (error) {
       TOAST.supabaseError(error, "Löschen fehlgeschlagen");
+      return;
+    }
+    if (!count) {
+      TOAST.error("Antrag konnte nicht zurückgezogen werden");
       return;
     }
     toast.success("Antrag zurückgezogen");

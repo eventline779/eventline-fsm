@@ -152,7 +152,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
     admin && (
       <KpiCard
         icon={<Briefcase className="h-3.5 w-3.5" />}
-        label="Offene Auftraege"
+        label="Offene Aufträge"
         value={admin.kpi?.offene_auftraege ?? 0}
         href="/auftraege?from=dashboard"
       />
@@ -381,13 +381,13 @@ function ZuErledigenCard({ data }: { data: AdminData["zu_erledigen"] }) {
       <div className="divide-y">
         <TodoRow
           icon={<PlaneTakeoff className="h-4 w-4" />}
-          label="Ferien-Antraege pending"
+          label="Ferien-Anträge pending"
           count={data.ferien_pending}
           href="/hr?tab=anfragen&from=dashboard"
         />
         <TodoRow
           icon={<AlertCircle className="h-4 w-4" />}
-          label="Ueberfaellige Auftraege"
+          label="Überfällige Aufträge"
           count={data.ueberfaellige_auftraege}
           href="/auftraege?from=dashboard"
           urgent={data.ueberfaellige_auftraege > 0}

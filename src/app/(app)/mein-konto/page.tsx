@@ -41,13 +41,15 @@ export default function MeinKontoPage() {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab");
   // Legacy-Deep-Link ?tab=dokumente → nach /hr?tab=loehne umleiten
-  // (die MA-Lohn-Sicht lebt jetzt dort). Muss VOR dem State-Init passieren
-  // sonst rendern wir kurz einen Empty-State.
+  // (die MA-Lohn-Sicht lebt jetzt dort). Redirect + Suppress-Render
+  // (unten) verhindern das kurze Aufblitzen des Profil-Tabs waehrend
+  // die Navigation laeuft.
+  const isLegacyRedirect = urlTab === "dokumente";
   useEffect(() => {
-    if (urlTab === "dokumente") {
+    if (isLegacyRedirect) {
       router.replace("/hr?tab=loehne");
     }
-  }, [urlTab, router]);
+  }, [isLegacyRedirect, router]);
   const initialTab: Tab = (urlTab && ALL_TABS.includes(urlTab as Tab)) ? (urlTab as Tab) : "profil";
   const { firstVisitedAt, ready: onboardingReady, markVisited } = useMeinKontoOnboarding();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -80,6 +82,10 @@ export default function MeinKontoPage() {
     { key: "benachrichtigungen", label: "Benachrichtigungen", icon: <Bell className="h-4 w-4" /> },
     { key: "kalender",           label: "Kalender",           icon: <Calendar className="h-4 w-4" /> },
   ];
+
+  // Waehrend der Legacy-Redirect laeuft (?tab=dokumente → /hr?tab=loehne)
+  // NICHTS rendern — sonst blitzt der Profil-Tab kurz auf.
+  if (isLegacyRedirect) return null;
 
   return (
     <div>

@@ -155,8 +155,15 @@ export default function KalenderPage() {
   // Events ab die in den sichtbaren Monat reichen.
   const load = useCallback(async () => {
     setLoading(true);
-    const rangeStart = new Date(year, month - 1, 1).toISOString();
-    const rangeEnd = new Date(year, month + 2, 0, 23, 59, 59).toISOString();
+    // TZ-Falle (§4): new Date(y, m, d).toISOString() serialisiert LOCAL-
+    // Mitternacht als UTC — bei einem Client in anderer TZ als Zurich
+    // verschieben sich die Grenzen und Events am Rand verschwinden.
+    // Wir setzen die Range in UTC an und geben +/- 3h Puffer (Zurich
+    // ist UTC+1/+2), sodass alles ab Zurich-Mitternacht des Buffer-Monats
+    // bis Zurich-23:59 des End-Monats sicher enthalten ist.
+    const TZ_BUFFER_MS = 3 * 60 * 60 * 1000;
+    const rangeStart = new Date(Date.UTC(year, month - 1, 1) - TZ_BUFFER_MS).toISOString();
+    const rangeEnd = new Date(Date.UTC(year, month + 2, 1) + TZ_BUFFER_MS).toISOString();
     // time_off arbeitet auf Date-Only — separate Range-Strings.
     const toDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const rangeStartDate = toDateStr(new Date(year, month - 1, 1));
@@ -485,9 +492,10 @@ export default function KalenderPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              {/* View-Toggle — auf Mobile ausgeblendet (dort ist nur Wochen-
-                  Ansicht sinnvoll). Auf Desktop wie gehabt. */}
-              <div className="hidden md:flex p-0.5 bg-muted rounded-lg">
+              {/* View-Toggle — Default auf Mobile = "woche" (Monatsgrid ist
+                  unter 768px kaum bedienbar), Toggle aber trotzdem sichtbar
+                  damit Nutzer bei Rotation/Zoom manuell zurueck koennen. */}
+              <div className="flex p-0.5 bg-muted rounded-lg">
                 {(["monat", "woche"] as const).map((v) => (
                   <button
                     key={v}

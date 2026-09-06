@@ -203,10 +203,13 @@ export default function AuftraegePage() {
   // doppelte Datums-Werte. ACTIVE_PAGE_SIZE+1 fuer hasMore via n+1-Trick.
   const buildActiveQuery = useCallback((cursor: { start_date: string | null; id: string } | null) => {
     const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    // is_deleted-Nullguard: .neq('is_deleted', true) filtert NULL raus (SQL 3-valued
+    // logic), also Rows aus Migrationen vor is_deleted-Default gehen verloren.
+    // Explizit "IS NULL OR FALSE" — konsistent zur Archiv-Query unten.
     let q = supabase
       .from("jobs")
       .select(JOBS_SELECT)
-      .neq("is_deleted", true)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .or(cancelledFilter);
     // aktiv-Segment: freigegebene Auftraege (partner_entwurf gehoert nur
     // ins Partnerportal, Anfragen/Entwuerfe/Partner-Anfragen laufen ausserhalb
@@ -276,10 +279,11 @@ export default function AuftraegePage() {
   // Sort: start_date DESC (juengste-past zuerst), composite cursor (start_date, id).
   const buildArchiveQuery = useCallback((cursor: { start_date: string | null; id: string } | null) => {
     const cancelledFilter = "cancelled_as_anfrage.is.null,cancelled_as_anfrage.eq.false";
+    // is_deleted-Nullguard analog zur Active-Query (siehe oben).
     let q = supabase
       .from("jobs")
       .select(JOBS_SELECT)
-      .neq("is_deleted", true)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .or(cancelledFilter);
 
     if (filterStatus === "abgeschlossen" || filterStatus === "storniert") {
@@ -299,7 +303,9 @@ export default function AuftraegePage() {
     }
 
     const titleQ = searchTitle.trim();
-    if (titleQ) q = q.ilike("title", `%${titleQ}%`);
+    // ILIKE-Escape: %/_ waeren sonst Wildcards und ein Backslash im Suchbegriff
+    // wuerde die Escape-Sequenz zerbrechen — alle drei backslash-quoten.
+    if (titleQ) q = q.ilike("title", `%${titleQ.replace(/[\\%_]/g, "\\$&")}%`);
 
     const numQ = searchNumber.trim();
     if (numQ.length === 6 && /^\d+$/.test(numQ)) {

@@ -291,7 +291,10 @@ export default function AuftragDetailPage() {
       variant: "outline" as const,
     },
     {
-      from: ["offen"] as JobStatus[],
+      // partner_anfrage kann durch Admin manuell storniert werden falls
+      // der Partner nicht antwortet — sonst haengt der Auftrag stuck (der
+      // PartnerAnfrageBanner ist nur der positive Weg via Aufnehmen/Ablehnen).
+      from: ["offen", "partner_anfrage"] as JobStatus[],
       to: "storniert" as JobStatus,
       label: "Stornieren",
       icon: <XCircle className="h-4 w-4" />,

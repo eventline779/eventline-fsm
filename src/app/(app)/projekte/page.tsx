@@ -55,6 +55,8 @@ export default function ProjektePage() {
   }, [showArchive]);
 
   const load = useCallback(async () => {
+    // is_deleted-Nullguard: .eq('is_deleted', false) filtert NULL raus, alte
+    // Rows aus der Zeit vor dem Default-Wert wuerden verschwinden.
     const { data: projects } = await supabase
       .from("projects")
       .select(`
@@ -62,7 +64,7 @@ export default function ProjektePage() {
         assigned_to, created_at, goal_date, completion_success,
         assignee:profiles!projects_assigned_to_fkey(full_name)
       `)
-      .eq("is_deleted", false)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .order("project_number", { ascending: false });
     if (!projects) { setRows([]); return; }
 
