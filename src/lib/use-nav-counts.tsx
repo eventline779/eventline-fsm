@@ -68,7 +68,8 @@ export function NavCountsProvider({ children, isAdmin }: ProviderProps) {
         .from("todos")
         .select("id", { count: "exact", head: true })
         .eq("assigned_to", user.id)
-        .eq("status", "offen"),
+        .eq("status", "offen")
+        .is("deleted_at", null),
       supabase
         .from("tickets")
         .select("id", { count: "exact", head: true })
