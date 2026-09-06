@@ -318,6 +318,7 @@ interface AdminPayload {
     ferien_pending: number;
     ueberfaellige_auftraege: number;
     neue_belege: number;
+    offene_tickets: number;
   };
   team_status: {
     eingestempelt: number;
@@ -394,6 +395,7 @@ async function loadAdminData(opts?: {
     ferienPending,
     ueberfaelligeAuftraege,
     neueBelege,
+    offeneTicketsRes,
     eingestempelt,
     ferienHeute,
     overdueCountRes,
@@ -444,6 +446,19 @@ async function loadAdminData(opts?: {
       .eq("type", "beleg")
       .is("filed_at", null)
       .neq("status", "abgelehnt"),
+    // Offene Tickets (non-Beleg): stempel_aenderung + material + IT — genau
+    // das Set das /tickets zeigt (dort wird beleg per .neq('type','beleg')
+    // ausgeblendet, weil Belege ihren eigenen Workflow auf /abrechnung haben
+    // und schon via `neue_belege` oben gezaehlt sind — sonst Doppel-Zaehlung).
+    // Click-Through fuehrt auf /tickets → Count stimmt mit der Liste ueberein.
+    // archived_at wird durch den Daily-Job (Migration 064) erst nach status !=
+    // 'offen' gesetzt, ist hier defensiv gefiltert falls sich das mal aendert.
+    admin
+      .from("tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "offen")
+      .neq("type", "beleg")
+      .is("archived_at", null),
     // Team-Status: eingestempelt.
     // scopedUserIds=null -> firm-weit; sonst .in('user_id', ids). scopedUserIds
     // enthaelt IMMER mind. den User selbst (siehe oben), .in([]) -> "IN ()"
@@ -500,6 +515,7 @@ async function loadAdminData(opts?: {
     ferienPending.error ??
     ueberfaelligeAuftraege.error ??
     neueBelege.error ??
+    offeneTicketsRes.error ??
     eingestempelt.error ??
     ferienHeute.error ??
     overdueCountRes.error ??
@@ -536,6 +552,7 @@ async function loadAdminData(opts?: {
       ferien_pending: ferienPending.count ?? 0,
       ueberfaellige_auftraege: ueberfaelligeAuftraege.count ?? 0,
       neue_belege: neueBelege.count ?? 0,
+      offene_tickets: offeneTicketsRes.count ?? 0,
     },
     team_status: {
       eingestempelt: eingestempelt.count ?? 0,

@@ -25,7 +25,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle, ArrowRight, Briefcase, CalendarDays, ClipboardList,
-  Clock, Handshake, PlaneTakeoff, PlayCircle, Receipt, Settings2, Users, Wallet,
+  Clock, Handshake, PlaneTakeoff, PlayCircle, Receipt, Settings2,
+  Ticket as TicketIcon, Users, Wallet,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { JobNumber } from "@/components/job-number";
@@ -69,6 +70,7 @@ interface AdminData {
     ferien_pending: number;
     ueberfaellige_auftraege: number;
     neue_belege: number;
+    offene_tickets: number;
   };
   team_status: {
     eingestempelt: number;
@@ -185,7 +187,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
   "zu-erledigen": ({ admin }) =>
     admin && (
       <ZuErledigenCard
-        data={admin.zu_erledigen ?? { ferien_pending: 0, ueberfaellige_auftraege: 0, neue_belege: 0 }}
+        data={admin.zu_erledigen ?? { ferien_pending: 0, ueberfaellige_auftraege: 0, neue_belege: 0, offene_tickets: 0 }}
       />
     ),
   "team-status": ({ admin }) =>
@@ -397,6 +399,12 @@ function ZuErledigenCard({ data }: { data: AdminData["zu_erledigen"] }) {
           label="Neue Belege"
           count={data.neue_belege}
           href="/abrechnung?from=dashboard"
+        />
+        <TodoRow
+          icon={<TicketIcon className="h-4 w-4" />}
+          label="Offene Tickets"
+          count={data.offene_tickets}
+          href="/tickets?from=dashboard"
         />
       </div>
     </section>
