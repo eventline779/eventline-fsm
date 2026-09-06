@@ -28,13 +28,27 @@
  *   2) Hidden Widgets (aus overrides.hidden ∩ catalog) am Ende, in
  *      overrides.widget_order-Reihenfolge, danach Registry-Reihenfolge.
  *
- * Steuerung (Smooth-DnD, refactored 2026-09):
+ * Steuerung (Pro-DnD, refactored 2026-09-06 — nach Feedback "verschwindet
+ * beim Draggen, verzerrt den Rest"):
  *   - Reihenfolge via @dnd-kit/core + sortable MIT DragOverlay. Grund:
  *     das Preview-Grid hat variable Spans (col-span-4/6/12); ohne Overlay
  *     springt das gezogene Element beim Layout-Reflow — mit Overlay bleibt
- *     ein blasser Platzhalter an der Ursprungsposition und ein Ghost folgt
- *     dem Cursor. Alle anderen Kacheln gleiten in ihre neue Position
- *     (cubic-bezier(0.25, 1, 0.5, 1), 220ms).
+ *     ein sichtbarer Placeholder an der Ursprungsposition und ein Ghost
+ *     folgt dem Cursor. Alle anderen Kacheln gleiten in ihre neue Position.
+ *   - Ursprungs-Slot ist ein SICHTBARER dashed Placeholder (opacity 0.35 +
+ *     dashed accent border). Frueher unsichtbar per opacity:0 — dann fuehlte
+ *     sich der Drag an als waere das Widget "weg". Jetzt ist immer klar wo
+ *     das Widget hingehoert (Ghost am Cursor, Placeholder im Grid).
+ *   - Ghost hat rotate 1.5deg, tiefen Shadow, accent-Border → sieht optisch
+ *     "hochgehoben" aus (Linear/Notion-Muster). Kein leichter "scale" mehr —
+ *     Rotation liest sich besser als "in-motion" als eine schlichte Skalierung.
+ *   - Drop-Target-Highlight: der Slot unter dem Cursor bekommt einen
+ *     accent-farbenen Ring + subtiles Background-Tint → User sieht LIVE wohin
+ *     die Kachel landen wird, nicht erst nach dem Drop.
+ *   - Grid-Container bekommt beim Drag einen leichten Ambient-Tint (heller
+ *     Backdrop) → visuell klar "Drag-Modus aktiv".
+ *   - Cursor state-driven getrennt: idle=grab, drag=grabbing (auf ganzer
+ *     Kachel via body.data-dashboard-dragging Attribut).
  *   - PointerSensor (activation-distance 6px, sonst wuerde ein Klick auf
  *     den Auge-Button faelschlicherweise als Drag gewertet) + KeyboardSensor
  *     fuer Screenreader/Tastatur-Nutzer.
@@ -95,6 +109,7 @@ import {
   useSensors,
   type DragCancelEvent,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -191,6 +206,10 @@ export function DashboardPreferencesModal({
   const [activeSize, setActiveSize] = useState<{ w: number; h: number } | null>(
     null,
   );
+  // overId = die Kachel unter dem Cursor waehrend Drag. Wird per onDragOver
+  // upgedated und getriggert live das Drop-Target-Highlight (accent-Ring auf
+  // dem Ziel-Slot). Ohne das muesste der User raten wohin sein Drop landet.
+  const [overId, setOverId] = useState<string | null>(null);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -337,11 +356,25 @@ export function DashboardPreferencesModal({
     // andere Kacheln in die Luecke rutschen).
     const rect = event.active.rect.current.initial;
     if (rect) setActiveSize({ w: rect.width, h: rect.height });
+    // Body-Attribut fuer Cursor-State: grabbing ueberall waehrend Drag,
+    // damit auch das Modal-Backdrop einen konsistenten Cursor zeigt.
+    if (typeof document !== "undefined") {
+      document.body.setAttribute("data-dashboard-dragging", "true");
+    }
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const over = event.over;
+    setOverId(over ? (over.id as string) : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     setActiveSize(null);
+    setOverId(null);
+    if (typeof document !== "undefined") {
+      document.body.removeAttribute("data-dashboard-dragging");
+    }
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setItems((prev) => {
@@ -357,7 +390,20 @@ export function DashboardPreferencesModal({
   function handleDragCancel(_event: DragCancelEvent) {
     setActiveId(null);
     setActiveSize(null);
+    setOverId(null);
+    if (typeof document !== "undefined") {
+      document.body.removeAttribute("data-dashboard-dragging");
+    }
   }
+
+  // Cleanup body-attribut wenn Modal unmounted waehrend Drag lief
+  useEffect(() => {
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-dashboard-dragging");
+      }
+    };
+  }, []);
 
   async function resetToDefault() {
     if (saveTimer.current) {
@@ -449,15 +495,20 @@ export function DashboardPreferencesModal({
           // ueber eine breite Kachel hinweg zieht.
           collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
           <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
             <div
-              className="rounded-xl border p-3"
+              className="rounded-xl border p-3 transition-colors duration-200"
               style={{
-                backgroundColor:
-                  "color-mix(in oklab, var(--foreground) 3%, transparent)",
+                backgroundColor: activeId
+                  ? "color-mix(in oklab, var(--accent) 5%, var(--background))"
+                  : "color-mix(in oklab, var(--foreground) 3%, transparent)",
+                borderColor: activeId
+                  ? "color-mix(in oklab, var(--accent) 30%, var(--border))"
+                  : undefined,
               }}
             >
               <div className="grid grid-cols-12 gap-2">
@@ -468,17 +519,20 @@ export function DashboardPreferencesModal({
                     spanClass={spanFor(it.id, mobilePreview)}
                     onToggle={() => toggleHidden(it.id)}
                     isActive={activeId === it.id}
+                    isOverTarget={overId === it.id && activeId !== it.id}
+                    anyDragActive={activeId !== null}
                   />
                 ))}
               </div>
             </div>
           </SortableContext>
 
-          {/* DragOverlay = die frei schwebende Ghost-Kachel. Sie erbt Groesse
-              der Original-Kachel (via activeSize) und rendert mit Lift-Shadow
-              + leichter Scale — signalisiert "wird bewegt". dropAnimation
-              gleitet die Ghost sanft in die Zielposition, danach uebernimmt
-              die echte Kachel (die dann bereits an der neuen Position steht). */}
+          {/* DragOverlay = die frei schwebende Ghost-Kachel. Erbt Groesse der
+              Original-Kachel (activeSize) und rendert mit tiefen Shadow +
+              leichter Rotation (1.5deg) + accent-Border — signalisiert
+              "hochgehoben, wird bewegt". Rotation liest sich als "in-motion"
+              besser als eine schlichte Skalierung (Linear/Notion-Muster).
+              dropAnimation gleitet die Ghost sanft in die Zielposition. */}
           <DragOverlay
             zIndex={1200}
             dropAnimation={{
@@ -493,8 +547,12 @@ export function DashboardPreferencesModal({
                   width: activeSize.w,
                   height: activeSize.h,
                   cursor: "grabbing",
-                  transform: "scale(1.03)",
-                  boxShadow: "0 18px 42px rgba(0, 0, 0, 0.28)",
+                  transform: "rotate(1.5deg)",
+                  boxShadow:
+                    "0 24px 48px -8px rgba(0, 0, 0, 0.35), 0 8px 16px -4px rgba(0, 0, 0, 0.2)",
+                  outline: "2px solid var(--accent)",
+                  outlineOffset: "-1px",
+                  backgroundColor: "var(--card)",
                 }}
               />
             ) : null}
@@ -536,6 +594,7 @@ function PreviewTileVisual({
   style,
   className,
   extraTop,
+  contentOpacity,
 }: {
   item: PreferenceItem;
   style?: React.CSSProperties;
@@ -543,7 +602,13 @@ function PreviewTileVisual({
   /** Slot fuer die Sortable-Wrapper — z.B. dnd-kit listeners auf dem
    *  Kachel-Body. Overlay laesst das leer. */
   extraTop?: React.ReactNode;
+  /** Wenn gesetzt: erzwingt die Content-Opacity (Titel/Icon/Bars). Wird vom
+   *  Placeholder-State genutzt (dashed Slot, waehrend Ghost am Cursor haengt)
+   *  um den Text auf ~25% zu faden ohne den Border/BG mitzuziehen. */
+  contentOpacity?: number;
 }) {
+  const effectiveContentOpacity =
+    contentOpacity !== undefined ? contentOpacity : item.hidden ? 0.55 : 1;
   return (
     <div
       className={`relative rounded-lg border select-none ${className ?? ""}`}
@@ -559,12 +624,13 @@ function PreviewTileVisual({
         <span
           className="mt-0.5 shrink-0 text-muted-foreground/60"
           aria-hidden
+          style={{ opacity: effectiveContentOpacity }}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>
         <div
           className="flex-1 min-w-0"
-          style={{ opacity: item.hidden ? 0.55 : 1 }}
+          style={{ opacity: effectiveContentOpacity }}
         >
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             <span className="text-accent shrink-0">{iconFor(item.id)}</span>
@@ -575,7 +641,7 @@ function PreviewTileVisual({
         </div>
       </div>
 
-      {item.hidden && (
+      {item.hidden && contentOpacity === undefined && (
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg"
           style={{
@@ -604,11 +670,17 @@ function SortablePreviewTile({
   spanClass,
   onToggle,
   isActive,
+  isOverTarget,
+  anyDragActive,
 }: {
   item: PreferenceItem;
   spanClass: string;
   onToggle: () => void;
   isActive: boolean;
+  /** Cursor hovert gerade ueber DIESER Kachel waehrend Drag → Drop-Target-Ring */
+  isOverTarget: boolean;
+  /** Irgendwer wird gerade gedraggt (dann Hover-Boosts unterdruecken) */
+  anyDragActive: boolean;
 }) {
   const {
     attributes,
@@ -630,34 +702,46 @@ function SortablePreviewTile({
   });
   const [hover, setHover] = useState(false);
 
-  // Waehrend Drag ist die Kachel nur ein Platzhalter: 0-Opacity, KEIN
-  // Transform, KEIN Shadow (der Ghost uebernimmt beides). Ohne Transform-
-  // /Shadow gibt es keine "doppelte Kachel"-Optik neben dem Ghost. Das
-  // Grid haelt den Slot layout-technisch weiterhin frei.
-  const wrapperStyle: React.CSSProperties = isDragging
-    ? {
-        opacity: 0,
-        transition,
-      }
-    : {
-        transform: CSS.Transform.toString(transform),
-        transition,
-      };
+  // Waehrend Drag: die Kachel bleibt SICHTBAR als dashed Placeholder
+  // (frueher opacity:0 — hat sich angefuehlt als waere das Widget "weg").
+  // Der Ghost am Cursor UND der Placeholder im Grid zusammen sagen dem User
+  // klar: "das Widget ist da (Ghost), gehoert hierhin (Placeholder), landet
+  // dort (Drop-Target-Ring)". Layout-technisch bleibt der Slot besetzt.
+  const wrapperStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
-  // Innerer Look: Hover-Boost nur wenn NICHT gerade gedraggt — ansonsten
-  // wuerde der State-Reset am Drag-Ende einen kurzen Farb-Flash geben.
+  // Innerer Look:
+  // - isDragging: dashed accent-Border + faded Content → sichtbarer Placeholder
+  // - isOverTarget: accent-Ring + subtile accent-BG → "hier landet der Drop"
+  // - hover (idle): dezenter foreground-Tint
   const innerStyle: React.CSSProperties = {
-    backgroundColor:
-      !isDragging && hover
-        ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
+    backgroundColor: isDragging
+      ? "color-mix(in oklab, var(--accent) 6%, transparent)"
+      : isOverTarget
+        ? "color-mix(in oklab, var(--accent) 10%, var(--card))"
+        : !anyDragActive && hover
+          ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
+          : undefined,
+    borderColor: isDragging
+      ? "color-mix(in oklab, var(--accent) 55%, transparent)"
+      : isOverTarget
+        ? "var(--accent)"
         : undefined,
+    borderStyle: isDragging ? "dashed" : "solid",
+    borderWidth: isOverTarget && !isDragging ? "2px" : "1px",
+    boxShadow: isOverTarget && !isDragging
+      ? "0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent)"
+      : undefined,
     cursor: isActive ? "grabbing" : "grab",
     // Touch-Action: pan-y ist Standard-Scroll; wir muessen es hier
     // deaktivieren, sonst schluckt der Browser den Drag-Gesture auf Mobile.
     touchAction: "none",
-    // Farb-Transition sauber trennen von der dnd-transform-Transition — die
-    // wird oben inline gesetzt und darf nicht ueberschrieben werden.
-    transition: "background-color 140ms ease",
+    // Weiche Farb-/Border-Transition wenn Drag-Target wechselt (nur
+    // background+border, NICHT transform — das haengt an dnd-kit).
+    transition:
+      "background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease",
   };
 
   return (
@@ -670,6 +754,7 @@ function SortablePreviewTile({
         item={item}
         style={innerStyle}
         className="h-full"
+        contentOpacity={isDragging ? 0.25 : undefined}
         extraTop={
           <>
             {/* Drag-Handle-Layer: fuellt die ganze Kachel, faengt Pointer/Key-
@@ -685,27 +770,30 @@ function SortablePreviewTile({
               aria-label={`${item.title} verschieben`}
             />
             {/* Auge-Button: eigene Layer ueber dem Drag-Handle, damit Klick
-                den Handle nicht triggert. stopPropagation reicht, weil der
-                Sensor am Handle-Layer haengt. */}
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle();
-              }}
-              className={
-                item.hidden
-                  ? "icon-btn absolute right-2 top-2 z-10"
-                  : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
-              }
-              aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
-              data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
-              style={{ cursor: "pointer" }}
-            >
-              {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+                den Handle nicht triggert. Waehrend Drag verstecken wir ihn,
+                damit der Placeholder minimal-clean aussieht (kein irritierender
+                Toggle-Button auf einer "weg-gezogenen" Kachel). */}
+            {!isDragging && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle();
+                }}
+                className={
+                  item.hidden
+                    ? "icon-btn absolute right-2 top-2 z-10"
+                    : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
+                }
+                aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
+                data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
+                style={{ cursor: "pointer" }}
+              >
+                {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            )}
           </>
         }
       />
