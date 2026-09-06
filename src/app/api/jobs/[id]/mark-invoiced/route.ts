@@ -41,8 +41,11 @@ export async function POST(
 
   const admin = createAdminClient();
 
-  // Pre-Check: Job muss existieren + abgeschlossen + noch nicht abgerechnet.
-  // Race-Schutz gegen doppelten Submit (zwei Tabs, beide klicken kurz nacheinander).
+  // Pre-Check gibt praezise Fehlermeldungen ("nicht gefunden" vs "nicht
+  // abgeschlossen" vs "bereits abgerechnet"). Der eigentliche Race-Schutz
+  // gegen 2-Tab-Doppel-Submit liegt aber im UPDATE selbst weiter unten:
+  // .is('invoiced_at', null) macht die Zeile atomar zum Guard — nur der
+  // erste Request kriegt die Zeile.
   const { data: existing } = await admin
     .from("jobs")
     .select("id, status, invoiced_at, is_deleted")
@@ -61,18 +64,32 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Auftrag wurde bereits als abgerechnet markiert" }, { status: 400 });
   }
 
-  const { error } = await admin
+  // Atomarer Update: nur wenn invoiced_at im DB-Moment noch NULL ist wird
+  // die Zeile getroffen. Zwei parallel klickende Tabs → nur einer gewinnt,
+  // der zweite kriegt Konflikt-Fehler statt stumme Rechnungsnummer-
+  // Ueberschreibung. count: 'exact' liefert die tatsaechlich getroffene
+  // Zeilenzahl fuer den Race-Check.
+  const { error, count } = await admin
     .from("jobs")
     .update({
       invoiced_at: new Date().toISOString(),
       invoice_number: raw,
       invoiced_by: auth.user.id,
-    })
-    .eq("id", id);
+    }, { count: "exact" })
+    .eq("id", id)
+    .is("invoiced_at", null);
 
   if (error) {
     logError("api.jobs.mark-invoiced", error, { userId: auth.user.id, jobId: id });
     return NextResponse.json({ success: false, error: "Speichern fehlgeschlagen" }, { status: 500 });
+  }
+  if (count === 0) {
+    // Zwischen Pre-Check und Update hat ein paralleler Request die
+    // Rechnungsnummer schon gesetzt — nicht ueberschreiben.
+    return NextResponse.json(
+      { success: false, error: "Auftrag wurde inzwischen von jemand anderem als abgerechnet markiert" },
+      { status: 409 },
+    );
   }
 
   return NextResponse.json({ success: true });

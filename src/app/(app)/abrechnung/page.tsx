@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -103,11 +104,6 @@ const BELEGE_SELECT = `
   id, ticket_number, title, description, status, data, created_at,
   creator:profiles!tickets_created_by_fkey(full_name)
 `.replace(/\s+/g, " ").trim();
-
-// =====================================================================
-// Umsatz-Trend (Stunden pro Monat, gruppiert nach invoiced_at)
-// =====================================================================
-
 
 // =====================================================================
 // Helpers
@@ -227,7 +223,11 @@ export default function AbrechnungPage() {
         .eq("status", "abgeschlossen")
         .is("invoiced_at", null)
         .is("invoice_skipped_at", null)
-        .neq("is_deleted", true)
+        // is_deleted null-safe: alte Rows koennen NULL sein (Spalte wurde
+        // mit default false nachtraeglich hinzugefuegt, aber nicht NOT NULL).
+        // .neq("is_deleted", true) verwirft NULL-Rows, weil in SQL
+        // `NULL != true` als NULL evaluiert → RLS-Filter faellt raus.
+        .or("is_deleted.is.null,is_deleted.eq.false")
         .order("end_date", { ascending: false, nullsFirst: false })
         .limit(100),
       supabase
@@ -258,8 +258,10 @@ export default function AbrechnungPage() {
   useEffect(() => { load(); }, [load]);
 
   // Highlight-Handler: sobald die Jobs geladen sind und ein highlight-Param
-  // da ist, scroll die Karte in View, flash sie 2s und strippe den Param
-  // aus der URL (damit ein Reload nicht immer wieder flasht).
+  // da ist, flash die Karte 2s und strippe den Param aus der URL (damit ein
+  // Reload nicht immer wieder flasht). Der Scroll passiert nicht hier via
+  // setTimeout+getElementById (das verpufft bei spaeten Rerendern), sondern
+  // in JobCard selbst per Callback-Ref (§15 CLAUDE.md).
   useEffect(() => {
     if (!highlightId || loading) return;
     const exists = jobs.some((j) => j.id === highlightId);
@@ -276,17 +278,12 @@ export default function AbrechnungPage() {
     // react-hooks/set-state-in-effect nicht ueber synchronen setState
     // im Effect meckert und React nicht cascading-rendert.
     queueMicrotask(() => setFlashJobId(highlightId));
-    // Kurz warten bis die Karte gerendert ist, dann in View scrollen.
-    const t = setTimeout(() => {
-      document.getElementById(`job-card-${highlightId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 60);
     const flashTimer = setTimeout(() => setFlashJobId(null), 2100);
     const params = new URLSearchParams(searchParams.toString());
     params.delete("highlight");
     const qs = params.toString();
     router.replace(`/abrechnung${qs ? `?${qs}` : ""}`, { scroll: false });
     return () => {
-      clearTimeout(t);
       clearTimeout(flashTimer);
     };
   }, [highlightId, loading, jobs, router, searchParams]);
@@ -385,6 +382,9 @@ export default function AbrechnungPage() {
     }
     // Netzwerk-/JSON-Fehler MUESSEN das submitting-Flag freigeben, sonst
     // bleibt der Modal-Button dauerhaft „Speichere…" und der User haengt.
+    // WICHTIG: submitting bleibt bis zum setModal(null) TRUE — sonst kann
+    // der User im Zeitfenster zwischen fetch-Success und Modal-Close den
+    // Button erneut klicken (Doppel-Submit-Race).
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -394,13 +394,13 @@ export default function AbrechnungPage() {
       const json = (await res.json().catch(() => null)) as { success?: boolean; error?: string } | null;
       if (!res.ok || !json?.success) {
         TOAST.errorOr(json?.error, "Aktion fehlgeschlagen");
+        setSubmitting(false);
         return;
       }
     } catch (err) {
       TOAST.errorOr(err instanceof Error ? err.message : null, "Netzwerkfehler");
-      return;
-    } finally {
       setSubmitting(false);
+      return;
     }
     if (modal.kind === "job") {
       // Undo-Toast (5s): der User kann die Aktion sofort rueckgaengig machen
@@ -437,11 +437,33 @@ export default function AbrechnungPage() {
     }
     setModal(null);
     setReference("");
+    setSubmitting(false);
   }
 
   const canEdit = useMemo(() => can("abrechnung:edit"), [can]);
 
-  if (!ready) return null;
+  if (!ready) {
+    // Skeleton-Fallback statt leerer Seite waehrend Permissions laden (§7).
+    // Struktur spiegelt das echte Layout: Header + zwei Spalten mit Karten.
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[0, 1].map((col) => (
+            <div key={col} className="space-y-3">
+              <Skeleton className="h-6 w-40" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const modalKind = modal?.kind ?? null;
   const isJobModal = modalKind === "job";
@@ -735,6 +757,21 @@ interface JobCardProps {
 }
 
 function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById, flash }: JobCardProps) {
+  // Scroll-into-view via Callback-Ref (§15 CLAUDE.md): feuert exakt einmal
+  // wenn flash zum ersten Mal true wird UND der DOM-Node steht. useCallback
+  // ist auf flash dependency-gated — sobald flash false→true wechselt, hat
+  // die Ref-Callback eine neue Identity, React ruft sie mit dem echten Node
+  // auf. hasScrolledRef schuetzt vor Re-Scroll auf Rerender-Cascades.
+  const hasScrolledRef = useRef(false);
+  const cardRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el || !flash) return;
+      if (hasScrolledRef.current) return;
+      hasScrolledRef.current = true;
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    },
+    [flash],
+  );
   const report = job.service_reports[0] ?? null;
   const stempelByUser = aggregatePerUser(job.time_entries);
   const { billable: rapportByUser, notBillable: notBillableByUser, notBillableReasons } = aggregateReportPerUser(job.service_reports);
@@ -759,7 +796,7 @@ function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById, fla
 
   return (
     <Card
-      id={`job-card-${job.id}`}
+      ref={cardRef}
       className="bg-card overflow-hidden transition-shadow"
       // Highlight-Flash bei Ankunft aus dem Auftrag-Detail. Robust per
       // inline style — Tailwind-`ring-*`-Utilities greifen an Card manchmal
