@@ -3,11 +3,19 @@
 /**
  * Stempelzeiten-Portal (vereinfacht — 2026-09-02, User-Dropdown 2026-09-06).
  *
- * Zeigt Stempeleintraege der letzten 30 Tage als flache, nach Tag gruppierte
- * Liste — kein Datums-Picker, keine Quick-Chips, kein Heatmap-/Pivot-Toggle,
- * kein Anomalien-Only-Filter mehr. Anomalien (lange Schicht > 10h,
+ * Zeigt Stempeleintraege als flache, nach Tag gruppierte Liste — kein
+ * Datums-Picker, keine Quick-Chips, kein Heatmap-/Pivot-Toggle, kein
+ * Anomalien-Only-Filter mehr. Anomalien (lange Schicht > 10h,
  * Mitternacht-Uebergang, vergessener Stempel-Out > 18h) erscheinen als
  * kleine Chips pro Zeile.
+ *
+ * Ansicht-Modi ("Letzte 30 Tage" | "Archiv" — 2026-09-06): der Default lautet
+ * "Recent" (Fenster DEFAULT_RANGE_DAYS Tage, ein Roundtrip, schnell). Klick
+ * auf "Archiv" laedt cursor-paginiert je ARCHIVE_PAGE_SIZE Eintraege und
+ * blendet einen "Mehr laden"-Button ein bis alle Historie durch ist.
+ * Persistenz via `?mode=archive` (URL) + localStorage `stempelzeiten-view-mode`.
+ * Auftrags-Filter dominiert wie bisher — dessen Query kennt kein Zeitfenster
+ * und braucht keinen Modus, daher wird der Toggle dort ausgeblendet.
  *
  * KPIs oben (3 Kacheln): Diese Woche / Dieser Monat / Ø pro Arbeitstag Monat.
  * "Heute" faellt weg — steht ohnehin ganz oben in der Liste.
@@ -49,9 +57,11 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
   AlertTriangle, Moon, Search, Users, Edit3, Lock, Download,
+  Archive, ChevronDown,
 } from "lucide-react";
 import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
@@ -138,9 +148,15 @@ interface NormalizedEntry {
   durationMinutes: number | null;
 }
 
-/** Range-Fenster in Tagen — hart. Wer weiter zurueck schauen will, nutzt
- *  die Lohn-Monatsstunden oder /hr?tab=loehne. */
+/** Range-Fenster in Tagen fuer den "Recent"-Mode (Default). Der Archiv-Mode
+ *  hebelt das Fenster ab und laedt cursor-basiert paginiert alle Eintraege. */
 const DEFAULT_RANGE_DAYS = 30;
+
+/** Seitengroesse im Archiv-Mode. Erst-Ladung + jeder "Mehr laden"-Klick lauft
+ *  ueber diesen Wert. Composite-Cursor (clock_in, id) fuer Tie-Break bei
+ *  gleichzeitigen Stempel-Ins. n+1-Trick zur hasMore-Erkennung analog zu
+ *  /auftraege-Archiv (siehe `buildArchiveQuery` in auftraege/page.tsx). */
+const ARCHIVE_PAGE_SIZE = 100;
 
 /** Sentinel-Id fuer "Alle Personen" im Person-Dropdown. Kein UUID → kann
  *  nicht mit einem realen Profil kollidieren. Der URL-Param verwendet den
@@ -441,6 +457,45 @@ export function StempelzeitenView() {
   const isAllUsersView = selectedUserId === ALL_USERS_SENTINEL;
   const isOwnView = !isAllUsersView && (!selectedUserId || selectedUserId === currentUserId);
 
+  // Ansicht-Modus: "recent" (Default, letzte 30 Tage) oder "archive" (paginiert,
+  // alle Eintraege). URL `?mode=archive` + localStorage `stempelzeiten-view-mode`;
+  // Default (recent) haelt die URL clean.
+  const [viewMode, setViewMode] = useState<"recent" | "archive">(() => {
+    if (typeof window === "undefined") return "recent";
+    const fromUrl = searchParams.get("mode");
+    if (fromUrl === "archive") return "archive";
+    if (fromUrl === "recent") return "recent";
+    try {
+      const stored = localStorage.getItem("stempelzeiten-view-mode");
+      if (stored === "archive") return "archive";
+    } catch { /* SSR/private mode → ignorieren */ }
+    return "recent";
+  });
+  // Archiv-Pagination-State: hasMore triggert den "Mehr laden"-Button;
+  // loadingMore verhindert Doppelklicks und zeigt Spinner-Text.
+  const [archiveHasMore, setArchiveHasMore] = useState(false);
+  const [archiveLoadingMore, setArchiveLoadingMore] = useState(false);
+  // Race-Guard: alte load()/loadArchiveMore()-Antworten verwerfen, wenn
+  // zwischenzeitlich eine neuere Query gefeuert wurde (User wechselt schnell
+  // Mode/User/Filter → sonst mixed-scope-Rows in der Liste).
+  const loadIdRef = useRef(0);
+
+  const setViewModeAndPersist = useCallback((next: "recent" | "archive") => {
+    setViewMode(next);
+    try {
+      if (next === "archive") localStorage.setItem("stempelzeiten-view-mode", next);
+      else localStorage.removeItem("stempelzeiten-view-mode");
+    } catch { /* private mode */ }
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (next === "archive") url.searchParams.set("mode", "archive");
+    else url.searchParams.delete("mode");
+    // history.replaceState statt router.replace — rein visueller URL-Update,
+    // KEIN Next.js Route-Transition (spart Re-Mount und respektiert den
+    // HR-Tab-Kontext, in dem diese View eingebettet laufen kann).
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
   // Auftragsnummer-Filter (URL-persistent via ?auftrag=XXXXX). Der Text im
   // Input ist entkoppelt vom "committeten" Filter — Live-Suche mit 300ms
   // Debounce (Enter committed sofort). Wenn gesetzt, zeigt die Ansicht alle
@@ -611,10 +666,12 @@ export function StempelzeitenView() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const myLoadId = ++loadIdRef.current;
     const fromTs = new Date(fromIso + "T00:00:00").toISOString();
 
     // Auftragsnummer-Filter aktiv → eigenstaendiger Pfad. Kein 30-Tage-
     // Cutoff (der Sinn ist "alles was auf diesem Auftrag gestempelt wurde").
+    // Archiv-Modus greift hier nicht — der Auftrag zeigt sowieso alles.
     if (jobFilterActive && jobFilterNumber !== null) {
       setJobLookupState("loading");
       // 1) Auftrag per job_number aufloesen. maybeSingle → null wenn nicht da.
@@ -623,6 +680,7 @@ export function StempelzeitenView() {
         .select("id, job_number, title, customer:customers(name)")
         .eq("job_number", jobFilterNumber)
         .maybeSingle();
+      if (myLoadId !== loadIdRef.current) return;
       if (jobErr) TOAST.supabaseError(jobErr, "Auftrag konnte nicht geladen werden");
       const jobHeader = (job as unknown as JobFilterHeader | null) ?? null;
       setJobFilterHeader(jobHeader);
@@ -631,6 +689,7 @@ export function StempelzeitenView() {
         setJobLookupState("not_found");
         setOwnEntries([]);
         setScopedEntries([]);
+        setArchiveHasMore(false);
         setLoading(false);
         return;
       }
@@ -642,18 +701,23 @@ export function StempelzeitenView() {
         .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, user:profiles(full_name), project:projects(project_number, title)")
         .eq("job_id", jobHeader.id)
         .order("clock_in", { ascending: false });
+      if (myLoadId !== loadIdRef.current) return;
       if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
       setJobFilterEntries((data as unknown as JobFilterEntry[]) ?? []);
       setOwnEntries([]);
       setScopedEntries([]);
+      setArchiveHasMore(false);
       setLoading(false);
       return;
     }
 
-    // Kein Auftrags-Filter → User-Auswahl steuert die Query.
+    // Kein Auftrags-Filter → User-Auswahl + Modus steuern die Query.
     setJobFilterHeader(null);
     setJobFilterEntries([]);
     setJobLookupState("idle");
+    setArchiveHasMore(false);
+
+    const isArchive = viewMode === "archive";
 
     // "Alle Personen" — Sentinel gewaehlt. Query bewusst OHNE user_id-Filter:
     // RLS entscheidet welche Rows sichtbar sind (Admin=alle, Teamleiter=Team
@@ -662,13 +726,22 @@ export function StempelzeitenView() {
     // fuer scope='self' unterbinden). user_id kommt mit, damit die Row-
     // Darstellung ueber usersMap wie im Fremd-User-Modus den MA-Namen zeigt.
     if (isAllUsersView) {
-      const { data, error } = await supabase
+      let q = supabase
         .from("time_entries")
-        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
-        .gte("clock_in", fromTs)
-        .order("clock_in", { ascending: false });
+        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)");
+      if (!isArchive) q = q.gte("clock_in", fromTs);
+      q = q.order("clock_in", { ascending: false }).order("id", { ascending: true });
+      if (isArchive) q = q.limit(ARCHIVE_PAGE_SIZE + 1);
+      const { data, error } = await q;
+      if (myLoadId !== loadIdRef.current) return;
       if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
-      setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
+      const rows = (data as unknown as ScopedEntry[]) ?? [];
+      if (isArchive) {
+        setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+        setScopedEntries(rows.slice(0, ARCHIVE_PAGE_SIZE));
+      } else {
+        setScopedEntries(rows);
+      }
       setOwnEntries([]);
       setLoading(false);
       return;
@@ -680,14 +753,23 @@ export function StempelzeitenView() {
     // Daher zwingend nach currentUserId filtern.
     if (isOwnView) {
       if (!currentUserId) { setLoading(false); return; }
-      const { data, error } = await supabase
+      let q = supabase
         .from("time_entries")
         .select("id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
-        .eq("user_id", currentUserId)
-        .gte("clock_in", fromTs)
-        .order("clock_in", { ascending: false });
+        .eq("user_id", currentUserId);
+      if (!isArchive) q = q.gte("clock_in", fromTs);
+      q = q.order("clock_in", { ascending: false }).order("id", { ascending: true });
+      if (isArchive) q = q.limit(ARCHIVE_PAGE_SIZE + 1);
+      const { data, error } = await q;
+      if (myLoadId !== loadIdRef.current) return;
       if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
-      setOwnEntries((data as unknown as OwnEntry[]) ?? []);
+      const rows = (data as unknown as OwnEntry[]) ?? [];
+      if (isArchive) {
+        setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+        setOwnEntries(rows.slice(0, ARCHIVE_PAGE_SIZE));
+      } else {
+        setOwnEntries(rows);
+      }
       setScopedEntries([]);
       setLoading(false);
       return;
@@ -699,19 +781,106 @@ export function StempelzeitenView() {
     // Query eine leere Liste (Empty-State greift, Sanitizer raeumt
     // beim naechsten Render auf).
     if (!selectedUserId) { setLoading(false); return; }
-    const { data, error } = await supabase
+    let q = supabase
       .from("time_entries")
       .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
-      .eq("user_id", selectedUserId)
-      .gte("clock_in", fromTs)
-      .order("clock_in", { ascending: false });
+      .eq("user_id", selectedUserId);
+    if (!isArchive) q = q.gte("clock_in", fromTs);
+    q = q.order("clock_in", { ascending: false }).order("id", { ascending: true });
+    if (isArchive) q = q.limit(ARCHIVE_PAGE_SIZE + 1);
+    const { data, error } = await q;
+    if (myLoadId !== loadIdRef.current) return;
     if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
-    setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
+    const rows = (data as unknown as ScopedEntry[]) ?? [];
+    if (isArchive) {
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setScopedEntries(rows.slice(0, ARCHIVE_PAGE_SIZE));
+    } else {
+      setScopedEntries(rows);
+    }
     setOwnEntries([]);
     setLoading(false);
   }, [
     supabase, currentUserId, fromIso, jobFilterActive, jobFilterNumber,
-    isAllUsersView, isOwnView, selectedUserId,
+    isAllUsersView, isOwnView, selectedUserId, viewMode,
+  ]);
+
+  /** Naechste Archiv-Seite nachladen. Cursor = letztes clock_in+id der aktuell
+   *  angezeigten Liste (composite fuer Tie-Break). Filter/User-Kontext muss mit
+   *  der load()-Query uebereinstimmen — deshalb saemtliche User-Pfade hier
+   *  gespiegelt. Der Race-Guard (loadIdRef) verhindert stale-appends wenn der
+   *  User waehrend des Requests Mode/User wechselt (dann feuert load() eine
+   *  neue Query, hebt myLoadId hoch und verwirft das alte Ergebnis). */
+  const loadArchiveMore = useCallback(async () => {
+    if (viewMode !== "archive") return;
+    if (jobFilterActive) return; // Auftrags-Filter kennt kein Paging
+    if (archiveLoadingMore || !archiveHasMore) return;
+
+    const currentList: { clock_in: string; id: string }[] = isOwnView
+      ? ownEntries
+      : scopedEntries;
+    if (currentList.length === 0) return;
+    const last = currentList[currentList.length - 1];
+    const cursorClockIn = last.clock_in;
+    const cursorId = last.id;
+
+    setArchiveLoadingMore(true);
+    const myLoadId = ++loadIdRef.current;
+
+    // Cursor-Filter: (clock_in < c.clock_in) OR (clock_in = c.clock_in AND id > c.id)
+    // Reihenfolge in der Query bleibt clock_in DESC, id ASC — Tie-Break bei
+    // gleichzeitigen Stempel-Ins deterministisch. Kein NULL-Fall — clock_in ist NOT NULL.
+    const cursorOr = `clock_in.lt.${cursorClockIn},and(clock_in.eq.${cursorClockIn},id.gt.${cursorId})`;
+
+    if (isAllUsersView) {
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
+        .or(cursorOr)
+        .order("clock_in", { ascending: false })
+        .order("id", { ascending: true })
+        .limit(ARCHIVE_PAGE_SIZE + 1);
+      if (myLoadId !== loadIdRef.current) { setArchiveLoadingMore(false); return; }
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
+      const rows = (data as unknown as ScopedEntry[]) ?? [];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setScopedEntries((prev) => [...prev, ...rows.slice(0, ARCHIVE_PAGE_SIZE)]);
+    } else if (isOwnView) {
+      if (!currentUserId) { setArchiveLoadingMore(false); return; }
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
+        .eq("user_id", currentUserId)
+        .or(cursorOr)
+        .order("clock_in", { ascending: false })
+        .order("id", { ascending: true })
+        .limit(ARCHIVE_PAGE_SIZE + 1);
+      if (myLoadId !== loadIdRef.current) { setArchiveLoadingMore(false); return; }
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
+      const rows = (data as unknown as OwnEntry[]) ?? [];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setOwnEntries((prev) => [...prev, ...rows.slice(0, ARCHIVE_PAGE_SIZE)]);
+    } else {
+      if (!selectedUserId) { setArchiveLoadingMore(false); return; }
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
+        .eq("user_id", selectedUserId)
+        .or(cursorOr)
+        .order("clock_in", { ascending: false })
+        .order("id", { ascending: true })
+        .limit(ARCHIVE_PAGE_SIZE + 1);
+      if (myLoadId !== loadIdRef.current) { setArchiveLoadingMore(false); return; }
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
+      const rows = (data as unknown as ScopedEntry[]) ?? [];
+      setArchiveHasMore(rows.length > ARCHIVE_PAGE_SIZE);
+      setScopedEntries((prev) => [...prev, ...rows.slice(0, ARCHIVE_PAGE_SIZE)]);
+    }
+    setArchiveLoadingMore(false);
+  }, [
+    supabase, viewMode, jobFilterActive, archiveLoadingMore, archiveHasMore,
+    isAllUsersView, isOwnView, selectedUserId, currentUserId,
+    ownEntries, scopedEntries,
   ]);
 
   // Legitimer cascading-Effect: `load` haengt an isOwnView + selectedUserId
@@ -771,17 +940,24 @@ export function StempelzeitenView() {
   }, []);
 
   /** Excel-Download der aktuell sichtbaren Timesheets. Uebergibt genau die
-   *  Filter, die die View auch anzeigt: 30-Tage-Range, User-Auswahl,
-   *  Auftrags-Nummer. Der Endpoint erzwingt RLS zusaetzlich serverseitig
-   *  (Teamleiter/Normal-User sehen nur ihren Scope). */
+   *  Filter, die die View auch anzeigt: 30-Tage-Range (Recent) oder alle
+   *  Eintraege (Archiv, `mode=archive`), User-Auswahl, Auftrags-Nummer.
+   *  Der Endpoint erzwingt RLS zusaetzlich serverseitig (Teamleiter/Normal-
+   *  User sehen nur ihren Scope). Dateiname reflektiert den Modus. */
   const downloadExcel = useCallback(async () => {
     if (exporting) return;
     setExporting(true);
     try {
       const to = todayLocalIso();
+      const isArchive = viewMode === "archive" && !jobFilterActive;
       const params = new URLSearchParams();
-      params.set("from", fromIso);
-      params.set("to", to);
+      if (isArchive) {
+        // Kein from/to → Endpoint laedt alles was der User via RLS sehen darf.
+        params.set("mode", "archive");
+      } else {
+        params.set("from", fromIso);
+        params.set("to", to);
+      }
       if (jobFilterActive && jobFilterNumber !== null) {
         params.set("auftrag", String(jobFilterNumber));
       } else if (isAllUsersView) {
@@ -798,7 +974,9 @@ export function StempelzeitenView() {
       const blob = await res.blob();
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `stempelzeiten_${fromIso}_${to}.xlsx`;
+      link.download = isArchive
+        ? `stempelzeiten_archiv_${to}.xlsx`
+        : `stempelzeiten_${fromIso}_${to}.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -808,7 +986,7 @@ export function StempelzeitenView() {
     } finally {
       setExporting(false);
     }
-  }, [exporting, fromIso, jobFilterActive, jobFilterNumber, isAllUsersView, isOwnView, selectedUserId]);
+  }, [exporting, fromIso, jobFilterActive, jobFilterNumber, isAllUsersView, isOwnView, selectedUserId, viewMode]);
 
   async function deleteEntry(id: string, clockIn: string) {
     // Client-side Lock-Check: erspart Roundtrip + zeigt sofortige Meldung.
@@ -940,7 +1118,9 @@ export function StempelzeitenView() {
                 ? (jobFilterHeader
                     ? `Auftrag INT-${jobFilterHeader.job_number} · alle Stempeleinträge`
                     : `Auftragsnummer INT-${jobFilterNumber}`)
-                : `${scopeSubLabel} · letzte ${DEFAULT_RANGE_DAYS} Tage`}
+                : `${scopeSubLabel} · ${viewMode === "archive"
+                    ? "Archiv (alle Einträge)"
+                    : `letzte ${DEFAULT_RANGE_DAYS} Tage`}`}
             </p>
           </div>
         </div>
@@ -1058,6 +1238,34 @@ export function StempelzeitenView() {
           />
         </div>
 
+        {/* Modus-Toggle: Recent (letzte 30 Tage, Default) vs Archiv (alles,
+            paginiert). Bei aktivem Auftrags-Filter versteckt — der zeigt
+            ohnehin alle Eintraege auf dem Auftrag, ein Modus-Toggle waere
+            redundant. Kasten-Toggle-Off/Active spiegelt Rest der App. */}
+        {!jobFilterActive && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setViewModeAndPersist("recent")}
+              className={viewMode === "recent" ? "kasten-active" : "kasten-toggle-off"}
+              data-tooltip="Nur die letzten 30 Tage anzeigen"
+              aria-pressed={viewMode === "recent"}
+            >
+              Letzte {DEFAULT_RANGE_DAYS} Tage
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewModeAndPersist("archive")}
+              className={viewMode === "archive" ? "kasten-active" : "kasten-toggle-off"}
+              data-tooltip="Alle Stempeleinträge — paginiert"
+              aria-pressed={viewMode === "archive"}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archiv
+            </button>
+          </div>
+        )}
+
         {/* Ansichts-Wechsel — bei Auftrags-Filter ausgeblendet (die Auftrags-
             Ansicht zeigt bewusst alle MA auf dem Auftrag; ein zusaetzlicher
             Person-Filter waere redundant). Nur sichtbar wenn der User
@@ -1085,13 +1293,6 @@ export function StempelzeitenView() {
           </div>
         )}
 
-        {/* Hinweistext-Fallback, wenn User keine Fremd-Ansicht darf — nur
-            Auftrag-Filter da, Rest der Zeile leer wirkt hohl. */}
-        {!jobFilterActive && !canSelectOther && (
-          <p className="text-xs text-muted-foreground hidden md:block ml-auto">
-            Stempeleinträge der letzten {DEFAULT_RANGE_DAYS} Tage
-          </p>
-        )}
       </div>
 
       {/* Auftrags-Header — bei aktivem Auftrags-Filter + gefundenem Auftrag */}
@@ -1129,23 +1330,48 @@ export function StempelzeitenView() {
             <p className="text-sm text-muted-foreground mt-1">
               {jobFilterActive
                 ? `Auf INT-${jobFilterNumber} wurde bisher nicht gestempelt.`
-                : isAllUsersView
-                  ? `In den letzten ${DEFAULT_RANGE_DAYS} Tagen wurde nicht gestempelt.`
-                  : isOwnView
-                    ? `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
-                    : `${viewedUserName ?? "Dieser Mitarbeiter"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
+                : viewMode === "archive"
+                  ? isAllUsersView
+                    ? "Es gibt keine Stempeleinträge."
+                    : isOwnView
+                      ? "Du hast bisher nicht gestempelt."
+                      : `${viewedUserName ?? "Dieser Mitarbeiter"} hat bisher nicht gestempelt.`
+                  : isAllUsersView
+                    ? `In den letzten ${DEFAULT_RANGE_DAYS} Tagen wurde nicht gestempelt.`
+                    : isOwnView
+                      ? `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
+                      : `${viewedUserName ?? "Dieser Mitarbeiter"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <GroupedList
-          entries={normalized}
-          now={now}
-          currentUserId={currentUserId}
-          canCreateTicket={can("tickets:create")}
-          onDelete={deleteEntry}
-          onCorrect={openCorrect}
-        />
+        <>
+          <GroupedList
+            entries={normalized}
+            now={now}
+            currentUserId={currentUserId}
+            canCreateTicket={can("tickets:create")}
+            onDelete={deleteEntry}
+            onCorrect={openCorrect}
+          />
+          {/* "Mehr laden" — nur im Archiv-Modus, wenn mehr Seiten da sind
+              und die Liste nicht gerade neu-geladen wird. Klick fordert die
+              naechste ARCHIVE_PAGE_SIZE-Seite via Cursor an. */}
+          {viewMode === "archive" && !jobFilterActive && archiveHasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadArchiveMore}
+                disabled={archiveLoadingMore}
+                className="kasten kasten-muted"
+                aria-label="Weitere Stempel-Einträge laden"
+              >
+                {archiveLoadingMore ? <Spinner size={14} /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {archiveLoadingMore ? "Lade…" : "Mehr laden"}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {ConfirmModalElement}

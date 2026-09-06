@@ -1,4 +1,4 @@
-// GET /api/stempelzeiten/export?from=YYYY-MM-DD&to=YYYY-MM-DD&user=<uuid|all>&auftrag=<n>
+// GET /api/stempelzeiten/export?from=YYYY-MM-DD&to=YYYY-MM-DD&user=<uuid|all>&auftrag=<n>&mode=archive
 //
 // Excel-Export der Stempelzeiten-Ansicht (Timesheets). Spiegelt die Filter-
 // Semantik der /stempelzeiten-View 1:1:
@@ -10,6 +10,9 @@
 //   - auftrag=<n>      → alle Rows auf diesem Auftrag (job_number). Ueberschreibt
 //                        den user-Filter (Auftrags-Ansicht zeigt bewusst alle MA).
 //   - from / to        → optional, Default: letzte 30 Tage. Format YYYY-MM-DD.
+//   - mode=archive     → Zeitfenster deaktivieren, ALLE via RLS sichtbaren
+//                        Eintraege exportieren (spiegelt Archiv-Modus der View).
+//                        from/to werden ignoriert; Dateiname `stempelzeiten_archiv_<to>.xlsx`.
 //
 // RLS entscheidet welche Zeilen der User tatsaechlich sehen darf
 // (time_entries_select_* Policies + sees_user() fuer Teamleiter). Der
@@ -86,6 +89,8 @@ export async function GET(req: Request) {
   // Beide Aliases akzeptieren: `user` (wie in der View-URL) und `user_id`.
   const userParam = url.searchParams.get("user") ?? url.searchParams.get("user_id");
   const auftragParam = url.searchParams.get("auftrag");
+  // Archiv-Modus: kein Zeitfenster, alle via RLS sichtbaren Eintraege.
+  const isArchive = url.searchParams.get("mode") === "archive";
 
   // Default: letzte 30 Tage (spiegelt DEFAULT_RANGE_DAYS in stempelzeiten-view).
   const nowMs = Date.now();
@@ -93,13 +98,13 @@ export async function GET(req: Request) {
   const defaultTo = utcIsoDate(new Date(nowMs));
   const from = /^\d{4}-\d{2}-\d{2}$/.test(fromParam ?? "") ? (fromParam as string) : defaultFrom;
   const to = /^\d{4}-\d{2}-\d{2}$/.test(toParam ?? "") ? (toParam as string) : defaultTo;
-  if (from > to) {
+  if (!isArchive && from > to) {
     return NextResponse.json({ success: false, error: "from muss <= to sein" }, { status: 400 });
   }
-  const fromTs = new Date(`${from}T00:00:00Z`).toISOString();
   // Ende inklusive → wir nehmen den Beginn des Folgetags als exklusive obere Grenze
   // (deckt alle clock_in-Zeitstempel bis 23:59:59.999 UTC am `to`-Tag ab; DST-tolerant
-  // genug fuer den Range-Filter).
+  // genug fuer den Range-Filter). Im Archiv-Modus ungenutzt.
+  const fromTs = new Date(`${from}T00:00:00Z`).toISOString();
   const toTs = new Date(new Date(`${to}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000).toISOString();
 
   const supabase = await createClient();
@@ -125,9 +130,16 @@ export async function GET(req: Request) {
   let query = supabase
     .from("time_entries")
     .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
-    .gte("clock_in", fromTs)
-    .lt("clock_in", toTs)
     .order("clock_in", { ascending: false });
+
+  if (!isArchive) {
+    query = query.gte("clock_in", fromTs).lt("clock_in", toTs);
+  } else {
+    // Archiv: harte Obergrenze — schuetzt vor OOM bei riesigen Historien.
+    // 50k Rows entsprechen ca. 10 MB xlsx (grob geschaetzt); wer mehr braucht,
+    // filtert per user/auftrag oder splittet in from/to-Fenster.
+    query = query.limit(50000);
+  }
 
   if (jobIdFilter) {
     // Auftrags-Filter dominiert (wie in der View — Auftrags-Ansicht zeigt bewusst
@@ -207,7 +219,9 @@ export async function GET(req: Request) {
   };
 
   const buffer = await wb.xlsx.writeBuffer();
-  const filename = `stempelzeiten_${from}_${to}.xlsx`;
+  const filename = isArchive
+    ? `stempelzeiten_archiv_${defaultTo}.xlsx`
+    : `stempelzeiten_${from}_${to}.xlsx`;
   return new NextResponse(buffer as BodyInit, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
