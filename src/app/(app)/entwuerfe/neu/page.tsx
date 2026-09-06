@@ -192,6 +192,7 @@ export default function EntwurfNeuPage() {
               setForm((p) => ({ ...p, customer_id: "", customer_name: q }));
             }}
             createNewLabel="Neuer Kunde"
+            commitFreeTextOnBlur
           />
           {!form.customer_id && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -257,6 +258,7 @@ export default function EntwurfNeuPage() {
               setForm((p) => ({ ...p, location_id: "", location_name: q }));
             }}
             createNewLabel="Externer Ort"
+            commitFreeTextOnBlur
           />
           {!form.location_id && (
             <div className="space-y-1 pt-1">

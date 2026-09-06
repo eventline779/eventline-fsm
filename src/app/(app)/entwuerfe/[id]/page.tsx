@@ -548,6 +548,7 @@ export default function EntwurfDetailPage() {
                       patch({ customer_id: null, customer_name: q })
                     }
                     createNewLabel="Neuer Kunde"
+                    commitFreeTextOnBlur
                   />
                 </div>
                 {!draft.customer_id && (
@@ -556,6 +557,11 @@ export default function EntwurfDetailPage() {
                       Firma / Kundenname (Freitext)
                     </label>
                     <Input
+                      // key sorgt dafuer, dass der uncontrolled Input remountet,
+                      // wenn customer_name von aussen aktualisiert wird (z.B. per
+                      // Auto-Commit aus dem SearchableSelect oben). Ohne key
+                      // wuerde die defaultValue-Aktualisierung ignoriert.
+                      key={`cust-name-${draft.customer_name ?? ""}`}
                       defaultValue={draft.customer_name ?? ""}
                       onBlur={(e) => {
                         const v = e.target.value.trim();
@@ -639,6 +645,7 @@ export default function EntwurfDetailPage() {
                   patch({ location_id: null, location_name: q })
                 }
                 createNewLabel="Externer Ort"
+                commitFreeTextOnBlur
               />
               {!draft.location_id && (
                 <div className="pt-1">
@@ -646,6 +653,9 @@ export default function EntwurfDetailPage() {
                     Externer Ort / Adresse (Freitext, wird nicht als Location gespeichert)
                   </label>
                   <Input
+                    // key analog zu customer_name-Input: Remount bei externem
+                    // location_name-Update (z.B. Auto-Commit aus dem Select).
+                    key={`loc-name-${draft.location_name ?? ""}`}
                     defaultValue={draft.location_name ?? ""}
                     onBlur={(e) => {
                       const v = e.target.value.trim();

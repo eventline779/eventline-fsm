@@ -43,6 +43,13 @@ interface Props {
   onCreateNew?: (query: string) => void;
   /** Label vor dem getippten Wert, z.B. "Neuer Kunde" -> "+ Neuer Kunde: Max". Default "Neu anlegen". */
   createNewLabel?: string;
+  /** Wenn true UND onCreateNew gesetzt: verlaesst der User das Feld mit
+   *  eingetipptem Text, der keinem existierenden Item entspricht (auch
+   *  keinem partiellen), wird onCreateNew(text) automatisch aufgerufen —
+   *  damit die Eingabe nicht kommentarlos verloren geht.
+   *  Nur einsetzen wenn onCreateNew billig ist (State-Set / Patch),
+   *  NICHT wenn onCreateNew navigiert oder ein Modal oeffnet. Default false. */
+  commitFreeTextOnBlur?: boolean;
 }
 
 function matchesWordStart(text: string, q: string): boolean {
@@ -64,6 +71,7 @@ export function SearchableSelect({
   active = false,
   onCreateNew,
   createNewLabel = "Neu anlegen",
+  commitFreeTextOnBlur = false,
 }: Props) {
   const selectedItem = items.find((i) => i.id === value) ?? null;
   const [search, setSearch] = useState(selectedItem?.label ?? "");
@@ -123,6 +131,14 @@ export function SearchableSelect({
     };
   }, [open]);
 
+  // Ref auf die aktuellen items/callbacks — der onDocClick-Handler braucht sie
+  // zum Zeitpunkt des Klicks, ohne dass der Listener bei jedem Parent-Render
+  // (neues items-Array) neu registriert wird.
+  const latestRef = useRef({ items, onCreateNew, commitFreeTextOnBlur });
+  useEffect(() => {
+    latestRef.current = { items, onCreateNew, commitFreeTextOnBlur };
+  });
+
   // Click outside
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -131,6 +147,29 @@ export function SearchableSelect({
       const inDropdown = dropdownRef.current?.contains(target);
       if (!inWrapper && !inDropdown) {
         setOpen(false);
+        // Auto-Commit: hat der User etwas eingetippt, das keinem Item entspricht
+        // (auch keinem Wort-Start-Match), UND ist commitFreeTextOnBlur aktiv,
+        // dann persistieren wir den Text ueber onCreateNew — sonst geht die
+        // Eingabe verloren wenn der User "aus dem Feld geht" ohne die
+        // "Neu anlegen"-Option aus dem Dropdown auszuwaehlen.
+        const trimmed = search.trim();
+        const {
+          items: latestItems,
+          onCreateNew: latestOnCreateNew,
+          commitFreeTextOnBlur: latestCommit,
+        } = latestRef.current;
+        const anyPartialMatch =
+          trimmed.length > 0 &&
+          latestItems.some((i) => matchesWordStart(i.label, trimmed));
+        if (
+          latestCommit &&
+          latestOnCreateNew &&
+          trimmed.length > 0 &&
+          !anyPartialMatch &&
+          trimmed !== (selectedItem?.label ?? "")
+        ) {
+          latestOnCreateNew(trimmed);
+        }
         // Wenn beim Verlassen kein Match, Anzeige auf letzten gültigen Wert zurücksetzen
         if (search !== (selectedItem?.label ?? "")) {
           setSearch(selectedItem?.label ?? "");
