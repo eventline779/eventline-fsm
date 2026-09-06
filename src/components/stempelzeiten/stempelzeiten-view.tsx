@@ -51,7 +51,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
-  AlertTriangle, Moon, Search, Users, Edit3, Lock,
+  AlertTriangle, Moon, Search, Users, Edit3, Lock, Download,
 } from "lucide-react";
 import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
@@ -397,6 +397,9 @@ export function StempelzeitenView() {
   // Profile-RLS wuerde einen direkten Join fuer Nicht-Admins blockieren.
   const [usersMap, setUsersMap] = useState<Map<string, string>>(() => new Map());
   const [now, setNow] = useState(() => Date.now());
+  // Excel-Export: gleicher Style wie im Lohn-Timesheet (Blob → temporaerer
+  // Anchor). `exporting`-Guard verhindert Doppelklicks + zeigt Spinner-Text.
+  const [exporting, setExporting] = useState(false);
 
   // Rolle-Scope + Team-Members steuern die Dropdown-Sichtbarkeit.
   // Rolle-Scope kommt aus roles.scope (Migration 208), Admin ist implizit
@@ -767,6 +770,46 @@ export function StempelzeitenView() {
     setShowStempelTicket(true);
   }, []);
 
+  /** Excel-Download der aktuell sichtbaren Timesheets. Uebergibt genau die
+   *  Filter, die die View auch anzeigt: 30-Tage-Range, User-Auswahl,
+   *  Auftrags-Nummer. Der Endpoint erzwingt RLS zusaetzlich serverseitig
+   *  (Teamleiter/Normal-User sehen nur ihren Scope). */
+  const downloadExcel = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const to = todayLocalIso();
+      const params = new URLSearchParams();
+      params.set("from", fromIso);
+      params.set("to", to);
+      if (jobFilterActive && jobFilterNumber !== null) {
+        params.set("auftrag", String(jobFilterNumber));
+      } else if (isAllUsersView) {
+        params.set("user", "all");
+      } else if (!isOwnView && selectedUserId) {
+        params.set("user", selectedUserId);
+      }
+      const res = await fetch(`/api/stempelzeiten/export?${params.toString()}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        toast.error(j?.error || "Excel-Export fehlgeschlagen");
+        return;
+      }
+      const blob = await res.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `stempelzeiten_${fromIso}_${to}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Excel-Export fehlgeschlagen");
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, fromIso, jobFilterActive, jobFilterNumber, isAllUsersView, isOwnView, selectedUserId]);
+
   async function deleteEntry(id: string, clockIn: string) {
     // Client-side Lock-Check: erspart Roundtrip + zeigt sofortige Meldung.
     // RLS haerte das serverseitig ohnehin ab (Migration 214).
@@ -902,6 +945,18 @@ export function StempelzeitenView() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {can("stempelzeiten:view") && (
+            <button
+              type="button"
+              onClick={downloadExcel}
+              disabled={exporting}
+              className="kasten kasten-muted"
+              data-tooltip="Sichtbare Stempelzeiten als Excel herunterladen"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {exporting ? "Wird exportiert…" : "Excel"}
+            </button>
+          )}
           {can("tickets:create") && (
             <button
               type="button"
