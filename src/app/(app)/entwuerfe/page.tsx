@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search, X, ClipboardEdit, Archive, User as UserIcon, MapPin, Calendar, MessageSquare, ArrowRightCircle } from "lucide-react";
+import { Plus, Search, X, ClipboardEdit, Archive, User as UserIcon, MapPin, Calendar, MessageSquare, ArrowRightCircle, List, LayoutGrid } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { toast } from "sonner";
 
 type Segment = "active_group" | "storniert";
+type View = "liste" | "karten";
 
 interface DraftListRow {
   id: string;
@@ -62,6 +63,7 @@ interface OwnerOption {
 const LS_SEGMENT = "entwuerfe-segment";
 const LS_SEARCH = "entwuerfe-search";
 const LS_OWNER = "entwuerfe-owner";
+const LS_VIEW = "entwuerfe-view";
 
 const STATUS_CHIP: Record<DraftListRow["status"], { label: string; color: string }> = {
   aktiv: { label: "Aktiv", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
@@ -99,6 +101,11 @@ export default function EntwuerfePage() {
   const [filterOwner, setFilterOwner] = useState<string>(() =>
     typeof window !== "undefined" ? localStorage.getItem(LS_OWNER) ?? "" : "",
   );
+  const [view, setView] = useState<View>(() => {
+    if (typeof window === "undefined") return "liste";
+    const v = localStorage.getItem(LS_VIEW);
+    return v === "karten" ? "karten" : "liste";
+  });
   const [drafts, setDrafts] = useState<DraftListRow[]>([]);
   const [owners, setOwners] = useState<OwnerOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +125,9 @@ export default function EntwuerfePage() {
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(LS_OWNER, filterOwner);
   }, [filterOwner]);
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem(LS_VIEW, view);
+  }, [view]);
 
   const loadDrafts = useCallback(async () => {
     setLoading(true);
@@ -257,15 +267,49 @@ export default function EntwuerfePage() {
             Reset
           </button>
         )}
+        {/* Ansicht-Toggle: Liste (default, kompakt) vs. Karten (Grid wie /projekte).
+            Persistiert in localStorage (LS_VIEW). */}
+        <div className="flex items-center gap-1 ml-auto sm:ml-0">
+          <button
+            type="button"
+            onClick={() => setView("liste")}
+            className={view === "liste" ? "kasten-active" : "kasten-toggle-off"}
+            data-tooltip="Listen-Ansicht"
+            aria-pressed={view === "liste"}
+            aria-label="Listen-Ansicht"
+          >
+            <List className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Liste</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("karten")}
+            className={view === "karten" ? "kasten-active" : "kasten-toggle-off"}
+            data-tooltip="Karten-Ansicht"
+            aria-pressed={view === "karten"}
+            aria-label="Karten-Ansicht"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Karten</span>
+          </button>
+        </div>
       </div>
 
-      {/* Liste */}
+      {/* Liste ODER Karten (Toggle) */}
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-16 rounded-xl" />
-          ))}
-        </div>
+        view === "karten" ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
+        )
       ) : total === 0 ? (
         <Card className="border-dashed bg-card">
           <CardContent className="p-0">
@@ -307,6 +351,12 @@ export default function EntwuerfePage() {
             />
           </CardContent>
         </Card>
+      ) : view === "karten" ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {drafts.map((d) => (
+            <DraftCard key={d.id} d={d} />
+          ))}
+        </div>
       ) : (
         <div className="space-y-1.5">
           {drafts.map((d) => {
@@ -402,6 +452,126 @@ export default function EntwuerfePage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * DraftCard — Karten-Ansicht analog /projekte (Grid 1/2/3).
+ * Kopf: ENT-Nr + Status-Chip. Titel. Meta (Kunde/Location/Datum).
+ * Bottom: Owner-Initial-Avatar + Notiz-Count.
+ * Storniert/Umgewandelt visuell zurueckgenommen (opacity-70), Border-Tint
+ * je Status damit die Karte schon vor dem Chip lesbar ist.
+ */
+function DraftCard({ d }: { d: DraftListRow }) {
+  const kundeName = d.customer?.name ?? d.customer_name ?? d.contact_person ?? "—";
+  const location = d.location?.name ?? null;
+  const dateText = formatDateRange(d.expected_start_date, d.expected_end_date);
+  const notesCount = d.notes_count?.[0]?.count ?? 0;
+  const statusChip = STATUS_CHIP[d.status];
+  const isConverted = d.status === "umgewandelt";
+  const isCancelled = d.status === "storniert";
+  const muted = isConverted || isCancelled;
+
+  // Dezente Border-Tints je Status — analog /projekte.
+  const statusBorderClass: Record<DraftListRow["status"], string> = {
+    aktiv:             "border-emerald-300/70 dark:border-emerald-500/30",
+    wartet_auf_kunde:  "border-amber-300/70 dark:border-amber-500/30",
+    storniert:         "border-gray-300/60 dark:border-gray-500/25",
+    umgewandelt:       "border-blue-300/60 dark:border-blue-500/30",
+  };
+
+  const ownerInitials = d.owner
+    ? d.owner.full_name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0]?.toUpperCase() ?? "")
+        .join("")
+    : "";
+
+  return (
+    <div
+      className={[
+        "card-hover group relative flex flex-col gap-2 rounded-xl border bg-card p-3",
+        statusBorderClass[d.status] ?? "",
+        muted ? "opacity-70" : "",
+      ].join(" ")}
+    >
+      <Link href={`/entwuerfe/${d.id}`} className="absolute inset-0 rounded-xl" aria-label={d.title} />
+
+      {/* Kopf: Nr + Status-Chip */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-mono font-semibold text-muted-foreground tabular-nums">
+          ENT-{d.draft_number}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {isConverted && d.converted_to_job_id && (
+            <span
+              className="inline-flex items-center text-[11px] text-blue-600 dark:text-blue-400"
+              data-tooltip="Zum Auftrag umgewandelt"
+            >
+              <ArrowRightCircle className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <span
+            className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${statusChip.color}`}
+          >
+            {statusChip.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Titel */}
+      <h3 className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+        {d.title}
+      </h3>
+
+      {/* Meta: Kunde / Location / Datum */}
+      <div className="flex flex-col gap-1 text-[11px] text-muted-foreground min-w-0">
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <UserIcon className="h-3 w-3 shrink-0" />
+          <span className="truncate">{kundeName}</span>
+        </span>
+        {location && (
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">{location}</span>
+          </span>
+        )}
+        {dateText && (
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 shrink-0" />
+            <span className="tabular-nums whitespace-nowrap">{dateText}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Bottom: Owner-Avatar + Notiz-Count */}
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        {d.owner ? (
+          <span
+            className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0"
+            data-tooltip={`Verantwortlich: ${d.owner.full_name}`}
+          >
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-foreground/10 dark:bg-foreground/15 text-[9px] font-bold text-foreground/80 shrink-0">
+              {ownerInitials || "?"}
+            </span>
+            <span className="truncate">{d.owner.full_name}</span>
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/60 italic">niemand zugeteilt</span>
+        )}
+        {notesCount > 0 && (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground shrink-0"
+            data-tooltip={`${notesCount} Notiz${notesCount === 1 ? "" : "en"}`}
+          >
+            <MessageSquare className="h-3 w-3" />
+            {notesCount}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
