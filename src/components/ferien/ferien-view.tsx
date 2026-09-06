@@ -3,13 +3,19 @@
 /**
  * Ferien & Abwesenheit — Mitarbeiter beantragen, Admin genehmigt.
  *
- * Mitarbeiter-Sicht: nur eigene Antraege (RLS regelt). Beantragen via
- * "+ Neue Anfrage"-Button. Eigene noch nicht entschiedene Antraege sind
- * loeschbar.
+ * Struktur (2026-09-06 vereinfacht nach Leo-Feedback "keine Ordnung, sieht
+ * auch vergangene, zu viele komische infos"):
  *
- * Admin-Sicht (ferien:approve): Tabs "Meine | Team", Team-Liste mit
- * Filter nach Status, Genehmigen/Ablehnen-Buttons auf "beantragt"-Eintraegen.
- * Top-Stats: offene Antraege + aktuell abwesend.
+ *   Section 1 — "Zu genehmigen"       (nur Admin, nur wenn offen)
+ *   Section 2 — "Aktuell & Kommend"   (start_date ASC = naechstes zuerst)
+ *   Section 3 — "Vergangen"           (collapsed by default, DESC)
+ *
+ * Keine Status- oder Typ-Filter mehr — die Sektionen ersetzen den
+ * Status-Filter, und die Typ-Icons in jeder Row machen visuelles Scannen
+ * nach Typ ausreichend. Fuer Admin bleibt nur der Meine/Team-Toggle.
+ *
+ * Vergangenes ist kollabiert, damit die Hauptansicht nicht durch Historie
+ * ueberladen wird — der User klickt einmal um sie zu sehen.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,7 +24,24 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Plane, ThermometerSun, Repeat, Coffee, Shield, Plus, Check, X, Trash2, Calendar, AlertCircle, Inbox, UserRound, CalendarClock } from "lucide-react";
+import {
+  Plane,
+  ThermometerSun,
+  Repeat,
+  Coffee,
+  Shield,
+  Plus,
+  Check,
+  X,
+  Trash2,
+  Calendar,
+  AlertCircle,
+  Inbox,
+  UserRound,
+  CalendarClock,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -39,10 +62,6 @@ const TYPE_META: Record<TimeOffType, { label: string; icon: React.ComponentType<
   militaer:      { label: "Militär",        icon: Shield,          color: "bg-green-100 text-green-700 dark:bg-green-500/25 dark:text-green-200" },
 };
 
-/**
- * STATUS-Chip: Farbcodierung app-weit konsistent — Genehmigt=grün,
- * Offen(beantragt)=amber, Abgelehnt=rot. Punkt vorne für stärkere Scannability.
- */
 const STATUS_META: Record<TimeOffStatus, { label: string; chip: string; dot: string }> = {
   beantragt: { label: "Offen",     chip: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30", dot: "bg-amber-500" },
   genehmigt: { label: "Genehmigt", chip: "bg-green-50 text-green-700 ring-1 ring-green-200/70 dark:bg-green-500/15 dark:text-green-200 dark:ring-green-400/30", dot: "bg-green-500" },
@@ -72,18 +91,10 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/**
- * Wiederverwendbare Ferien-View — 1:1 der frueheren Page-Content,
- * extrahiert damit /hr sie als Tab einbetten kann. Die duenne Page unter
- * (app)/ferien/page.tsx haelt Deep-Links am Leben.
- */
 export function FerienView() {
   const supabase = createClient();
   const { profile, can, ready } = usePermissions();
   const { confirm, ConfirmModalElement } = useConfirm();
-  // Deep-Link-Route /ferien kann via Dashboard aufgerufen werden
-  // (?from=dashboard). In /hr eingebettet regelt der HR-Header den Zurueck-
-  // Pfeil — hier dann keinen zusaetzlichen zeigen (sonst 2 Pfeile).
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const showBackButton =
@@ -95,8 +106,7 @@ export function FerienView() {
   const [entries, setEntries] = useState<TimeOffWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"meine" | "team">("meine");
-  const [filterStatus, setFilterStatus] = useState<TimeOffStatus | "alle">("alle");
-  const [filterType, setFilterType] = useState<TimeOffType | "alle">("alle");
+  const [showPast, setShowPast] = useState(false);
 
   // Anfrage-Modal
   const [creating, setCreating] = useState(false);
@@ -115,7 +125,7 @@ export function FerienView() {
     const { data, error } = await supabase
       .from("time_off")
       .select("*, user:profiles!time_off_user_id_fkey(full_name)")
-      .order("start_date", { ascending: false });
+      .order("start_date", { ascending: true });
     if (error) {
       TOAST.supabaseError(error, "Anträge konnten nicht geladen werden");
       setLoading(false);
@@ -127,22 +137,45 @@ export function FerienView() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Effective view: Non-Admins sehen immer "meine"
   const effectiveView = canApprove ? view : "meine";
 
-  const visible = useMemo(() => {
-    let list = entries;
-    if (effectiveView === "meine") {
-      list = list.filter((e) => e.user_id === userId);
-    }
-    if (effectiveView === "team") {
-      if (filterStatus !== "alle") list = list.filter((e) => e.status === filterStatus);
-      if (filterType !== "alle") list = list.filter((e) => e.type === filterType);
-    }
-    return list;
-  }, [entries, effectiveView, filterStatus, filterType, userId]);
+  // Scope zuerst nach View (Meine vs Team), dann in 3 Sektionen splitten:
+  // Zu genehmigen | Aktuell & Kommend | Vergangen.
+  const { toApprove, activeUpcoming, past } = useMemo(() => {
+    const today = todayISO();
+    const scoped = effectiveView === "meine"
+      ? entries.filter((e) => e.user_id === userId)
+      : entries;
 
-  // Stats fuer Admin-Header — offene Antraege / aktuell abwesend / kommende 7 Tage.
+    const toApprove: TimeOffWithUser[] = [];
+    const activeUpcoming: TimeOffWithUser[] = [];
+    const past: TimeOffWithUser[] = [];
+
+    for (const e of scoped) {
+      const isDone = e.end_date < today || e.status === "abgelehnt";
+      if (effectiveView === "team" && e.status === "beantragt" && !isDone) {
+        // Admin-View: alle offenen Anträge landen in "Zu genehmigen",
+        // egal ob Start heute oder in 3 Wochen.
+        toApprove.push(e);
+        continue;
+      }
+      if (isDone) {
+        past.push(e);
+      } else {
+        activeUpcoming.push(e);
+      }
+    }
+
+    // Sortierung: ASC für aktive Sektionen (was steht als nächstes an),
+    // DESC für Vergangenes (neuestes zuerst wenn User aufklappt).
+    toApprove.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    activeUpcoming.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    past.sort((a, b) => b.start_date.localeCompare(a.start_date));
+
+    return { toApprove, activeUpcoming, past };
+  }, [entries, effectiveView, userId]);
+
+  // Admin-Stats — 3 Karten, unverändert.
   const stats = useMemo(() => {
     if (!canApprove) return null;
     const now = todayISO();
@@ -188,9 +221,6 @@ export function FerienView() {
           note: newNote.trim() || null,
         }),
       });
-      // §7: 502/HTML-Response wuerde res.json() werfen — Modal blieb
-      // ohne Feedback offen. try/catch faengt es ab und der Button
-      // wird per finally wieder freigegeben.
       const json = await res.json();
       if (!json.success) {
         TOAST.errorOr(json.error, "Anlegen fehlgeschlagen");
@@ -214,10 +244,6 @@ export function FerienView() {
       variant: "red",
     });
     if (!ok) return;
-    // §6/§14: count:'exact' + explizite Filter — sonst schluckt eine RLS-
-    // Silence den Fehlversuch als scheinbaren Erfolg. user_id gaten damit
-    // der Nutzer wirklich nur eigene Antraege loeschen kann (Non-Admin).
-    // Status-Gate: bereits entschiedene Antraege duerfen nicht mehr weg.
     const uid = userId;
     if (!uid) {
       TOAST.error("Nicht eingeloggt");
@@ -274,6 +300,8 @@ export function FerienView() {
 
   if (!ready) return null;
 
+  const hasAnything = toApprove.length + activeUpcoming.length + past.length > 0;
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -295,7 +323,7 @@ export function FerienView() {
         </button>
       </div>
 
-      {/* Admin-Stats — 3 Karten mit farbigem Icon-Bubble, tabular-nums */}
+      {/* Admin-Stats */}
       {canApprove && stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard
@@ -322,74 +350,31 @@ export function FerienView() {
         </div>
       )}
 
-      {/* Filter (Admin) — zwei getrennte Rows: Meine/Team-Toggle oben, dann Typ+Status */}
+      {/* Meine/Team-Toggle (nur Admin). Kein Status-/Typ-Filter mehr — die
+          Sektionen ersetzen das. */}
       {canApprove && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setView("meine")}
-              className={view === "meine" ? "kasten-active" : "kasten-toggle-off"}
-            >
-              Meine
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("team")}
-              className={view === "team" ? "kasten-active" : "kasten-toggle-off"}
-            >
-              Team
-            </button>
-          </div>
-          {view === "team" && (
-            <div className="rounded-lg border border-border bg-muted/30 p-2 space-y-2">
-              <FilterGroup label="Status">
-                {(["alle", "beantragt", "genehmigt", "abgelehnt"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setFilterStatus(s)}
-                    className={filterStatus === s ? "kasten-active" : "kasten-toggle-off"}
-                  >
-                    {s !== "alle" && <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />}
-                    {s === "alle" ? "Alle" : STATUS_META[s].label}
-                  </button>
-                ))}
-              </FilterGroup>
-              <FilterGroup label="Typ">
-                <button
-                  type="button"
-                  onClick={() => setFilterType("alle")}
-                  className={filterType === "alle" ? "kasten-active" : "kasten-toggle-off"}
-                >
-                  Alle
-                </button>
-                {(Object.keys(TYPE_META) as TimeOffType[]).map((t) => {
-                  const meta = TYPE_META[t];
-                  const Icon = meta.icon;
-                  const active = filterType === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setFilterType(t)}
-                      className={active ? "kasten-active" : "kasten-toggle-off"}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {meta.label}
-                    </button>
-                  );
-                })}
-              </FilterGroup>
-            </div>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setView("meine")}
+            className={view === "meine" ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Meine
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("team")}
+            className={view === "team" ? "kasten-active" : "kasten-toggle-off"}
+          >
+            Team
+          </button>
         </div>
       )}
 
-      {/* List */}
+      {/* Sektionen */}
       {loading ? (
         <Loading />
-      ) : visible.length === 0 ? (
+      ) : !hasAnything ? (
         <div className="rounded-xl border border-dashed border-border bg-card">
           <EmptyState
             icon={Calendar}
@@ -397,23 +382,100 @@ export function FerienView() {
             description={
               effectiveView === "meine"
                 ? "Leg deine erste Anfrage an — Ferien, Krankheit, Kompensation oder Frei-Tag."
-                : "Mit diesen Filtern gibt es keine Einträge. Filter zurücksetzen oder Zeitraum weiten."
+                : "In der Team-Ansicht sind aktuell keine Anträge sichtbar."
             }
           />
         </div>
       ) : (
-        <div className="space-y-2">
-          {visible.map((e) => (
-            <EntryRow
-              key={e.id}
-              entry={e}
-              showUser={effectiveView === "team"}
-              isOwn={e.user_id === userId}
-              canApprove={canApprove}
-              onDelete={() => deleteEntry(e)}
-              onDecide={(d) => openDecide(e, d)}
-            />
-          ))}
+        <div className="space-y-5">
+          {toApprove.length > 0 && (
+            <Section
+              title="Zu genehmigen"
+              count={toApprove.length}
+              tone="amber"
+            >
+              {toApprove.map((e) => (
+                <EntryRow
+                  key={e.id}
+                  entry={e}
+                  showUser={effectiveView === "team"}
+                  isOwn={e.user_id === userId}
+                  canApprove={canApprove}
+                  onDelete={() => deleteEntry(e)}
+                  onDecide={(d) => openDecide(e, d)}
+                />
+              ))}
+            </Section>
+          )}
+
+          {activeUpcoming.length > 0 && (
+            <Section
+              title="Aktuell & Kommend"
+              count={activeUpcoming.length}
+            >
+              {activeUpcoming.map((e) => (
+                <EntryRow
+                  key={e.id}
+                  entry={e}
+                  showUser={effectiveView === "team"}
+                  isOwn={e.user_id === userId}
+                  canApprove={canApprove}
+                  onDelete={() => deleteEntry(e)}
+                  onDecide={(d) => openDecide(e, d)}
+                />
+              ))}
+            </Section>
+          )}
+
+          {/* Aktuelle Ansicht ist leer aber es gibt Vergangenes — Hinweis
+              statt komplett-leer Empty-State. */}
+          {toApprove.length === 0 && activeUpcoming.length === 0 && past.length > 0 && (
+            <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Aktuell keine offenen oder kommenden Abwesenheiten.
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                {past.length} vergangene Einträge unten aufklappbar.
+              </p>
+            </div>
+          )}
+
+          {past.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowPast((v) => !v)}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-muted/40 transition-colors text-left"
+              >
+                {showPast ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Vergangen
+                </span>
+                <span className="text-[10px] font-semibold text-muted-foreground/70 tabular-nums">
+                  {past.length}
+                </span>
+              </button>
+              {showPast && (
+                <div className="space-y-2 mt-2">
+                  {past.map((e) => (
+                    <EntryRow
+                      key={e.id}
+                      entry={e}
+                      showUser={effectiveView === "team"}
+                      isOwn={e.user_id === userId}
+                      canApprove={canApprove}
+                      onDelete={() => deleteEntry(e)}
+                      onDecide={(d) => openDecide(e, d)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -532,7 +594,7 @@ export function FerienView() {
                 {" "}({daysBetween(deciding.entry.start_date, deciding.entry.end_date)} Tage)
               </p>
               {deciding.entry.note && (
-                <p className="text-xs mt-1 italic">"{deciding.entry.note}"</p>
+                <p className="text-xs mt-1 italic">&bdquo;{deciding.entry.note}&ldquo;</p>
               )}
             </div>
 
@@ -578,7 +640,43 @@ export function FerienView() {
 }
 
 // =====================================================================
-// StatCard — Admin-Header-Kachel mit farbigem Icon-Bubble
+// Section — Sektion-Header mit Titel + Count-Badge, dann die Rows
+// =====================================================================
+
+function Section({
+  title,
+  count,
+  tone,
+  children,
+}: {
+  title: string;
+  count: number;
+  tone?: "amber";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline gap-2 px-1">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {title}
+        </h2>
+        <span
+          className={`text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full ${
+            tone === "amber"
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200"
+              : "text-muted-foreground/70 bg-muted/60"
+          }`}
+        >
+          {count}
+        </span>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+// =====================================================================
+// StatCard
 // =====================================================================
 
 const STAT_TONE: Record<"amber" | "red" | "blue" | "green", { bubble: string }> = {
@@ -619,21 +717,6 @@ function StatCard({
 }
 
 // =====================================================================
-// FilterGroup — Label + Chip-Reihe
-// =====================================================================
-
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold w-14 shrink-0">
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-// =====================================================================
 // EntryRow — eine Antrag-Zeile
 // =====================================================================
 
@@ -657,43 +740,44 @@ function EntryRow({ entry, showUser, isOwn, canApprove, onDelete, onDecide }: En
   return (
     <div className="group rounded-xl border border-border bg-card px-3 sm:px-4 py-3 transition-colors hover:border-border/80 hover:bg-muted/20">
       <div className="flex items-center gap-3">
-        {/* Typ-Icon-Bubble (groesser als vorher, klar erkennbar) */}
         <div className="shrink-0">
           <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${typeMeta.color}`}>
             <TypeIcon className="h-5 w-5" />
           </span>
         </div>
 
-        {/* Hauptspalte */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {showUser && entry.user?.full_name ? (
-              <span className="font-semibold text-sm text-foreground truncate">
-                {entry.user.full_name}
-              </span>
+              <>
+                <span className="font-semibold text-sm text-foreground truncate">
+                  {entry.user.full_name}
+                </span>
+                <span className="text-xs text-muted-foreground">· {typeMeta.label}</span>
+              </>
             ) : (
               <span className="font-semibold text-sm text-foreground">
                 {typeMeta.label}
               </span>
             )}
-            {showUser && entry.user?.full_name && (
-              <span className="text-xs text-muted-foreground">
-                · {typeMeta.label}
+            {/* Status-Chip nur zeigen wenn nicht in der "Zu genehmigen"-
+                Sektion (dort ist der Status per Definition beantragt und
+                der Chip wäre redundant). Bei Meine-View immer zeigen. */}
+            {!(canApprove && showUser && entry.status === "beantragt") && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusMeta.chip}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
+                {statusMeta.label}
               </span>
             )}
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusMeta.chip}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
-              {statusMeta.label}
-            </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1 tabular-nums">
             {formatDateRange(entry.start_date, entry.end_date)}
           </p>
           {entry.note && (
             <p className="text-xs italic mt-1 text-foreground/80 truncate">
-              „{entry.note}"
+              &bdquo;{entry.note}&ldquo;
             </p>
           )}
           {entry.status === "abgelehnt" && entry.decision_note && (
@@ -704,7 +788,6 @@ function EntryRow({ entry, showUser, isOwn, canApprove, onDelete, onDecide }: En
           )}
         </div>
 
-        {/* Tage-Badge — prominent, tabular-nums, kompakt */}
         <div className="shrink-0 flex flex-col items-center justify-center px-2.5 min-w-[3rem] rounded-lg bg-muted/60 border border-border/60 py-1.5">
           <span className="text-base font-bold tabular-nums leading-tight text-foreground">
             {days}
@@ -714,7 +797,6 @@ function EntryRow({ entry, showUser, isOwn, canApprove, onDelete, onDecide }: En
           </span>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
           {canDecide && (
             <>
