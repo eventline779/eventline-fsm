@@ -234,6 +234,10 @@ export type JobDetailWithRelations = Omit<
   room: JobRoomSummary | null;
   project_lead: { full_name: string } | null;
   cancelled_by_profile: { full_name: string } | null;
+  /** Wer hat den "Kunde kontaktiert"-Flag gesetzt (Follow-up-Tracking,
+   *  Migration 211). NULL wenn noch niemand kontaktiert hat oder das
+   *  Profil nicht mehr existiert (FK-Delete-Cascade auf SET NULL). */
+  customer_contacted_by_profile: { full_name: string } | null;
 };
 
 export interface JobAppointment {

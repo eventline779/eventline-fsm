@@ -10,7 +10,7 @@
  * gruen=abschliessen, rot=destruktiv) verhindert Klick-Verwechslungen.
  */
 
-import { type ReactNode } from "react";
+import { type ReactNode, useTransition } from "react";
 import {
   MapPin,
   User,
@@ -18,7 +18,11 @@ import {
   XCircle,
   AlertCircle,
   Inbox,
+  Phone,
+  PhoneCall,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { BackButton } from "@/components/ui/back-button";
 import { JobNumber } from "@/components/job-number";
 import { JobStempelButton } from "@/components/stempel/job-stempel-button";
@@ -54,6 +58,10 @@ type Props = {
    *  ueber <AuftragNextActionChip> und reicht ihn hier durch, damit der
    *  Header keine Modal-/Status-Callbacks kennen muss. */
   nextActionChip?: ReactNode;
+  /** Ruft die Detail-Page auf, damit sie den Job neu laedt — z.B. nach
+   *  dem "Kunde kontaktiert"-Toggle. Optional damit Aufrufer ohne
+   *  Reload-Handler nicht brechen. */
+  onReload?: () => void | Promise<void>;
 };
 
 export function AuftragStickyHeader({
@@ -69,6 +77,7 @@ export function AuftragStickyHeader({
   activeTab,
   onSelectTab,
   nextActionChip,
+  onReload,
 }: Props) {
   const customer = job.customer ?? job.location?.customer ?? undefined;
   const location = job.location ?? undefined;
@@ -196,6 +205,20 @@ export function AuftragStickyHeader({
         {job.status === "offen" && (
           <JobStempelButton jobId={jobId} jobNumber={job.job_number} />
         )}
+
+        {/* "Kunde kontaktiert"-Toggle — Follow-up-Tracking (Migration 211).
+            Verhindert doppelte Anrufe, wenn mehrere Team-Member denselben
+            Auftrag klaeren. Nur sichtbar wenn der Auftrag nicht gerade
+            partner_anfrage oder storniert ist — in diesen Zustaenden
+            gibt es ohnehin keinen "Kunden anrufen"-Sinn. */}
+        {job.status !== "partner_anfrage" && job.status !== "storniert" && (
+          <KundeKontaktiertButton
+            jobId={jobId}
+            contactedAt={job.customer_contacted_at}
+            contactedByName={job.customer_contacted_by_profile?.full_name ?? null}
+            onReload={onReload}
+          />
+        )}
       </div>
 
       {/* End-Date-Hint */}
@@ -215,5 +238,124 @@ export function AuftragStickyHeader({
         ariaLabel="Auftrag-Bereiche"
       />
     </div>
+  );
+}
+
+// =====================================================================
+// KundeKontaktiertButton — Toggle mit Optimistic-Reload
+// =====================================================================
+// - NULL customer_contacted_at → "Kunde kontaktieren" (kasten-muted + Phone)
+//   Klick → POST /api/auftraege/[id]/customer-contacted
+// - gesetzt → "Kontaktiert · vor N …" (kasten-green + PhoneCall)
+//   Klick → DELETE (Undo)
+// Tooltip zeigt volles Datum (Europe/Zurich §4) + Name aus profiles-Join.
+// useTransition sorgt fuer disabled+Spinner (siehe §7 Grundregel).
+
+function relativeSince(iso: string, now: Date = new Date()): string {
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (ms < 60_000) return "gerade eben";
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 60) return `vor ${mins} Min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `vor ${hours} Std`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "gestern";
+  if (days < 7) return `vor ${days} Tagen`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `vor ${weeks} ${weeks === 1 ? "Woche" : "Wochen"}`;
+  // Fallback: hartes Datum (Europe/Zurich — §4 CLAUDE.md).
+  return new Date(iso).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" });
+}
+
+function KundeKontaktiertButton({
+  jobId,
+  contactedAt,
+  contactedByName,
+  onReload,
+}: {
+  jobId: string;
+  contactedAt: string | null;
+  contactedByName: string | null;
+  onReload?: () => void | Promise<void>;
+}) {
+  const [pending, startTransition] = useTransition();
+  const isContacted = !!contactedAt;
+
+  const fullDateTooltip = contactedAt
+    ? new Date(contactedAt).toLocaleString("de-CH", {
+        timeZone: "Europe/Zurich",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+  const tooltip = isContacted
+    ? contactedByName
+      ? `Kontaktiert am ${fullDateTooltip} von ${contactedByName}. Klick zum Rueckgaengig-Machen.`
+      : `Kontaktiert am ${fullDateTooltip}. Klick zum Rueckgaengig-Machen.`
+    : "Als 'Kunde kontaktiert' markieren, damit niemand doppelt anruft.";
+
+  const onClick = () => {
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/auftraege/${jobId}/customer-contacted`, {
+          method: isContacted ? "DELETE" : "POST",
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { success: boolean; error?: string }
+          | null;
+        if (!res.ok || !json?.success) {
+          const msg =
+            json?.error ??
+            (res.status === 403
+              ? "Keine Berechtigung fuer diese Aktion."
+              : "Aktion fehlgeschlagen. Bitte erneut versuchen.");
+          toast.error(msg);
+          return;
+        }
+        toast.success(isContacted ? "Markierung entfernt" : "Als kontaktiert markiert");
+        await onReload?.();
+      } catch {
+        toast.error("Netzwerkfehler — bitte erneut versuchen.");
+      }
+    });
+  };
+
+  if (isContacted) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={pending}
+        data-tooltip={tooltip}
+        className="kasten kasten-green"
+      >
+        {pending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <PhoneCall className="h-4 w-4" />
+        )}
+        Kontaktiert · {relativeSince(contactedAt!)}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      data-tooltip={tooltip}
+      className="kasten kasten-muted"
+    >
+      {pending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Phone className="h-4 w-4" />
+      )}
+      Kunde kontaktieren
+    </button>
   );
 }

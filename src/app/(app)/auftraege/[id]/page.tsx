@@ -320,6 +320,7 @@ export default function AuftragDetailPage() {
         tabs={tabs}
         activeTab={activeTab}
         onSelectTab={selectTab}
+        onReload={loadAll}
         nextActionChip={
           <AuftragNextActionChip
             jobId={jobId}
