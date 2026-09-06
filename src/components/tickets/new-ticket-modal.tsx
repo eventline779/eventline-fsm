@@ -27,13 +27,10 @@ import type { TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { localDateIso, localTimeHM } from "@/lib/swiss-time";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, LogIn, LogOut, Coffee, PencilLine, Lock } from "lucide-react";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, Lock } from "lucide-react";
 import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import type { TicketType } from "@/types";
 
-type StempelMode = "korrektur" | "vergessen";
-/** Preset-Slots fuer Stempel-Aenderungs-Tickets — jeder Slot steuert Modus + Prefill. */
-type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
 /** Kontext-Typ fuer den gestempelten Zeitraum: externer Auftrag, internes
  *  Projekt (Zeit-Budget), oder freie "Andere Arbeit" (kein Kontext-Objekt).
  *
@@ -43,19 +40,20 @@ type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
  *  approven, keine Handarbeit mehr in project_time_entries. */
 type StempelContext = "auftrag" | "projekt" | "andere_arbeit";
 
-/** Preset-Definitionen: Icon, Label, Kurzbeschreibung. */
-const STEMPEL_PRESETS: Array<{ id: StempelPreset; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { id: "no_in",      label: "Vergessen einzustempeln", desc: "Zu Schichtbeginn nicht gestempelt",     icon: LogIn      },
-  { id: "no_out",     label: "Vergessen auszustempeln", desc: "Am Ende der Schicht nicht gestempelt",  icon: LogOut     },
-  { id: "wrong_time", label: "Zeit war falsch",         desc: "Start- oder Endzeit stimmt nicht",       icon: PencilLine },
-  { id: "no_break",   label: "Pause vergessen",         desc: "30-min Pause wurde nicht abgezogen",    icon: Coffee     },
-];
+/** Sentinel-Value fuer den Eintrag-Picker: 'Neuer Eintrag (nachtragen)'.
+ *  Wenn der User das waehlt, wird time_entry_id leer geschrieben und der
+ *  Submit macht ein Vergessen-Ticket (kein bestehender Eintrag) statt einer
+ *  Korrektur. Kein separates Preset noetig. */
+const NEW_ENTRY_ID = "__new__";
 
-/** Klick-Vorschlaege fuer das Grund-Textfeld. */
+/** Klick-Vorschlaege fuer das Grund-Textfeld — decken die 3 haeufigsten
+ *  Faelle ab (Vergessen einzustempeln / Zeit falsch / laenger gedauert). */
 const STEMPEL_TEXTBAUSTEINE: string[] = [
   "Vergessen einzustempeln",
+  "Vergessen auszustempeln",
   "Zeit falsch eingegeben",
   "Schicht länger gedauert",
+  "Pause nicht abgezogen",
 ];
 
 /** ISO-timestamptz (UTC) → 'YYYY-MM-DDTHH:MM' in Europe/Zurich, kompatibel
@@ -174,19 +172,10 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
   const [analysisIssues, setAnalysisIssues] = useState<string[]>([]);
   const [analysisDone, setAnalysisDone] = useState(false);
 
-  // Stempel-Aenderung-spezifisch.
-  const [stempelMode, setStempelMode] = useState<StempelMode>("korrektur");
-  // Preset-Slot: welche der 4 Kacheln oben ist gewaehlt. null = noch nichts
-  // ausgewaehlt, Formular wartet auf User-Klick. Der Preset bestimmt Modus
-  // + Prefills; nach Klick kann der User Felder frei anpassen. Wird von
-  // initialData/initialType-Prefill (z.B. /stempelzeiten "Korrigieren"-Row-
-  // Button) als 'wrong_time' vorbelegt.
-  const [stempelPreset, setStempelPreset] = useState<StempelPreset | null>(null);
-  // Kontext-Segment: welche "Art" von Zeit gestempelt wurde. Steuert welcher
-  // Picker unter dem Segment-Toggle erscheint (Auftrag / Projekt / nur
-  // Beschreibung). Default 'auftrag' (haeufigster Fall); wird beim
-  // Preset-Klick / initialData-Prefill anhand des ausgewaehlten Eintrags
-  // auf 'andere_arbeit' bzw. — bei Projekt-Toggle — 'projekt' gesetzt.
+  // Stempel-Aenderung-spezifisch. Kein separater Modus-State mehr — der
+  // Modus (Korrektur vs Nachtrag) wird aus stempel.time_entry_id abgeleitet:
+  // gesetzte ID = Korrektur eines bestehenden Eintrags; leer/NEW_ENTRY_ID =
+  // Nachtrag (Vergessen).
   const [stempelContext, setStempelContext] = useState<StempelContext>("auftrag");
   const [timeEntries, setTimeEntries] = useState<Array<{ id: string; clock_in: string; clock_out: string | null; job_id: string | null; job_label: string | null }>>([]);
   const [stempel, setStempel] = useState({
@@ -236,8 +225,6 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       setAnalyzing(false);
       setAnalysisIssues([]);
       setAnalysisDone(false);
-      setStempelMode("korrektur");
-      setStempelPreset(null);
       setStempelContext("auftrag");
       setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", project_id: "", beschreibung: "", grund: "" });
       setMaterialItems([{ artikel: "", menge: "1", betrag_chf: "" }]);
@@ -251,8 +238,6 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     // damit die Preset-Kachel oben visuell aktiv ist und der User sofort
     // in den Ende-Zeit-Feldern anpasst.
     if (initialType === "stempel_aenderung" && initialData?.timeEntryId) {
-      setStempelMode("korrektur");
-      setStempelPreset("wrong_time");
       // Kontext aus dem vorbelegten Eintrag ableiten: mit job_id → Auftrag,
       // ohne → Andere Arbeit. Projekt-Zeit-Eintraege leiten wir hier
       // absichtlich NICHT auf 'projekt' um — der Prefill-Pfad kommt vom
@@ -416,116 +401,14 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     // nicht wortlos zerstoeren.
   }
 
-  /**
-   * Preset waehlen — setzt Modus + Prefill fuer den entsprechenden Flow.
-   * Wird von den 4 Preset-Kacheln oben im Stempel-Form aufgerufen. Presets
-   * sind smart: sie suchen den passenden time_entry (juengster offener,
-   * letzter geschlossener) und fuellen die Felder mit sinnvollen Defaults —
-   * User muss idealerweise nur den Grund tippen + evtl. Minuten korrigieren.
-   *
-   * WICHTIG: Titel/Grund werden mit Preset-spezifischem Textbaustein
-   * vorbelegt, aber nur wenn der User noch nichts eingetippt hat (nicht
-   * ueberschreiben wenn Preset gewechselt wird).
-   */
-  function applyPreset(preset: StempelPreset) {
-    setStempelPreset(preset);
-    const now = new Date();
-    const todayIso = localDateIso(now);
-    const nowTime = localTimeHM(now);
-    const nowLocal = `${todayIso}T${nowTime}`;
-
-    if (preset === "no_in") {
-      // Vergessen einzustempeln: Modus 'vergessen', Datum=heute, Start=00:00
-      // (User muss Zeit korrigieren), Ende=jetzt. Auftrag-Preselect via
-      // letztem Job (falls verfuegbar). '00:00' als Start-Default statt leer,
-      // damit new Date(...).toISOString() beim Submit nicht Invalid Date
-      // wirft — User sieht 00:00 und aendert auf tatsaechliche Start-Zeit.
-      setStempelMode("vergessen");
-      const lastJobId = timeEntries[0]?.job_id ?? "";
-      // Kontext: haeufigster Fall bei Vergessen ist Auftrag — Wechsel auf
-      // Projekt / Andere Arbeit macht der User via Segment-Toggle.
-      setStempelContext("auftrag");
-      setStempel({
-        time_entry_id: "",
-        neu_start: `${todayIso}T00:00`,
-        neu_end: nowLocal,
-        job_id: lastJobId,
-        project_id: "",
-        beschreibung: "",
-        grund: "Vergessen einzustempeln",
-      });
-      return;
-    }
-
-    if (preset === "no_out") {
-      // Vergessen auszustempeln: juengster OFFENER Eintrag (clock_out=null).
-      // Faellt auf 'no_in' zurueck wenn kein offener Eintrag existiert.
-      const openEntry = timeEntries.find((e) => e.clock_out === null);
-      if (!openEntry) {
-        toast.info("Kein offener Stempel-Eintrag — nutze stattdessen 'Vergessen einzustempeln'");
-        applyPreset("no_in");
-        return;
-      }
-      setStempelMode("korrektur");
-      // Kontext aus dem gewaehlten Eintrag ableiten (Auftrag oder Andere Arbeit).
-      setStempelContext(openEntry.job_id ? "auftrag" : "andere_arbeit");
-      setStempel({
-        time_entry_id: openEntry.id,
-        neu_start: isoToZurichDatetimeLocal(openEntry.clock_in),
-        neu_end: nowLocal,
-        job_id: openEntry.job_id ?? "",
-        project_id: "",
-        beschreibung: "",
-        grund: "Vergessen auszustempeln",
-      });
-      return;
-    }
-
-    if (preset === "wrong_time") {
-      // Zeit war falsch: Modus 'korrektur', User waehlt Eintrag; die
-      // neu_start/neu_end werden beim Eintrag-Wechsel unten in der
-      // SearchableSelect-onChange mit dem AKTUELLEN clock_in/clock_out
-      // des gewaehlten Eintrags vorbelegt — User muss nur die falschen
-      // Minuten aendern.
-      setStempelMode("korrektur");
-      setStempelContext("auftrag");
-      setStempel({
-        time_entry_id: "",
-        neu_start: "",
-        neu_end: "",
-        job_id: "",
-        project_id: "",
-        beschreibung: "",
-        grund: "Zeit falsch eingegeben",
-      });
-      return;
-    }
-
-    if (preset === "no_break") {
-      // Pause vergessen: letzter geschlossener Eintrag, neu_end um 30 Minuten
-      // gekuerzt (Pause abziehen). RPC koennte spaeter in zwei Rows
-      // splitten — fuer jetzt reduzieren wir nur die Gesamtzeit.
-      const closedEntry = timeEntries.find((e) => e.clock_out !== null);
-      if (!closedEntry || !closedEntry.clock_out) {
-        toast.info("Kein abgeschlossener Stempel-Eintrag gefunden");
-        setStempelPreset(null);
-        return;
-      }
-      const endMinus30Ms = new Date(closedEntry.clock_out).getTime() - 30 * 60_000;
-      setStempelMode("korrektur");
-      setStempelContext(closedEntry.job_id ? "auftrag" : "andere_arbeit");
-      setStempel({
-        time_entry_id: closedEntry.id,
-        neu_start: isoToZurichDatetimeLocal(closedEntry.clock_in),
-        neu_end: isoToZurichDatetimeLocal(new Date(endMinus30Ms).toISOString()),
-        job_id: closedEntry.job_id ?? "",
-        project_id: "",
-        beschreibung: "",
-        grund: "Pause (30 min) nicht abgezogen",
-      });
-      return;
-    }
-  }
+  /** Modus wird aus stempel.time_entry_id abgeleitet — kein separater
+   *  State. Leere/NEW_ENTRY_ID = Nachtrag ('vergessen'), gesetzte UUID =
+   *  Korrektur eines bestehenden Eintrags. Der Submit-Handler nutzt das,
+   *  um data-Payload und apply_ticket-Verhalten zu bestimmen. */
+  const stempelMode: "korrektur" | "vergessen" =
+    stempel.time_entry_id && stempel.time_entry_id !== NEW_ENTRY_ID
+      ? "korrektur"
+      : "vergessen";
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = e.target.files;
@@ -666,17 +549,18 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     }
     if (type === "stempel_aenderung") {
       if (!stempel.grund.trim()) return "Grund ist Pflicht";
-      if (stempelMode === "korrektur" && !stempel.time_entry_id) return "Stempel-Eintrag auswählen";
-      if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
-      // Lock-Check: neu_start (nur Vergessen-Modus — Korrektur-Modus haerte
-      // apply_ticket serverseitig ab, dort ist die Alt-Row-Info verfuegbar).
-      // Client-Warnung erspart dem User das Absenden + Ablehnen-Toast.
-      if (stempelMode === "vergessen" && stempel.neu_start && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start))) {
+      // Sowohl bei Korrektur als auch bei Nachtrag brauchen wir Start + Ende
+      // — bei Korrektur werden sie beim Auswaehlen des Eintrags vorbelegt,
+      // bei Nachtrag muss der User sie tippen.
+      if (!stempel.neu_start || !stempel.neu_end) return "Start- und End-Zeit fehlen";
+      // Lock-Check: bei Nachtrag prueft der Client den neu_start; bei
+      // Korrektur haerte apply_ticket serverseitig ab (Alt-Row-Info ist
+      // dort verfuegbar). Warnung im Client erspart dem User das
+      // Absenden + Ablehnen-Toast.
+      if (stempelMode === "vergessen" && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start))) {
         return TIME_ENTRY_LOCK_MESSAGE;
       }
-      // Kontext-abhaengige Pflichtfelder — gelten in beiden Modi, weil der
-      // User via Segment-Toggle bewusst 'Projekt' / 'Andere Arbeit' waehlen
-      // kann und dann das jeweilige Feld nicht leer lassen darf.
+      // Kontext-Pflichtfelder — je nach Segment-Toggle.
       if (stempelContext === "auftrag" && stempelMode === "vergessen" && !stempel.job_id) return "Auftrag auswählen";
       if (stempelContext === "projekt" && !stempel.project_id) return "Projekt auswählen";
       if (stempelContext === "andere_arbeit" && !stempel.beschreibung.trim()) return "Beschreibung der Arbeit ist Pflicht";
@@ -1064,339 +948,216 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
 
           {type === "stempel_aenderung" && (
             <div className="space-y-3">
-              {/* Preset-Row (4 Kacheln): steuert Modus + Prefills. Statt
-                  binaerem korrektur/vergessen-Toggle kann der User direkt
-                  in Klartext sagen was schief lief — das Formular macht
-                  den Rest. */}
+              {/* EIN flacher Flow: Eintrag waehlen (bestehender oder neu),
+                  Zeiten korrigieren/eintragen, Kontext bestaetigen, Grund
+                  tippen. Keine Preset-Kacheln, keine bedingten Sub-Sections
+                  — der Nutzer sieht immer die gleichen Felder und weiss was
+                  er tut. Modus (Korrektur vs Nachtrag) wird aus der Eintrag-
+                  Auswahl abgeleitet. */}
+
+              {/* Eintrag-Picker: bestehende Eintraege + "Neu (nachtragen)"-
+                  Option ganz oben. Auswahl fuellt Zeiten + Kontext vor. */}
               <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/70 ml-1">Was ist passiert? *</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {STEMPEL_PRESETS.map((p) => {
-                    const Icon = p.icon;
-                    const active = stempelPreset === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => applyPreset(p.id)}
-                        aria-pressed={active}
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
-                          active
-                            ? "border-red-500/50 bg-red-500/[0.08]"
-                            : "border-border bg-card hover:border-foreground/30 hover:bg-muted/40"
-                        }`}
-                      >
-                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${active ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`} />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium leading-tight">{p.label}</p>
-                          <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-tight">{p.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Eintrag *</p>
+                <SearchableSelect
+                  value={stempel.time_entry_id || NEW_ENTRY_ID}
+                  onChange={(v) => {
+                    if (v === NEW_ENTRY_ID) {
+                      // Nachtrag: heute vorbelegen, Rest leer.
+                      const todayIso = localDateIso(new Date());
+                      setStempel((prev) => ({
+                        ...prev,
+                        time_entry_id: "",
+                        neu_start: `${todayIso}T00:00`,
+                        neu_end: `${todayIso}T00:00`,
+                        job_id: "",
+                      }));
+                      setStempelContext("auftrag");
+                      return;
+                    }
+                    // Bestehender Eintrag: Zeiten + Kontext uebernehmen —
+                    // User aendert nur was falsch ist.
+                    const entry = timeEntries.find((e) => e.id === v);
+                    if (!entry) return;
+                    setStempel((prev) => ({
+                      ...prev,
+                      time_entry_id: v,
+                      neu_start: isoToZurichDatetimeLocal(entry.clock_in),
+                      neu_end: entry.clock_out
+                        ? isoToZurichDatetimeLocal(entry.clock_out)
+                        : isoToZurichDatetimeLocal(new Date().toISOString()),
+                      job_id: entry.job_id ?? "",
+                    }));
+                    setStempelContext(entry.job_id ? "auftrag" : "andere_arbeit");
+                  }}
+                  items={[
+                    { id: NEW_ENTRY_ID, label: "+ Neuer Eintrag (nachtragen)" },
+                    ...timeEntries.map((e) => {
+                      const inLabel = new Date(e.clock_in).toLocaleString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                      const outLabel = e.clock_out
+                        ? " – " + new Date(e.clock_out).toLocaleString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
+                        : " (noch offen)";
+                      return {
+                        id: e.id,
+                        // timeZone Europe/Zurich zwingend — SSR (UTC) wuerde
+                        // sonst Schichten kurz nach Mitternacht als Vortag
+                        // labeln, was die Stempel-Auswahl irrefuehrt.
+                        label: `${inLabel}${outLabel} — ${e.job_label ?? "—"}`,
+                      };
+                    }),
+                  ]}
+                  placeholder="Eintrag auswählen oder neu…"
+                  clearable={false}
+                />
+              </div>
+
+              {/* Start / Ende — immer sichtbar, immer editierbar. Bei
+                  bestehendem Eintrag mit dessen Zeiten vorbelegt. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
+                  <div className="flex gap-2">
+                    <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
+                    <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-28" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
+                  <div className="flex gap-2">
+                    <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
+                    <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-28" />
+                  </div>
                 </div>
               </div>
 
-              {/* Bis der User einen Preset waehlt, freundlicher Hinweis
-                  statt leerer Fels-Wand. */}
-              {!stempelPreset && (
-                <div className="px-4 py-5 rounded-xl border border-dashed bg-muted/20 text-center">
-                  <Clock className="h-6 w-6 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm font-medium">Wähle oben aus, was passiert ist</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Wir füllen dann die passenden Felder automatisch aus.
-                  </p>
+              {/* Lock-Warnung: nur bei Nachtrag (Korrektur wird serverseitig
+                  gegen die Alt-Row gepueft). Erspart User Absenden + Ablehn. */}
+              {stempelMode === "vergessen" && stempel.neu_start && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start)) && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
+                  <Lock className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-800 dark:text-amber-200">
+                    <p className="font-semibold">Zeitraum bereits abgerechnet</p>
+                    <p className="mt-0.5">
+                      Der gewählte Tag liegt nach der Abrechnungs-Deadline
+                      (5. des Folgemonats). Nachträge sind hier nicht mehr
+                      möglich — bitte an die Buchhaltung wenden.
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {/* Kontext-Segment (Auftrag | Projekt | Andere Arbeit) — steht
-                  in beiden Modi (Korrektur + Vergessen) direkt unter der
-                  Preset-Row. Der aktive Toggle steuert welches Kontext-Feld
-                  darunter erscheint:
-                    - Auftrag: date-gefilterter Auftrag-Picker (bestehend)
-                    - Projekt: Projekt-Picker (nur genehmigte Projekte)
-                    - Andere Arbeit: nur Beschreibungs-Feld (Pflicht)
-                  Projekt-Zeit landet als data.project_id im Ticket und wird
-                  beim Approve von apply_ticket direkt in time_entries.project_id
-                  geschrieben (Migration 212 + 213). */}
-              {stempelPreset && (
-                <>
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground/70 ml-1">Kontext *</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setStempelContext("auftrag")}
-                        aria-pressed={stempelContext === "auftrag"}
-                        className={stempelContext === "auftrag" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
-                      >
-                        Auftrag
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStempelContext("projekt")}
-                        aria-pressed={stempelContext === "projekt"}
-                        className={stempelContext === "projekt" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
-                      >
-                        Projekt
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStempelContext("andere_arbeit")}
-                        aria-pressed={stempelContext === "andere_arbeit"}
-                        className={stempelContext === "andere_arbeit" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
-                      >
-                        Andere Arbeit
-                      </button>
-                    </div>
-                  </div>
+              {/* Kontext-Segment (Auftrag | Projekt | Andere Arbeit) — immer
+                  sichtbar. Vorbelegt aus dem gewaehlten Eintrag, User kann
+                  wechseln (z.B. wenn Kontext falsch war). */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Kontext *</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStempelContext("auftrag")}
+                    aria-pressed={stempelContext === "auftrag"}
+                    className={stempelContext === "auftrag" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                  >
+                    Auftrag
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStempelContext("projekt")}
+                    aria-pressed={stempelContext === "projekt"}
+                    className={stempelContext === "projekt" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                  >
+                    Projekt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStempelContext("andere_arbeit")}
+                    aria-pressed={stempelContext === "andere_arbeit"}
+                    className={stempelContext === "andere_arbeit" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                  >
+                    Andere Arbeit
+                  </button>
+                </div>
+              </div>
 
-                  {stempelContext === "auftrag" && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">
-                        Auftrag {stempelMode === "vergessen" ? "*" : "(optional — wenn Neu-Zuordnung)"}
-                      </p>
-                      <SearchableSelect
-                        value={stempel.job_id}
-                        onChange={(v) => setStempel({ ...stempel, job_id: v })}
-                        items={(() => {
-                          // Filter Auftraege auf solche die am Stempel-Datum
-                          // laufen (start_date <= datum <= end_date). Bei
-                          // Korrektur-Modus liefert das Start-Feld das Datum;
-                          // bei Vergessen ebenfalls. Wenn kein Datum: alle.
-                          const stempelDate = dtDate(stempel.neu_start);
-                          const relevant = stempelDate
-                            ? jobs.filter((j) => {
-                                if (!j.start_date) return true;
-                                const start = localDateIso(new Date(j.start_date));
-                                const end = localDateIso(new Date(j.end_date ?? j.start_date));
-                                return start <= stempelDate && stempelDate <= end;
-                              })
-                            : jobs;
-                          return relevant.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` }));
-                        })()}
-                        placeholder="Auftrag auswählen…"
-                        clearable={false}
-                      />
-                    </div>
-                  )}
-
-                  {stempelContext === "projekt" && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Projekt *</p>
-                      {projects.length === 0 ? (
-                        <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
-                          Keine genehmigten Projekte vorhanden — wähle stattdessen Auftrag oder Andere Arbeit.
-                        </div>
-                      ) : (
-                        <SearchableSelect
-                          value={stempel.project_id}
-                          onChange={(v) => setStempel({ ...stempel, project_id: v })}
-                          items={projects.map((p) => ({ id: p.id, label: p.title }))}
-                          placeholder="Projekt auswählen…"
-                          clearable={false}
-                        />
-                      )}
-                      <p className="text-[10px] text-muted-foreground/60 ml-1 mt-1">
-                        Projekt-Zeit wird bei der Genehmigung automatisch als Stempeleintrag mit Projekt-Bezug angelegt.
-                      </p>
-                    </div>
-                  )}
-
-                  {stempelContext === "andere_arbeit" && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit *</p>
-                      <Input
-                        value={stempel.beschreibung}
-                        onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })}
-                        placeholder="kurz: was wurde gemacht"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Korrektur-Formular (mode=korrektur) — aktiv bei
-                  'no_out' / 'wrong_time' / 'no_break'. */}
-              {stempelPreset && stempelMode === "korrektur" && (
-                <>
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground/70 ml-1">Welcher Eintrag? *</p>
-                    {timeEntries.length === 0 ? (
-                      <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
-                        Keine Stempel-Einträge gefunden — nutze „Vergessen einzustempeln".
-                      </div>
-                    ) : (
-                      <SearchableSelect
-                        value={stempel.time_entry_id}
-                        onChange={(v) => {
-                          // Bei Wechsel: neu_start/neu_end mit den AKTUELLEN
-                          // Werten des Eintrags vorbelegen — User aendert nur
-                          // die falschen Minuten, statt Datum + Zeit komplett
-                          // neu zu tippen. Fuer 'no_out' (clock_out=null)
-                          // bleibt das bereits gesetzte 'jetzt' als Ende
-                          // erhalten.
-                          const entry = timeEntries.find((e) => e.id === v);
-                          setStempel((prev) => ({
-                            ...prev,
-                            time_entry_id: v,
-                            neu_start: entry ? isoToZurichDatetimeLocal(entry.clock_in) : prev.neu_start,
-                            neu_end: entry?.clock_out
-                              ? isoToZurichDatetimeLocal(entry.clock_out)
-                              : prev.neu_end,
-                            job_id: entry?.job_id ?? prev.job_id,
-                          }));
-                        }}
-                        items={timeEntries.map((e) => {
-                          const inLabel = new Date(e.clock_in).toLocaleString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-                          const outLabel = e.clock_out
-                            ? " – " + new Date(e.clock_out).toLocaleString("de-CH", { timeZone: "Europe/Zurich", hour: "2-digit", minute: "2-digit" })
-                            : " (noch offen)";
-                          return {
-                            id: e.id,
-                            // timeZone Europe/Zurich zwingend — SSR (UTC) wuerde
-                            // sonst Schichten kurz nach Mitternacht als Vortag
-                            // labeln, was die Stempel-Auswahl irrefuehrt.
-                            label: `${inLabel}${outLabel} — ${e.job_label ?? "—"}`,
-                          };
-                        })}
-                        placeholder="Stempel-Eintrag auswählen…"
-                        clearable={false}
-                      />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Start</p>
-                      <div className="flex gap-2">
-                        <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-28" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Korrigiertes Ende</p>
-                      <div className="flex gap-2">
-                        <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-28" />
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Vergessen-Formular (mode=vergessen) — aktiv bei 'no_in'. */}
-              {stempelPreset && stempelMode === "vergessen" && (
-                <>
-                  {/* Lock-Warnung — sobald der gewaehlte neu_start-Zeitraum
-                      im gesperrten Abrechnungs-Fenster liegt (5. des Folge-
-                      monats), kann apply_ticket den Eintrag serverseitig
-                      nicht mehr anlegen. Wir zeigen es sofort im Modal, damit
-                      der User nicht ausfuellt + abgelehnt wird. Der Submit-
-                      Guard in validate() blockt zusaetzlich. */}
-                  {stempel.neu_start && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start)) && (
-                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
-                      <Lock className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                      <div className="text-xs text-amber-800 dark:text-amber-200">
-                        <p className="font-semibold">Zeitraum bereits abgerechnet</p>
-                        <p className="mt-0.5">
-                          Der gewählte Tag liegt nach der Abrechnungs-Deadline
-                          (5. des Folgemonats). Nachträge sind hier nicht mehr
-                          möglich — bitte an die Buchhaltung wenden.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {/* Zeitraum-Autofill: letzte bis zu 3 Time-Entries als
-                      Klick-Chips ("Heute 06.09 09:00–17:00 · INT-1234").
-                      Klick uebernimmt Datum + Start/End + Job. Loeschen von
-                      Tippen. Nur zeigen wenn Eintraege vorhanden. */}
-                  {timeEntries.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Von letzter Schicht übernehmen</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {timeEntries.slice(0, 3).map((e) => {
-                          const inDate = new Date(e.clock_in);
-                          const iso = localDateIso(inDate);
-                          const inTime = localTimeHM(inDate);
-                          const outTime = e.clock_out ? localTimeHM(new Date(e.clock_out)) : null;
-                          const today = localDateIso(new Date());
-                          const yesterday = localDateIso(new Date(Date.now() - 86_400_000));
-                          const dayLabel = iso === today
-                            ? "Heute"
-                            : iso === yesterday
-                              ? "Gestern"
-                              : inDate.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit" });
-                          return (
-                            <button
-                              key={e.id}
-                              type="button"
-                              onClick={() => {
-                                setStempel((prev) => ({
-                                  ...prev,
-                                  neu_start: isoToZurichDatetimeLocal(e.clock_in),
-                                  neu_end: e.clock_out ? isoToZurichDatetimeLocal(e.clock_out) : prev.neu_end,
-                                  job_id: e.job_id ?? prev.job_id,
-                                }));
-                              }}
-                              className="px-2.5 py-1 rounded-lg border border-border bg-muted/30 text-[11px] hover:bg-muted/60 hover:border-foreground/30 transition-colors"
-                            >
-                              {dayLabel} {inTime}{outTime ? `–${outTime}` : ""} · {e.job_label ?? "—"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Start *</p>
-                      <div className="flex gap-2">
-                        <Input type="date" value={dtDate(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_start)} onChange={(e) => setStempelDateTime("neu_start", "time", e.target.value)} className="w-28" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Ende *</p>
-                      <div className="flex gap-2">
-                        <Input type="date" value={dtDate(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "date", e.target.value)} className="flex-1" />
-                        <Input type="time" value={dtTime(stempel.neu_end)} onChange={(e) => setStempelDateTime("neu_end", "time", e.target.value)} className="w-28" />
-                      </div>
-                    </div>
-                  </div>
-                  {/* Kontext-Picker (Auftrag / Projekt / Beschreibung) steht
-                      im gemeinsamen Segment-Block oberhalb der Modus-
-                      Formulare — hier nichts mehr. */}
-                </>
-              )}
-
-              {/* Grund-Textarea + 3 Textbaustein-Klick-Vorschlaege (nur
-                  wenn Preset gewaehlt — sonst hat der User noch nichts
-                  ausgewaehlt und die Textarea waere verwirrend). */}
-              {stempelPreset && (
+              {stempelContext === "auftrag" && (
                 <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground/70 ml-1">Grund der Änderung *</p>
-                  <textarea
-                    value={stempel.grund}
-                    onChange={(e) => setStempel({ ...stempel, grund: e.target.value })}
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
-                    placeholder="warum gehört das angepasst…"
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">
+                    Auftrag {stempelMode === "vergessen" ? "*" : "(optional — wenn Neu-Zuordnung)"}
+                  </p>
+                  <SearchableSelect
+                    value={stempel.job_id}
+                    onChange={(v) => setStempel({ ...stempel, job_id: v })}
+                    items={(() => {
+                      const stempelDate = dtDate(stempel.neu_start);
+                      const relevant = stempelDate
+                        ? jobs.filter((j) => {
+                            if (!j.start_date) return true;
+                            const start = localDateIso(new Date(j.start_date));
+                            const end = localDateIso(new Date(j.end_date ?? j.start_date));
+                            return start <= stempelDate && stempelDate <= end;
+                          })
+                        : jobs;
+                      return relevant.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` }));
+                    })()}
+                    placeholder="Auftrag auswählen…"
+                    clearable={false}
                   />
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {STEMPEL_TEXTBAUSTEINE.map((tb) => (
-                      <button
-                        key={tb}
-                        type="button"
-                        onClick={() => setStempel((prev) => ({ ...prev, grund: tb }))}
-                        className="px-2 py-0.5 rounded-md border border-border bg-muted/30 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
-                      >
-                        {tb}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
+
+              {stempelContext === "projekt" && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Projekt *</p>
+                  {projects.length === 0 ? (
+                    <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
+                      Keine genehmigten Projekte vorhanden — wähle stattdessen Auftrag oder Andere Arbeit.
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      value={stempel.project_id}
+                      onChange={(v) => setStempel({ ...stempel, project_id: v })}
+                      items={projects.map((p) => ({ id: p.id, label: p.title }))}
+                      placeholder="Projekt auswählen…"
+                      clearable={false}
+                    />
+                  )}
+                </div>
+              )}
+
+              {stempelContext === "andere_arbeit" && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit *</p>
+                  <Input
+                    value={stempel.beschreibung}
+                    onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })}
+                    placeholder="kurz: was wurde gemacht"
+                  />
+                </div>
+              )}
+
+              {/* Grund + Textbausteine — immer sichtbar. */}
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground/70 ml-1">Grund der Änderung *</p>
+                <textarea
+                  value={stempel.grund}
+                  onChange={(e) => setStempel({ ...stempel, grund: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-card resize-none"
+                  placeholder="warum gehört das angepasst…"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {STEMPEL_TEXTBAUSTEINE.map((tb) => (
+                    <button
+                      key={tb}
+                      type="button"
+                      onClick={() => setStempel((prev) => ({ ...prev, grund: tb }))}
+                      className="px-2 py-0.5 rounded-md border border-border bg-muted/30 text-[10px] text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+                    >
+                      {tb}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
