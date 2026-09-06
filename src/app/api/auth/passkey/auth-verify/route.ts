@@ -10,22 +10,47 @@
  *      geben, damit er sich mit verifyOtp() einloggen kann.
  *
  * ============================================================
- * SESSION-ERZEUGUNG (Kern-Trick)
+ * SESSION-ERZEUGUNG — offiziell empfohlener Workaround
  * ============================================================
- * Supabase hat keine native WebAuthn-/Passkey-Integration. Der Umweg:
- *   admin.generateLink({ type: 'magiclink', email }) gibt uns einen
- *   hashed_token zurück — der ist normalerweise in einem Mail-Link
- *   drin, wir verwenden ihn hier direkt. Der Client ruft dann
- *   supabase.auth.verifyOtp({ token_hash, type: 'email' }) und bekommt
- *   damit eine echte Supabase-Session (Cookies werden gesetzt).
+ * NICHT REFACTOREN. Dieser Magic-Link-Umweg ist bewusst so gewählt.
+ * Er ist der offiziell empfohlene Pfad für Custom-Auth (WebAuthn/
+ * Passkey), solange Supabase keine native WebAuthn-Integration hat
+ * (siehe supabase/gotrue Discussions + Supabase-Docs "Custom Auth").
  *
- * Das ist der offiziell dokumentierte Weg für "custom auth" (siehe
- * https://supabase.com/docs/guides/auth/auth-hooks bzw. discussions
- * zu WebAuthn/Passkey). Sicher, weil:
- *   - Der Passkey-Verify auf dem Server ist der Auth-Anker (nur wer
- *     den privaten Schlüssel besitzt, kommt hier durch).
- *   - Der hashed_token ist ein-mal verwendbar und läuft schnell ab.
+ * Ablauf:
+ *   admin.generateLink({ type: 'magiclink', email }) → hashed_token
+ *   (die Mail wird NICHT verschickt — generateLink sendet nie).
+ *   Client ruft supabase.auth.verifyOtp({ token_hash, type: 'email' })
+ *   → echte Supabase-Session (access_token + refresh_token, Cookies
+ *   werden über die SSR-Bridge gesetzt).
+ *
+ * Sicher, weil:
+ *   - Der Passkey-Verify oben ist der Auth-Anker (nur wer den privaten
+ *     Schlüssel besitzt, kommt bis hier durch).
+ *   - Der hashed_token ist einmal verwendbar und läuft schnell ab.
  *   - Der Server enthüllt die Email nur, wenn Passkey-Verify durchging.
+ *
+ * Geprüfte Alternativen (alle abgelehnt):
+ *   A) admin.auth.admin.signInWithId / createSession → existiert im
+ *      supabase-js v2 NICHT (keine Admin-API die eine Session ausstellt).
+ *   B) Custom-JWT + setSession({ access_token, refresh_token }) mit
+ *      SUPABASE_JWT_SECRET → nur access_token selbst-signierbar; ein
+ *      selbst-signierter refresh_token wird von GoTrue abgelehnt →
+ *      Session stirbt nach ~1h. Workaround wäre direkter INSERT in
+ *      auth.sessions + auth.refresh_tokens (interne GoTrue-Tabellen,
+ *      Schema bricht bei Supabase-Updates — verstößt gegen "robust
+ *      by default" / "auf lange Sicht bauen").
+ *   D) Eigene Session-Cookies + Middleware → bricht RLS (auth.uid()
+ *      bleibt null), ~40 Files umschreiben. Overkill.
+ *
+ * Kosmetische Nebenwirkung des Magic-Link-Wegs: Supabase legt einen
+ * Auth-Log-Entry "user_magiclink_requested" an und zählt gegen das
+ * Magiclink-Rate-Limit (default 30/h/Email — pro User beim Login
+ * unerreichbar). Kein Ops-Problem.
+ *
+ * Neu evaluieren erst wenn: (a) supabase-js eine offizielle
+ * admin.createSession-API bekommt (siehe Roadmap-Issues auf GitHub),
+ * ODER (b) >100 Mitarbeiter Passkey nutzen und Log-Rauschen spürbar.
  */
 
 import { NextResponse } from "next/server";
@@ -153,8 +178,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "User hat keine Email." }, { status: 500 });
   }
 
-  // 5) Magic-Link erzeugen und den hashed_token an den Client zurück.
-  // Der Client ruft damit supabase.auth.verifyOtp({ token_hash, type:
+  // 5) Session-Handshake via Magic-Link-hashed_token (siehe Header-
+  // Kommentar — offiziell empfohlener Workaround, KEIN echter Mail-
+  // Versand). Client ruft supabase.auth.verifyOtp({ token_hash, type:
   // 'email' }) → damit werden die Auth-Cookies gesetzt.
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
     type: "magiclink",
