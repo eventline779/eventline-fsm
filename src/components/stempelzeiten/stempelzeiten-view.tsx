@@ -54,6 +54,7 @@ import { Input } from "@/components/ui/input";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import { JobNumber } from "@/components/job-number";
 import { SearchableSelect, type SelectItem } from "@/components/searchable-select";
+import { formatProjectNumber } from "@/lib/projekte-format";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import {
@@ -66,11 +67,16 @@ import { BackButton } from "@/components/ui/back-button";
 interface OwnEntry {
   id: string;
   job_id: string | null;
+  /** Seit Migration 212: Projekt-Stempel liegen ebenfalls in time_entries
+   *  (statt in der Legacy-Tabelle project_time_entries). project_id gesetzt
+   *  + job_id NULL → Projekt-Stempel; wird als "PROJ-XX · Titel" gelabelt. */
+  project_id: string | null;
   clock_in: string;
   clock_out: string | null;
   description: string | null;
   notes: string | null;
   job: { job_number: number; title: string } | null;
+  project: { project_number: number | null; title: string } | null;
 }
 
 /** Zeile fuer Team- und Alle-Scope. Wie OwnEntry, aber mit user_id — der
@@ -94,11 +100,13 @@ interface JobFilterEntry {
   id: string;
   user_id: string;
   job_id: string | null;
+  project_id: string | null;
   clock_in: string;
   clock_out: string | null;
   description: string | null;
   notes: string | null;
   user: { full_name: string | null } | null;
+  project: { project_number: number | null; title: string } | null;
 }
 
 /** Header-Info fuer den gefundenen Auftrag beim Auftragsnummer-Filter. */
@@ -180,17 +188,48 @@ function monthLastIso(iso: string): string {
   return `${y}-${pad2(m)}-${pad2(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
 }
 
+/** Baut Label + Href fuer eine Stempel-Zeile aus job/project-Feldern.
+ *  Priorisiert Auftrag vor Projekt (bewusst — falls beide gesetzt sind, ist
+ *  der Auftrag der Haupt-Kontext; Projekt-Zeit auf einem Auftrag ist der
+ *  seltene Fall). Fallback null → Row zeigt Description bzw. "Andere Arbeit". */
+function labelHrefFor(e: {
+  job_id: string | null;
+  project_id: string | null;
+  job: { job_number: number; title: string } | null;
+  project: { project_number: number | null; title: string } | null;
+}): { jobId: string | null; jobLabel: string | null; jobHref: string | null } {
+  if (e.job_id && e.job) {
+    return {
+      jobId: e.job_id,
+      jobLabel: `INT-${e.job.job_number} · ${e.job.title}`,
+      jobHref: `/auftraege/${e.job_id}`,
+    };
+  }
+  if (e.project_id && e.project) {
+    return {
+      jobId: e.project_id,
+      jobLabel: `${formatProjectNumber(e.project.project_number)} · ${e.project.title}`,
+      jobHref: `/projekte/${e.project_id}`,
+    };
+  }
+  // FK ohne geladenes Objekt (RLS blockiert z.B. Team-Leiter am Projekt) →
+  // wenigstens die ID beibehalten damit anomaly/link-Logik nicht kippt,
+  // aber kein Label (Row faellt auf description/"Andere Arbeit" zurueck).
+  return { jobId: e.job_id ?? e.project_id, jobLabel: null, jobHref: null };
+}
+
 function normalizeOwn(e: OwnEntry, currentUserId: string | null): NormalizedEntry {
   const dur = e.clock_out
     ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
     : null;
+  const lh = labelHrefFor(e);
   return {
     id: e.id,
     userId: currentUserId, // eigene Sicht -> per Definition der eingeloggte User
     userName: null,
-    jobId: e.job_id,
-    jobLabel: e.job_id && e.job ? `INT-${e.job.job_number} · ${e.job.title}` : null,
-    jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
+    jobId: lh.jobId,
+    jobLabel: lh.jobLabel,
+    jobHref: lh.jobHref,
     description: e.description,
     clockIn: e.clock_in,
     clockOut: e.clock_out,
@@ -205,13 +244,14 @@ function normalizeScoped(e: ScopedEntry, usersMap: Map<string, string>): Normali
   const dur = e.clock_out
     ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
     : null;
+  const lh = labelHrefFor(e);
   return {
     id: e.id,
     userId: e.user_id,
     userName: usersMap.get(e.user_id) ?? "Unbekannt",
-    jobId: e.job_id,
-    jobLabel: e.job_id && e.job ? `INT-${e.job.job_number} · ${e.job.title}` : null,
-    jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
+    jobId: lh.jobId,
+    jobLabel: lh.jobLabel,
+    jobHref: lh.jobHref,
     description: e.description,
     clockIn: e.clock_in,
     clockOut: e.clock_out,
@@ -225,6 +265,9 @@ function normalizeJobFilter(e: JobFilterEntry, jobHeader: JobFilterHeader): Norm
   const dur = e.clock_out
     ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
     : null;
+  // Der Auftrags-Filter fragt strikt nach job_id, ergo ist jobHeader hier
+  // per Definition der passende Auftrags-Label — project_id-Fallback nicht
+  // noetig (das waere ein separater "Projekt-Filter", den es (noch) nicht gibt).
   return {
     id: e.id,
     userId: e.user_id,
@@ -560,7 +603,7 @@ export function StempelzeitenView() {
       //    Nicht-Admins nur eigene bzw. Team (per _select_team-Policy).
       const { data, error } = await supabase
         .from("time_entries")
-        .select("id, user_id, job_id, clock_in, clock_out, description, notes, user:profiles(full_name)")
+        .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, user:profiles(full_name), project:projects(project_number, title)")
         .eq("job_id", jobHeader.id)
         .order("clock_in", { ascending: false });
       if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
@@ -584,7 +627,7 @@ export function StempelzeitenView() {
       if (!currentUserId) { setLoading(false); return; }
       const { data, error } = await supabase
         .from("time_entries")
-        .select("id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
+        .select("id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
         .eq("user_id", currentUserId)
         .gte("clock_in", fromTs)
         .order("clock_in", { ascending: false });
@@ -603,7 +646,7 @@ export function StempelzeitenView() {
     if (!selectedUserId) { setLoading(false); return; }
     const { data, error } = await supabase
       .from("time_entries")
-      .select("id, user_id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
+      .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, job:jobs(job_number, title), project:projects(project_number, title)")
       .eq("user_id", selectedUserId)
       .gte("clock_in", fromTs)
       .order("clock_in", { ascending: false });
