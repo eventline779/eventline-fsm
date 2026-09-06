@@ -129,7 +129,7 @@ export async function POST(req: Request) {
   if (totalDeductionPct >= 100) {
     return NextResponse.json({
       success: false,
-      error: `Summe der Abzuege ist ${totalDeductionPct.toFixed(2)}% — muss < 100% sein. Bitte Lohn-Daten pruefen.`,
+      error: `Summe der Abzüge ist ${totalDeductionPct.toFixed(2)}% — muss < 100% sein. Bitte Lohn-Daten prüfen.`,
     }, { status: 400 });
   }
 

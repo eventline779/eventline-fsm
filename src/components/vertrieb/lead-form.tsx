@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Check, ArrowRight, AlertTriangle, Mail, Phone, Calendar, Filter, Plus, Trash2, PartyPopper, Building2, Users, RotateCcw, Sparkles } from "lucide-react";
 import type { VertriebContact, VertriebStatus, VertriebPriority } from "@/types";
+import type { VertriebContactDetails, VertriebTermin } from "@/types/vertrieb";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, KATEGORIE_OPTIONS, STEPS, BEDARF_BEREICHE, type VertriebFormState } from "@/app/(app)/vertrieb/constants";
 import { SearchableSelect } from "@/components/searchable-select";
 
@@ -48,7 +49,7 @@ interface Props {
   onSendBestaetigung: () => void | Promise<void>;
   onOpenAuftrag: () => void;
   onSelectExistingCustomer: (customerId: string) => void;
-  currentContactWithDetails: () => (VertriebContact & { details: any }) | null;
+  currentContactWithDetails: () => (VertriebContact & { details: VertriebContactDetails }) | null;
 }
 
 export function LeadForm({
@@ -234,7 +235,7 @@ export function LeadForm({
               {/* Erstellte Termine anzeigen */}
               {(() => {
                 const c = currentContactWithDetails();
-                const termine: any[] = c?.details?.termine || [];
+                const termine: VertriebTermin[] = c?.details?.termine || [];
                 if (termine.length === 0) return null;
                 return (
                   <div className="space-y-1.5">
@@ -251,7 +252,7 @@ export function LeadForm({
                           <p className="text-muted-foreground text-[11px]">
                             {(() => { const [y,m,d] = t.date.split("-").map(Number); return new Date(Date.UTC(y, m-1, d, 12)).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }); })()} · {t.time}{t.end_time ? ` – ${t.end_time}` : ""}
                           </p>
-                          {t.note && <p className="text-muted-foreground text-[11px] italic mt-0.5">{t.note}</p>}
+                          {t.notes && <p className="text-muted-foreground text-[11px] italic mt-0.5">{t.notes}</p>}
                         </div>
                         <button type="button" onClick={() => onDeleteTermin(t.id)} className="p-1 text-gray-400 hover:text-red-500" aria-label="Termin löschen"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>

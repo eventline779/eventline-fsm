@@ -320,7 +320,7 @@ interface BaseArgs {
 const TICKET_TYPE_LABEL: Record<string, string> = {
   it: "IT-Problem",
   beleg: "Beleg",
-  stempel_aenderung: "Stempel-Aenderung",
+  stempel_aenderung: "Stempel-Änderung",
   material: "Material",
 };
 
@@ -418,56 +418,11 @@ export async function notifyJobOverdueDay1(
   },
 ) {
   await deliver(client, args.recipients, "job_overdue", {
-    title: `Ueberfaelliger Auftrag: ${args.jobTitle}`,
-    message: `Auftrag INT-${args.jobNumber} sollte am ${args.endDateIso} abgeschlossen sein — bitte kuemmern.`,
+    title: `Überfälliger Auftrag: ${args.jobTitle}`,
+    message: `Auftrag INT-${args.jobNumber} sollte am ${args.endDateIso} abgeschlossen sein — bitte kümmern.`,
     link: `/auftraege/${args.jobId}`,
     resource_type: "job",
     resource_id: args.jobId,
-  });
-}
-
-// --- APPOINTMENTS --------------------------------------------
-
-export async function notifyAppointmentNew(
-  client: SupabaseClient,
-  args: BaseArgs & {
-    appointmentId: string;
-    appointmentTitle: string;
-    jobId: string;
-    jobNumber: number;
-    startTime: string;
-    byName: string;
-  },
-) {
-  const when = new Date(args.startTime).toLocaleString("de-CH", {
-    timeZone: "Europe/Zurich", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
-  await deliver(client, args.recipients, "appointment_new", {
-    title: `Neuer Termin: ${args.appointmentTitle}`,
-    message: `${when} - INT-${args.jobNumber}. Eingetragen von ${args.byName}.`,
-    link: `/auftraege/${args.jobId}`,
-    resource_type: "appointment",
-    resource_id: args.appointmentId,
-  });
-}
-
-// --- TODOS ---------------------------------------------------
-
-export async function notifyTodoAssigned(
-  client: SupabaseClient,
-  args: BaseArgs & {
-    todoId: string;
-    todoTitle: string;
-    byName: string;
-    urgent?: boolean;
-  },
-) {
-  await deliver(client, args.recipients, "todo_assigned", {
-    title: `${args.urgent ? "Dringend: " : ""}${args.todoTitle}`,
-    message: `${args.byName} hat dir ein Todo zugewiesen.`,
-    link: `/todos`,
-    resource_type: "todo",
-    resource_id: args.todoId,
   });
 }
 
@@ -489,7 +444,7 @@ export async function notifyStempelReminderPerEntry(
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
   });
   await deliver(client, [args.userId], "stempel_reminder", {
-    title: `Stempeluhr laeuft noch: ${args.jobLabel}`,
+    title: `Stempeluhr läuft noch: ${args.jobLabel}`,
     message: `Termin endete ${endStr} — bitte ausstempeln falls die Arbeit fertig ist.`,
     link: "/stempel",
     resource_type: "time_entry",
@@ -505,7 +460,7 @@ export async function notifyStempelReminder(
   },
 ) {
   await deliver(client, args.recipients, "stempel_reminder", {
-    title: "Stempel laeuft noch",
+    title: "Stempel läuft noch",
     message: `Du bist seit ${args.sinceMin} Min eingestempelt — vergessen auszustempeln?`,
     link: "/stempelzeiten",
     resource_type: null,
@@ -527,8 +482,8 @@ export async function notifyTodoOverdue(
 ) {
   const dayWord = args.daysOverdue === 1 ? "Tag" : "Tagen";
   await deliver(client, args.recipients, "todo_overdue", {
-    title: `Ueberfaelliges Todo: ${args.title}`,
-    message: `Seit ${args.daysOverdue} ${dayWord} ueberfaellig (war faellig am ${args.dueDateIso}).`,
+    title: `Überfälliges Todo: ${args.title}`,
+    message: `Seit ${args.daysOverdue} ${dayWord} überfällig (war fällig am ${args.dueDateIso}).`,
     link: "/todos",
     resource_type: "todo",
     resource_id: args.todoId,
@@ -547,8 +502,8 @@ export async function notifyVertriebWiedervorlage(
   },
 ) {
   const msg = args.note
-    ? `Wiedervorlage faellig fuer ${args.firma}: ${args.note}`
-    : `Wiedervorlage faellig fuer ${args.firma}`;
+    ? `Wiedervorlage fällig für ${args.firma}: ${args.note}`
+    : `Wiedervorlage fällig für ${args.firma}`;
   await deliver(client, args.recipients, "vertrieb_wiedervorlage", {
     title: `Vertrieb: ${args.firma}`,
     message: msg,

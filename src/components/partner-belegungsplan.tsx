@@ -312,13 +312,13 @@ export function PartnerBelegungsplan({ locationId }: Props) {
                     const titleAttr = `${kind === "belegt" ? "Belegt (EVENTLINE-intern)" : b.title} (${b.start.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}${b.end.getTime() !== b.start.getTime() ? ` – ${b.end.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}` : ""})`;
                     if (kind === "belegt") {
                       return (
-                        <div key={b.id} className={cls} title={titleAttr}>
+                        <div key={b.id} className={cls} data-tooltip={titleAttr}>
                           {label}
                         </div>
                       );
                     }
                     return b.isOwn ? (
-                      <Link key={b.id} href={`/partner/anfragen/${b.id}`} className={cls} title={titleAttr}>
+                      <Link key={b.id} href={`/partner/anfragen/${b.id}`} className={cls} data-tooltip={titleAttr}>
                         {label}
                       </Link>
                     ) : (
@@ -327,7 +327,7 @@ export function PartnerBelegungsplan({ locationId }: Props) {
                         type="button"
                         onClick={() => setVermietungDetail(b)}
                         className={cls}
-                        title={titleAttr}
+                        data-tooltip={titleAttr}
                       >
                         {label}
                       </button>

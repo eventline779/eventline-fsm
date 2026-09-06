@@ -368,7 +368,7 @@ function RowEditor({
       {!readonly && editWarning && (
         <p className="text-[10px] text-amber-700 dark:text-amber-400 italic mb-2 leading-relaxed">{editWarning}</p>
       )}
-      <FieldGroup title="Mitarbeiter-Abzuege (%)" fields={AN_FIELDS} drafts={drafts} setDrafts={setDrafts} savingKey={savingKey} onSave={saveField} readonly={readonly} baseValues={rowToStringMap(row)} />
+      <FieldGroup title="Mitarbeiter-Abzüge (%)" fields={AN_FIELDS} drafts={drafts} setDrafts={setDrafts} savingKey={savingKey} onSave={saveField} readonly={readonly} baseValues={rowToStringMap(row)} />
       <FieldGroup title="Arbeitgeber-Anteil (%)" fields={AG_FIELDS} drafts={drafts} setDrafts={setDrafts} savingKey={savingKey} onSave={saveField} readonly={readonly} baseValues={rowToStringMap(row)} />
       <BvgField row={row} drafts={drafts} setDrafts={setDrafts} onSave={saveField} savingKey={savingKey} readonly={readonly} />
     </div>
@@ -549,10 +549,10 @@ function NewRowForm({
           className="h-8 text-xs px-2 rounded-md border border-border bg-background"
         />
         <span className="text-[10px] text-muted-foreground/70">
-          Vorbelegt mit aktuellen Werten — nur die geaenderten anpassen.
+          Vorbelegt mit aktuellen Werten — nur die geänderten anpassen.
         </span>
       </div>
-      <FieldGroup title="Mitarbeiter-Abzuege (%)" fields={AN_FIELDS} drafts={values} setDrafts={setValues} savingKey={null} onSave={() => {}} readonly={false} baseValues={values} />
+      <FieldGroup title="Mitarbeiter-Abzüge (%)" fields={AN_FIELDS} drafts={values} setDrafts={setValues} savingKey={null} onSave={() => {}} readonly={false} baseValues={values} />
       <FieldGroup title="Arbeitgeber-Anteil (%)" fields={AG_FIELDS} drafts={values} setDrafts={setValues} savingKey={null} onSave={() => {}} readonly={false} baseValues={values} />
       <div className="flex items-center gap-2">
         <label className="text-[10px] text-muted-foreground/70 shrink-0">BVG-Schwelle</label>

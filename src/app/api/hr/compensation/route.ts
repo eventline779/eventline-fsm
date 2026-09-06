@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     if (sumEmployeePct(effective) >= 100) {
       return NextResponse.json({
         success: false,
-        error: `Summe der Mitarbeiter-Abzuege ist ${sumEmployeePct(effective).toFixed(2)}% — muss < 100% sein.`,
+        error: `Summe der Mitarbeiter-Abzüge ist ${sumEmployeePct(effective).toFixed(2)}% — muss < 100% sein.`,
       }, { status: 400 });
     }
   }

@@ -5,7 +5,7 @@
  * Namen in der Monatsstunden-Tabelle.
  *
  * Sektionen:
- *   - Stammdaten: Brutto/Netto/Vollkosten/h + Abzuegen-Breakdown
+ *   - Stammdaten: Brutto/Netto/Vollkosten/h + Abzüge-Breakdown
  *   - Jahres-Stunden (Stempel/Geplant/Rapport)
  *   - Nachtarbeit-Counter (24/Jahr-Limit) mit Datums-Liste + Zuschlag-Hinweis
  *   - Sonntags-/Feiertagsarbeit-Counter (6/Jahr-Limit) mit Datums-Liste
