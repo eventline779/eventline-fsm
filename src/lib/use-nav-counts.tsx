@@ -138,10 +138,12 @@ export function NavCountsProvider({ children, isAdmin }: ProviderProps) {
     const visibilityHandler = () => { if (document.visibilityState === "visible") load(); };
     window.addEventListener("jobs:invalidate", handler);
     window.addEventListener("realtime:tickets", handler);
+    window.addEventListener("realtime:todos", handler);
     document.addEventListener("visibilitychange", visibilityHandler);
     return () => {
       window.removeEventListener("jobs:invalidate", handler);
       window.removeEventListener("realtime:tickets", handler);
+      window.removeEventListener("realtime:todos", handler);
       document.removeEventListener("visibilitychange", visibilityHandler);
     };
   }, [load]);

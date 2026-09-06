@@ -164,7 +164,16 @@ export function Sidebar({ profile, permissions, onSignOut }: SidebarProps) {
                         </div>
                       )}
                       <span className="flex-1">{item.label}</span>
-                      {badge > 0 && (
+                      {badge > 0 && item.href.startsWith("/todos") && (
+                        // Todos: nur ein dezenter roter Punkt (Menge irrelevant,
+                        // Klick fuehrt eh in die Liste). Analog zu Rechnungen-Dot.
+                        <span
+                          className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+                          aria-label={`${badge} offene Todos`}
+                        />
+                      )}
+                      {badge > 0 && !item.href.startsWith("/todos") && (
+                        // Zahl-Badge fuer alle anderen Nav-Items (Rechnungen etc.):
                         // Transparenter Filler + roter Border + rote Schrift,
                         // bg pulst zwischen dunkel-tinted und rot (siehe
                         // @keyframes badge-pulse in globals.css).
