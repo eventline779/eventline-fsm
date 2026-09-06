@@ -112,19 +112,6 @@ function daysBetween(a: string, b: string): number {
   return Math.max(0, Math.round(ms / (24 * 3600 * 1000)));
 }
 
-/** Montag 00:00 der aktuellen Woche (Europe/Zurich) als YYYY-MM-DD.
- *  Rechnet ausschliesslich mit Lokal-Datums-Strings (kein Date-Rundlauf). */
-function currentWeekStartIso(): string {
-  const today = todayLocalIso();
-  const [y, m, d] = today.split("-").map(Number);
-  // Wochentag via Date.UTC + getUTCDay ist stabil, weil wir das Datum als
-  // "reines Tages-Datum" behandeln (kein TZ-Drift bei mittags Timestamps).
-  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // So=0..Sa=6
-  const monOffset = (dow + 6) % 7; // Mo=0, So=6
-  const monday = new Date(Date.UTC(y, m - 1, d - monOffset));
-  return `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, "0")}-${String(monday.getUTCDate()).padStart(2, "0")}`;
-}
-
 // ---------------------------------------------------------------------------
 // Techniker: eigenes Cockpit
 // ---------------------------------------------------------------------------
@@ -382,11 +369,12 @@ async function loadAdminData(opts?: {
     "partner_anfrage",
     "partner_entwurf",
   ];
-  const weekStart = currentWeekStartIso();
-  const [y, m, d] = weekStart.split("-").map(Number);
-  const weekEndDate = new Date(Date.UTC(y, m - 1, d + 7));
-  const weekEndIso = weekEndDate.toISOString();
-  const weekStartIso = new Date(Date.UTC(y, m - 1, d)).toISOString();
+  // Rolling 7-Tage-Fenster ab JETZT (nicht Kalender-Woche Mo-So).
+  // Kalender-Woche waere am Sonntag/spaeten Samstag leer/irrefuehrend
+  // ("Termine diese Woche" zeigt am So 0). Rolling ist immer aussagend.
+  const nowMs = Date.now();
+  const rollingStartIso = new Date(nowMs).toISOString();
+  const rollingEndIso = new Date(nowMs + 7 * 24 * 3600 * 1000).toISOString();
 
   const [
     offeneAuftraege,
@@ -410,14 +398,14 @@ async function loadAdminData(opts?: {
       // is_deleted IS NOT TRUE als "nicht geloescht"). Deshalb explizit
       // .not(..., "is", true) — konsistent mit dem Rest der Codebasis.
       .not("is_deleted", "is", true),
-    // Termine der Woche — Parent-Job darf nicht soft-deleted sein
-    // (is_deleted IS NOT TRUE), sonst zeigt der KPI verwaiste Termine
-    // gelöschter Auftraege. Inner-Join + foreignTable-Filter.
+    // Termine der naechsten 7 Tage (rolling ab jetzt) — Parent-Job darf
+    // nicht soft-deleted sein (is_deleted IS NOT TRUE), sonst zeigt der
+    // KPI verwaiste Termine geloeschter Auftraege. Inner-Join + foreignTable-Filter.
     admin
       .from("job_appointments")
       .select("id, job:jobs!inner(is_deleted)", { count: "exact", head: true })
-      .gte("start_time", weekStartIso)
-      .lt("start_time", weekEndIso)
+      .gte("start_time", rollingStartIso)
+      .lt("start_time", rollingEndIso)
       .not("job.is_deleted", "is", true),
     admin
       .from("jobs")

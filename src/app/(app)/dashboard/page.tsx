@@ -163,7 +163,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
     admin && (
       <KpiCard
         icon={<CalendarDays className="h-3.5 w-3.5" />}
-        label="Termine diese Woche"
+        label="Termine nächste 7 Tage"
         value={admin.kpi?.geplante_termine_woche ?? 0}
         href="/kalender?from=dashboard"
       />

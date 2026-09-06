@@ -75,7 +75,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   },
   {
     id: "kpi-termine-woche",
-    title: "Termine diese Woche",
+    title: "Termine nächste 7 Tage",
     size: "1x1",
     requires: ["kalender:view"],
     defaultRoles: ["admin"],
