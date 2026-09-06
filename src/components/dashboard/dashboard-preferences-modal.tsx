@@ -28,33 +28,37 @@
  *   2) Hidden Widgets (aus overrides.hidden ∩ catalog) am Ende, in
  *      overrides.widget_order-Reihenfolge, danach Registry-Reihenfolge.
  *
- * Steuerung (Pro-DnD, refactored 2026-09-06 — nach Feedback "verschwindet
- * beim Draggen, verzerrt den Rest"):
- *   - Reihenfolge via @dnd-kit/core + sortable MIT DragOverlay. Grund:
- *     das Preview-Grid hat variable Spans (col-span-4/6/12); ohne Overlay
- *     springt das gezogene Element beim Layout-Reflow — mit Overlay bleibt
- *     ein sichtbarer Placeholder an der Ursprungsposition und ein Ghost
- *     folgt dem Cursor. Alle anderen Kacheln gleiten in ihre neue Position.
- *   - Ursprungs-Slot ist ein SICHTBARER dashed Placeholder (opacity 0.35 +
- *     dashed accent border). Frueher unsichtbar per opacity:0 — dann fuehlte
- *     sich der Drag an als waere das Widget "weg". Jetzt ist immer klar wo
- *     das Widget hingehoert (Ghost am Cursor, Placeholder im Grid).
- *   - Ghost hat rotate 1.5deg, tiefen Shadow, accent-Border → sieht optisch
- *     "hochgehoben" aus (Linear/Notion-Muster). Kein leichter "scale" mehr —
- *     Rotation liest sich besser als "in-motion" als eine schlichte Skalierung.
- *   - Drop-Target-Highlight: der Slot unter dem Cursor bekommt einen
- *     accent-farbenen Ring + subtiles Background-Tint → User sieht LIVE wohin
+ * Steuerung (Pro-DnD v2, refactored 2026-09-06 nach Video-Feedback
+ * "man kann es so nicht gebrauchen"):
+ *   - DARSTELLUNG: vertikale Liste, EINE Kachel pro Zeile, uniforme Zeilen-
+ *     hoehe. Frueher waren die Kacheln in einem 12-col-Grid mit variablen
+ *     col-spans (4/6/12); @dnd-kit's rectSortingStrategy berechnet aber
+ *     Transform-Deltas basierend auf uniformer Zellgroesse → bei variablen
+ *     Spans landen Kacheln waehrend Drag an unmoeglichen Positionen und
+ *     ueberlappen sich (Video-Beweis). Uniforme Liste + verticalListSorting
+ *     macht das Layout stabil (Muster: Notion-Widgets, macOS Widget-Editor).
+ *   - Die tatsaechliche Layout-Breite (1/3, 1/2, 2/3, Voll) bleibt sichtbar
+ *     als kleines Badge + Balken-Icon rechts an jeder Zeile — der User
+ *     sieht also weiterhin welche Kachel wie breit sein wird, ohne dass
+ *     das Modal-Layout selbst variable Breiten haben muss.
+ *   - Ursprungs-Slot ist ein SICHTBARER dashed Placeholder (accent border,
+ *     Content auf 25% gefadet). Frueher unsichtbar per opacity:0 — dann
+ *     fuehlte sich der Drag an als waere das Widget "weg". Jetzt ist immer
+ *     klar wo das Widget hingehoert.
+ *   - Ghost mit rotate 1.5deg, tiefer Shadow, accent-Border → sieht optisch
+ *     "hochgehoben" aus (Linear/Notion-Muster).
+ *   - Drop-Target-Highlight: die Zeile unter dem Cursor bekommt einen
+ *     accent-farbenen Ring + Background-Tint → User sieht LIVE wohin
  *     die Kachel landen wird, nicht erst nach dem Drop.
- *   - Grid-Container bekommt beim Drag einen leichten Ambient-Tint (heller
- *     Backdrop) → visuell klar "Drag-Modus aktiv".
+ *   - Container-Backdrop tintiert waehrend Drag leicht in accent → visuell
+ *     klar "Drag-Modus aktiv".
  *   - Cursor state-driven getrennt: idle=grab, drag=grabbing (auf ganzer
  *     Kachel via body.data-dashboard-dragging Attribut).
  *   - PointerSensor (activation-distance 6px, sonst wuerde ein Klick auf
  *     den Auge-Button faelschlicherweise als Drag gewertet) + KeyboardSensor
  *     fuer Screenreader/Tastatur-Nutzer.
- *   - Sichtbarkeit via Eye/EyeOff-icon-btn im Widget-Kopf; hidden Widgets
- *     bleiben in der Reihenfolge, werden aber ausgegraut + mit Overlay
- *     markiert (User sieht wo sie wieder auftauchen wuerden).
+ *   - Sichtbarkeit via Eye/EyeOff-icon-btn rechts; hidden Widgets bleiben
+ *     in der Reihenfolge, werden aber ausgegraut markiert.
  *   - Mobile-Vorschau-Toggle: zwingt alle Widgets im Preview auf volle
  *     Breite (1 Spalte), so sieht der User das effektive Mobile-Layout.
  *   - Auto-Save debounced 400ms bei Aenderung — kein "Speichern"-Button;
@@ -115,14 +119,24 @@ import {
 import {
   SortableContext,
   arrayMove,
-  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { widgetSpanClass } from "@/lib/dashboard-widgets";
+
+// Uebersetzt die Tailwind-Span-Klasse in ein User-lesbares Label + einen
+// numerischen Anteil (fuer die kleine Breiten-Bar rechts). Fallback = Voll,
+// falls jemals ein unbekannter Span reinkommt.
+function spanInfo(spanClass: string): { label: string; fraction: number } {
+  if (spanClass.includes("col-span-4")) return { label: "1/3 breit", fraction: 1 / 3 };
+  if (spanClass.includes("col-span-6")) return { label: "1/2 breit", fraction: 1 / 2 };
+  if (spanClass.includes("col-span-8")) return { label: "2/3 breit", fraction: 2 / 3 };
+  return { label: "Volle Breite", fraction: 1 };
+}
 
 interface CatalogItem {
   id: string;
@@ -471,15 +485,11 @@ export function DashboardPreferencesModal({
       </div>
 
       {!loaded ? (
-        <div className="rounded-xl border bg-muted/30 p-3">
-          <div className="grid grid-cols-12 gap-2">
-            <Skeleton className="h-16 col-span-4" />
-            <Skeleton className="h-16 col-span-4" />
-            <Skeleton className="h-16 col-span-4" />
-            <Skeleton className="h-16 col-span-12" />
-            <Skeleton className="h-16 col-span-6" />
-            <Skeleton className="h-16 col-span-6" />
-          </div>
+        <div className="rounded-xl border bg-muted/30 p-2 space-y-1.5">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">
@@ -499,9 +509,9 @@ export function DashboardPreferencesModal({
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             <div
-              className="rounded-xl border p-3 transition-colors duration-200"
+              className="rounded-xl border p-2 transition-colors duration-200 max-h-[60vh] overflow-y-auto"
               style={{
                 backgroundColor: activeId
                   ? "color-mix(in oklab, var(--accent) 5%, var(--background))"
@@ -511,9 +521,9 @@ export function DashboardPreferencesModal({
                   : undefined,
               }}
             >
-              <div className="grid grid-cols-12 gap-2">
+              <div className="space-y-1.5">
                 {items.map((it) => (
-                  <SortablePreviewTile
+                  <SortablePreviewRow
                     key={it.id}
                     item={it}
                     spanClass={spanFor(it.id, mobilePreview)}
@@ -541,8 +551,9 @@ export function DashboardPreferencesModal({
             }}
           >
             {activeItem && activeSize ? (
-              <PreviewTileVisual
+              <PreviewRowVisual
                 item={activeItem}
+                spanInfo={spanInfo(spanFor(activeItem.id, mobilePreview))}
                 style={{
                   width: activeSize.w,
                   height: activeSize.h,
@@ -583,35 +594,38 @@ export function DashboardPreferencesModal({
 }
 
 // ---------------------------------------------------------------------------
-// PreviewTileVisual — reine Darstellungs-Kachel. Wird sowohl von der
-// sortable Wrapper-Component als auch vom DragOverlay verwendet, damit
-// Ghost + Original 1:1 identisch aussehen (keine "Sprung"-Effekte beim
-// Wechsel zwischen Sortable-Kachel und Overlay-Kachel).
+// PreviewRowVisual — reine Darstellungs-Zeile. Uniforme Hoehe (~56px), volle
+// Breite. Layout: Grip · Icon · Titel (flex-1) · Breiten-Bar · Auge-Button.
+// Wird sowohl von SortablePreviewRow als auch vom DragOverlay verwendet,
+// damit Ghost + Original 1:1 identisch aussehen (kein "Sprung"-Effekt beim
+// Uebergang zwischen Sortable-Zeile und Overlay).
 // ---------------------------------------------------------------------------
 
-function PreviewTileVisual({
+function PreviewRowVisual({
   item,
+  spanInfo: si,
   style,
   className,
-  extraTop,
+  toggleButton,
   contentOpacity,
 }: {
   item: PreferenceItem;
+  spanInfo: { label: string; fraction: number };
   style?: React.CSSProperties;
   className?: string;
-  /** Slot fuer die Sortable-Wrapper — z.B. dnd-kit listeners auf dem
-   *  Kachel-Body. Overlay laesst das leer. */
-  extraTop?: React.ReactNode;
-  /** Wenn gesetzt: erzwingt die Content-Opacity (Titel/Icon/Bars). Wird vom
-   *  Placeholder-State genutzt (dashed Slot, waehrend Ghost am Cursor haengt)
-   *  um den Text auf ~25% zu faden ohne den Border/BG mitzuziehen. */
+  /** Auge-Button; kann vom Sortable-Wrapper injiziert werden. Overlay
+   *  laesst es leer (Overlay ist rein visuell, nicht interaktiv). */
+  toggleButton?: React.ReactNode;
+  /** Wenn gesetzt: erzwingt die Content-Opacity (Titel/Icon). Wird vom
+   *  Placeholder-State genutzt (dashed Zeile, waehrend Ghost am Cursor
+   *  haengt) um den Text auf ~25% zu faden ohne Border/BG mitzuziehen. */
   contentOpacity?: number;
 }) {
   const effectiveContentOpacity =
     contentOpacity !== undefined ? contentOpacity : item.hidden ? 0.55 : 1;
   return (
     <div
-      className={`relative rounded-lg border select-none ${className ?? ""}`}
+      className={`relative rounded-lg border select-none flex items-center gap-3 pl-2 pr-2 py-2.5 h-14 ${className ?? ""}`}
       style={{
         backgroundColor: item.hidden
           ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
@@ -619,53 +633,74 @@ function PreviewTileVisual({
         ...style,
       }}
     >
-      {extraTop}
-      <div className="flex items-start gap-2 p-2.5 min-h-16">
+      <span
+        className="shrink-0 text-muted-foreground/50"
+        aria-hidden
+        style={{ opacity: effectiveContentOpacity }}
+      >
+        <GripVertical className="h-4 w-4" />
+      </span>
+      <span
+        className="shrink-0 text-accent"
+        aria-hidden
+        style={{ opacity: effectiveContentOpacity }}
+      >
+        {iconFor(item.id)}
+      </span>
+      <span
+        className="flex-1 min-w-0 truncate text-sm font-medium"
+        style={{
+          opacity: effectiveContentOpacity,
+          color: item.hidden ? "var(--muted-foreground)" : "var(--foreground)",
+        }}
+      >
+        {item.title}
+      </span>
+      <span
+        className="hidden sm:flex items-center gap-2 shrink-0"
+        style={{ opacity: effectiveContentOpacity }}
+      >
         <span
-          className="mt-0.5 shrink-0 text-muted-foreground/60"
-          aria-hidden
-          style={{ opacity: effectiveContentOpacity }}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </span>
-        <div
-          className="flex-1 min-w-0"
-          style={{ opacity: effectiveContentOpacity }}
-        >
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-            <span className="text-accent shrink-0">{iconFor(item.id)}</span>
-            <span className="truncate">{item.title}</span>
-          </div>
-          <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
-          <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
-        </div>
-      </div>
-
-      {item.hidden && contentOpacity === undefined && (
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg"
+          className="relative h-1.5 w-16 rounded-full overflow-hidden"
           style={{
             backgroundColor:
-              "color-mix(in oklab, var(--background) 55%, transparent)",
+              "color-mix(in oklab, var(--foreground) 10%, transparent)",
           }}
+          aria-hidden
         >
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            ausgeblendet
-          </span>
-        </div>
+          <span
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: `${si.fraction * 100}%`,
+              backgroundColor:
+                "color-mix(in oklab, var(--accent) 70%, transparent)",
+            }}
+          />
+        </span>
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground w-16 text-right">
+          {si.label}
+        </span>
+      </span>
+      {toggleButton}
+
+      {item.hidden && contentOpacity === undefined && (
+        <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded">
+          ausgeblendet
+        </span>
       )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SortablePreviewTile — dnd-kit-Wrapper. Rendert die Kachel im Grid, haengt
-// Drag-Listener aufs Body (nicht auf den Auge-Button — sonst wuerde ein
-// Klick als Drag-Start missinterpretiert). Waehrend Drag: Body ist ein
-// blasser Platzhalter, echter Inhalt wird per DragOverlay gerendert.
+// SortablePreviewRow — dnd-kit-Wrapper. Rendert eine Zeile in der vertikalen
+// Liste, haengt Drag-Listener auf einen absoluten Handle-Layer (nicht auf
+// den Auge-Button — der stopPropagated und liegt eine Ebene hoeher).
+// Waehrend Drag: Zeile bleibt SICHTBAR als dashed Placeholder, Ghost am
+// Cursor wird ueber DragOverlay gerendert.
 // ---------------------------------------------------------------------------
 
-function SortablePreviewTile({
+function SortablePreviewRow({
   item,
   spanClass,
   onToggle,
@@ -677,7 +712,7 @@ function SortablePreviewTile({
   spanClass: string;
   onToggle: () => void;
   isActive: boolean;
-  /** Cursor hovert gerade ueber DIESER Kachel waehrend Drag → Drop-Target-Ring */
+  /** Cursor hovert gerade ueber DIESER Zeile waehrend Drag → Drop-Target-Ring */
   isOverTarget: boolean;
   /** Irgendwer wird gerade gedraggt (dann Hover-Boosts unterdruecken) */
   anyDragActive: boolean;
@@ -691,31 +726,20 @@ function SortablePreviewTile({
     isDragging,
   } = useSortable({
     id: item.id,
-    // Explizite Transition-Kurve fuer den Layout-Reflow der NICHT-gezogenen
-    // Kacheln. dnd-kit-Default (250ms cubic-bezier) waere ok, aber wir
-    // teilen die Konstante mit der DragOverlay-Drop-Animation — konsistente
-    // Bewegung ueber alle Elemente hinweg.
     transition: {
       duration: DND_TRANSITION.duration,
       easing: DND_TRANSITION.easing,
     },
   });
   const [hover, setHover] = useState(false);
+  const si = spanInfo(spanClass);
 
-  // Waehrend Drag: die Kachel bleibt SICHTBAR als dashed Placeholder
-  // (frueher opacity:0 — hat sich angefuehlt als waere das Widget "weg").
-  // Der Ghost am Cursor UND der Placeholder im Grid zusammen sagen dem User
-  // klar: "das Widget ist da (Ghost), gehoert hierhin (Placeholder), landet
-  // dort (Drop-Target-Ring)". Layout-technisch bleibt der Slot besetzt.
+  // Waehrend Drag: Zeile bleibt SICHTBAR als dashed Placeholder.
   const wrapperStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  // Innerer Look:
-  // - isDragging: dashed accent-Border + faded Content → sichtbarer Placeholder
-  // - isOverTarget: accent-Ring + subtile accent-BG → "hier landet der Drop"
-  // - hover (idle): dezenter foreground-Tint
   const innerStyle: React.CSSProperties = {
     backgroundColor: isDragging
       ? "color-mix(in oklab, var(--accent) 6%, transparent)"
@@ -735,67 +759,53 @@ function SortablePreviewTile({
       ? "0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent)"
       : undefined,
     cursor: isActive ? "grabbing" : "grab",
-    // Touch-Action: pan-y ist Standard-Scroll; wir muessen es hier
-    // deaktivieren, sonst schluckt der Browser den Drag-Gesture auf Mobile.
     touchAction: "none",
-    // Weiche Farb-/Border-Transition wenn Drag-Target wechselt (nur
-    // background+border, NICHT transform — das haengt an dnd-kit).
     transition:
       "background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease",
   };
 
-  return (
-    <div
-      ref={setNodeRef}
-      className={spanClass}
-      style={wrapperStyle}
+  const toggleBtn = !isDragging ? (
+    <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={
+        item.hidden
+          ? "icon-btn shrink-0 relative z-10"
+          : "icon-btn icon-btn-green shrink-0 relative z-10"
+      }
+      aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
+      data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
+      style={{ cursor: "pointer" }}
     >
-      <PreviewTileVisual
+      {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </button>
+  ) : null;
+
+  return (
+    <div ref={setNodeRef} style={wrapperStyle} className="relative">
+      {/* Drag-Handle-Layer: deckt die Zeile AUSSER den Auge-Button ab
+          (per pointer-events + z-index). Der Button liegt eine Ebene
+          hoeher (relative z-10) und faengt seinen Klick selbst. */}
+      <div
+        className="absolute inset-0 rounded-lg"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        {...attributes}
+        {...listeners}
+        aria-label={`${item.title} verschieben`}
+        style={{ cursor: isActive ? "grabbing" : "grab" }}
+      />
+      <PreviewRowVisual
         item={item}
+        spanInfo={si}
         style={innerStyle}
-        className="h-full"
         contentOpacity={isDragging ? 0.25 : undefined}
-        extraTop={
-          <>
-            {/* Drag-Handle-Layer: fuellt die ganze Kachel, faengt Pointer/Key-
-                Events fuer dnd-kit. Absolut positioniert damit der Auge-Button
-                DARUEBER stehen kann (button liegt in einer eigenen Layer und
-                stopt Propagation). */}
-            <div
-              className="absolute inset-0 rounded-lg"
-              onMouseEnter={() => setHover(true)}
-              onMouseLeave={() => setHover(false)}
-              {...attributes}
-              {...listeners}
-              aria-label={`${item.title} verschieben`}
-            />
-            {/* Auge-Button: eigene Layer ueber dem Drag-Handle, damit Klick
-                den Handle nicht triggert. Waehrend Drag verstecken wir ihn,
-                damit der Placeholder minimal-clean aussieht (kein irritierender
-                Toggle-Button auf einer "weg-gezogenen" Kachel). */}
-            {!isDragging && (
-              <button
-                type="button"
-                onPointerDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle();
-                }}
-                className={
-                  item.hidden
-                    ? "icon-btn absolute right-2 top-2 z-10"
-                    : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
-                }
-                aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
-                data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
-                style={{ cursor: "pointer" }}
-              >
-                {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            )}
-          </>
-        }
+        toggleButton={toggleBtn}
       />
     </div>
   );
