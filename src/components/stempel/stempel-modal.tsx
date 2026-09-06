@@ -1,9 +1,15 @@
 "use client";
 
-// Stempel-Einstempeln-Modal: zwei Wege.
+// Stempel-Einstempeln-Modal: drei Wege.
 //   "Auf Auftrag": Auftrag aus Liste der aktiven (offen+anfrage+entwurf)
 //     suchen und auswaehlen — description optional.
-//   "Andere Arbeit": ohne Auftrag, description PFLICHT (sonst weiss
+//   "Auf Projekt": internes Projekt auswaehlen — description optional.
+//     Wenn User noch nicht Mitglied ist, wird er beim Stempeln automatisch
+//     dem Projekt beigefuegt (project_members-Insert), analog zum bisherigen
+//     Detail-Seiten-Flow. Gestempelt wird dann direkt in time_entries mit
+//     gesetzter project_id (siehe Migration 212), nicht mehr in der alten
+//     project_time_entries-Tabelle.
+//   "Andere Arbeit": ohne Auftrag/Projekt, description PFLICHT (sonst weiss
 //     der Admin spaeter nicht wofuer die Zeit gestempelt wurde).
 //
 // Bei direktem Klick auf "Auf Auftrag stempeln" auf einer Auftrag-Detail-
@@ -11,7 +17,6 @@
 // clockIn({jobId}) auf.
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +50,6 @@ interface Props {
 
 export function StempelModal({ open, onClose }: Props) {
   const supabase = createClient();
-  const router = useRouter();
   const { clockIn } = useStempel();
   const { role } = usePermissions();
   // Bewusst rollen-basiert: Admins haben einen anderen Zeit-Erfassungs-
@@ -59,6 +63,7 @@ export function StempelModal({ open, onClose }: Props) {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [search, setSearch] = useState("");
   const [selectedJob, setSelectedJob] = useState<JobOption | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectOption | null>(null);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<"job" | "projekt" | "other" | null>(null);
@@ -71,6 +76,7 @@ export function StempelModal({ open, onClose }: Props) {
     setMode("choose");
     setSearch("");
     setSelectedJob(null);
+    setSelectedProject(null);
     setDescription("");
     (async () => {
       // Naechste anstehende Auftraege zuerst — sortiert nach start_date
@@ -145,6 +151,39 @@ export function StempelModal({ open, onClose }: Props) {
       return;
     }
     toast.success(`Eingestempelt auf INT-${selectedJob.job_number}`);
+    onClose();
+  }
+
+  async function submitProject() {
+    if (!selectedProject) {
+      toast.error("Bitte ein Projekt auswählen");
+      return;
+    }
+    setSaving(true);
+    // Auto-join: wer noch nicht Mitglied ist, wird beim Stempeln in
+    // project_members aufgenommen (identisches Verhalten wie im Detail-
+    // Seiten-Flow, damit das RLS-Guard „nur Mitglieder duerfen sehen" fuer
+    // die Zeit-Ansicht des Projekts sofort greift).
+    if (!selectedProject.is_member) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: joinError } = await supabase
+          .from("project_members")
+          .insert({ project_id: selectedProject.id, user_id: user.id });
+        if (joinError && joinError.code !== "23505") {
+          setSaving(false);
+          toast.error("Beitritt zum Projekt fehlgeschlagen: " + joinError.message);
+          return;
+        }
+      }
+    }
+    const res = await clockIn({ projectId: selectedProject.id, description: description || null });
+    setSaving(false);
+    if (!res.success) {
+      TOAST.stempelError(res.error || "Einstempeln fehlgeschlagen");
+      return;
+    }
+    toast.success(`Eingestempelt auf ${formatProjectNumber(selectedProject.project_number)}`);
     onClose();
   }
 
@@ -357,7 +396,7 @@ export function StempelModal({ open, onClose }: Props) {
       {mode === "projekt" && (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Wähle ein Projekt. Wenn du noch nicht eingeloggt bist, wirst du automatisch beigetreten — dann kannst du die Uhr starten.
+            Wähle ein Projekt. Wenn du noch nicht eingeloggt bist, wirst du beim Stempeln automatisch beigetreten.
           </p>
           <Input
             placeholder="Projekt suchen (Nummer oder Titel)…"
@@ -373,8 +412,12 @@ export function StempelModal({ open, onClose }: Props) {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => { onClose(); router.push(`/projekte/${p.id}`); }}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border text-left hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-emerald-500/10 transition-all"
+                  onClick={() => setSelectedProject(p)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all duration-150 ${
+                    selectedProject?.id === p.id
+                      ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/40 shadow-sm"
+                      : "border-border hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-emerald-500/10"
+                  }`}
                 >
                   <FolderKanban className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span className="font-mono text-xs font-semibold text-muted-foreground shrink-0">{formatProjectNumber(p.project_number)}</span>
@@ -384,14 +427,31 @@ export function StempelModal({ open, onClose }: Props) {
                       <CheckCircle2 className="h-3 w-3" /> eingeloggt
                     </span>
                   ) : (
-                    <span className="text-[10px] font-medium text-muted-foreground shrink-0">Einloggen &amp; Stempeln</span>
+                    <span className="text-[10px] font-medium text-muted-foreground shrink-0">Auto-Beitritt</span>
                   )}
                 </button>
               ))
             )}
           </div>
+          <div>
+            <Label className="text-xs">Notiz (optional)</Label>
+            <Input
+              placeholder="Was machst du genau?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-1"
+            />
+          </div>
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={() => setMode("choose")} className="kasten kasten-muted flex-1">Zurück</button>
+            <button
+              type="button"
+              onClick={submitProject}
+              disabled={saving || !selectedProject}
+              className="kasten kasten-green flex-1"
+            >
+              {saving ? "Stempelt…" : "Einstempeln"}
+            </button>
           </div>
         </div>
       )}

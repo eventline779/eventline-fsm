@@ -17,6 +17,7 @@ import type { TimeEntry } from "@/types";
 
 interface ClockInOpts {
   jobId?: string | null;
+  projectId?: string | null;
   description?: string | null;
 }
 
@@ -69,6 +70,7 @@ export function StempelProvider({ children }: { children: ReactNode }) {
     const payload = {
       user_id: user.id,
       job_id: opts.jobId ?? null,
+      project_id: opts.projectId ?? null,
       description: opts.description?.trim() || null,
       clock_in: new Date().toISOString(),
     };

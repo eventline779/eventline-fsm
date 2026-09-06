@@ -1,22 +1,33 @@
 "use client";
 
 /**
- * Stempelzeiten-Portal (vereinfacht — 2026-09-02).
+ * Stempelzeiten-Portal (vereinfacht — 2026-09-02, Scope-Toggle 2026-09-06).
  *
- * Zeigt die eigenen Stempeleintraege der letzten 30 Tage als flache, nach
- * Tag gruppierte Liste — kein Datums-Picker, keine Quick-Chips, kein
- * Heatmap-/Pivot-Toggle, kein Anomalien-Only-Filter mehr. Anomalien
- * (lange Schicht > 10h, Mitternacht-Uebergang, vergessener Stempel-Out
- * > 18h) erscheinen als kleine Chips pro Zeile.
+ * Zeigt Stempeleintraege der letzten 30 Tage als flache, nach Tag gruppierte
+ * Liste — kein Datums-Picker, keine Quick-Chips, kein Heatmap-/Pivot-Toggle,
+ * kein Anomalien-Only-Filter mehr. Anomalien (lange Schicht > 10h,
+ * Mitternacht-Uebergang, vergessener Stempel-Out > 18h) erscheinen als
+ * kleine Chips pro Zeile.
  *
  * KPIs oben (3 Kacheln): Diese Woche / Dieser Monat / Ø pro Arbeitstag Monat.
  * "Heute" faellt weg — steht ohnehin ganz oben in der Liste.
  *
- * Admin-Sicht: SearchableSelect oben rechts. Standard = leer = eigene Sicht.
- * Beim Waehlen eines Mitarbeiters werden dessen Eintraege via admin-only-RPC
- * `get_all_time_entries` (SECURITY DEFINER) geladen. Der frueheren "Alle
- * Mitarbeiter"-Toggle entfaellt bewusst: eine gemischte Liste ist beim
- * schnellen Ueberblick meist verwirrender als hilfreich.
+ * Scope-Toggle (Eigene | Team | Alle) — ersetzt den frueheren Admin-User-
+ * Selector (SearchableSelect). Sichtbarkeit der Segments haengt an den
+ * Rechten des Users (Migration 208 Teamleiter-Scope):
+ *   - Eigene: IMMER sichtbar (Default).
+ *   - Team:   nur wenn Rolle-scope='team'|'all' ODER Admin, UND der User
+ *             tatsaechlich Team-Mitglieder hat (profiles.team_lead_id = ich).
+ *             Zeigt eigene + Team-Mitglieder-Eintraege. RLS
+ *             (time_entries_select_team via sees_user()) haerte das ab.
+ *   - Alle:   nur wenn Permission 'stempelzeiten:see-all' (Admin durch).
+ *             Zeigt firm-weit alle Eintraege, sortiert nach clock_in desc.
+ *             In Team- und Alle-Modus zeigt jede Row den Mitarbeiter-Namen
+ *             (Avatar + Farbcode), sonst waere die Liste unlesbar.
+ *
+ * Persistenz: URL `?scope=team|alle` + localStorage-Fallback. Eigene hat
+ * kein URL-Param (Default-Zustand). Wenn ein URL-Param einen Modus verlangt
+ * fuer den der User keine Rechte hat, faellt es auf 'eigene' zurueck.
  *
  * DST-Safety: KPI-Tages-Buckets via per-Minute-Bucketize (Europe/Zurich),
  * damit Nacht-Schichten korrekt auf zwei Tage verteilt werden. Die
@@ -29,11 +40,10 @@ import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
-  AlertTriangle, Moon, Search, X, Users, Edit3,
+  AlertTriangle, Moon, Search, Users, Edit3,
 } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
-import { SearchableSelect } from "@/components/searchable-select";
 import { Input } from "@/components/ui/input";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import { JobNumber } from "@/components/job-number";
@@ -46,20 +56,6 @@ import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { BackButton } from "@/components/ui/back-button";
 
-interface AdminEntry {
-  id: string;
-  user_id: string;
-  user_name: string;
-  job_id: string | null;
-  job_number: number | null;
-  job_title: string | null;
-  clock_in: string;
-  clock_out: string | null;
-  description: string | null;
-  notes: string | null;
-  duration_minutes: number | null;
-}
-
 interface OwnEntry {
   id: string;
   job_id: string | null;
@@ -68,6 +64,13 @@ interface OwnEntry {
   description: string | null;
   notes: string | null;
   job: { job_number: number; title: string } | null;
+}
+
+/** Zeile fuer Team- und Alle-Scope. Wie OwnEntry, aber mit user_id — der
+ *  Mitarbeiter-Name wird per usersMap (get_assignable_users) aufgeloest,
+ *  weil profiles-RLS einen direkten Join fuer Nicht-Admins blockiert. */
+interface ScopedEntry extends OwnEntry {
+  user_id: string;
 }
 
 /** Payload fuer den Row-"Korrigieren"-Button — wandert 1:1 in
@@ -170,21 +173,6 @@ function monthLastIso(iso: string): string {
   return `${y}-${pad2(m)}-${pad2(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
 }
 
-function normalizeAdmin(e: AdminEntry): NormalizedEntry {
-  return {
-    id: e.id,
-    userId: e.user_id,
-    userName: e.user_name,
-    jobId: e.job_id,
-    jobLabel: e.job_id && e.job_number ? `INT-${e.job_number} · ${e.job_title}` : null,
-    jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
-    description: e.description,
-    clockIn: e.clock_in,
-    clockOut: e.clock_out,
-    durationMinutes: e.duration_minutes,
-  };
-}
-
 function normalizeOwn(e: OwnEntry, currentUserId: string | null): NormalizedEntry {
   const dur = e.clock_out
     ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
@@ -193,6 +181,27 @@ function normalizeOwn(e: OwnEntry, currentUserId: string | null): NormalizedEntr
     id: e.id,
     userId: currentUserId, // eigene Sicht -> per Definition der eingeloggte User
     userName: null,
+    jobId: e.job_id,
+    jobLabel: e.job_id && e.job ? `INT-${e.job.job_number} · ${e.job.title}` : null,
+    jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
+    description: e.description,
+    clockIn: e.clock_in,
+    clockOut: e.clock_out,
+    durationMinutes: dur,
+  };
+}
+
+/** Scoped-Zeile (Team/Alle) — Name kommt aus der usersMap. Wenn die Map
+ *  den User nicht kennt (z.B. deaktivierter Mitarbeiter, dessen Eintraege
+ *  aber noch da sind), Fallback "Unbekannt" damit die Row lesbar bleibt. */
+function normalizeScoped(e: ScopedEntry, usersMap: Map<string, string>): NormalizedEntry {
+  const dur = e.clock_out
+    ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
+    : null;
+  return {
+    id: e.id,
+    userId: e.user_id,
+    userName: usersMap.get(e.user_id) ?? "Unbekannt",
     jobId: e.job_id,
     jobLabel: e.job_id && e.job ? `INT-${e.job.job_number} · ${e.job.title}` : null,
     jobHref: e.job_id ? `/auftraege/${e.job_id}` : null,
@@ -313,18 +322,54 @@ export function StempelzeitenView() {
    *  Aufruf (leeres Form). */
   const [correctPayload, setCorrectPayload] = useState<CorrectPayload | null>(null);
   const { can } = usePermissions();
-  // "Fremd-Sicht" (Admin-Selector + andere MA laden) gated ueber Permission,
-  // nicht ueber die admin-Rolle direkt — so kann HR/Team-Leitung ebenfalls
-  // per Rechte-Matrix Zugriff bekommen ohne Voll-Admin zu sein.
+  // "Alle"-Scope gated ueber Permission, nicht ueber die admin-Rolle direkt —
+  // so kann HR/Team-Leitung ebenfalls per Rechte-Matrix Zugriff bekommen ohne
+  // Voll-Admin zu sein. Admin ist implizit durch (hasPermission-Bypass).
   const canSeeAll = can("stempelzeiten:see-all");
   const [ownEntries, setOwnEntries] = useState<OwnEntry[]>([]);
-  const [adminEntries, setAdminEntries] = useState<AdminEntry[]>([]);
+  const [scopedEntries, setScopedEntries] = useState<ScopedEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  // Admin-only: Wechsel zwischen eigener Sicht ("") und einem einzelnen
-  // Mitarbeiter. Ersetzt den frueheren "Alle Mitarbeiter"-Toggle.
-  const [filterUserId, setFilterUserId] = useState("");
-  const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
+  // Users-Map (id -> full_name) fuer die Zeilen-Darstellung in Team/Alle-Modi.
+  // Wird bei Bedarf via get_assignable_users (SECURITY DEFINER) geladen —
+  // die Profile-RLS wuerde einen direkten Join fuer Nicht-Admins blockieren.
+  const [usersMap, setUsersMap] = useState<Map<string, string>>(() => new Map());
   const [now, setNow] = useState(() => Date.now());
+
+  // Scope-Toggle (Eigene | Team | Alle) — ersetzt den frueheren
+  // Admin-User-Selector. Details: siehe Doku oben im Datei-Kopf.
+  //
+  // Rolle-Scope kommt aus roles.scope (Migration 208). Admin ist implizit
+  // 'all'. Team-Members kommen aus profiles.team_lead_id = current_user.
+  // Ist die eine oder andere Info noch nicht geladen, wird die Sichtbarkeit
+  // konservativ (weniger anzeigen) berechnet — reload triggert dann Update.
+  const [roleScope, setRoleScope] = useState<"self" | "team" | "all">("self");
+  const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
+  const canTeam = (roleScope === "team" || roleScope === "all" || canSeeAll)
+    && teamMemberIds.length > 0;
+  const canAll = canSeeAll;
+
+  // URL-Param `?scope=team|alle`, Fallback localStorage, Default "eigene".
+  // `useState`-Initializer lest URL SYNCHRON, damit der erste Load die
+  // richtige Query feuert (kein Flicker "Eigene → Team").
+  const [scope, setScope] = useState<"eigene" | "team" | "alle">(() => {
+    if (typeof window === "undefined") return "eigene";
+    const fromUrl = searchParams.get("scope");
+    if (fromUrl === "team" || fromUrl === "alle") return fromUrl;
+    try {
+      const stored = localStorage.getItem("stempelzeiten-scope");
+      if (stored === "team" || stored === "alle") return stored;
+    } catch { /* SSR/private mode → ignorieren */ }
+    return "eigene";
+  });
+
+  // Effektiver Scope = gewaehlter Scope, aber sanitized falls Rechte fehlen.
+  // Passiert typischerweise wenn ein User einen alten URL-Link mit ?scope=alle
+  // aufmacht ohne die Rechte zu haben, oder wenn ein Team-Leiter kein Team
+  // (mehr) hat. Fallback ist immer "eigene" — sicher & funktional.
+  const effectiveScope: "eigene" | "team" | "alle" =
+    scope === "alle" && !canAll ? "eigene"
+    : scope === "team" && !canTeam ? "eigene"
+    : scope;
 
   // Auftragsnummer-Filter (URL-persistent via ?auftrag=XXXXX). Der Text im
   // Input ist entkoppelt vom "committeten" Filter — Live-Suche mit 300ms
@@ -357,22 +402,94 @@ export function StempelzeitenView() {
     })();
   }, [supabase]);
 
+  // Rolle-Scope + Team-Members einmalig fuer den eingeloggten User laden.
+  // Beides braucht der Toggle um zu entscheiden welche Segments sichtbar sind.
+  // Admin ist implizit 'all' — nicht abhaengig von der roles.scope-Spalte
+  // (sonst koennte sich ein Admin durch versehentliches Setzen aussperren).
   useEffect(() => {
-    if (!canSeeAll) return;
+    if (!currentUserId) return;
+    let cancelled = false;
+    (async () => {
+      // Rolle-Scope: profile.role -> roles.scope. Bei Fehler oder unbekannt
+      // konservativ auf 'self'. Admin-Fall wird ueber canSeeAll separat abgedeckt.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", currentUserId)
+        .maybeSingle();
+      const role = (profile as { role?: string } | null)?.role ?? "";
+      let s: "self" | "team" | "all" = "self";
+      if (role === "admin") {
+        s = "all";
+      } else if (role) {
+        const { data: roleRow } = await supabase
+          .from("roles")
+          .select("scope")
+          .eq("slug", role)
+          .maybeSingle();
+        const raw = (roleRow as { scope?: unknown } | null)?.scope;
+        if (raw === "team" || raw === "all" || raw === "self") s = raw;
+      }
+      if (cancelled) return;
+      setRoleScope(s);
+
+      // Team-Members = Profiles mit team_lead_id = ich. Auch fuer Nicht-
+      // Team-Rollen laden — kostet einen Roundtrip, macht die Toggle-Logik
+      // aber deterministisch (Anzahl aus dem State ablesbar).
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("team_lead_id", currentUserId);
+      if (cancelled) return;
+      const ids = ((members ?? []) as { id: string }[]).map((r) => r.id);
+      setTeamMemberIds(ids);
+    })();
+    return () => { cancelled = true; };
+  }, [supabase, currentUserId]);
+
+  // Users-Map fuer Zeilen-Darstellung — nur laden wenn Team/Alle-Modus
+  // (oder Auftrags-Filter, der ebenfalls Namen pro Row zeigt) tatsaechlich
+  // nutzbar/aktiv ist. get_assignable_users ist SECURITY DEFINER und
+  // liefert Namen unabhaengig von profiles-RLS.
+  const needsUsersMap = effectiveScope !== "eigene" || jobFilterActive;
+  useEffect(() => {
+    if (!needsUsersMap) return;
+    if (usersMap.size > 0) return; // einmal pro Session reicht
     (async () => {
       const { data } = await supabase.rpc("get_assignable_users");
-      setUsers((data as { id: string; full_name: string }[]) ?? []);
+      const list = (data as { id: string; full_name: string }[] | null) ?? [];
+      const map = new Map<string, string>();
+      for (const u of list) map.set(u.id, u.full_name);
+      setUsersMap(map);
     })();
-  }, [canSeeAll, supabase]);
+  }, [needsUsersMap, supabase, usersMap.size]);
+
+  // Scope wechseln + persistieren (URL + localStorage).
+  // - Default "eigene" → kein URL-Param (haelt die URL clean).
+  // - `history.replaceState` (nicht router.replace) — reiner visueller Update,
+  //   kein Next.js Route-Transition (spart Re-Mount und respektiert den
+  //   Ticket-System-Workflow der parallel laufen kann).
+  const setScopeAndPersist = useCallback((next: "eigene" | "team" | "alle") => {
+    setScope(next);
+    try { localStorage.setItem("stempelzeiten-scope", next); } catch { /* private mode */ }
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (next === "eigene") url.searchParams.delete("scope");
+    else url.searchParams.set("scope", next);
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
+  // Kein Sanitizer-Effect fuer den Scope-Fallback: `effectiveScope` derived
+  // den erlaubten Wert bereits at-render (wenn Rechte fehlen → "eigene").
+  // Wir belassen einen evtl. `?scope=team`-URL-Param stehen — sollte der
+  // Nutzer spaeter Team-Rechte bekommen, springt die Ansicht automatisch
+  // dorthin. Kein cascading setState-in-effect noetig.
 
   // 30-Tage-Cutoff hart — kein UI-Umschalter. Aus dem Render heraus stabil.
   const fromIso = useMemo(
     () => addDaysIso(todayLocalIso(), -DEFAULT_RANGE_DAYS),
     [],
   );
-
-  // Admin schaut auf einen anderen Mitarbeiter?
-  const viewingOther = canSeeAll && !!filterUserId && filterUserId !== currentUserId;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -395,13 +512,13 @@ export function StempelzeitenView() {
         setJobFilterEntries([]);
         setJobLookupState("not_found");
         setOwnEntries([]);
-        setAdminEntries([]);
+        setScopedEntries([]);
         setLoading(false);
         return;
       }
       setJobLookupState("idle");
       // 2) Alle time_entries fuer diesen Auftrag. RLS: Admins sehen alle,
-      //    Nicht-Admins nur eigene (per time_entries_select_own-Policy).
+      //    Nicht-Admins nur eigene bzw. Team (per _select_team-Policy).
       const { data, error } = await supabase
         .from("time_entries")
         .select("id, user_id, job_id, clock_in, clock_out, description, notes, user:profiles(full_name)")
@@ -410,43 +527,77 @@ export function StempelzeitenView() {
       if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
       setJobFilterEntries((data as unknown as JobFilterEntry[]) ?? []);
       setOwnEntries([]);
-      setAdminEntries([]);
+      setScopedEntries([]);
       setLoading(false);
       return;
     }
 
-    // Kein Auftrags-Filter → bestehende Logik (Eigene Sicht bzw. Admin-Fremdsicht).
+    // Kein Auftrags-Filter → Scope-Toggle steuert die Query.
     setJobFilterHeader(null);
     setJobFilterEntries([]);
     setJobLookupState("idle");
 
-    if (viewingOther) {
-      const { data, error } = await supabase.rpc("get_all_time_entries", {
-        filter_user_id: filterUserId,
-        filter_from: fromTs,
-        filter_to: null,
-      });
-      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
-      setAdminEntries((data as AdminEntry[]) ?? []);
-      setOwnEntries([]);
-    } else {
-      // RLS-Bug-Schutz: Admins haetten via RLS-Policy Zugriff auf ALLE
-      // time_entries — ohne expliziten user_id-Filter zeigt "Eigene Sicht"
-      // auch fremde Eintraege. Daher hier zwingend nach currentUserId
-      // filtern. Wenn currentUserId noch nicht geladen, kein Query.
+    // "Eigene" (Default) → wie bisher: nur eigene Eintraege.
+    // RLS-Bug-Schutz: Admins haetten via RLS Zugriff auf ALLE time_entries —
+    // ohne expliziten user_id-Filter zeigt "Eigene Sicht" auch fremde.
+    // Daher zwingend nach currentUserId filtern.
+    if (effectiveScope === "eigene") {
       if (!currentUserId) { setLoading(false); return; }
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("time_entries")
         .select("id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
         .eq("user_id", currentUserId)
         .gte("clock_in", fromTs)
         .order("clock_in", { ascending: false });
+      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
       setOwnEntries((data as unknown as OwnEntry[]) ?? []);
-      setAdminEntries([]);
+      setScopedEntries([]);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
-  }, [supabase, viewingOther, currentUserId, filterUserId, fromIso, jobFilterActive, jobFilterNumber]);
 
+    // "Team" → eigene + team_lead_id=ich. `.in(user_id, [self, ...teamIds])`.
+    // RLS (time_entries_select_team via sees_user()) haerte das ab: die
+    // Query bekommt nur Zeilen zurueck fuer die sees_user()=true — bei
+    // scope='team' sind das genau die genannten User.
+    if (effectiveScope === "team") {
+      if (!currentUserId) { setLoading(false); return; }
+      const ids = Array.from(new Set([currentUserId, ...teamMemberIds]));
+      const { data, error } = await supabase
+        .from("time_entries")
+        .select("id, user_id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
+        .in("user_id", ids)
+        .gte("clock_in", fromTs)
+        .order("clock_in", { ascending: false });
+      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+      setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
+      setOwnEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    // "Alle" → keine user_id-Einschraenkung. Admin/scope='all' sieht via RLS
+    // firm-weit alles. Namen kommen aus usersMap (get_assignable_users).
+    const { data, error } = await supabase
+      .from("time_entries")
+      .select("id, user_id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
+      .gte("clock_in", fromTs)
+      .order("clock_in", { ascending: false });
+    if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+    setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
+    setOwnEntries([]);
+    setLoading(false);
+  }, [
+    supabase, currentUserId, fromIso, jobFilterActive, jobFilterNumber,
+    effectiveScope, teamMemberIds,
+  ]);
+
+  // Legitimer cascading-Effect: `load` haengt an effectiveScope + teamMemberIds
+  // (die aus einem vorgelagerten Effekt gesetzt werden). Der Compiler flaggt
+  // das defensiv, ist hier aber gewollt: sobald der Teamleiter-Scope oder das
+  // Team-Set sich aendert, muss die Query neu feuern. React-Compiler-Warnung
+  // wird gezielt unterdrueckt — Rule-Alternative waere hier ueberkomplex.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   // Auftragsnummer-Filter mit URL sync + Debounce. Der Input triggert erst nach
@@ -486,8 +637,6 @@ export function StempelzeitenView() {
       window.history.replaceState({}, "", url.toString());
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    // jobFilterInput ist die einzige echte Trigger-Quelle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobFilterInput]);
 
   /** Oeffnet das Ticket-Modal fuer eine Stempel-Korrektur mit vorbelegten
@@ -520,8 +669,11 @@ export function StempelzeitenView() {
       if (!jobFilterHeader) return [];
       return jobFilterEntries.map((e) => normalizeJobFilter(e, jobFilterHeader));
     }
-    return viewingOther ? adminEntries.map(normalizeAdmin) : ownEntries.map((e) => normalizeOwn(e, currentUserId));
-  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, viewingOther, adminEntries, ownEntries, currentUserId]);
+    if (effectiveScope === "eigene") {
+      return ownEntries.map((e) => normalizeOwn(e, currentUserId));
+    }
+    return scopedEntries.map((e) => normalizeScoped(e, usersMap));
+  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, effectiveScope, ownEntries, scopedEntries, usersMap, currentUserId]);
 
   // Aggregat fuer den Auftrags-Header: Total-Minuten + Anzahl unique
   // Mitarbeiter, die auf dem Auftrag gestempelt haben.
@@ -564,7 +716,12 @@ export function StempelzeitenView() {
     return { weekMin, monthMin, avgPerDay, daysWorked: daysWithEntries.size };
   }, [dayBuckets]);
 
-  const selectedUserLabel = users.find((u) => u.id === filterUserId)?.full_name;
+  // Sub-Header-Text pro Scope. Aussagekraeftig genug, dass der Nutzer beim
+  // Aufmachen der Ansicht sofort weiss "was schaue ich hier gerade an".
+  const scopeSubLabel: string =
+    effectiveScope === "alle" ? "Alle Einträge"
+    : effectiveScope === "team" ? "Team-Einträge"
+    : "Deine Einträge";
 
   return (
     <div className="space-y-6">
@@ -578,7 +735,7 @@ export function StempelzeitenView() {
                 ? (jobFilterHeader
                     ? `Auftrag INT-${jobFilterHeader.job_number} · alle Stempeleinträge`
                     : `Auftragsnummer INT-${jobFilterNumber}`)
-                : `${viewingOther ? (selectedUserLabel ?? "Fremd-Ansicht") : "Deine Einträge"} · letzte ${DEFAULT_RANGE_DAYS} Tage`}
+                : `${scopeSubLabel} · letzte ${DEFAULT_RANGE_DAYS} Tage`}
             </p>
           </div>
         </div>
@@ -682,27 +839,52 @@ export function StempelzeitenView() {
           />
         </div>
 
-        {/* Hinweistext (wenn kein Auftrags-Filter) — schiebt Selector nach rechts */}
-        {!jobFilterActive && (
+        {/* Scope-Toggle (Eigene | Team | Alle) — bei Auftrags-Filter ausgeblendet
+            (die Auftrags-Ansicht zeigt bewusst alle MA auf dem Auftrag; ein
+            zusaetzlicher Scope-Filter wuerde das Bild reduzieren, ohne Mehrwert).
+            Segments-Sichtbarkeit: Eigene IMMER, Team nur bei Rolle-scope>=team
+            + tatsaechlichen Team-Mitgliedern, Alle nur bei stempelzeiten:see-all
+            (Admin implizit). Details siehe Doku im Datei-Kopf. */}
+        {!jobFilterActive && (canTeam || canAll) && (
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => setScopeAndPersist("eigene")}
+              className={effectiveScope === "eigene" ? "kasten-active" : "kasten"}
+              data-tooltip="Nur eigene Stempel-Einträge"
+            >
+              Eigene
+            </button>
+            {canTeam && (
+              <button
+                type="button"
+                onClick={() => setScopeAndPersist("team")}
+                className={effectiveScope === "team" ? "kasten-active" : "kasten"}
+                data-tooltip={`Eigene + Team (${teamMemberIds.length} MA)`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Team
+              </button>
+            )}
+            {canAll && (
+              <button
+                type="button"
+                onClick={() => setScopeAndPersist("alle")}
+                className={effectiveScope === "alle" ? "kasten-active" : "kasten"}
+                data-tooltip="Alle Mitarbeiter (firm-weit)"
+              >
+                Alle
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Hinweistext-Fallback, wenn User keinen Team/Alle-Zugriff hat — nur
+            Auftrag-Filter da, Rest der Zeile leer wirkt hohl. */}
+        {!jobFilterActive && !canTeam && !canAll && (
           <p className="text-xs text-muted-foreground hidden md:block ml-auto">
             Stempeleinträge der letzten {DEFAULT_RANGE_DAYS} Tage
           </p>
-        )}
-
-        {/* Admin-Selector — bei Auftrags-Filter ausgeblendet (die Ansicht zeigt
-            bewusst ALLE MA auf dem Auftrag; ein zusaetzlicher MA-Filter wuerde
-            das Bild reduzieren, ohne Mehrwert fuer den Anwendungsfall). */}
-        {canSeeAll && !jobFilterActive && (
-          <div className="w-full sm:w-56 sm:ml-2">
-            <SearchableSelect
-              value={filterUserId}
-              onChange={setFilterUserId}
-              placeholder="Eigene Sicht"
-              items={users.map((u) => ({ id: u.id, label: u.full_name }))}
-              active={viewingOther}
-              clearable
-            />
-          </div>
         )}
       </div>
 
@@ -741,9 +923,11 @@ export function StempelzeitenView() {
             <p className="text-sm text-muted-foreground mt-1">
               {jobFilterActive
                 ? `Auf INT-${jobFilterNumber} wurde bisher nicht gestempelt.`
-                : viewingOther
-                  ? `${selectedUserLabel ?? "Diese Person"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
-                  : `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
+                : effectiveScope === "alle"
+                  ? `In den letzten ${DEFAULT_RANGE_DAYS} Tagen wurde nicht gestempelt.`
+                  : effectiveScope === "team"
+                    ? `Weder du noch dein Team hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen gestempelt.`
+                    : `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
             </p>
           </CardContent>
         </Card>
