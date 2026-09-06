@@ -4,82 +4,60 @@
  * DashboardPreferencesModal — Zahnrad-Modal fuer persoenliche
  * Widget-Sichtbarkeit + Reihenfolge im Dashboard.
  *
- * Bau-Modus: Drag-and-Drop mit Live-Vorschau (Mini-Dashboard-Grid).
+ * Bau-Modus: Drag-and-Drop mit ECHTER 1:1 Layout-Vorschau (kein Listen-
+ * Kompromiss). Das Preview-Grid nutzt die selben col-span-Klassen wie
+ * das echte Dashboard — der User sieht genau, wie sein Dashboard nach
+ * dem Umsortieren aussehen wird.
  *
  * Datenmodell (Server, /api/dashboard + /api/dashboard/overrides):
  *   catalog        — alle Widgets die die Registry kennt (aus /api/dashboard).
- *   visibleIds     — die aktuell sichtbaren Widgets in ihrer Anzeige-Reihenfolge
- *                    (Server hat bereits Rollen- + Permission- + User-Filter
- *                    angewendet).
- *   overrides      — {hidden, widget_order} aus user_dashboard_overrides
- *                    (leerer Default falls kein Eintrag existiert).
+ *   visibleIds     — die aktuell sichtbaren Widgets in ihrer Anzeige-Reihenfolge.
+ *   overrides      — {hidden, widget_order} aus user_dashboard_overrides.
  *
- * Modal-Set (welche Widgets der User ueberhaupt sieht):
- *   Wir zeigen nur Widgets die der User theoretisch sehen darf — d.h.
- *   `visibleIds ∪ overrides.hidden`. Widgets, die der User aufgrund Rollen-
- *   Restriction oder fehlender Permission NIE bekommt, tauchen erst gar
- *   nicht auf — sonst koennte der User "Geister-Widgets" aktivieren, die
- *   trotzdem serverseitig gefiltert werden. Die einzige Ausnahme sind
- *   Widgets die der User frueher hatte (heute in overrides.hidden) —
- *   die zeigen wir, damit er sie zurueckholen kann.
+ * DnD-Architektur (v3 — 2026-09-06, nach Video-Feedback):
  *
- * Reihenfolge im Modal:
- *   1) Sichtbare Widgets in visibleIds-Reihenfolge
- *   2) Hidden Widgets (aus overrides.hidden ∩ catalog) am Ende, in
- *      overrides.widget_order-Reihenfolge, danach Registry-Reihenfolge.
+ *   Kern-Erkenntnis: @dnd-kit's SortableContext + rectSortingStrategy
+ *   berechnet transform-Deltas fuer Auto-Reflow der Kacheln WAEHREND
+ *   des Drags. Bei variablen Grid-Spans (col-span-4/6/12) sind diese
+ *   Deltas systematisch falsch → Kacheln landen visuell an unmoeglichen
+ *   Positionen (Video: "verzerrt den Rest, ueberlappt, ragt raus").
  *
- * Steuerung (Pro-DnD v2, refactored 2026-09-06 nach Video-Feedback
- * "man kann es so nicht gebrauchen"):
- *   - DARSTELLUNG: vertikale Liste, EINE Kachel pro Zeile, uniforme Zeilen-
- *     hoehe. Frueher waren die Kacheln in einem 12-col-Grid mit variablen
- *     col-spans (4/6/12); @dnd-kit's rectSortingStrategy berechnet aber
- *     Transform-Deltas basierend auf uniformer Zellgroesse → bei variablen
- *     Spans landen Kacheln waehrend Drag an unmoeglichen Positionen und
- *     ueberlappen sich (Video-Beweis). Uniforme Liste + verticalListSorting
- *     macht das Layout stabil (Muster: Notion-Widgets, macOS Widget-Editor).
- *   - Die tatsaechliche Layout-Breite (1/3, 1/2, 2/3, Voll) bleibt sichtbar
- *     als kleines Badge + Balken-Icon rechts an jeder Zeile — der User
- *     sieht also weiterhin welche Kachel wie breit sein wird, ohne dass
- *     das Modal-Layout selbst variable Breiten haben muss.
- *   - Ursprungs-Slot ist ein SICHTBARER dashed Placeholder (accent border,
- *     Content auf 25% gefadet). Frueher unsichtbar per opacity:0 — dann
- *     fuehlte sich der Drag an als waere das Widget "weg". Jetzt ist immer
- *     klar wo das Widget hingehoert.
- *   - Ghost mit rotate 1.5deg, tiefer Shadow, accent-Border → sieht optisch
- *     "hochgehoben" aus (Linear/Notion-Muster).
- *   - Drop-Target-Highlight: die Zeile unter dem Cursor bekommt einen
- *     accent-farbenen Ring + Background-Tint → User sieht LIVE wohin
- *     die Kachel landen wird, nicht erst nach dem Drop.
- *   - Container-Backdrop tintiert waehrend Drag leicht in accent → visuell
- *     klar "Drag-Modus aktiv".
- *   - Cursor state-driven getrennt: idle=grab, drag=grabbing (auf ganzer
- *     Kachel via body.data-dashboard-dragging Attribut).
- *   - PointerSensor (activation-distance 6px, sonst wuerde ein Klick auf
- *     den Auge-Button faelschlicherweise als Drag gewertet) + KeyboardSensor
- *     fuer Screenreader/Tastatur-Nutzer.
- *   - Sichtbarkeit via Eye/EyeOff-icon-btn rechts; hidden Widgets bleiben
- *     in der Reihenfolge, werden aber ausgegraut markiert.
- *   - Mobile-Vorschau-Toggle: zwingt alle Widgets im Preview auf volle
- *     Breite (1 Spalte), so sieht der User das effektive Mobile-Layout.
- *   - Auto-Save debounced 400ms bei Aenderung — kein "Speichern"-Button;
- *     Server-Fehler landen als Toast (CLAUDE.md § "sofortiges Ladefeedback").
- *   - "Auf Standard zuruecksetzen" = DELETE /api/dashboard/overrides.
- *   - "Fertig" schliesst das Modal SOFORT und flusht pending Save im
- *     Hintergrund; onSaved() feuert erst nach abgeschlossenem PUT damit
- *     der Parent-Refetch die aktuellen Overrides sieht.
+ *   Neue Loesung — Sortable-Reflow komplett abschalten, Layout beim
+ *   Drop sanft ueberblenden via View-Transitions-API:
  *
- * Vorschau vs. echtes Dashboard:
- *   Die Preview-Bausteine sind Layout-Vorschauen: Titel + Icon + Span-
- *   Groesse (col-span-4 / col-span-6 / col-span-12), NICHT die volle
- *   Widget-Renderung. Damit bleibt das Modal schnell (keine API-Requests
- *   pro Widget) und passt auch bei kleinem Viewport in den Modal-Rahmen.
- *   Die Span-Klassen kommen aus dashboard-widgets.ts — Single-Source-of-
- *   Truth, dieselbe Konstante die dashboard/page.tsx nutzt.
+ *   1. WAEHREND DRAG: Grid ist eingefroren. Keine Kachel bewegt sich.
+ *      Nur der Ghost am Cursor bewegt sich (DragOverlay).
+ *   2. URSPRUNGS-SLOT: bleibt sichtbar als dashed Placeholder (accent
+ *      Border, Content auf 25%). User sieht klar wo's herkommt.
+ *   3. HOVER-TARGET: die Kachel unter dem Cursor bekommt einen accent-
+ *      Ring + subtile Fuellung — User sieht LIVE wo der Drop landet.
+ *   4. BEIM DROP: `document.startViewTransition` (moderne Browser) laesst
+ *      den Browser selbst den Layout-Sprung sauber animieren — inklusive
+ *      variabler Spans. Fallback: hartes Umschalten (aeltere Browser).
+ *      Jede Kachel bekommt einen eindeutigen `view-transition-name`
+ *      damit der Browser die Kachel ueber das Reorder hinweg
+ *      identifizieren und animieren kann.
+ *
+ *   Verwendete dnd-kit-APIs: useDraggable + useDroppable pro Kachel,
+ *   KEIN SortableContext, KEIN useSortable. Das ist der Grund warum
+ *   das Layout stabil bleibt: die Bibliothek fasst das Grid gar nicht
+ *   an.
+ *
+ * Weitere UX-Details:
+ *   - PointerSensor mit 6px activation-distance (Klick auf Auge-Button
+ *     wird NICHT als Drag interpretiert) + KeyboardSensor fuer a11y.
+ *   - Body-Attribut data-dashboard-dragging setzt globalen grabbing-
+ *     Cursor waehrend Drag.
+ *   - Mobile-Vorschau-Toggle zwingt alle Kacheln auf col-span-12 →
+ *     zeigt effektives Mobile-Layout.
+ *   - Auge-Icon auf gezogener Kachel ausgeblendet — Placeholder clean.
+ *   - Auto-Save debounced 400ms, Toast bei Fehler, "Fertig" flusht
+ *     pending Save im Hintergrund und schliesst sofort.
  *
  * Server-Roundtrips:
- *   - GET  /api/dashboard/overrides  (nur beim Oeffnen)
- *   - PUT  /api/dashboard/overrides  (debounced 400ms bei Aenderung)
- *   - DELETE /api/dashboard/overrides (bei Reset)
+ *   - GET    /api/dashboard/overrides  (nur beim Oeffnen)
+ *   - PUT    /api/dashboard/overrides  (debounced 400ms bei Aenderung)
+ *   - DELETE /api/dashboard/overrides  (bei Reset)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -109,6 +87,8 @@ import {
   KeyboardSensor,
   PointerSensor,
   pointerWithin,
+  useDraggable,
+  useDroppable,
   useSensor,
   useSensors,
   type DragCancelEvent,
@@ -116,27 +96,9 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { widgetSpanClass } from "@/lib/dashboard-widgets";
-
-// Uebersetzt die Tailwind-Span-Klasse in ein User-lesbares Label + einen
-// numerischen Anteil (fuer die kleine Breiten-Bar rechts). Fallback = Voll,
-// falls jemals ein unbekannter Span reinkommt.
-function spanInfo(spanClass: string): { label: string; fraction: number } {
-  if (spanClass.includes("col-span-4")) return { label: "1/3 breit", fraction: 1 / 3 };
-  if (spanClass.includes("col-span-6")) return { label: "1/2 breit", fraction: 1 / 2 };
-  if (spanClass.includes("col-span-8")) return { label: "2/3 breit", fraction: 2 / 3 };
-  return { label: "Volle Breite", fraction: 1 };
-}
 
 interface CatalogItem {
   id: string;
@@ -163,13 +125,9 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// Widget-Preview-Metadaten. Span kommt aus dashboard-widgets.ts (Single-Source
-// of Truth) — dieselbe Konstante die dashboard/page.tsx nutzt. Icons hingegen
-// leben hier lokal, weil sie React-Nodes sind (Registry ist reine Config).
+// Widget-Preview-Metadaten (Icons pro ID + Span-Auswahl).
 // ---------------------------------------------------------------------------
 
-/** Icon pro Widget — identisch zu Dashboard-Renderern. Fehlender Eintrag
- *  faellt auf einen neutralen Punkt zurueck (siehe iconFor). */
 const WIDGET_ICONS: Record<string, React.ReactNode> = {
   "kpi-offene-auftraege": <Briefcase className="h-4 w-4" />,
   "kpi-termine-woche": <CalendarDays className="h-4 w-4" />,
@@ -193,14 +151,22 @@ function spanFor(id: string, mobile: boolean): string {
   return widgetSpanClass(id);
 }
 
-/** Gemeinsame Transition-Kurve fuer DnD-Reflow + Drop-Animation. Cubic-Bezier
- *  ist ease-out (schnell raus, sanft rein) — matcht wie Notion/Linear ihre
- *  Sortable-Elemente animieren. Duration bewusst kurz (220ms), damit der
- *  Reflow direkt reagiert, aber nicht ruckelt. */
-const DND_TRANSITION = {
-  duration: 220,
-  easing: "cubic-bezier(0.25, 1, 0.5, 1)",
-} as const;
+/** Applies fn inside a View Transition if the browser supports it (Chromium,
+ *  Safari 18+, Firefox 145+). Falls es nicht geht: fn direkt aufrufen. */
+function withViewTransition(fn: () => void) {
+  if (
+    typeof document !== "undefined" &&
+    "startViewTransition" in document &&
+    typeof (document as unknown as { startViewTransition?: (cb: () => void) => unknown })
+      .startViewTransition === "function"
+  ) {
+    (
+      document as unknown as { startViewTransition: (cb: () => void) => unknown }
+    ).startViewTransition(fn);
+  } else {
+    fn();
+  }
+}
 
 export function DashboardPreferencesModal({
   open,
@@ -213,16 +179,10 @@ export function DashboardPreferencesModal({
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mobilePreview, setMobilePreview] = useState(false);
-  // activeId + activeSize werden waehrend Drag gesetzt, damit die DragOverlay-
-  // Ghost-Kachel die exakte Groesse der Ursprungskachel bekommt (sonst rendert
-  // Overlay in einer beliebigen Default-Groesse und "hopst" beim Drag-Start).
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeSize, setActiveSize] = useState<{ w: number; h: number } | null>(
     null,
   );
-  // overId = die Kachel unter dem Cursor waehrend Drag. Wird per onDragOver
-  // upgedated und getriggert live das Drop-Target-Highlight (accent-Ring auf
-  // dem Ziel-Slot). Ohne das muesste der User raten wohin sein Drop landet.
   const [overId, setOverId] = useState<string | null>(null);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,9 +215,6 @@ export function DashboardPreferencesModal({
         const userOrder = json.widget_order ?? [];
         const catalogById = new Map(catalog.map((c) => [c.id, c]));
 
-        // Sichtbare in genau der Reihenfolge in der der Server sie liefert,
-        // gefiltert auf bekannte Katalog-Eintraege (Robustheit gegen
-        // Registry-Drift).
         const orderedIds: string[] = [];
         const seen = new Set<string>();
         for (const id of visibleIds) {
@@ -267,9 +224,6 @@ export function DashboardPreferencesModal({
           orderedIds.push(id);
         }
 
-        // Hidden-Anhang: nur was der User bewusst versteckt hat und was
-        // im Katalog existiert — plus die User-Order fuer stabile Position
-        // beim spaeteren Un-Hide.
         const hiddenCandidates = Array.from(userHidden).filter(
           (id) => catalogById.has(id) && !seen.has(id),
         );
@@ -303,17 +257,13 @@ export function DashboardPreferencesModal({
   }, [open, catalog, visibleIds]);
 
   // ------------------------------------------------------------------
-  // Debounced Auto-Save. Setzt dirtyRef=false erst nach erfolgreichem PUT,
-  // damit ein weiterer Klick waehrend Save als "neue Aenderung" zaehlt.
+  // Debounced Auto-Save.
   // ------------------------------------------------------------------
   const persist = useCallback(async (payload: PreferenceItem[]) => {
     setSaving(true);
     try {
       const body = {
         hidden: payload.filter((i) => i.hidden).map((i) => i.id),
-        // widget_order enthaelt ALLE Items (sichtbar + versteckt) in
-        // aktueller Modal-Reihenfolge — sonst geht die Position eines
-        // hidden-Widgets verloren, wenn der User es spaeter re-aktiviert.
         widget_order: payload.map((i) => i.id),
       };
       const res = await fetch("/api/dashboard/overrides", {
@@ -344,7 +294,6 @@ export function DashboardPreferencesModal({
     [persist],
   );
 
-  // Cleanup pending Save-Timer beim Unmount.
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -362,19 +311,18 @@ export function DashboardPreferencesModal({
     });
   }
 
+  function setDraggingCursor(on: boolean) {
+    if (typeof document === "undefined") return;
+    if (on) document.body.setAttribute("data-dashboard-dragging", "true");
+    else document.body.removeAttribute("data-dashboard-dragging");
+  }
+
   function handleDragStart(event: DragStartEvent) {
     const id = event.active.id as string;
     setActiveId(id);
-    // Ursprungs-Rect merken → DragOverlay-Ghost hat exakt die Zielgroesse
-    // (initial = vor Layout-Shift, sonst waere die Groesse schon 0 wenn
-    // andere Kacheln in die Luecke rutschen).
     const rect = event.active.rect.current.initial;
     if (rect) setActiveSize({ w: rect.width, h: rect.height });
-    // Body-Attribut fuer Cursor-State: grabbing ueberall waehrend Drag,
-    // damit auch das Modal-Backdrop einen konsistenten Cursor zeigt.
-    if (typeof document !== "undefined") {
-      document.body.setAttribute("data-dashboard-dragging", "true");
-    }
+    setDraggingCursor(true);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -383,21 +331,28 @@ export function DashboardPreferencesModal({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
     setActiveId(null);
     setActiveSize(null);
     setOverId(null);
-    if (typeof document !== "undefined") {
-      document.body.removeAttribute("data-dashboard-dragging");
-    }
-    const { active, over } = event;
+    setDraggingCursor(false);
     if (!over || active.id === over.id) return;
-    setItems((prev) => {
-      const oldIdx = prev.findIndex((i) => i.id === active.id);
-      const newIdx = prev.findIndex((i) => i.id === over.id);
-      if (oldIdx === -1 || newIdx === -1) return prev;
-      const next = arrayMove(prev, oldIdx, newIdx);
-      scheduleSave(next);
-      return next;
+    // View-Transition umschliesst das setState → der Browser animiert das
+    // Grid-Reorder inkl. variabler col-spans automatisch weich. Fallback:
+    // hartes Umschalten (aeltere Browser). Sowohl der Reorder als auch
+    // der scheduleSave() muessen VOR dem Ende der Transition passieren,
+    // deshalb beides innerhalb des Callbacks.
+    withViewTransition(() => {
+      setItems((prev) => {
+        const oldIdx = prev.findIndex((i) => i.id === active.id);
+        const newIdx = prev.findIndex((i) => i.id === over.id);
+        if (oldIdx === -1 || newIdx === -1) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(oldIdx, 1);
+        next.splice(newIdx, 0, moved);
+        scheduleSave(next);
+        return next;
+      });
     });
   }
 
@@ -405,18 +360,11 @@ export function DashboardPreferencesModal({
     setActiveId(null);
     setActiveSize(null);
     setOverId(null);
-    if (typeof document !== "undefined") {
-      document.body.removeAttribute("data-dashboard-dragging");
-    }
+    setDraggingCursor(false);
   }
 
-  // Cleanup body-attribut wenn Modal unmounted waehrend Drag lief
   useEffect(() => {
-    return () => {
-      if (typeof document !== "undefined") {
-        document.body.removeAttribute("data-dashboard-dragging");
-      }
-    };
+    return () => setDraggingCursor(false);
   }, []);
 
   async function resetToDefault() {
@@ -443,10 +391,6 @@ export function DashboardPreferencesModal({
   }
 
   function handleFinish() {
-    // Modal SOFORT schliessen (kein blockierender Spinner). Wenn noch ein
-    // debounced Save pending ist, schicken wir ihn im Hintergrund und
-    // triggern onSaved erst NACH dem PUT — sonst refetcht der Parent
-    // /api/dashboard vor dem Update und sieht kurz die alten Overrides.
     const flush = saveTimer.current !== null;
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
@@ -461,15 +405,11 @@ export function DashboardPreferencesModal({
     }
   }
 
-  // dnd-kit Sensoren: PointerSensor mit kleiner Aktivierungs-Distanz, damit
-  // ein reiner Klick auf den Auge-Button NICHT als Drag interpretiert wird.
-  // KeyboardSensor fuer Screenreader/Tastatur-Nutzer.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinatesShim }),
   );
 
-  const sortableIds = useMemo(() => items.map((i) => i.id), [items]);
   const activeItem = useMemo(
     () => (activeId ? items.find((i) => i.id === activeId) ?? null : null),
     [activeId, items],
@@ -485,11 +425,15 @@ export function DashboardPreferencesModal({
       </div>
 
       {!loaded ? (
-        <div className="rounded-xl border bg-muted/30 p-2 space-y-1.5">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
+        <div className="rounded-xl border bg-muted/30 p-3">
+          <div className="grid grid-cols-12 gap-2">
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-4" />
+            <Skeleton className="h-16 col-span-12" />
+            <Skeleton className="h-16 col-span-6" />
+            <Skeleton className="h-16 col-span-6" />
+          </div>
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">
@@ -498,62 +442,42 @@ export function DashboardPreferencesModal({
       ) : (
         <DndContext
           sensors={sensors}
-          // pointerWithin ist praeziser als closestCenter bei variablen
-          // Grid-Spans (col-span-4 vs col-span-12): das Hover-Target ist
-          // immer die Kachel unter dem Pointer, nicht die naechstliegende
-          // Mitte — sonst schwankt das Drop-Target waehrend der User
-          // ueber eine breite Kachel hinweg zieht.
           collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-            <div
-              className="rounded-xl border p-2 transition-colors duration-200 max-h-[60vh] overflow-y-auto"
-              style={{
-                backgroundColor: activeId
-                  ? "color-mix(in oklab, var(--accent) 5%, var(--background))"
-                  : "color-mix(in oklab, var(--foreground) 3%, transparent)",
-                borderColor: activeId
-                  ? "color-mix(in oklab, var(--accent) 30%, var(--border))"
-                  : undefined,
-              }}
-            >
-              <div className="space-y-1.5">
-                {items.map((it) => (
-                  <SortablePreviewRow
-                    key={it.id}
-                    item={it}
-                    spanClass={spanFor(it.id, mobilePreview)}
-                    onToggle={() => toggleHidden(it.id)}
-                    isActive={activeId === it.id}
-                    isOverTarget={overId === it.id && activeId !== it.id}
-                    anyDragActive={activeId !== null}
-                  />
-                ))}
-              </div>
-            </div>
-          </SortableContext>
-
-          {/* DragOverlay = die frei schwebende Ghost-Kachel. Erbt Groesse der
-              Original-Kachel (activeSize) und rendert mit tiefen Shadow +
-              leichter Rotation (1.5deg) + accent-Border — signalisiert
-              "hochgehoben, wird bewegt". Rotation liest sich als "in-motion"
-              besser als eine schlichte Skalierung (Linear/Notion-Muster).
-              dropAnimation gleitet die Ghost sanft in die Zielposition. */}
-          <DragOverlay
-            zIndex={1200}
-            dropAnimation={{
-              duration: DND_TRANSITION.duration,
-              easing: DND_TRANSITION.easing,
+          <div
+            className="rounded-xl border p-3 transition-colors duration-200"
+            style={{
+              backgroundColor: activeId
+                ? "color-mix(in oklab, var(--accent) 5%, var(--background))"
+                : "color-mix(in oklab, var(--foreground) 3%, transparent)",
+              borderColor: activeId
+                ? "color-mix(in oklab, var(--accent) 30%, var(--border))"
+                : undefined,
             }}
           >
+            <div className="grid grid-cols-12 gap-2">
+              {items.map((it) => (
+                <GridTile
+                  key={it.id}
+                  item={it}
+                  spanClass={spanFor(it.id, mobilePreview)}
+                  onToggle={() => toggleHidden(it.id)}
+                  isDragging={activeId === it.id}
+                  isOverTarget={overId === it.id && activeId !== it.id}
+                  anyDragActive={activeId !== null}
+                />
+              ))}
+            </div>
+          </div>
+
+          <DragOverlay zIndex={1200} dropAnimation={null}>
             {activeItem && activeSize ? (
-              <PreviewRowVisual
+              <TileVisual
                 item={activeItem}
-                spanInfo={spanInfo(spanFor(activeItem.id, mobilePreview))}
                 style={{
                   width: activeSize.w,
                   height: activeSize.h,
@@ -594,38 +518,29 @@ export function DashboardPreferencesModal({
 }
 
 // ---------------------------------------------------------------------------
-// PreviewRowVisual — reine Darstellungs-Zeile. Uniforme Hoehe (~56px), volle
-// Breite. Layout: Grip · Icon · Titel (flex-1) · Breiten-Bar · Auge-Button.
-// Wird sowohl von SortablePreviewRow als auch vom DragOverlay verwendet,
-// damit Ghost + Original 1:1 identisch aussehen (kein "Sprung"-Effekt beim
-// Uebergang zwischen Sortable-Zeile und Overlay).
+// TileVisual — reine Darstellungs-Kachel. Wird von GridTile und vom
+// DragOverlay verwendet, damit Ghost + Original 1:1 identisch aussehen.
 // ---------------------------------------------------------------------------
 
-function PreviewRowVisual({
+function TileVisual({
   item,
-  spanInfo: si,
   style,
   className,
   toggleButton,
   contentOpacity,
 }: {
   item: PreferenceItem;
-  spanInfo: { label: string; fraction: number };
   style?: React.CSSProperties;
   className?: string;
-  /** Auge-Button; kann vom Sortable-Wrapper injiziert werden. Overlay
-   *  laesst es leer (Overlay ist rein visuell, nicht interaktiv). */
   toggleButton?: React.ReactNode;
-  /** Wenn gesetzt: erzwingt die Content-Opacity (Titel/Icon). Wird vom
-   *  Placeholder-State genutzt (dashed Zeile, waehrend Ghost am Cursor
-   *  haengt) um den Text auf ~25% zu faden ohne Border/BG mitzuziehen. */
+  /** Wenn gesetzt: erzwingt Content-Opacity (Placeholder faded auf 25%). */
   contentOpacity?: number;
 }) {
-  const effectiveContentOpacity =
+  const effOp =
     contentOpacity !== undefined ? contentOpacity : item.hidden ? 0.55 : 1;
   return (
     <div
-      className={`relative rounded-lg border select-none flex items-center gap-3 pl-2 pr-2 py-2.5 h-14 ${className ?? ""}`}
+      className={`relative rounded-lg border select-none ${className ?? ""}`}
       style={{
         backgroundColor: item.hidden
           ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
@@ -633,133 +548,112 @@ function PreviewRowVisual({
         ...style,
       }}
     >
-      <span
-        className="shrink-0 text-muted-foreground/50"
-        aria-hidden
-        style={{ opacity: effectiveContentOpacity }}
-      >
-        <GripVertical className="h-4 w-4" />
-      </span>
-      <span
-        className="shrink-0 text-accent"
-        aria-hidden
-        style={{ opacity: effectiveContentOpacity }}
-      >
-        {iconFor(item.id)}
-      </span>
-      <span
-        className="flex-1 min-w-0 truncate text-sm font-medium"
-        style={{
-          opacity: effectiveContentOpacity,
-          color: item.hidden ? "var(--muted-foreground)" : "var(--foreground)",
-        }}
-      >
-        {item.title}
-      </span>
-      <span
-        className="hidden sm:flex items-center gap-2 shrink-0"
-        style={{ opacity: effectiveContentOpacity }}
-      >
-        <span
-          className="relative h-1.5 w-16 rounded-full overflow-hidden"
-          style={{
-            backgroundColor:
-              "color-mix(in oklab, var(--foreground) 10%, transparent)",
-          }}
-          aria-hidden
-        >
-          <span
-            className="absolute inset-y-0 left-0 rounded-full"
-            style={{
-              width: `${si.fraction * 100}%`,
-              backgroundColor:
-                "color-mix(in oklab, var(--accent) 70%, transparent)",
-            }}
-          />
-        </span>
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground w-16 text-right">
-          {si.label}
-        </span>
-      </span>
       {toggleButton}
+      <div className="flex items-start gap-2 p-2.5 min-h-16">
+        <span
+          className="mt-0.5 shrink-0 text-muted-foreground/60"
+          aria-hidden
+          style={{ opacity: effOp }}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+        <div className="flex-1 min-w-0" style={{ opacity: effOp }}>
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-accent shrink-0">{iconFor(item.id)}</span>
+            <span className="truncate">{item.title}</span>
+          </div>
+          <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
+          <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
+        </div>
+      </div>
 
       {item.hidden && contentOpacity === undefined && (
-        <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded">
-          ausgeblendet
-        </span>
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--background) 55%, transparent)",
+          }}
+        >
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            ausgeblendet
+          </span>
+        </div>
       )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SortablePreviewRow — dnd-kit-Wrapper. Rendert eine Zeile in der vertikalen
-// Liste, haengt Drag-Listener auf einen absoluten Handle-Layer (nicht auf
-// den Auge-Button — der stopPropagated und liegt eine Ebene hoeher).
-// Waehrend Drag: Zeile bleibt SICHTBAR als dashed Placeholder, Ghost am
-// Cursor wird ueber DragOverlay gerendert.
+// GridTile — Kachel im echten col-span-Grid. Nutzt useDraggable +
+// useDroppable OHNE SortableContext → keine Auto-Reflow-Transforms
+// waehrend Drag, keine Layout-Verzerrung. Grid bleibt eingefroren bis
+// zum Drop, dann uebernimmt startViewTransition (Parent) das
+// weiche Reorder.
 // ---------------------------------------------------------------------------
 
-function SortablePreviewRow({
+function GridTile({
   item,
   spanClass,
   onToggle,
-  isActive,
+  isDragging,
   isOverTarget,
   anyDragActive,
 }: {
   item: PreferenceItem;
   spanClass: string;
   onToggle: () => void;
-  isActive: boolean;
-  /** Cursor hovert gerade ueber DIESER Zeile waehrend Drag → Drop-Target-Ring */
+  isDragging: boolean;
   isOverTarget: boolean;
-  /** Irgendwer wird gerade gedraggt (dann Hover-Boosts unterdruecken) */
   anyDragActive: boolean;
 }) {
   const {
     attributes,
     listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: item.id,
-    transition: {
-      duration: DND_TRANSITION.duration,
-      easing: DND_TRANSITION.easing,
-    },
-  });
+    setNodeRef: setDragRef,
+  } = useDraggable({ id: item.id });
+  const {
+    setNodeRef: setDropRef,
+    isOver,
+  } = useDroppable({ id: item.id });
   const [hover, setHover] = useState(false);
-  const si = spanInfo(spanClass);
 
-  // Waehrend Drag: Zeile bleibt SICHTBAR als dashed Placeholder.
-  const wrapperStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const setRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      setDragRef(el);
+      setDropRef(el);
+    },
+    [setDragRef, setDropRef],
+  );
+
+  // Kombinierter Over-Highlight-State: useDroppable's isOver ist zuverlaessig
+  // fuer das Hover-Feedback, aber wir kombinieren es mit dem Parent-overId
+  // fallback, damit auch der activeId-Fall (Kachel ueber sich selbst) OFF ist.
+  const showOverRing = (isOver || isOverTarget) && !isDragging;
 
   const innerStyle: React.CSSProperties = {
     backgroundColor: isDragging
       ? "color-mix(in oklab, var(--accent) 6%, transparent)"
-      : isOverTarget
+      : showOverRing
         ? "color-mix(in oklab, var(--accent) 10%, var(--card))"
         : !anyDragActive && hover
           ? "color-mix(in oklab, var(--foreground) 8%, var(--card))"
           : undefined,
     borderColor: isDragging
       ? "color-mix(in oklab, var(--accent) 55%, transparent)"
-      : isOverTarget
+      : showOverRing
         ? "var(--accent)"
         : undefined,
     borderStyle: isDragging ? "dashed" : "solid",
-    borderWidth: isOverTarget && !isDragging ? "2px" : "1px",
-    boxShadow: isOverTarget && !isDragging
+    borderWidth: showOverRing ? "2px" : "1px",
+    boxShadow: showOverRing
       ? "0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent)"
       : undefined,
-    cursor: isActive ? "grabbing" : "grab",
+    cursor: isDragging ? "grabbing" : "grab",
     touchAction: "none",
+    // WICHTIG: transition NUR fuer Farb-/Border-States, NICHT fuer transform
+    // — transform darf hier nichts machen, weil Grid nicht ge-reflow'd wird.
+    // Der weiche Layout-Wechsel geschieht via startViewTransition beim Drop.
     transition:
       "background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease",
   };
@@ -775,8 +669,8 @@ function SortablePreviewRow({
       }}
       className={
         item.hidden
-          ? "icon-btn shrink-0 relative z-10"
-          : "icon-btn icon-btn-green shrink-0 relative z-10"
+          ? "icon-btn absolute right-2 top-2 z-10"
+          : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
       }
       aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
       data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
@@ -787,26 +681,34 @@ function SortablePreviewRow({
   ) : null;
 
   return (
-    <div ref={setNodeRef} style={wrapperStyle} className="relative">
-      {/* Drag-Handle-Layer: deckt die Zeile AUSSER den Auge-Button ab
-          (per pointer-events + z-index). Der Button liegt eine Ebene
-          hoeher (relative z-10) und faengt seinen Klick selbst. */}
-      <div
-        className="absolute inset-0 rounded-lg"
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        {...attributes}
-        {...listeners}
-        aria-label={`${item.title} verschieben`}
-        style={{ cursor: isActive ? "grabbing" : "grab" }}
-      />
-      <PreviewRowVisual
-        item={item}
-        spanInfo={si}
-        style={innerStyle}
-        contentOpacity={isDragging ? 0.25 : undefined}
-        toggleButton={toggleBtn}
-      />
+    <div
+      ref={setRefs}
+      className={spanClass}
+      // view-transition-name: Browser identifiziert die Kachel ueber das
+      // Reorder hinweg und animiert automatisch von old-position zu
+      // new-position (moderne Chrome/Edge/Safari 18+). Fallback: kein
+      // Effekt, hartes Umschalten. Prefix widget- damit keine Kollision
+      // mit anderen VT-Names auf der Seite.
+      style={{ viewTransitionName: `widget-${item.id}` }}
+    >
+      <div className="relative h-full">
+        <div
+          className="absolute inset-0 rounded-lg"
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          {...attributes}
+          {...listeners}
+          aria-label={`${item.title} verschieben`}
+          style={{ cursor: isDragging ? "grabbing" : "grab" }}
+        />
+        <TileVisual
+          item={item}
+          style={innerStyle}
+          className="h-full"
+          contentOpacity={isDragging ? 0.25 : undefined}
+          toggleButton={toggleBtn}
+        />
+      </div>
     </div>
   );
 }
@@ -873,4 +775,26 @@ function SegBtn({
       {children}
     </button>
   );
+}
+
+// KeyboardSensor Coordinate-Getter — flach, ohne SortableContext, weil wir
+// den Sort selbst machen. Rueckt den Fokus fuer arrow-keys um 20px in die
+// Richtung — dnd-kit KeyboardSensor braucht das als "Bewegungsvorschlag"
+// wenn kein SortableContext den naechsten Slot berechnet.
+function sortableKeyboardCoordinatesShim(
+  event: KeyboardEvent,
+  args: { currentCoordinates: { x: number; y: number } },
+) {
+  const { currentCoordinates } = args;
+  switch (event.code) {
+    case "ArrowRight":
+      return { x: currentCoordinates.x + 25, y: currentCoordinates.y };
+    case "ArrowLeft":
+      return { x: currentCoordinates.x - 25, y: currentCoordinates.y };
+    case "ArrowDown":
+      return { x: currentCoordinates.x, y: currentCoordinates.y + 25 };
+    case "ArrowUp":
+      return { x: currentCoordinates.x, y: currentCoordinates.y - 25 };
+  }
+  return undefined;
 }
