@@ -57,7 +57,7 @@ const EVENTS: { type: NotificationType; label: string; description: string }[] =
 
 const CHANNELS: { key: "in_app" | "email" | "push"; label: string; icon: typeof Bell; enabled: boolean; tooltip?: string }[] = [
   { key: "in_app", label: "In-App",  icon: Bell,        enabled: true  },
-  { key: "email",  label: "E-Mail",  icon: Mail,        enabled: false, tooltip: "Folgt in einer naechsten Phase" },
+  { key: "email",  label: "E-Mail",  icon: Mail,        enabled: false, tooltip: "Folgt in einer nächsten Phase" },
   { key: "push",   label: "Push",    icon: Smartphone,  enabled: true  },
 ];
 
@@ -178,7 +178,7 @@ export function BenachrichtigungenTab() {
 
       {/* Intro */}
       <div className="text-sm text-muted-foreground">
-        Steuere pro Ereignistyp welcher Kanal genutzt wird. Aenderungen werden automatisch gespeichert.
+        Steuere pro Ereignistyp welcher Kanal genutzt wird. Änderungen werden automatisch gespeichert.
         {saving && <span className="ml-2 text-xs text-muted-foreground/70">(Speichert…)</span>}
       </div>
 
@@ -295,7 +295,7 @@ function SoundToggleCard() {
           </div>
           <div>
             <p className="font-medium text-sm">Sound bei neuer Benachrichtigung</p>
-            <p className="text-xs text-muted-foreground">Kurzer Hinweiston wenn die App geoeffnet ist. Pro Geraet einstellbar.</p>
+            <p className="text-xs text-muted-foreground">Kurzer Hinweiston wenn die App geöffnet ist. Pro Gerät einstellbar.</p>
           </div>
         </div>
         <Toggle value={enabled} onChange={toggle} />
@@ -397,10 +397,10 @@ function PushSubscriptionCard() {
             <Smartphone className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold">Push auf diesem Geraet</p>
+            <p className="text-sm font-semibold">Push auf diesem Gerät</p>
             <p className="text-xs text-muted-foreground">
               {permission === "denied"
-                ? "Im Browser blockiert — Permission in den Browser-Settings zuruecksetzen."
+                ? "Im Browser blockiert — Permission in den Browser-Settings zurücksetzen."
                 : subscribed
                   ? "Aktiv. Du bekommst System-Benachrichtigungen auch wenn die App geschlossen ist."
                   : "Nicht aktiviert. Aktivieren um auch ohne offene App benachrichtigt zu werden."}

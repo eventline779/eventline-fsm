@@ -51,7 +51,7 @@ export function PermissionAuditLogCard() {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Aenderungs-Protokoll</h2>
+          <h2 className="text-sm font-semibold">Änderungs-Protokoll</h2>
           <span className="text-[10px] text-muted-foreground">(letzte 100)</span>
         </div>
 
@@ -61,7 +61,7 @@ export function PermissionAuditLogCard() {
           <div className="px-3 py-6 text-center space-y-1">
             <ShieldAlert className="h-5 w-5 text-muted-foreground/50 mx-auto" />
             <p className="text-xs text-muted-foreground">
-              Noch keine Rollen-/Permission-Aenderungen protokolliert.
+              Noch keine Rollen-/Permission-Änderungen protokolliert.
             </p>
           </div>
         ) : (

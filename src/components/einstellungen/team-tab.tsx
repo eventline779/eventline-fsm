@@ -650,7 +650,7 @@ export function TeamTab() {
                           disabled={selectable.length === 0}
                           className="font-medium text-foreground/80 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {allSelectableSelected ? "Sichtbare abwaehlen" : "Sichtbare auswaehlen"}
+                          {allSelectableSelected ? "Sichtbare abwählen" : "Sichtbare auswählen"}
                         </button>
                       </div>
                       <ul className="max-h-64 overflow-y-auto divide-y divide-border/60">
@@ -671,7 +671,7 @@ export function TeamTab() {
                                       ? "flex items-center gap-2.5 px-3 py-2 cursor-not-allowed bg-foreground/[0.02] dark:bg-foreground/[0.04]"
                                       : "flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.08]"
                                   }
-                                  data-tooltip={locked ? "Zuerst im anderen Team abwaehlen, dann hier hinzufuegen" : undefined}
+                                  data-tooltip={locked ? "Zuerst im anderen Team abwählen, dann hier hinzufügen" : undefined}
                                 >
                                   <input
                                     type="checkbox"

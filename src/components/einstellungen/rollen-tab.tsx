@@ -522,16 +522,16 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
               type="button"
               onClick={() => resetWidgetsToDefault(roleSlug)}
               className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-              data-tooltip="Rollen-Override loeschen — die Rolle zeigt wieder das Default-Set aus der Registry."
+              data-tooltip="Rollen-Override löschen — die Rolle zeigt wieder das Default-Set aus der Registry."
             >
               <RotateCcw className="h-3 w-3" />
-              Auf Registry-Default zuruecksetzen
+              Auf Registry-Default zurücksetzen
             </button>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Welche Kacheln User dieser Rolle standardmaessig auf dem Dashboard sehen.
-          Jeder User kann fuer sich selbst zusaetzlich Widgets ausblenden oder umsortieren.
+          Welche Kacheln User dieser Rolle standardmässig auf dem Dashboard sehen.
+          Jeder User kann für sich selbst zusätzlich Widgets ausblenden oder umsortieren.
         </p>
         <div className="space-y-1">
           {widgets.map((w, idx) => {
@@ -577,8 +577,8 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                   onDragEnd={() => { setDragging(null); setDropTarget(null); }}
                   className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
                   style={{ cursor: "grab" }}
-                  data-tooltip="Ziehen um die Reihenfolge zu aendern"
-                  aria-label="Reihenfolge aendern"
+                  data-tooltip="Ziehen um die Reihenfolge zu ändern"
+                  aria-label="Reihenfolge ändern"
                 >
                   <GripVertical className="h-4 w-4" />
                 </span>
