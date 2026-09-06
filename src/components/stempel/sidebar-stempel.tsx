@@ -10,21 +10,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Clock, Square, Briefcase, FileText } from "lucide-react";
+import { Clock, Square, Briefcase, FileText, Ticket } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { StempelModal } from "./stempel-modal";
+import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
+import { usePermissions } from "@/lib/use-permissions";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export function SidebarStempel() {
   const { active, loading, clockOut } = useStempel();
+  const { can } = usePermissions();
   const [showModal, setShowModal] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [jobLabel, setJobLabel] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [stopHovered, setStopHovered] = useState(false);
+  const [ticketHovered, setTicketHovered] = useState(false);
   const supabase = createClient();
+  // Ticket-Button ist ein sekundaerer Trigger neben dem Einstempeln-Button.
+  // Nur sichtbar wenn der User Tickets erstellen darf — Admins passen via
+  // has_permission() automatisch durch. Icon-only + data-tooltip haelt die
+  // Sidebar kompakt (Grundregel: less but intuitive).
+  const canTicket = can("tickets:create");
 
   useEffect(() => {
     if (!active) return;
@@ -70,7 +80,8 @@ export function SidebarStempel() {
 
   return (
     <>
-      <div className="px-3 mb-2">
+      <div className="px-3 mb-2 flex items-stretch gap-2">
+        <div className="flex-1 min-w-0">
         {active ? (
           <div
             className="rounded-xl overflow-hidden"
@@ -158,9 +169,43 @@ export function SidebarStempel() {
             <span className="flex-1 text-left">Einstempeln</span>
           </button>
         )}
+        </div>
+        {/* Sekundaerer Trigger: Stempel-Aenderungs-Ticket. Icon-only + Tooltip
+            damit die Sidebar kompakt bleibt. Sichtbar in beiden Zustaenden
+            (aktiv + idle) — der User will genau dann eine Korrektur, wenn
+            was schief lief. self-stretch matched die Hoehe der Pille/des
+            Einstempeln-Buttons. */}
+        {canTicket && (
+          <button
+            type="button"
+            onClick={() => setShowTicket(true)}
+            onMouseEnter={() => setTicketHovered(true)}
+            onMouseLeave={() => setTicketHovered(false)}
+            aria-label="Stempel-Aenderung anfragen"
+            data-tooltip="Stempel-Aenderung anfragen"
+            className="shrink-0 self-stretch w-10 flex items-center justify-center rounded-xl"
+            style={{
+              transition: "background-color 180ms, color 180ms, border-color 180ms",
+              border: `2px solid ${ticketHovered ? "var(--stempel-color, #14b8a6)" : "rgba(20,184,166,0.35)"}`,
+              backgroundColor: ticketHovered ? "rgba(20,184,166,0.18)" : "rgba(20,184,166,0.06)",
+              color: ticketHovered ? "rgb(15,118,110)" : "rgb(20,184,166)",
+            }}
+          >
+            <Ticket className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <StempelModal open={showModal} onClose={() => setShowModal(false)} />
+      <NewTicketModal
+        open={showTicket}
+        onClose={() => setShowTicket(false)}
+        onCreated={() => {
+          setShowTicket(false);
+          toast.success("Ticket erstellt — Admin wurde benachrichtigt");
+        }}
+        initialType="stempel_aenderung"
+      />
     </>
   );
 }

@@ -8,15 +8,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Clock, Square, Briefcase, FileText, ChevronUp } from "lucide-react";
+import { Clock, Square, Briefcase, FileText, ChevronUp, Ticket } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { StempelModal } from "./stempel-modal";
+import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
+import { usePermissions } from "@/lib/use-permissions";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export function StempelWidget() {
   const { active, loading, clockOut } = useStempel();
+  const { can } = usePermissions();
   const [showModal, setShowModal] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [expanded, setExpanded] = useState(false);
   const [jobLabel, setJobLabel] = useState<string | null>(null);
@@ -25,6 +29,10 @@ export function StempelWidget() {
   // bei selten-genutzten Elementen).
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [ticketHovered, setTicketHovered] = useState(false);
+  // Sekundaerer Ticket-Trigger nur wenn User die Permission hat — Admins
+  // passen via has_permission automatisch durch.
+  const canTicket = can("tickets:create");
   // Desktop-Skip: das Widget ist per md:hidden nur auf Mobile sichtbar.
   // Trotzdem lief die Komponente auf Desktop komplett durch (Job-Label-
   // Query, Timer) — verschwendete Ressourcen. matchMedia (md-Breakpoint
@@ -143,7 +151,9 @@ export function StempelWidget() {
               </div>
             )}
             {/* Volle-Breite-Bar — Live-Timer + Job/Beschreibung links, Chevron
-                rechts. Klick toggelt expand. */}
+                rechts. Klick toggelt expand. Sekundaerer Ticket-Button
+                (Stempel-Aenderung) sitzt in der gleichen Zeile rechts. */}
+            <div className="flex items-stretch gap-2">
             <button
               type="button"
               onClick={() => setExpanded((e) => !e)}
@@ -154,7 +164,7 @@ export function StempelWidget() {
               // Bg = solides Card-Token + teal-Tint mit hoeherer Alpha damit
               // Content darunter sauber verdeckt wird. Vorher rgba(...,0.14)
               // war zu transparent — Karten unter der Bar schienen durch.
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-teal-700 dark:text-teal-300 bg-card"
+              className="flex-1 min-w-0 flex items-center gap-3 px-4 py-2.5 rounded-xl text-teal-700 dark:text-teal-300 bg-card"
               style={{
                 transform: pressed ? "scale(0.99)" : hovered ? "scale(1.01)" : "scale(1)",
                 transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), box-shadow 200ms, background-color 200ms",
@@ -176,8 +186,29 @@ export function StempelWidget() {
               </span>
               <ChevronUp className={`h-4 w-4 transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`} />
             </button>
+            {canTicket && (
+              <button
+                type="button"
+                onClick={() => setShowTicket(true)}
+                onMouseEnter={() => setTicketHovered(true)}
+                onMouseLeave={() => setTicketHovered(false)}
+                aria-label="Stempel-Aenderung anfragen"
+                data-tooltip="Stempel-Aenderung anfragen"
+                className="shrink-0 w-11 flex items-center justify-center rounded-xl bg-card"
+                style={{
+                  transition: "background-color 180ms, color 180ms, border-color 180ms",
+                  border: `2px solid ${ticketHovered ? "var(--stempel-color, #14b8a6)" : "rgba(20,184,166,0.45)"}`,
+                  backgroundImage: `linear-gradient(rgba(20,184,166,${ticketHovered ? 0.22 : 0.10}), rgba(20,184,166,${ticketHovered ? 0.22 : 0.10}))`,
+                  color: ticketHovered ? "rgb(15,118,110)" : "rgb(20,184,166)",
+                }}
+              >
+                <Ticket className="h-4 w-4" />
+              </button>
+            )}
+            </div>
           </div>
         ) : (
+          <div className="flex items-stretch gap-2">
           <button
             type="button"
             onClick={() => setShowModal(true)}
@@ -185,7 +216,7 @@ export function StempelWidget() {
             onMouseLeave={() => { setHovered(false); setPressed(false); }}
             onMouseDown={() => setPressed(true)}
             onMouseUp={() => setPressed(false)}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-teal-700 dark:text-teal-300 bg-card"
+            className="flex-1 min-w-0 flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-teal-700 dark:text-teal-300 bg-card"
             style={{
               transform: pressed ? "scale(0.99)" : hovered ? "scale(1.01)" : "scale(1)",
               transition: "transform 180ms cubic-bezier(0.4,0,0.2,1), background-color 200ms",
@@ -198,10 +229,39 @@ export function StempelWidget() {
             <Clock className="h-4 w-4" />
             <span className="text-sm font-semibold">Einstempeln</span>
           </button>
+          {canTicket && (
+            <button
+              type="button"
+              onClick={() => setShowTicket(true)}
+              onMouseEnter={() => setTicketHovered(true)}
+              onMouseLeave={() => setTicketHovered(false)}
+              aria-label="Stempel-Aenderung anfragen"
+              data-tooltip="Stempel-Aenderung anfragen"
+              className="shrink-0 w-11 flex items-center justify-center rounded-xl bg-card"
+              style={{
+                transition: "background-color 180ms, color 180ms, border-color 180ms",
+                border: `2px solid ${ticketHovered ? "var(--stempel-color, #14b8a6)" : "rgba(20,184,166,0.45)"}`,
+                backgroundImage: `linear-gradient(rgba(20,184,166,${ticketHovered ? 0.22 : 0.10}), rgba(20,184,166,${ticketHovered ? 0.22 : 0.10}))`,
+                color: ticketHovered ? "rgb(15,118,110)" : "rgb(20,184,166)",
+              }}
+            >
+              <Ticket className="h-4 w-4" />
+            </button>
+          )}
+          </div>
         )}
       </div>
 
       <StempelModal open={showModal} onClose={() => setShowModal(false)} />
+      <NewTicketModal
+        open={showTicket}
+        onClose={() => setShowTicket(false)}
+        onCreated={() => {
+          setShowTicket(false);
+          toast.success("Ticket erstellt — Admin wurde benachrichtigt");
+        }}
+        initialType="stempel_aenderung"
+      />
     </>
   );
 }
