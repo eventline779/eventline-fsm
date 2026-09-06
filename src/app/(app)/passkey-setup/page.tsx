@@ -8,32 +8,45 @@
  * (app)/layout, sobald das Profil geladen ist und /api/auth/passkey/list
  * eine leere Liste liefert.
  *
- * Skip gibt es bewusst nicht — die Seite hat keinen "Ueberspringen"-Button
+ * Skip gibt es bewusst nicht — die Seite hat keinen "Überspringen"-Button
  * und die einzige Escape-Luke ist "Abmelden" (oben rechts). Sobald ein
  * Passkey registriert ist, springt die Seite via router.replace ins
  * Dashboard.
  */
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "@/components/einstellungen/passkeys-card";
-import { Fingerprint, ShieldCheck } from "lucide-react";
+import { Fingerprint, ShieldCheck, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export default function PasskeySetupPage() {
   const router = useRouter();
   const supabase = createClient();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
     try {
-      await fetch("/api/sessions/end", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "logout" }),
-      });
-    } catch { /* best-effort */ }
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+      try {
+        await fetch("/api/sessions/end", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "logout" }),
+        });
+      } catch { /* best-effort */ }
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      setSigningOut(false);
+      toast.error(
+        err instanceof Error ? err.message : "Abmelden fehlgeschlagen",
+      );
+    }
   }
 
   return (
@@ -46,7 +59,7 @@ export default function PasskeySetupPage() {
           Biometrischer Login einrichten
         </h1>
         <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
-          Fuer dein EVENTLINE-Konto ist ein biometrischer Login (Face-ID,
+          Für dein EVENTLINE-Konto ist ein biometrischer Login (Face-ID,
           Touch-ID, Fingerabdruck oder Windows-Hello) erforderlich.
           Registriere jetzt einen Passkey — danach kannst du dich ohne
           Passwort anmelden.
@@ -56,8 +69,8 @@ export default function PasskeySetupPage() {
       <div className="rounded-2xl border border-foreground/10 bg-card/60 p-4 mb-4 flex items-start gap-3 text-xs text-muted-foreground">
         <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
         <div>
-          Der Passkey wird sicher auf deinem Geraet gespeichert und verlaesst
-          es nie. EVENTLINE sieht nur den oeffentlichen Schluessel — dein
+          Der Passkey wird sicher auf deinem Gerät gespeichert und verlässt
+          es nie. EVENTLINE sieht nur den öffentlichen Schlüssel — dein
           Fingerabdruck oder Gesicht bleibt lokal.
         </div>
       </div>
@@ -68,9 +81,11 @@ export default function PasskeySetupPage() {
         <button
           type="button"
           onClick={handleSignOut}
-          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+          disabled={signingOut}
+          className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          Abbrechen und abmelden
+          {signingOut && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {signingOut ? "Wird abgemeldet…" : "Abbrechen und abmelden"}
         </button>
       </div>
     </div>

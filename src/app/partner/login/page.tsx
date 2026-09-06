@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
-import { Info, ArrowLeft } from "lucide-react";
+import { Info, ArrowLeft, Loader2 } from "lucide-react";
 import { appUrl } from "@/lib/app-url";
 
 // Partner-Login — eigene Seite, eigener Redirect-Pfad (/partner/anfragen).
@@ -42,16 +42,33 @@ export default function PartnerLoginPage() {
     // Partner-Login anmelden. Wenn die Email zu einem internen User gehoert,
     // direkt nach /login weiterleiten (mit Email-Prefill), bevor ueberhaupt
     // ein Auth-Versuch passiert. Spiegel-Logik zu /login → /partner/login.
-    const { data: isEventline } = await supabase.rpc("is_eventline_email", { p_email: email });
-    if (isEventline === true) {
-      router.push(`/login?email=${encodeURIComponent(email)}&reason=wrong_portal`);
-      return;
+    // try/catch damit ein Netzfehler auf dem Pre-Flight-RPC den Login-
+    // Button nicht in "Anmelden…" stecken laesst — bei RPC-Fehler
+    // ignorieren wir den Pre-Check und lassen den normalen Auth-Flow
+    // laufen (der Backstop weiter unten faengt den Fall trotzdem ab).
+    try {
+      const { data: isEventline, error: rpcErr } = await supabase.rpc("is_eventline_email", { p_email: email });
+      if (!rpcErr && isEventline === true) {
+        router.push(`/login?email=${encodeURIComponent(email)}&reason=wrong_portal`);
+        return;
+      }
+    } catch {
+      // Silent — Backstop nach signInWithPassword faengt EVENTLINE-User auch dann ab.
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError("E-Mail oder Passwort ist falsch.");
+      // Supabase liefert bei gebannten/deaktivierten Usern oft "Invalid login
+      // credentials" — selbe Meldung wie bei falschem Passwort. Bei expliziten
+      // ban-Codes geben wir die spezifische Meldung.
+      const msg = (error.message ?? "").toLowerCase();
+      const code = (error as { code?: string }).code;
+      if (msg.includes("banned") || msg.includes("deactivated") || code === "user_banned") {
+        setError("Dein Zugang ist im Moment nicht aktiv. Wende dich an EVENTLINE.");
+      } else {
+        setError("E-Mail oder Passwort ist falsch.");
+      }
       setLoading(false);
       return;
     }
@@ -159,6 +176,7 @@ export default function PartnerLoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="username"
                     className="h-10"
                   />
                 </div>
@@ -168,7 +186,14 @@ export default function PartnerLoginPage() {
                   className="kasten kasten-red w-full !py-2.5 !text-sm"
                   disabled={loading}
                 >
-                  {loading ? "Senden..." : "Link senden"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Wird gesendet…
+                    </>
+                  ) : (
+                    "Link senden"
+                  )}
                 </button>
                 <button
                   type="button"
@@ -183,15 +208,22 @@ export default function PartnerLoginPage() {
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">E-Mail</Label>
-                <Input id="email" type="email" placeholder="partner@firma.ch" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus={!fromWrongPortal} className="h-10" />
+                <Input id="email" type="email" placeholder="partner@firma.ch" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" autoFocus={!fromWrongPortal} className="h-10" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Passwort</Label>
-                <Input id="password" type="password" placeholder="Passwort eingeben" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus={fromWrongPortal} className="h-10" />
+                <Input id="password" type="password" placeholder="Passwort eingeben" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" autoFocus={fromWrongPortal} className="h-10" />
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button type="submit" className="kasten kasten-red w-full !py-2.5 !text-sm" disabled={loading}>
-                {loading ? "Anmelden..." : "Anmelden"}
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Wird angemeldet…
+                  </>
+                ) : (
+                  "Anmelden"
+                )}
               </button>
               <button
                 type="button"

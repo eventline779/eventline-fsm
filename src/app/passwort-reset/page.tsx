@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PasswortResetPage() {
   const [password, setPassword] = useState("");
@@ -39,7 +41,9 @@ export default function PasswortResetPage() {
       supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(({ error }) => {
           if (error) {
-            setError("Reset-Link ungültig oder abgelaufen. Bitte neuen Link anfordern.");
+            const msg = "Reset-Link ungültig oder abgelaufen. Bitte neuen Link anfordern.";
+            setError(msg);
+            toast.error(msg);
           } else {
             setSessionReady(true);
             // Hash aus der URL entfernen — kein Token-Leak in History
@@ -75,7 +79,9 @@ export default function PasswortResetPage() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      setError("Fehler: " + error.message);
+      const msg = "Passwort konnte nicht geändert werden: " + error.message;
+      setError(msg);
+      toast.error(msg);
       setLoading(false);
       return;
     }
@@ -97,8 +103,8 @@ export default function PasswortResetPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-md border shadow-2xl">
+    <div className="relative min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-background via-background to-foreground/[0.04]">
+      <Card className="w-full max-w-md border-foreground/10 shadow-xl">
         <CardHeader className="text-center pb-2">
           <div className="mb-4 flex justify-center">
             <Logo size="lg" />
@@ -107,50 +113,60 @@ export default function PasswortResetPage() {
         <CardContent>
           {success ? (
             <div className="text-center py-4">
-              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-500/15 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
               </div>
               <h3 className="font-semibold text-lg">Passwort geändert!</h3>
-              <p className="text-sm text-gray-500 mt-2">Du wirst zum Dashboard weitergeleitet...</p>
+              <p className="text-sm text-muted-foreground mt-2">Du wirst zum Dashboard weitergeleitet...</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div className="text-center mb-2">
                 <h3 className="font-semibold">Neues Passwort setzen</h3>
-                <p className="text-sm text-gray-500 mt-1">Gib dein neues Passwort ein</p>
+                <p className="text-sm text-muted-foreground mt-1">Gib dein neues Passwort ein</p>
               </div>
-              <div className="space-y-2">
-                <Label>Neues Passwort</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Neues Passwort</Label>
                 <Input
+                  id="password"
                   type="password"
                   placeholder="Min. 6 Zeichen"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="new-password"
+                  className="h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Passwort bestätigen</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm" className="text-xs font-medium text-muted-foreground">Passwort bestätigen</Label>
                 <Input
+                  id="confirm"
                   type="password"
                   placeholder="Passwort wiederholen"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
+                  autoComplete="new-password"
+                  className="h-10"
                 />
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <Button
+              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+              <button
                 type="submit"
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                className="kasten kasten-red w-full !py-2.5 !text-sm"
                 disabled={loading || !sessionReady}
               >
-                {loading ? "Speichern…" : !sessionReady ? "Lade…" : "Passwort ändern"}
-              </Button>
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading ? "Wird gespeichert…" : !sessionReady ? "Lade…" : "Passwort ändern"}
+              </button>
             </form>
           )}
         </CardContent>
       </Card>
+      <div className="absolute bottom-4 left-0 right-0 text-center text-[11px] text-muted-foreground">
+        <Link href="/datenschutz" className="hover:text-foreground transition-colors">Datenschutz</Link>
+      </div>
     </div>
   );
 }
