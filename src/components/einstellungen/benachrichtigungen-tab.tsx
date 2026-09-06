@@ -64,8 +64,11 @@ const CHANNELS: { key: "in_app" | "email" | "push"; label: string; icon: typeof 
 function effectiveChannel(channels: Channels, type: NotificationType, key: "in_app" | "email" | "push"): boolean {
   const ev = channels[type];
   if (!ev || ev[key] === undefined) {
-    // Default: in_app on, email/push off
-    return key === "in_app";
+    // Opt-out-Default: alles aktiv. Migration 217 legt beim ersten Login
+    // eine Row mit allen Kanaelen an; dieser Fallback traegt den Fall in
+    // dem eine Row (noch) fehlt oder ein neuer NotificationType noch nicht
+    // im Blob steht.
+    return true;
   }
   return Boolean(ev[key]);
 }
