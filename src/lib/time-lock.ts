@@ -58,4 +58,4 @@ export function isTimeEntryLocked(iso: string | Date | null | undefined): boolea
 /** Text fuer Tooltips / Toast / Inline-Warnung. Zentral, damit alle drei
  *  Stellen (Row-Icon, Approve-Warnung, Modal-Blocker) exakt gleich reden. */
 export const TIME_ENTRY_LOCK_MESSAGE =
-  "Zeitraum abgerechnet — nicht mehr aenderbar";
+  "Zeitraum abgerechnet — nicht mehr änderbar";
