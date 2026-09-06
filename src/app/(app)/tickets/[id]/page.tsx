@@ -241,6 +241,46 @@ export default function TicketDetailPage() {
     await load();
   }
 
+  // Ein-Klick-Genehmigen fuer Stempeltickets — ohne Confirm-Dialog.
+  // Nutzt POST /api/tickets/{id}/approve (Wrapper um apply_ticket-RPC),
+  // damit die neue Fast-Approve-UI eine deterministische, idempotente
+  // Server-Route hat. Der bestehende Erledigt/Ablehnen-Kasten unten
+  // bleibt als Fallback (bei Auftrag-Korrektur oder Ablehnung noetig).
+  async function quickApproveStempel() {
+    if (!ticket) return;
+    if (ticket.type !== "stempel_aenderung") return;
+    setBusy(true);
+    const payload: Record<string, unknown> = {};
+    // Auftrag-Korrektur mitschicken wenn der Admin den Wert geaendert
+    // hat (sonst laesst der Endpoint data.job_id unangetastet).
+    if (correctedJobId && correctedJobId !== (stempelJob?.id ?? "ANDERE_ARBEIT")) {
+      payload.corrected_job_id = correctedJobId;
+    }
+    if (resolutionNote.trim()) payload.resolution_note = resolutionNote.trim();
+    const res = await fetch(`/api/tickets/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json().catch(() => null)) as { success?: boolean; error?: string; ticket_number?: number } | null;
+    if (!res.ok || !json?.success) {
+      toast.error(json?.error ?? "Genehmigen fehlgeschlagen");
+      setBusy(false);
+      return;
+    }
+    // Notification an Ersteller (best effort, blockt UI nicht).
+    fetch("/api/tickets/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_id: id, event: "status_changed", note: resolutionNote.trim() || null }),
+    }).catch(() => {});
+    const label = json.ticket_number ? `Erledigt (T-${json.ticket_number})` : "Erledigt";
+    toast.success(label);
+    setResolutionNote("");
+    setBusy(false);
+    await load();
+  }
+
   async function applyStatus(newStatus: "erledigt" | "abgelehnt") {
     if (!ticket) return;
     const ok = await confirm({
@@ -574,10 +614,23 @@ export default function TicketDetailPage() {
               />
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => applyStatus("erledigt")} disabled={busy} className="kasten kasten-green flex-1">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Erledigt
-              </button>
+              {/* Ein-Klick-Genehmigen fuer Stempeltickets — feuert direkt
+                  POST /approve ohne Confirm-Dialog. Prominent als
+                  Primaeraktion; die klassischen Erledigt/Ablehnen-Buttons
+                  bleiben daneben als Fallback (Ablehnen braucht die Notiz,
+                  Erledigt fuer andere Ticket-Typen). */}
+              {ticket.type === "stempel_aenderung" && (
+                <button type="button" onClick={quickApproveStempel} disabled={busy} className="kasten kasten-green flex-1" data-tooltip="Genehmigt ohne Rueckfrage">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Genehmigen
+                </button>
+              )}
+              {ticket.type !== "stempel_aenderung" && (
+                <button type="button" onClick={() => applyStatus("erledigt")} disabled={busy} className="kasten kasten-green flex-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Erledigt
+                </button>
+              )}
               <button type="button" onClick={() => applyStatus("abgelehnt")} disabled={busy} className="kasten kasten-red flex-1">
                 <XCircle className="h-3.5 w-3.5" />
                 Ablehnen
