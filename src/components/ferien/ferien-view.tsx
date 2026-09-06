@@ -14,11 +14,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
-import { Plane, ThermometerSun, Repeat, Coffee, Shield, Plus, Check, X, Trash2, Calendar, AlertCircle } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Plane, ThermometerSun, Repeat, Coffee, Shield, Plus, Check, X, Trash2, Calendar, AlertCircle, Inbox, UserRound, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -32,17 +32,21 @@ interface TimeOffWithUser extends TimeOff {
 }
 
 const TYPE_META: Record<TimeOffType, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  ferien:        { label: "Ferien",         icon: Plane,           color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
-  krank:         { label: "Krank",          icon: ThermometerSun,  color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
-  kompensation:  { label: "Kompensation",   icon: Repeat,          color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
-  frei:          { label: "Frei",           icon: Coffee,          color: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300" },
-  militaer:      { label: "Militär",        icon: Shield,          color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
+  ferien:        { label: "Ferien",         icon: Plane,           color: "bg-blue-100 text-blue-700 dark:bg-blue-500/25 dark:text-blue-200" },
+  krank:         { label: "Krank",          icon: ThermometerSun,  color: "bg-red-100 text-red-700 dark:bg-red-500/25 dark:text-red-200" },
+  kompensation:  { label: "Kompensation",   icon: Repeat,          color: "bg-amber-100 text-amber-700 dark:bg-amber-500/25 dark:text-amber-200" },
+  frei:          { label: "Frei",           icon: Coffee,          color: "bg-gray-100 text-gray-700 dark:bg-gray-500/25 dark:text-gray-200" },
+  militaer:      { label: "Militär",        icon: Shield,          color: "bg-green-100 text-green-700 dark:bg-green-500/25 dark:text-green-200" },
 };
 
-const STATUS_META: Record<TimeOffStatus, { label: string; color: string }> = {
-  beantragt: { label: "Offen",       color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
-  genehmigt: { label: "Genehmigt",   color: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" },
-  abgelehnt: { label: "Abgelehnt",   color: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" },
+/**
+ * STATUS-Chip: Farbcodierung app-weit konsistent — Genehmigt=grün,
+ * Offen(beantragt)=amber, Abgelehnt=rot. Punkt vorne für stärkere Scannability.
+ */
+const STATUS_META: Record<TimeOffStatus, { label: string; chip: string; dot: string }> = {
+  beantragt: { label: "Offen",     chip: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/30", dot: "bg-amber-500" },
+  genehmigt: { label: "Genehmigt", chip: "bg-green-50 text-green-700 ring-1 ring-green-200/70 dark:bg-green-500/15 dark:text-green-200 dark:ring-green-400/30", dot: "bg-green-500" },
+  abgelehnt: { label: "Abgelehnt", chip: "bg-red-50 text-red-700 ring-1 ring-red-200/70 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-400/30",           dot: "bg-red-500" },
 };
 
 function formatDate(iso: string): string {
@@ -92,6 +96,7 @@ export function FerienView() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"meine" | "team">("meine");
   const [filterStatus, setFilterStatus] = useState<TimeOffStatus | "alle">("alle");
+  const [filterType, setFilterType] = useState<TimeOffType | "alle">("alle");
 
   // Anfrage-Modal
   const [creating, setCreating] = useState(false);
@@ -130,21 +135,28 @@ export function FerienView() {
     if (effectiveView === "meine") {
       list = list.filter((e) => e.user_id === userId);
     }
-    if (effectiveView === "team" && filterStatus !== "alle") {
-      list = list.filter((e) => e.status === filterStatus);
+    if (effectiveView === "team") {
+      if (filterStatus !== "alle") list = list.filter((e) => e.status === filterStatus);
+      if (filterType !== "alle") list = list.filter((e) => e.type === filterType);
     }
     return list;
-  }, [entries, effectiveView, filterStatus, userId]);
+  }, [entries, effectiveView, filterStatus, filterType, userId]);
 
-  // Stats fuer Admin-Header
+  // Stats fuer Admin-Header — offene Antraege / aktuell abwesend / kommende 7 Tage.
   const stats = useMemo(() => {
     if (!canApprove) return null;
     const now = todayISO();
+    const in7 = new Date();
+    in7.setDate(in7.getDate() + 7);
+    const in7Iso = `${in7.getFullYear()}-${String(in7.getMonth() + 1).padStart(2, "0")}-${String(in7.getDate()).padStart(2, "0")}`;
     const offen = entries.filter((e) => e.status === "beantragt").length;
     const aktuellAbwesend = entries.filter((e) =>
       e.status === "genehmigt" && e.start_date <= now && e.end_date >= now
     ).length;
-    return { offen, aktuellAbwesend };
+    const kommend = entries.filter((e) =>
+      e.status === "genehmigt" && e.start_date > now && e.start_date <= in7Iso
+    ).length;
+    return { offen, aktuellAbwesend, kommend };
   }, [entries, canApprove]);
 
   function openCreate() {
@@ -263,17 +275,17 @@ export function FerienView() {
   if (!ready) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           {showBackButton && <BackButton fallbackHref="/dashboard" />}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Ferien & Abwesenheit</h1>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Abwesenheit</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {canApprove
                 ? "Eigene Anträge einreichen, Team-Anträge genehmigen oder ablehnen."
-                : "Eigene Ferien-, Krank- oder Frei-Tage eintragen."}
+                : "Ferien, Krankheit, Kompensation oder Frei-Tage beantragen."}
             </p>
           </div>
         </div>
@@ -283,59 +295,93 @@ export function FerienView() {
         </button>
       </div>
 
-      {/* Admin-Stats */}
+      {/* Admin-Stats — 3 Karten mit farbigem Icon-Bubble, tabular-nums */}
       {canApprove && stats && (
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="bg-card">
-            <CardContent className="p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Offene Anträge
-              </p>
-              <p className="text-2xl font-bold tabular-nums mt-1">{stats.offen}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardContent className="p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Aktuell abwesend
-              </p>
-              <p className="text-2xl font-bold tabular-nums mt-1">{stats.aktuellAbwesend}</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard
+            icon={<Inbox className="h-4 w-4" />}
+            label="Offene Anträge"
+            value={stats.offen}
+            tone="amber"
+            hint="Warten auf Entscheidung"
+          />
+          <StatCard
+            icon={<UserRound className="h-4 w-4" />}
+            label="Aktuell abwesend"
+            value={stats.aktuellAbwesend}
+            tone="red"
+            hint="Heute nicht verfügbar"
+          />
+          <StatCard
+            icon={<CalendarClock className="h-4 w-4" />}
+            label="Kommende 7 Tage"
+            value={stats.kommend}
+            tone="blue"
+            hint="Geplante Abwesenheiten"
+          />
         </div>
       )}
 
-      {/* Tabs (Admin) */}
+      {/* Filter (Admin) — zwei getrennte Rows: Meine/Team-Toggle oben, dann Typ+Status */}
       {canApprove && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setView("meine")}
-            className={view === "meine" ? "kasten-active" : "kasten-toggle-off"}
-          >
-            Meine
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("team")}
-            className={view === "team" ? "kasten-active" : "kasten-toggle-off"}
-          >
-            Team
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setView("meine")}
+              className={view === "meine" ? "kasten-active" : "kasten-toggle-off"}
+            >
+              Meine
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("team")}
+              className={view === "team" ? "kasten-active" : "kasten-toggle-off"}
+            >
+              Team
+            </button>
+          </div>
           {view === "team" && (
-            <>
-              <div className="w-px bg-border mx-1" />
-              {(["alle", "beantragt", "genehmigt", "abgelehnt"] as const).map((s) => (
+            <div className="rounded-lg border border-border bg-muted/30 p-2 space-y-2">
+              <FilterGroup label="Status">
+                {(["alle", "beantragt", "genehmigt", "abgelehnt"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFilterStatus(s)}
+                    className={filterStatus === s ? "kasten-active" : "kasten-toggle-off"}
+                  >
+                    {s !== "alle" && <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />}
+                    {s === "alle" ? "Alle" : STATUS_META[s].label}
+                  </button>
+                ))}
+              </FilterGroup>
+              <FilterGroup label="Typ">
                 <button
-                  key={s}
                   type="button"
-                  onClick={() => setFilterStatus(s)}
-                  className={filterStatus === s ? "kasten-active" : "kasten-toggle-off"}
+                  onClick={() => setFilterType("alle")}
+                  className={filterType === "alle" ? "kasten-active" : "kasten-toggle-off"}
                 >
-                  {s === "alle" ? "Alle Status" : STATUS_META[s].label}
+                  Alle
                 </button>
-              ))}
-            </>
+                {(Object.keys(TYPE_META) as TimeOffType[]).map((t) => {
+                  const meta = TYPE_META[t];
+                  const Icon = meta.icon;
+                  const active = filterType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setFilterType(t)}
+                      className={active ? "kasten-active" : "kasten-toggle-off"}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </FilterGroup>
+            </div>
           )}
         </div>
       )}
@@ -344,16 +390,17 @@ export function FerienView() {
       {loading ? (
         <Loading />
       ) : visible.length === 0 ? (
-        <Card className="bg-card border-dashed">
-          <CardContent className="py-10 text-center">
-            <Calendar className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">
-              {effectiveView === "meine"
-                ? "Noch keine Anträge — leg deine erste Ferien-Anfrage an."
-                : "Keine Anträge mit diesen Filtern."}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-card">
+          <EmptyState
+            icon={Calendar}
+            title={effectiveView === "meine" ? "Noch keine Anträge" : "Keine Anträge gefunden"}
+            description={
+              effectiveView === "meine"
+                ? "Leg deine erste Anfrage an — Ferien, Krankheit, Kompensation oder Frei-Tag."
+                : "Mit diesen Filtern gibt es keine Einträge. Filter zurücksetzen oder Zeitraum weiten."
+            }
+          />
+        </div>
       ) : (
         <div className="space-y-2">
           {visible.map((e) => (
@@ -531,7 +578,63 @@ export function FerienView() {
 }
 
 // =====================================================================
-// EntryRow — eine Antrag-Zeile (Card)
+// StatCard — Admin-Header-Kachel mit farbigem Icon-Bubble
+// =====================================================================
+
+const STAT_TONE: Record<"amber" | "red" | "blue" | "green", { bubble: string }> = {
+  amber: { bubble: "bg-amber-100 text-amber-700 dark:bg-amber-500/25 dark:text-amber-200" },
+  red:   { bubble: "bg-red-100 text-red-700 dark:bg-red-500/25 dark:text-red-200" },
+  blue:  { bubble: "bg-blue-100 text-blue-700 dark:bg-blue-500/25 dark:text-blue-200" },
+  green: { bubble: "bg-green-100 text-green-700 dark:bg-green-500/25 dark:text-green-200" },
+};
+
+function StatCard({
+  icon, label, value, tone, hint,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tone: "amber" | "red" | "blue" | "green";
+  hint?: string;
+}) {
+  const t = STAT_TONE[tone];
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg ${t.bubble}`}>
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            {label}
+          </p>
+          <p className="text-2xl font-bold tabular-nums leading-tight mt-0.5">{value}</p>
+        </div>
+      </div>
+      {hint && (
+        <p className="text-[11px] text-muted-foreground mt-2">{hint}</p>
+      )}
+    </div>
+  );
+}
+
+// =====================================================================
+// FilterGroup — Label + Chip-Reihe
+// =====================================================================
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold w-14 shrink-0">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+// =====================================================================
+// EntryRow — eine Antrag-Zeile
 // =====================================================================
 
 interface EntryRowProps {
@@ -552,78 +655,102 @@ function EntryRow({ entry, showUser, isOwn, canApprove, onDelete, onDecide }: En
   const canDecide = canApprove && entry.status === "beantragt";
 
   return (
-    <Card className="bg-card">
-      <CardContent className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="shrink-0">
-            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg ${typeMeta.color}`}>
-              <TypeIcon className="h-4 w-4" />
-            </span>
-          </div>
+    <div className="group rounded-xl border border-border bg-card px-3 sm:px-4 py-3 transition-colors hover:border-border/80 hover:bg-muted/20">
+      <div className="flex items-center gap-3">
+        {/* Typ-Icon-Bubble (groesser als vorher, klar erkennbar) */}
+        <div className="shrink-0">
+          <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${typeMeta.color}`}>
+            <TypeIcon className="h-5 w-5" />
+          </span>
+        </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              {showUser && entry.user?.full_name && (
-                <span className="font-semibold text-sm">{entry.user.full_name}</span>
-              )}
-              <span className="text-sm text-muted-foreground">
+        {/* Hauptspalte */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {showUser && entry.user?.full_name ? (
+              <span className="font-semibold text-sm text-foreground truncate">
+                {entry.user.full_name}
+              </span>
+            ) : (
+              <span className="font-semibold text-sm text-foreground">
                 {typeMeta.label}
               </span>
-              <span className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full ${statusMeta.color}`}>
-                {statusMeta.label}
+            )}
+            {showUser && entry.user?.full_name && (
+              <span className="text-xs text-muted-foreground">
+                · {typeMeta.label}
               </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
-              {formatDateRange(entry.start_date, entry.end_date)} · {days} {days === 1 ? "Tag" : "Tage"}
-            </p>
-            {entry.note && (
-              <p className="text-xs italic mt-1 truncate">"{entry.note}"</p>
             )}
-            {entry.status === "abgelehnt" && entry.decision_note && (
-              <p className="text-[11px] mt-1 text-red-600 dark:text-red-400 flex items-start gap-1">
-                <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-                <span>{entry.decision_note}</span>
-              </p>
-            )}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusMeta.chip}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
+              {statusMeta.label}
+            </span>
           </div>
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+            {formatDateRange(entry.start_date, entry.end_date)}
+          </p>
+          {entry.note && (
+            <p className="text-xs italic mt-1 text-foreground/80 truncate">
+              „{entry.note}"
+            </p>
+          )}
+          {entry.status === "abgelehnt" && entry.decision_note && (
+            <p className="text-[11px] mt-1.5 text-red-600 dark:text-red-300 flex items-start gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>{entry.decision_note}</span>
+            </p>
+          )}
+        </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {canDecide && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onDecide("ablehnen")}
-                  className="kasten kasten-red"
-                  data-tooltip="Ablehnen"
-                  aria-label="Ablehnen"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDecide("genehmigen")}
-                  className="kasten kasten-green"
-                  data-tooltip="Genehmigen"
-                  aria-label="Genehmigen"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
-            {canCancel && !canDecide && (
+        {/* Tage-Badge — prominent, tabular-nums, kompakt */}
+        <div className="shrink-0 flex flex-col items-center justify-center px-2.5 min-w-[3rem] rounded-lg bg-muted/60 border border-border/60 py-1.5">
+          <span className="text-base font-bold tabular-nums leading-tight text-foreground">
+            {days}
+          </span>
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">
+            {days === 1 ? "Tag" : "Tage"}
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {canDecide && (
+            <>
               <button
                 type="button"
-                onClick={onDelete}
-                className="kasten kasten-muted"
-                data-tooltip="Zurückziehen"
-                aria-label="Zurückziehen"
+                onClick={() => onDecide("ablehnen")}
+                className="kasten kasten-red"
+                data-tooltip="Ablehnen"
+                aria-label="Ablehnen"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" />
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => onDecide("genehmigen")}
+                className="kasten kasten-green"
+                data-tooltip="Genehmigen"
+                aria-label="Genehmigen"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+          {canCancel && !canDecide && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="kasten kasten-muted"
+              data-tooltip="Zurückziehen"
+              aria-label="Zurückziehen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
