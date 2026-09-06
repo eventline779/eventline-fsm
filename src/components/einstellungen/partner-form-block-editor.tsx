@@ -22,6 +22,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/searchable-select";
 import { FormRenderer } from "@/components/partner-form/form-renderer";
 import {
   Trash2, GripVertical, X,
@@ -393,11 +394,17 @@ function BlockEditor({ block, allBlocks, onChange }: { block: FormBlock; allBloc
       {block.type === "info-banner" && (
         <>
           <Row label="Stil">
-            <select value={block.tone} onChange={(e) => patchAny("tone", e.target.value)} className="h-9 w-full px-3 text-sm rounded-xl border border-border bg-card">
-              <option value="info">Info (blau)</option>
-              <option value="warning">Warnung (gelb)</option>
-              <option value="success">Erfolg (grün)</option>
-            </select>
+            <SearchableSelect
+              value={block.tone}
+              onChange={(v) => patchAny("tone", v)}
+              items={[
+                { id: "info", label: "Info (blau)" },
+                { id: "warning", label: "Warnung (gelb)" },
+                { id: "success", label: "Erfolg (grün)" },
+              ]}
+              searchable={false}
+              clearable={false}
+            />
           </Row>
           <Row label="Text"><textarea value={block.text} onChange={(e) => patchAny("text", e.target.value)} rows={3} className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card" /></Row>
         </>
@@ -550,28 +557,29 @@ function ConditionEditor({
       <p className="text-[10px] text-muted-foreground/70">{hint}</p>
       {enabled && value && (
         <div className="space-y-1.5 pl-1 border-l-2 border-border/60">
-          <select
+          <SearchableSelect
             value={value.blockId}
-            onChange={(e) => onChange({ ...value, blockId: e.target.value })}
-            className="h-8 w-full px-2 text-xs rounded-lg border border-border bg-card"
-          >
-            <option value="">— Quell-Block wählen —</option>
-            {sourceBlocks.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.id} — {("label" in b ? b.label : b.type) as string}
-              </option>
-            ))}
-          </select>
-          <select
+            onChange={(v) => onChange({ ...value, blockId: v })}
+            items={sourceBlocks.map((b) => ({
+              id: b.id,
+              label: b.id,
+              sub: ("label" in b ? b.label : b.type) as string,
+            }))}
+            placeholder="— Quell-Block wählen —"
+            clearable={false}
+          />
+          <SearchableSelect
             value={value.op}
-            onChange={(e) => onChange({ ...value, op: e.target.value as BlockCondition["op"] })}
-            className="h-8 w-full px-2 text-xs rounded-lg border border-border bg-card"
-          >
-            <option value="on">ist an / ausgefüllt</option>
-            <option value="off">ist aus / leer</option>
-            <option value="equals">gleich…</option>
-            <option value="not-equals">ungleich…</option>
-          </select>
+            onChange={(v) => onChange({ ...value, op: v as BlockCondition["op"] })}
+            items={[
+              { id: "on", label: "ist an / ausgefüllt" },
+              { id: "off", label: "ist aus / leer" },
+              { id: "equals", label: "gleich…" },
+              { id: "not-equals", label: "ungleich…" },
+            ]}
+            searchable={false}
+            clearable={false}
+          />
           {needsValue && (
             <ConditionValueInput
               source={sourceBlock}
@@ -597,14 +605,13 @@ function ConditionValueInput({
   if (source && (source.type === "dropdown" || source.type === "radio" || source.type === "toggle-group")) {
     const opts = (source as { options?: DropdownOption[] }).options ?? [];
     return (
-      <select
+      <SearchableSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-8 w-full px-2 text-xs rounded-lg border border-border bg-card"
-      >
-        <option value="">— Wert wählen —</option>
-        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+        onChange={(v) => onChange(v)}
+        items={opts.map((o) => ({ id: o.value, label: o.label }))}
+        placeholder="— Wert wählen —"
+        clearable={false}
+      />
     );
   }
   return (
@@ -672,10 +679,13 @@ function MapToSelect({ value, onChange, only }: { value: string | undefined; onC
   const ALL = ["title", "description", "start_date", "end_date", "contact_person", "contact_phone", "contact_email", "guest_count"];
   const available = only ?? ALL;
   return (
-    <select value={value ?? ""} onChange={(e) => onChange(e.target.value || undefined)} className="h-9 w-full px-3 text-sm rounded-xl border border-border bg-card">
-      <option value="">— kein Mapping —</option>
-      {available.map((c) => <option key={c} value={c}>{c}</option>)}
-    </select>
+    <SearchableSelect
+      value={value ?? ""}
+      onChange={(v) => onChange(v || undefined)}
+      items={available.map((c) => ({ id: c, label: c }))}
+      placeholder="— kein Mapping —"
+      clearable
+    />
   );
 }
 

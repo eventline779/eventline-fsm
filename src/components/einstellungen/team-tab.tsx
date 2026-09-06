@@ -461,13 +461,12 @@ export function TeamTab() {
           </div>
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Rolle *</p>
-            <select
+            <SearchableSelect
               value={createForm.role}
-              onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-              className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card"
-            >
-              {roles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
-            </select>
+              onChange={(v) => setCreateForm({ ...createForm, role: v })}
+              items={roles.map((r) => ({ id: r.slug, label: r.label }))}
+              clearable={false}
+            />
           </div>
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground/70 ml-1">Teamleiter (optional)</p>
@@ -547,13 +546,12 @@ export function TeamTab() {
             </div>
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground/70 ml-1">Rolle</p>
-              <select
+              <SearchableSelect
                 value={edit.role}
-                onChange={(e) => setEdit({ ...edit, role: e.target.value })}
-                className="w-full h-9 px-3 text-sm rounded-xl border border-border bg-card"
-              >
-                {roles.map((r) => <option key={r.slug} value={r.slug}>{r.label}</option>)}
-              </select>
+                onChange={(v) => setEdit({ ...edit, role: v })}
+                items={roles.map((r) => ({ id: r.slug, label: r.label }))}
+                clearable={false}
+              />
             </div>
             {/* Team-Zuweisung — zwei Modi je nach Rolle:
                 a) Bearbeiteter User IST Teamleiter (Rolle scope='team'|'all'):
