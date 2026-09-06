@@ -63,7 +63,14 @@ function suggestNickname(): string {
   return "";
 }
 
-export function PasskeysCard() {
+interface PasskeysCardProps {
+  /** Optional Callback nach erfolgreicher Passkey-Registrierung. Wird vom
+   *  Passkey-Enrollment-Screen (/passkey-setup) genutzt, um nach dem ersten
+   *  Passkey ins Dashboard weiterzuleiten. */
+  onRegistered?: () => void;
+}
+
+export function PasskeysCard({ onRegistered }: PasskeysCardProps = {}) {
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
@@ -131,6 +138,7 @@ export function PasskeysCard() {
       }
       toast.success("Passkey eingerichtet");
       load();
+      onRegistered?.();
     } finally {
       setRegistering(false);
     }
