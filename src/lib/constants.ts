@@ -95,7 +95,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard", mobile: true },
-      { href: "/todos", label: "Todos", icon: "CheckSquare", mobile: true },
+      { href: "/todos", label: "Aufgaben", icon: "CheckSquare", mobile: true },
       { href: "/kalender", label: "Kalender", icon: "Calendar", mobile: true },
       // HR als Hub: enthält Übersicht + Stempelzeiten + Tickets + Ferien
       // (+ Löhne fuer Admin auf trusted device). matchPrefixes damit die
