@@ -1535,7 +1535,7 @@ function GroupedList({
               </div>
               <span className="text-xs font-bold tabular-nums">{formatDuration(total)}</span>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
+            <div className="rounded-xl border border-border bg-card divide-y divide-border [&>*:first-child]:rounded-t-xl [&>*:last-child]:rounded-b-xl">
               {list.map((e) => (
                 <EntryCard
                   key={e.id}
