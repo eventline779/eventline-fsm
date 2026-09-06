@@ -66,142 +66,28 @@ export function MobilePreviewFrame({ onClose }: Props) {
         zIndex: 2500,
         background: "color-mix(in oklab, #000 88%, transparent)",
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
+        gap: 20,
         backdropFilter: "blur(4px)",
+        padding: 20,
       }}
     >
-      {/* Top-Bar mit Device-Auswahl + Reload + Close. Fixed am oberen
-          Rand des Backdrops. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 16,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: 999,
-          padding: "6px 8px 6px 12px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-        }}
-      >
-        <Smartphone style={{ width: 14, height: 14, color: "var(--muted-foreground)" }} />
-        <span style={{ fontSize: 11, fontWeight: 600 }}>Mobile-Ansicht</span>
-        <div
-          style={{
-            width: 1,
-            height: 14,
-            background: "var(--border)",
-            margin: "0 4px",
-          }}
-        />
-        {DEVICE_PRESETS.map((d) => {
-          const active = d.key === device;
-          return (
-            <button
-              key={d.key}
-              type="button"
-              onClick={() => setDevice(d.key)}
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: 999,
-                border: "none",
-                background: active
-                  ? "color-mix(in oklab, var(--accent) 15%, transparent)"
-                  : "transparent",
-                color: active ? "var(--accent)" : "var(--muted-foreground)",
-                cursor: "pointer",
-              }}
-            >
-              {d.label}
-            </button>
-          );
-        })}
-        <div
-          style={{
-            width: 1,
-            height: 14,
-            background: "var(--border)",
-            margin: "0 4px",
-          }}
-        />
-        <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontVariantNumeric: "tabular-nums" }}>
-          {dev.w}×{dev.h}
-        </span>
-        <button
-          type="button"
-          onClick={reload}
-          title="Neu laden"
-          style={{
-            width: 24,
-            height: 24,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 999,
-            border: "none",
-            background: "transparent",
-            color: "var(--muted-foreground)",
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "color-mix(in oklab, var(--foreground) 8%, transparent)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
-        >
-          <RefreshCw style={{ width: 12, height: 12 }} />
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          title="Zurück zur Desktop-Ansicht"
-          style={{
-            width: 24,
-            height: 24,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 999,
-            border: "none",
-            background: "transparent",
-            color: "var(--foreground)",
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "color-mix(in oklab, #dc2626 15%, transparent)";
-            e.currentTarget.style.color = "#dc2626";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "var(--foreground)";
-          }}
-        >
-          <X style={{ width: 14, height: 14 }} />
-        </button>
-      </div>
-
       {/* Handy-Rahmen. Dezenter Bezel + subtile Notch damit klar ist,
           das ist ein Handy. Der iframe darin ist der eigentliche Viewport. */}
       <div
         style={{
           width: dev.w + 20,
           height: dev.h + 20,
-          maxWidth: "min(96vw, 480px)",
+          maxWidth: "min(80vw, 480px)",
           maxHeight: "min(90vh, 940px)",
           background: "#111",
           borderRadius: 40,
           padding: 10,
           boxShadow: "0 24px 60px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
           position: "relative",
+          flexShrink: 0,
         }}
       >
         {/* Notch */}
@@ -232,6 +118,164 @@ export function MobilePreviewFrame({ onClose }: Props) {
             display: "block",
           }}
         />
+      </div>
+
+      {/* Sidebar mit Device-Auswahl + Reload + Close. Vertikal RECHTS
+          neben dem Handy — beruehrt das Handy nicht, sauberer Look. */}
+      <div
+        style={{
+          display: "inline-flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          gap: 10,
+          background: "var(--card)",
+          border: "1px solid var(--border)",
+          borderRadius: 16,
+          padding: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+          minWidth: 160,
+          maxWidth: 200,
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            paddingBottom: 8,
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <Smartphone style={{ width: 14, height: 14, color: "var(--muted-foreground)" }} />
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.02em" }}>
+            Mobile-Ansicht
+          </span>
+        </div>
+
+        {/* Device-Presets vertikal */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: "var(--muted-foreground)",
+              marginBottom: 2,
+            }}
+          >
+            Gerät
+          </span>
+          {DEVICE_PRESETS.map((d) => {
+            const active = d.key === device;
+            return (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => setDevice(d.key)}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "6px 8px",
+                  borderRadius: 8,
+                  border: "1px solid " + (active ? "color-mix(in oklab, var(--accent) 50%, transparent)" : "transparent"),
+                  background: active
+                    ? "color-mix(in oklab, var(--accent) 12%, transparent)"
+                    : "transparent",
+                  color: active ? "var(--accent)" : "var(--foreground)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.background =
+                      "color-mix(in oklab, var(--foreground) 6%, transparent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Aktuelle Aufloesung */}
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--muted-foreground)",
+            fontVariantNumeric: "tabular-nums",
+            textAlign: "center",
+            padding: "4px 0",
+            borderTop: "1px solid var(--border)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          {dev.w}×{dev.h}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <button
+            type="button"
+            onClick={reload}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "6px 8px",
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--foreground)",
+              fontSize: 11,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background =
+                "color-mix(in oklab, var(--foreground) 6%, transparent)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <RefreshCw style={{ width: 12, height: 12 }} />
+            Neu laden
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "6px 8px",
+              borderRadius: 8,
+              border: "1px solid color-mix(in oklab, #dc2626 40%, transparent)",
+              background: "color-mix(in oklab, #dc2626 8%, transparent)",
+              color: "#dc2626",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "color-mix(in oklab, #dc2626 18%, transparent)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "color-mix(in oklab, #dc2626 8%, transparent)";
+            }}
+          >
+            <X style={{ width: 12, height: 12 }} />
+            Schliessen
+          </button>
+        </div>
       </div>
     </div>
   );
