@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Loading } from "@/components/ui/spinner";
 import { EmployeeWageDetailModal } from "@/components/hr/employee-wage-detail-modal";
 import { createClient } from "@/lib/supabase/client";
+import { logError } from "@/lib/log";
 
 interface EmployeeStats {
   profile_id: string;
@@ -160,6 +161,12 @@ export function MonatsstundenTable() {
         setData(json.employees as EmployeeStats[]);
         if (typeof json.bvgThresholdChf === "number") setBvgThreshold(json.bvgThresholdChf);
         if (Array.isArray(json.bvgForecastMonthLabels)) setBvgMonthLabels(json.bvgForecastMonthLabels);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logError("monatsstunden-table.load", err, { period: fmtMonth(period) });
+        toast.error("Netzwerkfehler beim Laden der Monatsstunden");
+        setData([]);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

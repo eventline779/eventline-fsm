@@ -78,29 +78,37 @@ export function TeamTab() {
 
   async function load() {
     setLoading(true);
-    const [profRes, rolesRes] = await Promise.all([
-      supabase.rpc("get_all_profiles_admin"),
-      fetch("/api/admin/roles").then((r) => r.json()),
-    ]);
-    const all = (profRes.data as Profile[]) ?? [];
-    setProfiles(all.filter((p) => p.role !== "partner"));
-    if (rolesRes?.success) {
-      // scope wird nur zur Filterung der Teamleiter-Kandidaten gebraucht —
-      // falls die API-Antwort scope (noch) nicht liefert (aeltere Route),
-      // faellt der Fallback auf 'self' zurueck, dann werden schlicht keine
-      // Kandidaten angezeigt statt zu crashen.
-      const rawRoles = rolesRes.roles as Array<{ slug: string; label: string; scope?: string }>;
-      setRoles(
-        rawRoles
-          .filter((r) => r.slug !== "partner")
-          .map((r) => ({
-            slug: r.slug,
-            label: r.label,
-            scope: (r.scope === "team" || r.scope === "all" ? r.scope : "self") as RoleOption["scope"],
-          })),
-      );
+    try {
+      const [profRes, rolesRes] = await Promise.all([
+        supabase.rpc("get_all_profiles_admin"),
+        fetch("/api/admin/roles").then((r) => r.json()),
+      ]);
+      const all = (profRes.data as Profile[]) ?? [];
+      setProfiles(all.filter((p) => p.role !== "partner"));
+      if (rolesRes?.success) {
+        // scope wird nur zur Filterung der Teamleiter-Kandidaten gebraucht —
+        // falls die API-Antwort scope (noch) nicht liefert (aeltere Route),
+        // faellt der Fallback auf 'self' zurueck, dann werden schlicht keine
+        // Kandidaten angezeigt statt zu crashen.
+        const rawRoles = rolesRes.roles as Array<{ slug: string; label: string; scope?: string }>;
+        setRoles(
+          rawRoles
+            .filter((r) => r.slug !== "partner")
+            .map((r) => ({
+              slug: r.slug,
+              label: r.label,
+              scope: (r.scope === "team" || r.scope === "all" ? r.scope : "self") as RoleOption["scope"],
+            })),
+        );
+      }
+    } catch (err) {
+      // Ohne try/catch blieb loading=true haengen wenn fetch/RPC failt —
+      // Team-Tab zeigte dann dauerhaft Spinner statt Fehlermeldung.
+      console.error("team-tab.load", err);
+      toast.error("Team konnte nicht geladen werden");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

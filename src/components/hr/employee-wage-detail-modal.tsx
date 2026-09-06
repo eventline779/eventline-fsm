@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Loading } from "@/components/ui/spinner";
 import { ChevronLeft, ChevronRight, Moon, CalendarDays, Wallet, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { logError } from "@/lib/log";
 
 interface Props {
   open: boolean;
@@ -102,6 +104,12 @@ export function EmployeeWageDetailModal({ open, profileId, initialYear, onClose 
         if (cancelled) return;
         if (json.success) setData(json as DetailResp);
         else setData(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logError("employee-wage-detail-modal.load", err, { profileId, year });
+        toast.error("Netzwerkfehler beim Laden der Lohn-Details");
+        setData(null);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
