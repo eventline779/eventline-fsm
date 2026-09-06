@@ -12,10 +12,9 @@
  * bestehende Voll-Formular oeffnet).
  */
 
-import { useState, useRef, useEffect } from "react";
-import { Plus, User, Calendar, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Plus, User, Calendar, AlertCircle, Loader2, Check } from "lucide-react";
 import { DatePopover } from "./date-popover";
-import { SearchableSelect } from "@/components/searchable-select";
 import { createPortal } from "react-dom";
 import { addDaysIso, todayIso, relativeDueLabel } from "@/lib/relative-date";
 import type { Profile } from "@/types";
@@ -42,9 +41,11 @@ function AssigneePopover({
   children: (opts: { open: () => void; isOpen: boolean }) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +66,15 @@ function AssigneePopover({
     };
   }, [open]);
 
+  // Beim Oeffnen: sofort Search-Input fokussieren + Query zuruecksetzen,
+  // damit User direkt tippen oder klicken kann (1 Klick statt 2).
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    const t = setTimeout(() => searchRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
@@ -82,20 +92,51 @@ function AssigneePopover({
     };
   }, [open]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((p) => p.full_name.toLowerCase().includes(q));
+  }, [options, query]);
+
   const popover = open && pos && typeof document !== "undefined" ? createPortal(
     <div
       ref={popRef}
       style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-      className="z-[1200] rounded-xl border border-border bg-popover shadow-lg p-2"
+      className="z-[1200] rounded-xl border border-border bg-popover shadow-lg overflow-hidden"
       onClick={(e) => e.stopPropagation()}
     >
-      <SearchableSelect
-        value={value}
-        onChange={(id) => { onChange(id); setOpen(false); }}
-        items={options.map((p) => ({ id: p.id, label: p.full_name }))}
-        clearable={false}
-        placeholder="Person auswaehlen ..."
+      <input
+        ref={searchRef}
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && filtered.length > 0) {
+            e.preventDefault();
+            onChange(filtered[0].id);
+            setOpen(false);
+          }
+        }}
+        placeholder="Person suchen ..."
+        className="w-full px-3 py-2 text-sm bg-transparent border-b border-border focus:outline-none"
       />
+      <ul className="max-h-60 overflow-y-auto py-1">
+        {filtered.length === 0 && (
+          <li className="px-3 py-2 text-xs text-muted-foreground">Keine Treffer</li>
+        )}
+        {filtered.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => { onChange(p.id); setOpen(false); }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm text-left hover:bg-foreground/[0.06] dark:hover:bg-foreground/[0.10]"
+            >
+              <span className="truncate">{p.full_name}</span>
+              {p.id === value && <Check className="h-3.5 w-3.5 text-foreground/60 shrink-0" />}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>,
     document.body,
   ) : null;
