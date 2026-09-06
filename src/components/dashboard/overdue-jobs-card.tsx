@@ -48,7 +48,7 @@ export function OverdueJobsCard({ count, items }: Props) {
     return (
       <section className="rounded-xl border bg-card p-3 text-sm text-muted-foreground flex items-center gap-2">
         <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        Alles im Zeitplan — keine ueberfaelligen Auftraege.
+        Alles im Zeitplan — keine überfälligen Aufträge.
       </section>
     );
   }
@@ -63,7 +63,7 @@ export function OverdueJobsCard({ count, items }: Props) {
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="font-heading text-base font-semibold text-red-700 dark:text-red-300">
-            Ueberfaellig
+            Überfällig
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             End-Datum vergangen, aber noch nicht abgeschlossen

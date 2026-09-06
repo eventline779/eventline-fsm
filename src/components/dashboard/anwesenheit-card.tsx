@@ -170,7 +170,7 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
     return (
       <section className={cn("rounded-xl border bg-card p-3 flex items-center gap-2 text-sm text-muted-foreground", className)}>
         <CalendarCheck className="h-4 w-4 text-accent" />
-        Anwesenheitskalender ist fuer dich nicht freigeschaltet.
+        Anwesenheitskalender ist für dich nicht freigeschaltet.
       </section>
     );
   }

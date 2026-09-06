@@ -329,12 +329,12 @@ export function DashboardPreferencesModal({
         credentials: "include",
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? "Zuruecksetzen fehlgeschlagen");
+      if (!json.success) throw new Error(json.error ?? "Zurücksetzen fehlgeschlagen");
       dirtyRef.current = false;
       onSaved();
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Zuruecksetzen fehlgeschlagen");
+      toast.error(e instanceof Error ? e.message : "Zurücksetzen fehlgeschlagen");
     } finally {
       setSaving(false);
     }
@@ -366,7 +366,7 @@ export function DashboardPreferencesModal({
     <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="3xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Widgets verschieben, ausblenden oder Reihenfolge aendern — nur fuer dich sichtbar.
+          Widgets verschieben, ausblenden oder Reihenfolge ändern — nur für dich sichtbar.
         </p>
         <PreviewToggle mobile={mobilePreview} onChange={setMobilePreview} />
       </div>
@@ -427,7 +427,7 @@ export function DashboardPreferencesModal({
           ) : (
             <RotateCcw className="h-3.5 w-3.5" />
           )}
-          Auf Standard zuruecksetzen
+          Auf Standard zurücksetzen
         </button>
         <button type="button" onClick={handleFinish} className="kasten kasten-red">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
