@@ -20,11 +20,12 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   Wrench, Receipt, Clock, Package, Calendar, User, FileText, Download, Eye,
-  CheckCircle2, XCircle, Trash2,
+  CheckCircle2, XCircle, Trash2, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { localDateIso } from "@/lib/swiss-time";
+import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import { PdfPopup } from "@/components/pdf-popup";
 import type { TicketWithRelations, TicketType, TicketStatus, TicketDataBeleg, TicketDataMaterial, TicketDataStempelAenderung, TicketDataIT } from "@/types";
 
@@ -69,6 +70,11 @@ export default function TicketDetailPage() {
   // data.job_id, oder via time_entries.job_id bei Korrektur). Null = kein
   // Auftrag (Andere Arbeit) ODER noch nicht geladen.
   const [stempelJob, setStempelJob] = useState<{ id: string; job_number: number; title: string } | null>(null);
+  // Lock-State fuer Stempeltickets: true wenn Alt-Row ODER Ziel-Zeitraum
+  // im gesperrten Abrechnungs-Fenster liegt (Migration 214/215). UI zeigt
+  // Warnung + disabled Approve — sonst wuerde apply_ticket serverseitig
+  // mit 'Zeitraum bereits abgerechnet' abbrechen.
+  const [stempelLocked, setStempelLocked] = useState(false);
   // Admin-Approval-Flow: Job-Korrektur. Sentinel "ANDERE_ARBEIT" = job_id NULL.
   // Default = bestehender stempelJob.id (also "keine Aenderung").
   const [correctedJobId, setCorrectedJobId] = useState<string>("");
@@ -127,18 +133,29 @@ export default function TicketDetailPage() {
       // - Vergessen (job_id direkt): jobs
       // - Andere Arbeit oder kein Bezug: stempelJob bleibt null
       if (t.type === "stempel_aenderung") {
-        const sd = (t.data ?? {}) as { time_entry_id?: string; job_id?: string };
+        const sd = (t.data ?? {}) as { time_entry_id?: string; job_id?: string; neu_start?: string };
         let jobId: string | null = null;
+        // Lock-Check:
+        //  Fall A (Korrektur) - Alt-Row muss ungesperrt sein UND (falls
+        //   neu_start gesetzt) der Ziel-Zeitraum ebenfalls.
+        //  Fall B (Vergessen) - Ziel-Zeitraum (neu_start) ungesperrt.
+        // Spiegel zu apply_ticket-RPC (Migration 215), damit UI + Server
+        // dasselbe sagen.
+        let locked = false;
         if (sd.time_entry_id) {
           const { data: te } = await supabase
             .from("time_entries")
-            .select("job_id")
+            .select("job_id, clock_in")
             .eq("id", sd.time_entry_id)
             .maybeSingle();
           jobId = te?.job_id ?? null;
-        } else if (sd.job_id) {
-          jobId = sd.job_id;
+          if (te?.clock_in && isTimeEntryLocked(te.clock_in)) locked = true;
+          if (sd.neu_start && isTimeEntryLocked(sd.neu_start)) locked = true;
+        } else {
+          if (sd.neu_start && isTimeEntryLocked(sd.neu_start)) locked = true;
+          if (sd.job_id) jobId = sd.job_id;
         }
+        setStempelLocked(locked);
         if (jobId) {
           const { data: job } = await supabase
             .from("jobs")
@@ -153,6 +170,7 @@ export default function TicketDetailPage() {
         }
       } else {
         setStempelJob(null);
+        setStempelLocked(false);
       }
     }
     setLoading(false);
@@ -562,6 +580,24 @@ export default function TicketDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Bearbeiten</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Lock-Warnung: bei Stempeltickets, deren Alt-Row ODER Ziel-
+                Zeitraum im gesperrten Abrechnungs-Fenster liegt. Approve wird
+                unten disabled — apply_ticket wuerde sonst serverseitig mit
+                'Zeitraum bereits abgerechnet' abbrechen. */}
+            {ticket.type === "stempel_aenderung" && stempelLocked && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3">
+                <Lock className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-800 dark:text-amber-200">
+                  <p className="font-semibold">Zeitraum bereits abgerechnet</p>
+                  <p className="mt-0.5">
+                    Dieser Zeitraum liegt nach der Abrechnungs-Deadline (5. des
+                    Folgemonats) und kann nicht mehr genehmigt werden.
+                    Nachtraegliche Korrektur nur per direktem SQL durch die
+                    Buchhaltung.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Auftrag-Korrektur fuer Stempel-Tickets — Admin kann den
                 vom Mitarbeiter gewaehlten Auftrag noch vor dem Erledigen
                 aendern (z.B. wenn aus zwei aehnlich benannten Auftraegen
@@ -620,7 +656,13 @@ export default function TicketDetailPage() {
                   bleiben daneben als Fallback (Ablehnen braucht die Notiz,
                   Erledigt fuer andere Ticket-Typen). */}
               {ticket.type === "stempel_aenderung" && (
-                <button type="button" onClick={quickApproveStempel} disabled={busy} className="kasten kasten-green flex-1" data-tooltip="Genehmigt ohne Rueckfrage">
+                <button
+                  type="button"
+                  onClick={quickApproveStempel}
+                  disabled={busy || stempelLocked}
+                  className="kasten kasten-green flex-1"
+                  data-tooltip={stempelLocked ? TIME_ENTRY_LOCK_MESSAGE : "Genehmigt ohne Rueckfrage"}
+                >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Genehmigen
                 </button>

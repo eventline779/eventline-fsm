@@ -40,8 +40,9 @@ import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
-  AlertTriangle, Moon, Search, Users, Edit3,
+  AlertTriangle, Moon, Search, Users, Edit3, Lock,
 } from "lucide-react";
+import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { Input } from "@/components/ui/input";
@@ -647,7 +648,13 @@ export function StempelzeitenView() {
     setShowStempelTicket(true);
   }, []);
 
-  async function deleteEntry(id: string) {
+  async function deleteEntry(id: string, clockIn: string) {
+    // Client-side Lock-Check: erspart Roundtrip + zeigt sofortige Meldung.
+    // RLS haerte das serverseitig ohnehin ab (Migration 214).
+    if (isTimeEntryLocked(clockIn)) {
+      toast.error(TIME_ENTRY_LOCK_MESSAGE);
+      return;
+    }
     const ok = await confirm({
       title: "Eintrag löschen?",
       message: "Der Stempel-Eintrag wird unwiderruflich entfernt.",
@@ -1072,7 +1079,7 @@ function GroupedList({
   now: number;
   currentUserId: string | null;
   canCreateTicket: boolean;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, clockIn: string) => void;
   onCorrect: (payload: CorrectPayload) => void;
 }) {
   // Gruppieren nach clock_in.localDate. Sortiert: neueste Tage zuerst.
@@ -1111,7 +1118,7 @@ function GroupedList({
                   anomaly={detectAnomaly(e, now)}
                   isOwn={!!currentUserId && e.userId === currentUserId}
                   canCreateTicket={canCreateTicket}
-                  onDelete={() => onDelete(e.id)}
+                  onDelete={() => onDelete(e.id, e.clockIn)}
                   onCorrect={() => onCorrect({
                     timeEntryId: e.id,
                     clockIn: e.clockIn,
@@ -1144,8 +1151,14 @@ function EntryCard({
   onCorrect: () => void;
 }) {
   const isRunning = !entry.clockOut;
+  // Lock-Check: nach 5. des Folgemonats ist der Eintrag abgerechnet und
+  // darf weder korrigiert noch geloescht werden (spiegelt Migration 214-RLS).
+  const locked = isTimeEntryLocked(entry.clockIn);
   return (
-    <div className="px-3 py-2 flex items-center gap-2.5 hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.05] transition-colors">
+    <div className={`px-3 py-2 flex items-center gap-2.5 transition-colors ${locked
+      ? "bg-muted/20 opacity-70"
+      : "hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.05]"
+    }`}>
       {entry.userName ? (
         <div
           className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white"
@@ -1199,9 +1212,17 @@ function EntryCard({
             </span>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground tabular-nums truncate">
-          {formatDateTime(entry.clockIn)}{entry.clockOut ? ` – ${formatDateTime(entry.clockOut)}` : ""}
-          {entry.jobLabel && entry.description ? <span className="ml-2 italic">· {entry.description}</span> : null}
+        <p className="text-[11px] text-muted-foreground tabular-nums truncate flex items-center gap-1">
+          {locked && (
+            <Lock
+              className="h-3 w-3 text-muted-foreground/70 shrink-0"
+              data-tooltip={TIME_ENTRY_LOCK_MESSAGE}
+            />
+          )}
+          <span className="truncate">
+            {formatDateTime(entry.clockIn)}{entry.clockOut ? ` – ${formatDateTime(entry.clockOut)}` : ""}
+            {entry.jobLabel && entry.description ? <span className="ml-2 italic">· {entry.description}</span> : null}
+          </span>
         </p>
       </div>
       <span className="font-mono font-semibold text-sm tabular-nums shrink-0">
@@ -1210,23 +1231,33 @@ function EntryCard({
       {/* Row-"Korrigieren" — Inline-Context, oeffnet Stempel-Aenderungs-Ticket
           mit vorbelegtem time_entry + Start + Ende. Nur bei eigenen Eintraegen
           (fremde Korrekturen sind nicht Sinn der Sache), nur wenn User Rechte
-          fuer Ticket-Erstellung hat. */}
+          fuer Ticket-Erstellung hat. Bei abgerechneten Eintraegen disabled +
+          Tooltip — apply_ticket wuerde eh mit HTTP 423 abbrechen. */}
       {isOwn && canCreateTicket && (
         <button
           type="button"
-          onClick={onCorrect}
-          className="p-1 rounded text-muted-foreground/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors shrink-0"
+          onClick={locked ? undefined : onCorrect}
+          disabled={locked}
+          className={`p-1 rounded transition-colors shrink-0 ${locked
+            ? "text-muted-foreground/25 cursor-not-allowed"
+            : "text-muted-foreground/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10"
+          }`}
           aria-label="Eintrag korrigieren"
-          data-tooltip="Korrigieren — Ticket mit vorbelegten Zeiten oeffnen"
+          data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : "Korrigieren — Ticket mit vorbelegten Zeiten oeffnen"}
         >
           <Edit3 className="h-3.5 w-3.5" />
         </button>
       )}
       <button
         type="button"
-        onClick={onDelete}
-        className="p-1 rounded text-muted-foreground/40 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+        onClick={locked ? undefined : onDelete}
+        disabled={locked}
+        className={`p-1 rounded transition-colors shrink-0 ${locked
+          ? "text-muted-foreground/25 cursor-not-allowed"
+          : "text-muted-foreground/40 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+        }`}
         aria-label="Eintrag löschen"
+        data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : undefined}
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>

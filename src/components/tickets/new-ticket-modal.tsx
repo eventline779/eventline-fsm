@@ -27,7 +27,8 @@ import type { TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { localDateIso, localTimeHM } from "@/lib/swiss-time";
 import { toast } from "sonner";
-import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, LogIn, LogOut, Coffee, PencilLine } from "lucide-react";
+import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, LogIn, LogOut, Coffee, PencilLine, Lock } from "lucide-react";
+import { isTimeEntryLocked, TIME_ENTRY_LOCK_MESSAGE } from "@/lib/time-lock";
 import type { TicketType } from "@/types";
 
 type StempelMode = "korrektur" | "vergessen";
@@ -628,6 +629,12 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       if (!stempel.grund.trim()) return "Grund ist Pflicht";
       if (stempelMode === "korrektur" && !stempel.time_entry_id) return "Stempel-Eintrag auswählen";
       if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
+      // Lock-Check: neu_start (nur Vergessen-Modus — Korrektur-Modus haerte
+      // apply_ticket serverseitig ab, dort ist die Alt-Row-Info verfuegbar).
+      // Client-Warnung erspart dem User das Absenden + Ablehnen-Toast.
+      if (stempelMode === "vergessen" && stempel.neu_start && isTimeEntryLocked(new Date(stempel.neu_start).toISOString())) {
+        return TIME_ENTRY_LOCK_MESSAGE;
+      }
       // Kontext-abhaengige Pflichtfelder — gelten in beiden Modi, weil der
       // User via Segment-Toggle bewusst 'Projekt' / 'Andere Arbeit' waehlen
       // kann und dann das jeweilige Feld nicht leer lassen darf.
@@ -1237,6 +1244,25 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
               {/* Vergessen-Formular (mode=vergessen) — aktiv bei 'no_in'. */}
               {stempelPreset && stempelMode === "vergessen" && (
                 <>
+                  {/* Lock-Warnung — sobald der gewaehlte neu_start-Zeitraum
+                      im gesperrten Abrechnungs-Fenster liegt (5. des Folge-
+                      monats), kann apply_ticket den Eintrag serverseitig
+                      nicht mehr anlegen. Wir zeigen es sofort im Modal, damit
+                      der User nicht ausfuellt + abgelehnt wird. Der Submit-
+                      Guard in validate() blockt zusaetzlich. */}
+                  {stempel.neu_start && isTimeEntryLocked(new Date(stempel.neu_start).toISOString()) && (
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
+                      <Lock className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800 dark:text-amber-200">
+                        <p className="font-semibold">Zeitraum bereits abgerechnet</p>
+                        <p className="mt-0.5">
+                          Der gewaehlte Tag liegt nach der Abrechnungs-Deadline
+                          (5. des Folgemonats). Nachtraege sind hier nicht mehr
+                          moeglich — bitte an die Buchhaltung wenden.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {/* Zeitraum-Autofill: letzte bis zu 3 Time-Entries als
                       Klick-Chips ("Heute 06.09 09:00–17:00 · INT-1234").
                       Klick uebernimmt Datum + Start/End + Job. Loeschen von
