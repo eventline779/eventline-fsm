@@ -33,6 +33,19 @@ import type { TicketType } from "@/types";
 type StempelMode = "korrektur" | "vergessen";
 /** Preset-Slots fuer Stempel-Aenderungs-Tickets — jeder Slot steuert Modus + Prefill. */
 type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
+/** Kontext-Typ fuer den gestempelten Zeitraum: externer Auftrag, internes
+ *  Projekt (Zeit-Budget), oder freie "Andere Arbeit" (kein Kontext-Objekt).
+ *
+ *  time_entries hat aktuell KEINE project_id-Spalte — Projekt-Zeit lebt in
+ *  der separaten Tabelle project_time_entries mit anderem Schema
+ *  (entry_date + minutes statt clock_in/clock_out). Fuer Tickets mit
+ *  context='projekt' speichern wir project_id in tickets.data und der
+ *  Admin traegt die Zeit manuell nach; automatisches Apply via
+ *  apply_ticket RPC unterstuetzt (Stand jetzt) nur job_id. Follow-up:
+ *  entweder time_entries.project_id-Migration oder neuer Ticket-Type
+ *  `projekt_zeit_nachstempeln` mit eigenem apply-Handler auf
+ *  project_time_entries. */
+type StempelContext = "auftrag" | "projekt" | "andere_arbeit";
 
 /** Preset-Definitionen: Icon, Label, Kurzbeschreibung. */
 const STEMPEL_PRESETS: Array<{ id: StempelPreset; label: string; desc: string; icon: React.ComponentType<{ className?: string }> }> = [
@@ -139,16 +152,27 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
   // initialData/initialType-Prefill (z.B. /stempelzeiten "Korrigieren"-Row-
   // Button) als 'wrong_time' vorbelegt.
   const [stempelPreset, setStempelPreset] = useState<StempelPreset | null>(null);
+  // Kontext-Segment: welche "Art" von Zeit gestempelt wurde. Steuert welcher
+  // Picker unter dem Segment-Toggle erscheint (Auftrag / Projekt / nur
+  // Beschreibung). Default 'auftrag' (haeufigster Fall); wird beim
+  // Preset-Klick / initialData-Prefill anhand des ausgewaehlten Eintrags
+  // auf 'andere_arbeit' bzw. — bei Projekt-Toggle — 'projekt' gesetzt.
+  const [stempelContext, setStempelContext] = useState<StempelContext>("auftrag");
   const [timeEntries, setTimeEntries] = useState<Array<{ id: string; clock_in: string; clock_out: string | null; job_id: string | null; job_label: string | null }>>([]);
   const [stempel, setStempel] = useState({
     time_entry_id: "",
     neu_start: "",        // datetime-local
     neu_end: "",          // datetime-local
     job_id: "",
+    project_id: "",       // nur genutzt wenn stempelContext === 'projekt'
     beschreibung: "",
     grund: "",
   });
   const [jobs, setJobs] = useState<{ id: string; job_number: number; title: string; start_date: string | null; end_date: string | null }[]>([]);
+  // Genehmigte, nicht-geloeschte Projekte fuer den Projekt-Kontext-Picker.
+  // status='genehmigt' weil Zeit nur auf genehmigte Projekte gestempelt
+  // werden darf (siehe Migration 186_projekte.sql — Budget-Kontrolle).
+  const [projects, setProjects] = useState<Array<{ id: string; title: string }>>([]);
 
   // Material-spezifisch — pro Anfrage koennen mehrere Positionen rein
   // (Warenkorb mit mehreren Artikeln). Mindestens 1 leeres Item beim
@@ -184,7 +208,8 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       setAnalysisDone(false);
       setStempelMode("korrektur");
       setStempelPreset(null);
-      setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", beschreibung: "", grund: "" });
+      setStempelContext("auftrag");
+      setStempel({ time_entry_id: "", neu_start: "", neu_end: "", job_id: "", project_id: "", beschreibung: "", grund: "" });
       setMaterialItems([{ artikel: "", menge: "1", betrag_chf: "" }]);
       setMaterialAuftrag("");
       setDevice("");
@@ -198,11 +223,16 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     if (initialType === "stempel_aenderung" && initialData?.timeEntryId) {
       setStempelMode("korrektur");
       setStempelPreset("wrong_time");
+      // Kontext aus dem vorbelegten Eintrag ableiten: mit job_id → Auftrag,
+      // ohne → Andere Arbeit. Projekt-Zeit-Eintraege kommen (aktuell) nicht
+      // ueber diesen Prefill-Pfad, weil sie in project_time_entries liegen.
+      setStempelContext(initialData.jobId ? "auftrag" : "andere_arbeit");
       setStempel({
         time_entry_id: initialData.timeEntryId,
         neu_start: initialData.clockIn ? isoToZurichDatetimeLocal(initialData.clockIn) : "",
         neu_end: initialData.clockOut ? isoToZurichDatetimeLocal(initialData.clockOut) : "",
         job_id: initialData.jobId ?? "",
+        project_id: "",
         beschreibung: "",
         grund: "",
       });
@@ -314,6 +344,27 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     })();
   }, [type, supabase]);
 
+  // Projekte fuer Stempel-Form laden — nur genehmigte, nicht-geloeschte.
+  // Genehmigt: weil nur auf genehmigte Projekte Zeit gestempelt werden darf
+  // (Budget-Kontrolle). Nach Titel sortieren fuer stabile alphabetische
+  // Reihenfolge im Picker.
+  useEffect(() => {
+    if (type !== "stempel_aenderung") return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, title")
+        .eq("status", "genehmigt")
+        .eq("is_deleted", false)
+        .order("title", { ascending: true });
+      if (error) {
+        toast.error("Projekte konnten nicht geladen werden: " + error.message);
+        return;
+      }
+      setProjects(data ?? []);
+    })();
+  }, [type, supabase]);
+
   function pickType(t: TicketType) {
     if (t === type) return; // Chip auf aktivem Typ tut nichts.
     setType(t);
@@ -354,11 +405,15 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       // wirft — User sieht 00:00 und aendert auf tatsaechliche Start-Zeit.
       setStempelMode("vergessen");
       const lastJobId = timeEntries[0]?.job_id ?? "";
+      // Kontext: haeufigster Fall bei Vergessen ist Auftrag — Wechsel auf
+      // Projekt / Andere Arbeit macht der User via Segment-Toggle.
+      setStempelContext("auftrag");
       setStempel({
         time_entry_id: "",
         neu_start: `${todayIso}T00:00`,
         neu_end: nowLocal,
         job_id: lastJobId,
+        project_id: "",
         beschreibung: "",
         grund: "Vergessen einzustempeln",
       });
@@ -375,11 +430,14 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
         return;
       }
       setStempelMode("korrektur");
+      // Kontext aus dem gewaehlten Eintrag ableiten (Auftrag oder Andere Arbeit).
+      setStempelContext(openEntry.job_id ? "auftrag" : "andere_arbeit");
       setStempel({
         time_entry_id: openEntry.id,
         neu_start: isoToZurichDatetimeLocal(openEntry.clock_in),
         neu_end: nowLocal,
         job_id: openEntry.job_id ?? "",
+        project_id: "",
         beschreibung: "",
         grund: "Vergessen auszustempeln",
       });
@@ -393,11 +451,13 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       // des gewaehlten Eintrags vorbelegt — User muss nur die falschen
       // Minuten aendern.
       setStempelMode("korrektur");
+      setStempelContext("auftrag");
       setStempel({
         time_entry_id: "",
         neu_start: "",
         neu_end: "",
         job_id: "",
+        project_id: "",
         beschreibung: "",
         grund: "Zeit falsch eingegeben",
       });
@@ -416,11 +476,13 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       }
       const endMinus30Ms = new Date(closedEntry.clock_out).getTime() - 30 * 60_000;
       setStempelMode("korrektur");
+      setStempelContext(closedEntry.job_id ? "auftrag" : "andere_arbeit");
       setStempel({
         time_entry_id: closedEntry.id,
         neu_start: isoToZurichDatetimeLocal(closedEntry.clock_in),
         neu_end: isoToZurichDatetimeLocal(new Date(endMinus30Ms).toISOString()),
         job_id: closedEntry.job_id ?? "",
+        project_id: "",
         beschreibung: "",
         grund: "Pause (30 min) nicht abgezogen",
       });
@@ -569,8 +631,12 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       if (!stempel.grund.trim()) return "Grund ist Pflicht";
       if (stempelMode === "korrektur" && !stempel.time_entry_id) return "Stempel-Eintrag auswählen";
       if (stempelMode === "vergessen" && (!stempel.neu_start || !stempel.neu_end)) return "Neue Start/End-Zeit fehlt";
-      if (stempelMode === "vergessen" && !stempel.job_id) return "Auftrag oder 'Andere Arbeit' auswählen";
-      if (stempelMode === "vergessen" && stempel.job_id === "ANDERE_ARBEIT" && !stempel.beschreibung.trim()) return "Beschreibung der Arbeit ist Pflicht bei 'Andere Arbeit'";
+      // Kontext-abhaengige Pflichtfelder — gelten in beiden Modi, weil der
+      // User via Segment-Toggle bewusst 'Projekt' / 'Andere Arbeit' waehlen
+      // kann und dann das jeweilige Feld nicht leer lassen darf.
+      if (stempelContext === "auftrag" && stempelMode === "vergessen" && !stempel.job_id) return "Auftrag auswählen";
+      if (stempelContext === "projekt" && !stempel.project_id) return "Projekt auswählen";
+      if (stempelContext === "andere_arbeit" && !stempel.beschreibung.trim()) return "Beschreibung der Arbeit ist Pflicht";
     }
     if (type === "material") {
       if (files.length === 0) return "Warenkorb-Screenshot ist Pflicht — bitte Datei hochladen";
@@ -607,22 +673,35 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
           genehmigt_via_ticket_id: belegApprovalSource === "ticket" ? belegApprovalTicketId : undefined,
         };
       } else if (type === "stempel_aenderung") {
+        // Kontext-abhaengige Felder — in data steht IMMER 'context', damit
+        // der Approver sofort weiss ob Auftrag / Projekt / Andere Arbeit
+        // gemeint war. job_id gilt nur fuer context='auftrag',
+        // project_id nur fuer 'projekt', beschreibung nur fuer
+        // 'andere_arbeit'. Der apply_ticket-RPC (Migration 107) verarbeitet
+        // aktuell nur job_id — Projekt-Zeit bleibt bis auf Weiteres eine
+        // Admin-Handarbeit (siehe StempelContext-Kommentar oben).
+        const contextFields: Record<string, unknown> = { context: stempelContext };
+        if (stempelContext === "auftrag") {
+          contextFields.job_id = stempel.job_id || undefined;
+        } else if (stempelContext === "projekt") {
+          contextFields.project_id = stempel.project_id || undefined;
+        } else if (stempelContext === "andere_arbeit") {
+          contextFields.beschreibung = stempel.beschreibung.trim() || undefined;
+        }
+
         if (stempelMode === "korrektur") {
           data = {
+            ...contextFields,
             time_entry_id: stempel.time_entry_id,
             neu_start: stempel.neu_start ? new Date(stempel.neu_start).toISOString() : undefined,
             neu_end: stempel.neu_end ? new Date(stempel.neu_end).toISOString() : undefined,
             grund: stempel.grund,
           };
         } else {
-          // 'ANDERE_ARBEIT' ist der UI-Sentinel fuer 'kein Auftrag' — in
-          // der DB landet job_id=undefined.
-          const jobId = stempel.job_id === "ANDERE_ARBEIT" ? undefined : stempel.job_id;
           data = {
+            ...contextFields,
             neu_start: new Date(stempel.neu_start).toISOString(),
             neu_end: new Date(stempel.neu_end).toISOString(),
-            job_id: jobId,
-            beschreibung: stempel.beschreibung || undefined,
             grund: stempel.grund,
           };
         }
@@ -983,6 +1062,115 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                 </div>
               )}
 
+              {/* Kontext-Segment (Auftrag | Projekt | Andere Arbeit) — steht
+                  in beiden Modi (Korrektur + Vergessen) direkt unter der
+                  Preset-Row. Der aktive Toggle steuert welches Kontext-Feld
+                  darunter erscheint:
+                    - Auftrag: date-gefilterter Auftrag-Picker (bestehend)
+                    - Projekt: neuer Projekt-Picker (nur genehmigte Projekte)
+                    - Andere Arbeit: nur Beschreibungs-Feld (Pflicht)
+                  Projekt-Zeit landet als data.project_id im Ticket — der
+                  Admin muss die Zeit derzeit manuell in die Projekt-Detail-
+                  Seite eintragen (project_time_entries), weil time_entries
+                  keine project_id-Spalte hat. Follow-up: Migration oder
+                  neuer Ticket-Type. */}
+              {stempelPreset && (
+                <>
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground/70 ml-1">Kontext *</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStempelContext("auftrag")}
+                        aria-pressed={stempelContext === "auftrag"}
+                        className={stempelContext === "auftrag" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                      >
+                        Auftrag
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStempelContext("projekt")}
+                        aria-pressed={stempelContext === "projekt"}
+                        className={stempelContext === "projekt" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                      >
+                        Projekt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStempelContext("andere_arbeit")}
+                        aria-pressed={stempelContext === "andere_arbeit"}
+                        className={stempelContext === "andere_arbeit" ? "kasten-active flex-1" : "kasten-toggle-off flex-1"}
+                      >
+                        Andere Arbeit
+                      </button>
+                    </div>
+                  </div>
+
+                  {stempelContext === "auftrag" && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/70 ml-1">
+                        Auftrag {stempelMode === "vergessen" ? "*" : "(optional — wenn Neu-Zuordnung)"}
+                      </p>
+                      <SearchableSelect
+                        value={stempel.job_id}
+                        onChange={(v) => setStempel({ ...stempel, job_id: v })}
+                        items={(() => {
+                          // Filter Auftraege auf solche die am Stempel-Datum
+                          // laufen (start_date <= datum <= end_date). Bei
+                          // Korrektur-Modus liefert das Start-Feld das Datum;
+                          // bei Vergessen ebenfalls. Wenn kein Datum: alle.
+                          const stempelDate = dtDate(stempel.neu_start);
+                          const relevant = stempelDate
+                            ? jobs.filter((j) => {
+                                if (!j.start_date) return true;
+                                const start = localDateIso(new Date(j.start_date));
+                                const end = localDateIso(new Date(j.end_date ?? j.start_date));
+                                return start <= stempelDate && stempelDate <= end;
+                              })
+                            : jobs;
+                          return relevant.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` }));
+                        })()}
+                        placeholder="Auftrag auswählen…"
+                        clearable={false}
+                      />
+                    </div>
+                  )}
+
+                  {stempelContext === "projekt" && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/70 ml-1">Projekt *</p>
+                      {projects.length === 0 ? (
+                        <div className="px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 text-muted-foreground">
+                          Keine genehmigten Projekte vorhanden — waehle stattdessen Auftrag oder Andere Arbeit.
+                        </div>
+                      ) : (
+                        <SearchableSelect
+                          value={stempel.project_id}
+                          onChange={(v) => setStempel({ ...stempel, project_id: v })}
+                          items={projects.map((p) => ({ id: p.id, label: p.title }))}
+                          placeholder="Projekt auswählen…"
+                          clearable={false}
+                        />
+                      )}
+                      <p className="text-[10px] text-muted-foreground/60 ml-1 mt-1">
+                        Projekt-Zeit wird nach Genehmigung manuell in die Projekt-Detailseite eingetragen.
+                      </p>
+                    </div>
+                  )}
+
+                  {stempelContext === "andere_arbeit" && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit *</p>
+                      <Input
+                        value={stempel.beschreibung}
+                        onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })}
+                        placeholder="kurz: was wurde gemacht"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Korrektur-Formular (mode=korrektur) — aktiv bei
                   'no_out' / 'wrong_time' / 'no_break'. */}
               {stempelPreset && stempelMode === "korrektur" && (
@@ -1112,45 +1300,9 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground/70 ml-1">Auftrag *</p>
-                    <SearchableSelect
-                      value={stempel.job_id}
-                      onChange={(v) => setStempel({ ...stempel, job_id: v })}
-                      items={(() => {
-                        // Filter Auftraege auf solche die am Stempel-Datum
-                        // laufen (start_date <= datum <= end_date). So muss
-                        // der User nicht durch alle Auftraege scrollen.
-                        // Auftraege ohne start_date bleiben drin (Default-
-                        // sicher). Wenn kein Stempel-Datum getippt: alle.
-                        // start/end via localDateIso — .slice(0,10) auf
-                        // timestamptz ist UTC-Datum, was Auftraege mit
-                        // start kurz nach Mitternacht (+02:00) als Vortag
-                        // filtert und den richtigen Auftrag verbirgt.
-                        const stempelDate = dtDate(stempel.neu_start);
-                        const relevant = stempelDate
-                          ? jobs.filter((j) => {
-                              if (!j.start_date) return true;
-                              const start = localDateIso(new Date(j.start_date));
-                              const end = localDateIso(new Date(j.end_date ?? j.start_date));
-                              return start <= stempelDate && stempelDate <= end;
-                            })
-                          : jobs;
-                        return [
-                          { id: "ANDERE_ARBEIT", label: "Keinem Auftrag (Andere Arbeit)" },
-                          ...relevant.map((j) => ({ id: j.id, label: `INT-${j.job_number} — ${j.title}` })),
-                        ];
-                      })()}
-                      placeholder="Auftrag oder 'Andere Arbeit' auswählen…"
-                      clearable={false}
-                    />
-                  </div>
-                  {stempel.job_id === "ANDERE_ARBEIT" && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground/70 ml-1">Beschreibung der Arbeit *</p>
-                      <Input value={stempel.beschreibung} onChange={(e) => setStempel({ ...stempel, beschreibung: e.target.value })} placeholder="kurz: was wurde gemacht" />
-                    </div>
-                  )}
+                  {/* Kontext-Picker (Auftrag / Projekt / Beschreibung) steht
+                      im gemeinsamen Segment-Block oberhalb der Modus-
+                      Formulare — hier nichts mehr. */}
                 </>
               )}
 
