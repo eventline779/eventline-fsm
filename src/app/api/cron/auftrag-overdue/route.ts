@@ -2,15 +2,28 @@
 //
 // Taeglicher Cron (Vercel schedule "0 9 * * *" = 09:00 UTC → 10:00 ZRH
 // Winter / 11:00 ZRH Sommer, kurz nach Buero-Start). Sucht ueberfaellige
-// Auftraege und schickt zwei Eskalations-Stufen an alle zugewiesenen MA
-// (aus job_appointments.assigned_to, dedupliziert pro Profil):
+// Auftraege und schickt gestaffelt Reminder aus:
 //
-//   Tag +1 nach end_date → in-app Notification (job_overdue-Typ)
-//   Tag +3 nach end_date → Email via Resend (Eskalation)
+//   Tag +1 nach end_date
+//     → in-app Notification an alle zugewiesenen MA (kind='notification')
+//     → Email an alle zugewiesenen MA               (kind='mail')
+//       Beides im gleichen Cron-Lauf, direkt hintereinander.
+//
+//   Tag +3 nach end_date
+//     → Email an den Team-Leader (profiles.team_lead_id, aus Migration 208)
+//       jedes zugewiesenen MA                       (kind='mail_lead')
+//       MA ohne Team-Leader werden geskippt (kein Crash).
+//       Mehrere MA mit demselben Team-Leader → nur EINE Mail pro Leader
+//       pro Auftrag (Dedup nach lead_id).
 //
 // Idempotenz: pro (job_id, kind) genau EINE Row in job_overdue_reminders
-// (Migration 205). Cron skippt Auftraege, fuer die die Row schon existiert.
-// So laeuft der Cron risikofrei taeglich, ohne Dubletten zu produzieren.
+// (Migration 205; kind-Set erweitert um 'mail_lead' in Migration 210).
+// Cron skippt Auftraege, fuer die die Row schon existiert. So laeuft der
+// Cron risikofrei taeglich, ohne Dubletten zu produzieren. Weil
+// 'notification' und 'mail' unterschiedliche kinds sind, laufen beide
+// Tag+1-Reminder unabhaengig durch die Idempotenz — schlaegt einer fehl
+// (z.B. RESEND-Key fehlt), kann er beim naechsten Cron-Lauf nachgeholt
+// werden, ohne dass der jeweils andere doppelt rausgeht.
 //
 // Filter fuer "ueberfaellige Auftraege":
 //   - status NOT IN ('abgeschlossen', 'storniert', 'entwurf', 'anfrage')
@@ -18,7 +31,7 @@
 //   - end_date IS NOT NULL
 //   - end_date::date < heute (Europe/Zurich-Kalender)
 //
-// Rueckgabe: {total_notified, total_mailed, skipped, errors}.
+// Rueckgabe: {total_notified, total_mailed, total_lead_mailed, skipped, errors}.
 
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -38,10 +51,11 @@ interface JobRow {
   status: string;
 }
 
-interface AssigneeRow {
+interface ProfileRow {
   id: string;
   full_name: string | null;
   email: string | null;
+  team_lead_id: string | null;
 }
 
 /** Tage-Differenz zwischen zwei YYYY-MM-DD-Strings im Europe/Zurich-Kalender. */
@@ -64,6 +78,16 @@ function endDateToLocalIso(endTs: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(endTs));
+}
+
+/** Datums-Anzeige fuer den Mail-Text — immer Europe/Zurich, dd.mm.yyyy. */
+function formatEndHuman(endTs: string): string {
+  return new Date(endTs).toLocaleDateString("de-CH", {
+    timeZone: "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 export async function GET(request: Request) {
@@ -104,6 +128,7 @@ export async function GET(request: Request) {
       candidates: 0,
       total_notified: 0,
       total_mailed: 0,
+      total_lead_mailed: 0,
     });
   }
 
@@ -136,20 +161,41 @@ export async function GET(request: Request) {
     set.add(r.assigned_to);
   }
 
-  // Profil-Daten fuer alle betroffenen User in EINEM Query (Mail braucht
-  // Name + Email, In-App-Notif braucht nur die id).
-  const allUserIds = Array.from(new Set(
+  // Profil-Daten fuer alle betroffenen User in EINEM Query.
+  // team_lead_id brauchen wir fuer die Tag+3-Mail an den Team-Leader.
+  // Zuerst nur die Assignee-IDs — die Team-Leader-Profile werden in einem
+  // zweiten Query nachgeladen (typisch << Assignee-Anzahl).
+  const assigneeUserIds = Array.from(new Set(
     Array.from(assigneesByJob.values()).flatMap((s) => Array.from(s)),
   ));
-  const profilesById = new Map<string, AssigneeRow>();
-  if (allUserIds.length > 0) {
+  const profilesById = new Map<string, ProfileRow>();
+  if (assigneeUserIds.length > 0) {
     const { data: profileRows } = await admin
       .from("profiles")
-      .select("id, full_name, email")
-      .in("id", allUserIds)
+      .select("id, full_name, email, team_lead_id")
+      .in("id", assigneeUserIds)
       .eq("is_active", true);
-    for (const p of (profileRows ?? []) as AssigneeRow[]) {
+    for (const p of (profileRows ?? []) as ProfileRow[]) {
       profilesById.set(p.id, p);
+    }
+  }
+
+  // Team-Leader-Profile nachladen (nur id, full_name, email; team_lead_id
+  // des Leaders interessiert hier nicht — Reminder eskalieren nicht rekursiv).
+  const leadIds = Array.from(new Set(
+    Array.from(profilesById.values())
+      .map((p) => p.team_lead_id)
+      .filter((v): v is string => !!v),
+  ));
+  const leadsById = new Map<string, ProfileRow>();
+  if (leadIds.length > 0) {
+    const { data: leadRows } = await admin
+      .from("profiles")
+      .select("id, full_name, email, team_lead_id")
+      .in("id", leadIds)
+      .eq("is_active", true);
+    for (const l of (leadRows ?? []) as ProfileRow[]) {
+      leadsById.set(l.id, l);
     }
   }
 
@@ -158,11 +204,24 @@ export async function GET(request: Request) {
   const resendKey = process.env.RESEND_API_KEY;
   const resend = resendKey ? new Resend(resendKey) : null;
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://eventline-basel.com";
+  const fromAddress = formatMailFrom(company, "noreply@eventline-basel.com");
 
   let totalNotified = 0;
   let totalMailed = 0;
+  let totalLeadMailed = 0;
   let skipped = 0;
   const errors: Array<{ job_id: string; kind: string; error: string }> = [];
+
+  /** Reminder-Row idempotent anlegen. 23505 (unique_violation) = eine
+   *  zweite Cron-Instanz war schneller → nicht als Fehler zaehlen. */
+  async function markSent(jobId: string, kind: string, sentUserIds: string[]) {
+    const { error: insErr } = await admin
+      .from("job_overdue_reminders")
+      .insert({ job_id: jobId, kind, sent_to_user_ids: sentUserIds });
+    if (insErr && insErr.code !== "23505") {
+      errors.push({ job_id: jobId, kind, error: insErr.message });
+    }
+  }
 
   for (const job of overdueJobs) {
     const endIso = endDateToLocalIso(job.end_date);
@@ -176,121 +235,194 @@ export async function GET(request: Request) {
       continue;
     }
 
-    const kind = overdueDays === 1 ? "notification" : "mail";
-    if (alreadySent.has(`${job.id}::${kind}`)) {
-      skipped++;
-      continue;
-    }
-
     const assigneeIds = Array.from(assigneesByJob.get(job.id) ?? []);
+    const endHuman = formatEndHuman(job.end_date);
+    const link = `${appBaseUrl}/auftraege/${job.id}`;
+
+    // Kein Assignee → alle relevanten Reminder-Kinds trotzdem als Marker
+    // eintragen, damit der Cron morgen nicht wieder rein-laeuft.
     if (assigneeIds.length === 0) {
-      // Keine Zuweisung → nichts zu tun, aber trotzdem als Reminder-Row
-      // eintragen, damit der Cron morgen nicht wieder rein-luft. Sonst
-      // wuerden Auftraege ohne Assignee jeden Cron-Lauf durchlaufen.
-      const { error: insErr } = await admin
-        .from("job_overdue_reminders")
-        .insert({ job_id: job.id, kind, sent_to_user_ids: [] });
-      if (insErr && insErr.code !== "23505") {
-        errors.push({ job_id: job.id, kind, error: insErr.message });
+      const kinds = overdueDays === 1 ? ["notification", "mail"] : ["mail_lead"];
+      for (const kind of kinds) {
+        if (alreadySent.has(`${job.id}::${kind}`)) continue;
+        await markSent(job.id, kind, []);
       }
       skipped++;
       continue;
     }
 
-    try {
-      if (kind === "notification") {
-        await notifyJobOverdueDay1(admin, {
-          recipients: assigneeIds,
-          jobId: job.id,
-          jobNumber: job.job_number,
-          jobTitle: job.title,
-          endDateIso: endIso,
-        });
-        totalNotified += assigneeIds.length;
-      } else {
-        // Tag +3 Mail: direkt via Resend, umgeht user_notification_settings.
-        // Bewusste Eskalation — die In-App-Notif von Tag +1 ist verpufft,
-        // jetzt muss die Mail zwingend raus, unabhaengig vom Kanal-Opt-in.
-        if (!resend) {
-          errors.push({ job_id: job.id, kind, error: "Kein RESEND_API_KEY" });
-          continue;
+    // ─────────── Tag +1: In-App + Mail an alle MA ───────────
+    if (overdueDays === 1) {
+      // In-App Notification
+      if (!alreadySent.has(`${job.id}::notification`)) {
+        try {
+          await notifyJobOverdueDay1(admin, {
+            recipients: assigneeIds,
+            jobId: job.id,
+            jobNumber: job.job_number,
+            jobTitle: job.title,
+            endDateIso: endIso,
+          });
+          totalNotified += assigneeIds.length;
+          await markSent(job.id, "notification", assigneeIds);
+        } catch (e) {
+          logError("cron.auftrag-overdue.notification", e, { jobId: job.id });
+          errors.push({
+            job_id: job.id,
+            kind: "notification",
+            error: e instanceof Error ? e.message : "unknown",
+          });
         }
-        const targets = assigneeIds
-          .map((id) => profilesById.get(id))
-          .filter((p): p is AssigneeRow & { email: string } => !!p && !!p.email);
-        const link = `${appBaseUrl}/auftraege/${job.id}`;
-        const endHuman = new Date(job.end_date).toLocaleDateString("de-CH", {
-          timeZone: "Europe/Zurich",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        });
-        const subject = `[EVENTLINE] Auftrag INT-${job.job_number} ist 3 Tage ueberfaellig`;
-        const mailSent: string[] = [];
-        for (const t of targets) {
-          const greeting = t.full_name ? t.full_name.split(" ")[0] : "";
-          try {
-            await resend.emails.send({
-              from: formatMailFrom(company, "noreply@eventline-basel.com"),
-              to: t.email,
-              subject,
-              html: `
-                <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
-                  <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
-                    <h2 style="color:white;margin:0;font-size:16px">${company.name}</h2>
+      }
+
+      // Mail an dieselben MA — direkt via Resend, umgeht bewusst
+      // user_notification_settings (Reminder muss zwingend raus).
+      if (!alreadySent.has(`${job.id}::mail`)) {
+        if (!resend) {
+          errors.push({ job_id: job.id, kind: "mail", error: "Kein RESEND_API_KEY" });
+        } else {
+          const targets = assigneeIds
+            .map((id) => profilesById.get(id))
+            .filter((p): p is ProfileRow & { email: string } => !!p && !!p.email);
+          const subject = `[EVENTLINE] Auftrag INT-${job.job_number} seit gestern ueberfaellig`;
+          const mailSent: string[] = [];
+          for (const t of targets) {
+            const greeting = t.full_name ? t.full_name.split(" ")[0] : "";
+            try {
+              await resend.emails.send({
+                from: fromAddress,
+                to: t.email,
+                subject,
+                html: `
+                  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
+                    <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+                      <h2 style="color:white;margin:0;font-size:16px">${company.name}</h2>
+                    </div>
+                    <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+                      <p style="margin:0 0 12px">Hallo ${greeting || "zusammen"},</p>
+                      <p style="margin:0 0 16px">Der Auftrag <strong>INT-${job.job_number} ${escapeHtml(job.title)}</strong> war fuer den <strong>${endHuman}</strong> geplant und ist noch nicht abgeschlossen.</p>
+                      <p style="margin:0 0 20px">Bitte pruefe den Status und schliesse den Auftrag ab oder aktualisiere das Enddatum.</p>
+                      <p style="margin:0 0 24px">
+                        <a href="${link}" style="display:inline-block;padding:10px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Zum Auftrag</a>
+                      </p>
+                      <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+                      <p style="margin:0;color:#bbb;font-size:11px">${formatMailFooter(company)}</p>
+                    </div>
                   </div>
-                  <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
-                    <p style="margin:0 0 12px">Hallo ${greeting || "zusammen"},</p>
-                    <p style="margin:0 0 16px">Der Auftrag <strong>INT-${job.job_number} ${escapeHtml(job.title)}</strong> war fuer den <strong>${endHuman}</strong> geplant und ist noch nicht abgeschlossen.</p>
-                    <p style="margin:0 0 20px">Bitte pruefe den Status und schliesse den Auftrag ab oder aktualisiere das Enddatum.</p>
-                    <p style="margin:0 0 24px">
-                      <a href="${link}" style="display:inline-block;padding:10px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Zum Auftrag</a>
-                    </p>
-                    <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
-                    <p style="margin:0;color:#bbb;font-size:11px">${formatMailFooter(company)}</p>
-                  </div>
-                </div>
-              `,
-            });
-            mailSent.push(t.id);
-            totalMailed++;
-          } catch (e) {
-            logError("cron.auftrag-overdue.mail", e, { jobId: job.id, email: t.email });
-            errors.push({
-              job_id: job.id,
-              kind,
-              error: `mail to ${t.email}: ${e instanceof Error ? e.message : "unknown"}`,
-            });
+                `,
+              });
+              mailSent.push(t.id);
+              totalMailed++;
+            } catch (e) {
+              logError("cron.auftrag-overdue.mail", e, { jobId: job.id, email: t.email });
+              errors.push({
+                job_id: job.id,
+                kind: "mail",
+                error: `mail to ${t.email}: ${e instanceof Error ? e.message : "unknown"}`,
+              });
+            }
+          }
+          // Nur wenn mindestens eine Mail durchging Row anlegen — sonst
+          // kann der naechste Cron-Lauf nachziehen (z.B. RESEND-Key wurde
+          // inzwischen gesetzt).
+          if (mailSent.length > 0) {
+            await markSent(job.id, "mail", mailSent);
           }
         }
-        // Wenn KEINE Mail durchging → Reminder-Row NICHT anlegen, damit
-        // morgen ein Retry moeglich ist. Sonst wuerde man permanent
-        // vergessenes RESEND_API_KEY-Setup nie mehr korrigiert bekommen.
-        if (mailSent.length === 0) continue;
+      }
+    }
+
+    // ─────────── Tag +3: Mail an den Team-Leader jedes MA ───────────
+    if (overdueDays === 3) {
+      if (alreadySent.has(`${job.id}::mail_lead`)) {
+        skipped++;
+        continue;
+      }
+      // Team-Leader pro MA aufloesen und pro Leader dedupen — mehrere MA
+      // desselben Leaders → nur eine Mail. Wir speichern die Namen der
+      // "betroffenen" MA pro Lead, damit die Mail auflisten kann welche
+      // Mitarbeiter das betrifft.
+      const membersByLead = new Map<string, ProfileRow[]>();
+      for (const uid of assigneeIds) {
+        const member = profilesById.get(uid);
+        if (!member || !member.team_lead_id) continue;
+        const lead = leadsById.get(member.team_lead_id);
+        if (!lead || !lead.email) continue;
+        let list = membersByLead.get(lead.id);
+        if (!list) {
+          list = [];
+          membersByLead.set(lead.id, list);
+        }
+        list.push(member);
       }
 
-      const sentUserIds = kind === "notification"
-        ? assigneeIds
-        : assigneeIds.filter((id) => {
-            const p = profilesById.get(id);
-            return !!p?.email;
+      if (membersByLead.size === 0) {
+        // Kein Team-Leader zu finden (kein MA hat team_lead_id oder alle
+        // Leader ohne Email). Reminder-Row trotzdem eintragen, damit der
+        // Cron morgen nicht wieder rein-laeuft.
+        await markSent(job.id, "mail_lead", []);
+        skipped++;
+        continue;
+      }
+
+      if (!resend) {
+        errors.push({ job_id: job.id, kind: "mail_lead", error: "Kein RESEND_API_KEY" });
+        continue;
+      }
+
+      const leadMailSent: string[] = [];
+      for (const [leadId, members] of membersByLead) {
+        const lead = leadsById.get(leadId);
+        if (!lead || !lead.email) continue;
+        // Wenn genau EIN MA betroffen: Name im Betreff. Bei mehreren:
+        // Anzahl im Betreff, Liste im Body.
+        const memberNames = members
+          .map((m) => m.full_name || m.email || "Mitarbeiter")
+          .join(", ");
+        const subject = members.length === 1
+          ? `[EVENTLINE] Team-Mitglied ${members[0].full_name || members[0].email || "MA"} hat Auftrag INT-${job.job_number} noch nicht abgeschlossen (3 Tage ueberfaellig)`
+          : `[EVENTLINE] ${members.length} Team-Mitglieder haben Auftrag INT-${job.job_number} noch nicht abgeschlossen (3 Tage ueberfaellig)`;
+        const greeting = lead.full_name ? lead.full_name.split(" ")[0] : "";
+        try {
+          await resend.emails.send({
+            from: fromAddress,
+            to: lead.email,
+            subject,
+            html: `
+              <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
+                <div style="background:#1a1a1a;padding:20px 24px;border-radius:12px 12px 0 0">
+                  <h2 style="color:white;margin:0;font-size:16px">${company.name}</h2>
+                </div>
+                <div style="background:white;padding:24px;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 12px 12px">
+                  <p style="margin:0 0 12px">Hallo ${greeting || "zusammen"},</p>
+                  <p style="margin:0 0 16px">Der Auftrag <strong>INT-${job.job_number} ${escapeHtml(job.title)}</strong> war fuer den <strong>${endHuman}</strong> geplant und ist seit 3 Tagen nicht abgeschlossen.</p>
+                  <p style="margin:0 0 16px">Betroffene${members.length === 1 ? "r Mitarbeiter" : " Mitarbeiter"} in deinem Team: <strong>${escapeHtml(memberNames)}</strong>.</p>
+                  <p style="margin:0 0 20px">Bitte hake bei ${members.length === 1 ? "ihm/ihr" : "ihnen"} nach und stell sicher, dass der Auftrag abgeschlossen oder das Enddatum aktualisiert wird.</p>
+                  <p style="margin:0 0 24px">
+                    <a href="${link}" style="display:inline-block;padding:10px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Zum Auftrag</a>
+                  </p>
+                  <hr style="border:none;border-top:1px solid #eee;margin:16px 0"/>
+                  <p style="margin:0;color:#bbb;font-size:11px">${formatMailFooter(company)}</p>
+                </div>
+              </div>
+            `,
           });
-
-      const { error: insErr } = await admin
-        .from("job_overdue_reminders")
-        .insert({ job_id: job.id, kind, sent_to_user_ids: sentUserIds });
-      // 23505 = unique_violation: eine zweite Cron-Instanz war schneller.
-      // Nicht als Fehler zaehlen — Idempotenz-Kontrakt greift.
-      if (insErr && insErr.code !== "23505") {
-        errors.push({ job_id: job.id, kind, error: insErr.message });
+          leadMailSent.push(lead.id);
+          totalLeadMailed++;
+        } catch (e) {
+          logError("cron.auftrag-overdue.mail-lead", e, { jobId: job.id, leadEmail: lead.email });
+          errors.push({
+            job_id: job.id,
+            kind: "mail_lead",
+            error: `mail_lead to ${lead.email}: ${e instanceof Error ? e.message : "unknown"}`,
+          });
+        }
       }
-    } catch (e) {
-      logError("cron.auftrag-overdue.deliver", e, { jobId: job.id, kind });
-      errors.push({
-        job_id: job.id,
-        kind,
-        error: e instanceof Error ? e.message : "unknown",
-      });
+      // Wie bei 'mail': nur wenn mindestens eine Lead-Mail durchging Row
+      // anlegen, sonst kann der naechste Cron-Lauf nachziehen.
+      if (leadMailSent.length > 0) {
+        await markSent(job.id, "mail_lead", leadMailSent);
+      }
     }
   }
 
@@ -300,6 +432,7 @@ export async function GET(request: Request) {
     candidates: overdueJobs.length,
     total_notified: totalNotified,
     total_mailed: totalMailed,
+    total_lead_mailed: totalLeadMailed,
     skipped,
     errors,
   });
