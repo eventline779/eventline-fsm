@@ -26,17 +26,23 @@ export const dynamic = "force-dynamic";
 const KNOWN_WIDGET_IDS = new Set<string>(DASHBOARD_WIDGETS.map((w) => w.id));
 
 /** String-Array aus body herausziehen und auf Registry-bekannte IDs
- *  reduzieren. Unbekannte silently droppen — siehe Kopf-Doku. */
+ *  reduzieren. Unbekannte silently droppen — siehe Kopf-Doku.
+ *  Zusaetzlich harte Laengen-Begrenzung auf die Anzahl bekannter Widget-IDs:
+ *  mehr macht semantisch nie Sinn (jedes Widget kommt hoechstens einmal vor
+ *  — siehe Dedup) und schuetzt vor missbrauchten Payloads mit tausenden
+ *  Fake-IDs, die zwar alle gedroppt werden, aber die Iteration teuer machen. */
 function sanitizeIdList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   const out: string[] = [];
   const seen = new Set<string>();
+  const cap = KNOWN_WIDGET_IDS.size;
   for (const item of v) {
     if (typeof item !== "string") continue;
     if (!KNOWN_WIDGET_IDS.has(item)) continue;
     if (seen.has(item)) continue;
     seen.add(item);
     out.push(item);
+    if (out.length >= cap) break;
   }
   return out;
 }

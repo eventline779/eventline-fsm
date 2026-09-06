@@ -195,6 +195,16 @@ async function loadMaData(userId: string): Promise<MaPayload> {
       .maybeSingle(),
   ]);
 
+  // §7 (nie stiller Fehlschlag): erster Fehler hochwerfen, damit der aeussere
+  // try/catch in GET() 500 + Ursache liefert, statt ein Lohn-Payload mit
+  // Nullen aus fehlgeschlagenen Queries.
+  const maResErr =
+    compRes.error ??
+    entriesRes.error ??
+    apptsMonthRes.error ??
+    nextApptRes.error;
+  if (maResErr) throw new Error(maResErr.message);
+
   // ------- Ist-Stunden diesen Monat (DST-safe via bucketize) -------
   type Entry = { clock_in: string; clock_out: string | null };
   const buckets = new Map<string, MinuteBucket>();
@@ -356,19 +366,27 @@ async function loadAdminData(): Promise<AdminPayload> {
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("status", "offen")
-      .neq("is_deleted", true),
+      // 3VL-Falle: .neq("is_deleted", true) filtert auch NULL-Zeilen weg
+      // (Migration 039 Partial-Indexe / View 040/087 behandeln
+      // is_deleted IS NOT TRUE als "nicht geloescht"). Deshalb explizit
+      // .not(..., "is", true) — konsistent mit dem Rest der Codebasis.
+      .not("is_deleted", "is", true),
+    // Termine der Woche — Parent-Job darf nicht soft-deleted sein
+    // (is_deleted IS NOT TRUE), sonst zeigt der KPI verwaiste Termine
+    // gelöschter Auftraege. Inner-Join + foreignTable-Filter.
     admin
       .from("job_appointments")
-      .select("id", { count: "exact", head: true })
+      .select("id, job:jobs!inner(is_deleted)", { count: "exact", head: true })
       .gte("start_time", weekStartIso)
-      .lt("start_time", weekEndIso),
+      .lt("start_time", weekEndIso)
+      .not("job.is_deleted", "is", true),
     admin
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("status", "abgeschlossen")
       .is("invoiced_at", null)
       .is("invoice_skipped_at", null)
-      .neq("is_deleted", true),
+      .not("is_deleted", "is", true),
     admin
       .from("time_off")
       .select("id", { count: "exact", head: true })
@@ -377,8 +395,12 @@ async function loadAdminData(): Promise<AdminPayload> {
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("status", "offen")
-      .neq("is_deleted", true)
-      .lt("end_date", today),
+      .not("is_deleted", "is", true)
+      // CLAUDE.md §4: timestamptz vs YYYY-MM-DD — .lt(today) wuerde gegen
+      // UTC-Mitternacht vergleichen, nicht Zurich-Mitternacht (Auftraege
+      // mit end_date 22:00-23:59 UTC waeren "faelschlich ueberfaellig").
+      // Zurich-Offset explizit anhaengen, konsistent mit overdueCountRes.
+      .lt("end_date", todayZurichStartIso),
     admin
       .from("tickets")
       .select("id", { count: "exact", head: true })
@@ -402,19 +424,37 @@ async function loadAdminData(): Promise<AdminPayload> {
     admin
       .from("jobs")
       .select("id", { count: "exact", head: true })
-      .neq("is_deleted", true)
+      .not("is_deleted", "is", true)
       .not("status", "in", `(${NON_OVERDUE_STATUS.join(",")})`)
       .lt("end_date", todayZurichStartIso),
     // Ueberfaellig — Top 5 zur Anzeige, aeltestes-end_date zuerst.
     admin
       .from("jobs")
       .select("id, job_number, title, end_date, customer:customers(name), location:locations(name)")
-      .neq("is_deleted", true)
+      .not("is_deleted", "is", true)
       .not("status", "in", `(${NON_OVERDUE_STATUS.join(",")})`)
       .lt("end_date", todayZurichStartIso)
       .order("end_date", { ascending: true })
       .limit(5),
   ]);
+
+  // §7 (nie stiller Fehlschlag): Fehlermeldung des ersten fehlgeschlagenen
+  // DB-Calls hochwerfen, damit der aeussere try/catch in GET() sauber
+  // 500 + Message liefert (Client zeigt Toast). Ohne diesen Check landen
+  // fehlende Spalte, RLS-Denial oder Netz-Fehler als "alle Zaehler = 0"
+  // im Payload — der User sieht ein "leeres" Dashboard ohne Ursache.
+  const adminResErr =
+    offeneAuftraege.error ??
+    geplanteTermineWoche.error ??
+    nichtAbgerechnet.error ??
+    ferienPending.error ??
+    ueberfaelligeAuftraege.error ??
+    neueBelege.error ??
+    eingestempelt.error ??
+    ferienHeute.error ??
+    overdueCountRes.error ??
+    overdueListRes.error;
+  if (adminResErr) throw new Error(adminResErr.message);
 
   type OverdueRow = {
     id: string;

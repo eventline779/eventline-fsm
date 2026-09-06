@@ -98,6 +98,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { widgetSpanClass } from "@/lib/dashboard-widgets";
 
 interface CatalogItem {
   id: string;
@@ -124,24 +125,10 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// Widget-Preview-Metadaten. 1:1-Spiegel zu WIDGET_SPAN in dashboard/page.tsx.
-// Wenn ein Widget dort umsortiert wird, hier nachziehen — sonst zeigt die
-// Vorschau eine andere Aufteilung als das echte Dashboard.
+// Widget-Preview-Metadaten. Span kommt aus dashboard-widgets.ts (Single-Source
+// of Truth) — dieselbe Konstante die dashboard/page.tsx nutzt. Icons hingegen
+// leben hier lokal, weil sie React-Nodes sind (Registry ist reine Config).
 // ---------------------------------------------------------------------------
-
-const PREVIEW_SPAN: Record<string, string> = {
-  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
-  "kpi-termine-woche": "col-span-12 sm:col-span-4",
-  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
-  "overdue-jobs": "col-span-12",
-  "zu-erledigen": "col-span-12 lg:col-span-6",
-  "team-status": "col-span-12 lg:col-span-6",
-  "anwesenheitskalender": "col-span-12",
-  "ma-monat-stunden": "col-span-12 lg:col-span-6",
-  "ma-prognose": "col-span-12 lg:col-span-6",
-  "ma-naechster-einsatz": "col-span-12",
-  "partner-willkommen": "col-span-12",
-};
 
 /** Icon pro Widget — identisch zu Dashboard-Renderern. Fehlender Eintrag
  *  faellt auf einen neutralen Punkt zurueck (siehe iconFor). */
@@ -165,7 +152,7 @@ function iconFor(id: string): React.ReactNode {
 
 function spanFor(id: string, mobile: boolean): string {
   if (mobile) return "col-span-12";
-  return PREVIEW_SPAN[id] ?? "col-span-12";
+  return widgetSpanClass(id);
 }
 
 export function DashboardPreferencesModal({

@@ -33,6 +33,7 @@ import { localHour } from "@/lib/swiss-time";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
 import { DashboardPreferencesModal } from "@/components/dashboard/dashboard-preferences-modal";
+import { widgetSpanClass } from "@/lib/dashboard-widgets";
 
 // ---------------------------------------------------------------------------
 // Payload-Typen (Spiegel zu /api/dashboard)
@@ -128,30 +129,11 @@ function fmtDateTime(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Widget-Layout — Column-Spans pro Widget im 12-Col-Grid
+// Widget-Layout
 // ---------------------------------------------------------------------------
-
-/** Wie breit jedes Widget im Grid ist. Fehlt ein Eintrag -> volle Breite.
- *  Wir gruppieren nicht extra "KPI-Reihen" — das Grid packt automatisch
- *  drei benachbarte 4/12-Widgets in eine Reihe. Wird ein KPI-Widget vom User
- *  ausgeblendet, ruecken die anderen automatisch nach.
- *
- *  WICHTIG: 1:1-Spiegel zu PREVIEW_SPAN in
- *  src/components/dashboard/dashboard-preferences-modal.tsx — bei Aenderung
- *  dort nachziehen, damit die Vorschau im Modal dieselbe Aufteilung zeigt. */
-const WIDGET_SPAN: Record<string, string> = {
-  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
-  "kpi-termine-woche": "col-span-12 sm:col-span-4",
-  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
-  "overdue-jobs": "col-span-12",
-  "zu-erledigen": "col-span-12 lg:col-span-6",
-  "team-status": "col-span-12 lg:col-span-6",
-  "anwesenheitskalender": "col-span-12",
-  "ma-monat-stunden": "col-span-12 lg:col-span-6",
-  "ma-prognose": "col-span-12 lg:col-span-6",
-  "ma-naechster-einsatz": "col-span-12",
-  "partner-willkommen": "col-span-12",
-};
+// Column-Spans pro Widget kommen aus src/lib/dashboard-widgets.ts (Single
+// Source of Truth — auch das Preferences-Modal liest von dort). Fruehere
+// PREVIEW_SPAN-Duplikation dort ist eliminiert.
 
 interface RenderContext {
   admin: AdminData | null;
@@ -167,7 +149,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
       <KpiCard
         icon={<Briefcase className="h-3.5 w-3.5" />}
         label="Offene Auftraege"
-        value={admin.kpi.offene_auftraege}
+        value={admin.kpi?.offene_auftraege ?? 0}
         href="/auftraege?from=dashboard"
       />
     ),
@@ -176,7 +158,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
       <KpiCard
         icon={<CalendarDays className="h-3.5 w-3.5" />}
         label="Termine diese Woche"
-        value={admin.kpi.geplante_termine_woche}
+        value={admin.kpi?.geplante_termine_woche ?? 0}
         href="/kalender?from=dashboard"
       />
     ),
@@ -185,7 +167,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
       <KpiCard
         icon={<Receipt className="h-3.5 w-3.5" />}
         label="Nicht abgerechnet"
-        value={admin.kpi.nicht_abgerechnet}
+        value={admin.kpi?.nicht_abgerechnet ?? 0}
         href="/abrechnung?from=dashboard"
       />
     ),
@@ -196,8 +178,18 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
         items={admin.overdue_jobs?.items ?? []}
       />
     ),
-  "zu-erledigen": ({ admin }) => admin && <ZuErledigenCard data={admin.zu_erledigen} />,
-  "team-status": ({ admin }) => admin && <TeamStatusCard data={admin.team_status} />,
+  "zu-erledigen": ({ admin }) =>
+    admin && (
+      <ZuErledigenCard
+        data={admin.zu_erledigen ?? { ferien_pending: 0, ueberfaellige_auftraege: 0, neue_belege: 0 }}
+      />
+    ),
+  "team-status": ({ admin }) =>
+    admin && (
+      <TeamStatusCard
+        data={admin.team_status ?? { eingestempelt: 0, in_ferien_heute: 0 }}
+      />
+    ),
   "anwesenheitskalender": () => <AnwesenheitskalenderCard />,
   "ma-monat-stunden": ({ ma }) => ma && <MaMonatStundenCard ma={ma} />,
   "ma-prognose": ({ ma }) => ma && <MaPrognoseCard ma={ma} />,
@@ -224,10 +216,13 @@ export default function DashboardPage() {
     (async () => {
       try {
         const res = await fetch("/api/dashboard", { credentials: "include", cache: "no-store" });
-        const json = await res.json();
+        // Bei HTML-Fehlerseite (500) wuerde res.json() sonst mit unpassendem
+        // SyntaxError fliegen — Status vorne wegfangen liefert einen echten Grund.
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`.trim());
+        const json = (await res.json()) as Partial<DashboardResponse> & { error?: string };
         if (cancelled) return;
-        if (!json.success) {
-          setError(json.error ?? "Laden fehlgeschlagen");
+        if (!json || typeof json !== "object" || !("success" in json) || !json.success) {
+          setError((json as { error?: string })?.error ?? "Laden fehlgeschlagen");
         } else {
           setData(json as DashboardResponse);
         }
@@ -325,7 +320,7 @@ export default function DashboardPage() {
             const node = render?.(ctx);
             if (!node) return null;
             return (
-              <div key={id} className={WIDGET_SPAN[id] ?? "col-span-12"}>
+              <div key={id} className={widgetSpanClass(id)}>
                 {node}
               </div>
             );

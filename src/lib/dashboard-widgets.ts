@@ -98,7 +98,11 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
     id: "zu-erledigen",
     title: "Zu erledigen",
     size: "1x1",
-    requires: [],
+    // Zeigt Ferien-Antraege + ueberfaellige Auftraege + neue Belege — jede
+    // Zeile linkt in einen der Admin-Bereiche. Ohne Permission triggert
+    // sonst der loader='admin' die vollen 10 Admin-Counts (RLS gibt sie
+    // dann eh nicht raus, aber die Queries laufen).
+    requires: ["auftraege:view"],
     defaultRoles: ["admin"],
   },
   {
@@ -182,4 +186,36 @@ export function widgetsForRole(role: string): WidgetId[] {
  */
 export function widgetById(id: WidgetId): DashboardWidget | undefined {
   return DASHBOARD_WIDGETS.find((w) => w.id === id);
+}
+
+/**
+ * Column-Span-Klassen pro Widget im 12-Spalten-Grid (Tailwind).
+ *
+ * Single source of truth fuer sowohl das Dashboard-Layout
+ * (src/app/(app)/dashboard/page.tsx) als auch die Vorschau im
+ * Personalisierungs-Modal (src/components/dashboard/dashboard-preferences-modal.tsx).
+ * Beide Files importieren aus dieser Konstante — damit koennen sie nicht
+ * mehr auseinanderdriften, wenn ein Widget umsortiert wird.
+ *
+ * Fehlt ein Eintrag -> volle Breite (`col-span-12`). Neue Widget-IDs die in
+ * die Registry kommen, brauchen also nur hier einen Eintrag um in Vorschau
+ * und Live-Layout korrekt gerendert zu werden.
+ */
+export const WIDGET_SPAN: Record<WidgetId, string> = {
+  "kpi-offene-auftraege": "col-span-12 sm:col-span-4",
+  "kpi-termine-woche": "col-span-12 sm:col-span-4",
+  "kpi-nicht-abgerechnet": "col-span-12 sm:col-span-4",
+  "overdue-jobs": "col-span-12",
+  "zu-erledigen": "col-span-12 lg:col-span-6",
+  "team-status": "col-span-12 lg:col-span-6",
+  "anwesenheitskalender": "col-span-12",
+  "ma-monat-stunden": "col-span-12 lg:col-span-6",
+  "ma-prognose": "col-span-12 lg:col-span-6",
+  "ma-naechster-einsatz": "col-span-12",
+  "partner-willkommen": "col-span-12",
+};
+
+/** Lookup wrapper mit Default-Fallback auf volle Breite. */
+export function widgetSpanClass(id: string): string {
+  return (WIDGET_SPAN as Record<string, string | undefined>)[id] ?? "col-span-12";
 }

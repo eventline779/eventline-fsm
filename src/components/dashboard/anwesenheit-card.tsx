@@ -31,6 +31,7 @@ import { CalendarCheck, ChevronLeft, ChevronRight, Check, Plus, X, Trash2 } from
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { todayLocalIso, weekdayForDateIso } from "@/lib/swiss-time";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Person = { id: string; full_name: string | null };
 type Entry = { user_id: string; date: string; from_time: string; to_time: string };
@@ -93,11 +94,20 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
     if (!uid) return;
     const { data, error } = await supabase.rpc("get_anwesenheit_users");
     if (error) {
-      // RPC fehlt oder RLS haert ab → still ausblenden, kein Card-Fehler.
+      // Nie stiller Fehlschlag — Toast + console.error, sonst waere eine
+      // kaputte Migration/RPC von aussen nicht diagnostizierbar
+      // (CLAUDE.md §7). Card blendet trotzdem aus (Fallback-Verhalten).
+      console.error("get_anwesenheit_users failed", error);
+      toast.error(`Anwesenheit konnte nicht geladen werden: ${error.message}`);
       setAllowed(false);
       return;
     }
-    const list = ((data ?? []) as Person[]).map((p) => ({ id: p.id, full_name: p.full_name }));
+    // RPC koennte bei Signatur-Aenderung Object statt Array liefern —
+    // Array.isArray-Guard schuetzt vor TypeError im .map().
+    const list = (Array.isArray(data) ? (data as Person[]) : []).map((p) => ({
+      id: p.id,
+      full_name: p.full_name,
+    }));
     setPeople(list);
     setAllowed(list.some((p) => p.id === uid));
   }, [supabase, uid]);
@@ -124,8 +134,30 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
   useEffect(() => { if (uid) loadPeople(); }, [uid, loadPeople]);
   useEffect(() => { if (allowed) loadEntries(); }, [allowed, loadEntries]);
 
-  if (meLoading || allowed === null) return null;
-  if (!allowed) return null;
+  // §7: sofortiges Ladefeedback statt leerer Grid-Zelle. Solange Auth/RPC
+  // laufen zeigt die Card ein Skeleton — sonst blieb bei nicht-berechtigten
+  // Usern DAUERHAFT ein leerer full-width Kasten stehen (das umschliessende
+  // grid rendert immer `<div class="col-span-12">…</div>`).
+  if (meLoading || allowed === null) {
+    return (
+      <section className={cn("rounded-xl border bg-card p-3 flex flex-col gap-2", className)}>
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-40 w-full" />
+      </section>
+    );
+  }
+  // Server-side sollte das Widget bei fehlender Permission gar nicht liefern
+  // (siehe /api/dashboard). Landet es trotzdem hier (Rollen-Override,
+  // Registry-Drift), zeigen wir eine kompakte Not-anzeige statt eines
+  // leeren Kastens — sonst wirkt der Widget-Slot "kaputt".
+  if (!allowed) {
+    return (
+      <section className={cn("rounded-xl border bg-card p-3 flex items-center gap-2 text-sm text-muted-foreground", className)}>
+        <CalendarCheck className="h-4 w-4 text-accent" />
+        Anwesenheitskalender ist fuer dich nicht freigeschaltet.
+      </section>
+    );
+  }
 
   const todayIso = todayLocalIso();
   const entryOf = (userId: string, date: string) => entries.find((e) => e.user_id === userId && e.date === date);
