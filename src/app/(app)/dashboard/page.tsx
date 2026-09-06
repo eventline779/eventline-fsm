@@ -73,6 +73,10 @@ interface AdminData {
   team_status: {
     eingestempelt: number;
     in_ferien_heute: number;
+    // 'all' = firm-weit (Admin/scope='all'), 'team' = Team-Leiter-Sicht,
+    // 'self' = nur eigene Datensaetze (Sicherheitsnetz). Wird fuer den
+    // Widget-Titel genutzt ("Team-Status" vs "Mein Team").
+    scope?: "self" | "team" | "all";
   };
   overdue_jobs: {
     count: number;
@@ -187,7 +191,7 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
   "team-status": ({ admin }) =>
     admin && (
       <TeamStatusCard
-        data={admin.team_status ?? { eingestempelt: 0, in_ferien_heute: 0 }}
+        data={admin.team_status ?? { eingestempelt: 0, in_ferien_heute: 0, scope: "all" }}
       />
     ),
   "anwesenheitskalender": () => <AnwesenheitskalenderCard />,
@@ -400,10 +404,14 @@ function ZuErledigenCard({ data }: { data: AdminData["zu_erledigen"] }) {
 }
 
 function TeamStatusCard({ data }: { data: AdminData["team_status"] }) {
+  // Team-Leiter-Sicht: der Titel signalisiert die verengte Datengrundlage —
+  // "Mein Team" statt "Team-Status". Firm-weite Sicht (Admin/scope='all')
+  // bleibt beim generischen Titel. Migration 208 fuehrte roles.scope ein.
+  const title = data.scope === "team" ? "Mein Team" : "Team-Status";
   return (
     <section className="rounded-xl border bg-card p-4 h-full">
       <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-3">
-        <Users className="h-4 w-4 text-accent" /> Team-Status
+        <Users className="h-4 w-4 text-accent" /> {title}
       </h2>
       <div className="divide-y">
         <TodoRow

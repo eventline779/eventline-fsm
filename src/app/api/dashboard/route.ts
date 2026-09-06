@@ -322,6 +322,10 @@ interface AdminPayload {
   team_status: {
     eingestempelt: number;
     in_ferien_heute: number;
+    /** 'all' = firm-weit (Admin/scope='all'), 'team' = nur Team-Mitglieder
+     *  (scope='team'), 'self' = nur der User selbst. Wird vom Widget genutzt
+     *  um den Titel anzupassen (z.B. "Mein Team" statt "Team-Status"). */
+    scope: "all" | "team" | "self";
   };
   overdue_jobs: {
     count: number;
@@ -329,10 +333,43 @@ interface AdminPayload {
   };
 }
 
-async function loadAdminData(): Promise<AdminPayload> {
+/** Optionen fuer scope-gebundene Zaehler (Migration 208: Team-Leiter-Scope).
+ *  `scope='all'` (Admin / scope='all'): keine User-Filter, firm-weite Zahlen.
+ *  `scope='team'`: nur Zaehler fuer den User selbst + Mitarbeiter mit
+ *  `profiles.team_lead_id = userId`. `scope='self'`: nur der User selbst
+ *  (Sicherheitsnetz — kommt in der Praxis kaum vor, weil das Team-Status-
+ *  Widget `stempelzeiten:see-all` verlangt). */
+async function loadAdminData(opts?: {
+  userId: string;
+  scope: "self" | "team" | "all";
+}): Promise<AdminPayload> {
   const admin = createAdminClient();
   const today = todayLocalIso();
   const todayZurichStartIso = zurichMidnightIso(today);
+
+  // ---- Team-Status: Sichtbare User-IDs berechnen ----
+  // Null = firm-weit (Admin/all). Array = strikt auf diese IDs beschraenken.
+  // Der User selbst ist IMMER inkludiert (matches sees_user()-Semantik:
+  // target = ich selbst → true). Ein Team-Leiter sieht damit auch seinen
+  // eigenen Stempel/Ferien-Status im Widget.
+  let scopedUserIds: string[] | null = null;
+  const teamScope = opts?.scope ?? "all";
+  if (teamScope !== "all" && opts?.userId) {
+    if (teamScope === "team") {
+      const { data: membersRes, error: membersErr } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("team_lead_id", opts.userId);
+      if (membersErr) throw new Error(membersErr.message);
+      const memberIds = (membersRes ?? []).map((r) => r.id as string);
+      // Duplikat-Guard: sollte der Teamleiter versehentlich sich selbst als
+      // team_lead haben, verhindert der Set-Roundtrip Dopplung in der IN-Liste.
+      scopedUserIds = Array.from(new Set([opts.userId, ...memberIds]));
+    } else {
+      // scope='self' — nur der User selbst.
+      scopedUserIds = [opts.userId];
+    }
+  }
   // Auftraege gelten als "ueberfaellig" wenn end_date vor Zurich-Mitternacht-heute
   // liegt UND der Auftrag noch nicht abgeschlossen ist. Draft/Anfrage-Zustaende
   // sind explizit ausgeklammert (existieren als Vor-Auftrag, kein Termindruck).
@@ -407,16 +444,29 @@ async function loadAdminData(): Promise<AdminPayload> {
       .eq("type", "beleg")
       .is("filed_at", null)
       .neq("status", "abgelehnt"),
-    admin
-      .from("time_entries")
-      .select("id", { count: "exact", head: true })
-      .is("clock_out", null),
-    admin
-      .from("time_off")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "genehmigt")
-      .lte("start_date", today)
-      .gte("end_date", today),
+    // Team-Status: eingestempelt.
+    // scopedUserIds=null -> firm-weit; sonst .in('user_id', ids). scopedUserIds
+    // enthaelt IMMER mind. den User selbst (siehe oben), .in([]) -> "IN ()"
+    // ist damit unmoeglich.
+    (() => {
+      let q = admin
+        .from("time_entries")
+        .select("id", { count: "exact", head: true })
+        .is("clock_out", null);
+      if (scopedUserIds) q = q.in("user_id", scopedUserIds);
+      return q;
+    })(),
+    // Team-Status: heute in Ferien. Gleiches Scoping wie eingestempelt.
+    (() => {
+      let q = admin
+        .from("time_off")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "genehmigt")
+        .lte("start_date", today)
+        .gte("end_date", today);
+      if (scopedUserIds) q = q.in("user_id", scopedUserIds);
+      return q;
+    })(),
     // Ueberfaellig — Count aller Auftraege deren end_date vor heute (Zurich)
     // liegt und die noch nicht abgeschlossen sind. Hier bewusst kein Filter
     // auf status=offen wie in .zu_erledigen, sondern breiter: alles was
@@ -490,6 +540,7 @@ async function loadAdminData(): Promise<AdminPayload> {
     team_status: {
       eingestempelt: eingestempelt.count ?? 0,
       in_ferien_heute: ferienHeute.count ?? 0,
+      scope: teamScope,
     },
     overdue_jobs: {
       count: overdueCountRes.count ?? 0,
@@ -615,7 +666,7 @@ export async function GET() {
     const [roleRes, overrideRes] = await Promise.all([
       admin
         .from("roles")
-        .select("permissions, dashboard_widgets")
+        .select("permissions, dashboard_widgets, scope")
         .eq("slug", role)
         .maybeSingle(),
       admin
@@ -668,8 +719,20 @@ export async function GET() {
       const l = WIDGET_LOADERS[id];
       if (l) loadersNeeded.add(l);
     }
+    // scope fuer Team-Status ermitteln: Admin ist implizit 'all' (analog
+    // has_permission()/get_my_scope()). Sonst aus roles.scope, Default 'self'
+    // wenn Spalte fehlt (aeltere Rolle vor Migration 208).
+    const rawScope = (roleRes.data as { scope?: unknown } | null)?.scope;
+    const roleScope: "self" | "team" | "all" =
+      rawScope === "team" || rawScope === "all" || rawScope === "self"
+        ? rawScope
+        : "self";
+    const effectiveScope: "self" | "team" | "all" =
+      role === "admin" ? "all" : roleScope;
     const [adminData, maData] = await Promise.all([
-      loadersNeeded.has("admin") ? loadAdminData() : Promise.resolve(null),
+      loadersNeeded.has("admin")
+        ? loadAdminData({ userId: auth.user.id, scope: effectiveScope })
+        : Promise.resolve(null),
       loadersNeeded.has("ma") ? loadMaData(auth.user.id) : Promise.resolve(null),
     ]);
 
