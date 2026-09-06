@@ -523,7 +523,7 @@ export default function KundenDetailPage() {
             <EmptyState
               icon={ClipboardList}
               title="Noch keine Auftraege"
-              description="Auftraege fuer diesen Kunden erscheinen hier."
+              description="Aufträge für diesen Kunden erscheinen hier."
               action={
                 can("auftraege:create") ? (
                   <Link href={`/auftraege/neu?customer_id=${id}`} className="kasten kasten-red inline-flex items-center gap-1.5">

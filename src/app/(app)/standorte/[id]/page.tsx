@@ -468,7 +468,7 @@ export default function StandortDetailPage() {
                   value=""
                   onChange={(v) => { if (v) linkCustomer(v); }}
                   items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                  placeholder="Kunde auswaehlen..."
+                  placeholder="Kunde auswählen..."
                   clearable={false}
                 />
               </div>

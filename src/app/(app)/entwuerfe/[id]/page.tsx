@@ -285,7 +285,7 @@ export default function EntwurfDetailPage() {
     const ok = await confirm({
       title: "Entwurf stornieren?",
       message:
-        "Der Entwurf wird als storniert markiert und aus der Aktiv-Liste entfernt. Ueber den Segment-Toggle bleibt er auffindbar.",
+        "Der Entwurf wird als storniert markiert und aus der Aktiv-Liste entfernt. Über den Segment-Toggle bleibt er auffindbar.",
       confirmLabel: "Stornieren",
       variant: "red",
     });
@@ -304,7 +304,7 @@ export default function EntwurfDetailPage() {
     if (!draft) return;
     const ok = await confirm({
       title: "Entwurf in Auftrag umwandeln?",
-      message: `ENT-${draft.draft_number} wird archiviert (Status: umgewandelt) und ein neuer Auftrag entsteht daraus. Die Notizen-Historie bleibt am Entwurf. Der neue Auftrag oeffnet sich anschliessend.`,
+      message: `ENT-${draft.draft_number} wird archiviert (Status: umgewandelt) und ein neuer Auftrag entsteht daraus. Die Notizen-Historie bleibt am Entwurf. Der neue Auftrag öffnet sich anschliessend.`,
       confirmLabel: "In Auftrag umwandeln",
       variant: "blue",
     });
@@ -345,7 +345,7 @@ export default function EntwurfDetailPage() {
       }
       setNewNoteBody("");
       await load();
-      toast.success("Notiz hinzugefuegt");
+      toast.success("Notiz hinzugefügt");
     } finally {
       setNoteBusy(false);
     }
@@ -354,16 +354,16 @@ export default function EntwurfDetailPage() {
   async function deleteNote(noteId: string) {
     if (!draft) return;
     const ok = await confirm({
-      title: "Notiz loeschen?",
+      title: "Notiz löschen?",
       message: "Die Notiz wird unwiderruflich entfernt.",
-      confirmLabel: "Loeschen",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     const res = await fetch(`/api/entwuerfe/${draft.id}/notizen/${noteId}`, { method: "DELETE" });
     const json = await res.json();
     if (!json.success) {
-      toast.error(json.error ?? "Loeschen fehlgeschlagen");
+      toast.error(json.error ?? "Löschen fehlgeschlagen");
       return;
     }
     await load();
@@ -796,7 +796,7 @@ export default function EntwurfDetailPage() {
                 <textarea
                   value={newNoteBody}
                   onChange={(e) => setNewNoteBody(e.target.value)}
-                  placeholder="Was ist passiert? (z.B. Kunde hat sich zurueckgemeldet, Preisrahmen abgestimmt…)"
+                  placeholder="Was ist passiert? (z.B. Kunde hat sich zurückgemeldet, Preisrahmen abgestimmt…)"
                   rows={3}
                   style={{ fieldSizing: "content" } as React.CSSProperties}
                   className="w-full px-3 py-2 text-sm rounded-xl border bg-background resize-none transition-all hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring"
@@ -809,7 +809,7 @@ export default function EntwurfDetailPage() {
                     className="kasten kasten-blue"
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
-                    {noteBusy ? "Speichere…" : "Hinzufuegen"}
+                    {noteBusy ? "Speichere…" : "Hinzufügen"}
                   </button>
                 </div>
               </CardContent>
@@ -824,7 +824,7 @@ export default function EntwurfDetailPage() {
                 title="Noch keine Notizen"
                 description={
                   isArchived
-                    ? "Fuer diesen Entwurf wurden keine Notizen festgehalten."
+                    ? "Für diesen Entwurf wurden keine Notizen festgehalten."
                     : "Halte hier chronologisch fest: Anrufe, Mails, Meetings, allgemeine Notizen."
                 }
               />
@@ -857,8 +857,8 @@ export default function EntwurfDetailPage() {
                         type="button"
                         onClick={() => deleteNote(n.id)}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors shrink-0"
-                        aria-label="Notiz loeschen"
-                        data-tooltip="Notiz loeschen"
+                        aria-label="Notiz löschen"
+                        data-tooltip="Notiz löschen"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

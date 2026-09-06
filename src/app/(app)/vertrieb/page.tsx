@@ -187,7 +187,7 @@ export default function VertriebPage() {
     // Reassign-Regel: nur Admin darf einen Lead von User A nach User B
     // umlegen. Nicht-Admins koennen nur unassigned Leads holen.
     if (lead.assigned_to && lead.assigned_to !== toUserId && !isAdmin) {
-      toast.error("Dieser Lead gehoert schon jemandem — nur Admin darf umverteilen");
+      toast.error("Dieser Lead gehört schon jemandem — nur Admin darf umverteilen");
       return;
     }
     // Admin-Reassign braucht Confirm wenn jemand anderem weggenommen wird.
@@ -195,7 +195,7 @@ export default function VertriebPage() {
       const oldOwner = salesPeople.find((s) => s.id === lead.assigned_to)?.full_name ?? "jemand anderem";
       const ok = await confirm({
         title: "Lead umverteilen?",
-        message: `${lead.firma} ist aktuell ${oldOwner} zugewiesen. Wirklich uebernehmen?`,
+        message: `${lead.firma} ist aktuell ${oldOwner} zugewiesen. Wirklich übernehmen?`,
         confirmLabel: "Umverteilen",
         variant: "red",
       });
@@ -220,7 +220,7 @@ export default function VertriebPage() {
     const { error } = await supabase.from("vertrieb_contacts").update({ assigned_to: null }).eq("id", leadId);
     if (error) {
       setContacts((prev) => prev.map((c) => c.id === leadId ? { ...c, assigned_to: before } : c));
-      TOAST.supabaseError(error, "Zurueckgeben fehlgeschlagen");
+      TOAST.supabaseError(error, "Zurückgeben fehlgeschlagen");
     }
   }
 

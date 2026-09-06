@@ -9,33 +9,33 @@ import Link from "next/link";
 
 const MESSAGES: Record<string, { title: string; body: string; tone: "ok" | "info" | "error" }> = {
   ok: {
-    title: "Geraet bestaetigt",
-    body: "Das Geraet wurde als vertraut markiert. Der User kann jetzt auf Finanzen + Loehne zugreifen.",
+    title: "Gerät bestätigt",
+    body: "Das Gerät wurde als vertraut markiert. Der User kann jetzt auf Finanzen + Löhne zugreifen.",
     tone: "ok",
   },
   already: {
-    title: "Bereits bestaetigt",
-    body: "Dieses Geraet wurde schon einmal bestaetigt — der Link ist nur einmal gueltig.",
+    title: "Bereits bestätigt",
+    body: "Dieses Gerät wurde schon einmal bestätigt — der Link ist nur einmal gültig.",
     tone: "info",
   },
   revoked: {
-    title: "Geraet wurde widerrufen",
-    body: "Der User hat dieses Geraet selbst entfernt. Eine neue Bestaetigung ist nicht moeglich — der User muss erneut anfragen.",
+    title: "Gerät wurde widerrufen",
+    body: "Der User hat dieses Gerät selbst entfernt. Eine neue Bestätigung ist nicht möglich — der User muss erneut anfragen.",
     tone: "info",
   },
   invalid: {
-    title: "Ungueltiger Link",
-    body: "Dieser Bestaetigungs-Link ist nicht (mehr) gueltig. Falls du den Link aus einer alten Email aufrufst, ignoriere ihn.",
+    title: "Ungültiger Link",
+    body: "Dieser Bestätigungs-Link ist nicht (mehr) gültig. Falls du den Link aus einer alten Email aufrufst, ignoriere ihn.",
     tone: "error",
   },
   missing: {
     title: "Token fehlt",
-    body: "Der Link ist unvollstaendig — bitte den ganzen URL aus der Email aufrufen.",
+    body: "Der Link ist unvollständig — bitte den ganzen URL aus der Email aufrufen.",
     tone: "error",
   },
   error: {
     title: "Server-Fehler",
-    body: "Etwas ist schiefgegangen beim Bestaetigen. Bitte spaeter erneut versuchen.",
+    body: "Etwas ist schiefgegangen beim Bestätigen. Bitte später erneut versuchen.",
     tone: "error",
   },
 };
@@ -62,7 +62,7 @@ export default async function TrustResultPage({
         <h1 className={`text-xl font-semibold mb-3 ${toneColors[msg.tone]}`}>{msg.title}</h1>
         {device && (
           <p className="text-xs text-muted-foreground mb-4">
-            Geraet: <span className="font-mono">{device}</span>
+            Gerät: <span className="font-mono">{device}</span>
           </p>
         )}
         <p className="text-sm text-muted-foreground leading-relaxed">{msg.body}</p>

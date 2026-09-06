@@ -140,7 +140,7 @@ export default function EntwuerfePage() {
       const res = await fetch(`/api/entwuerfe?${params.toString()}`, { cache: "no-store" });
       const json = await res.json();
       if (!json.success) {
-        toast.error(json.error ?? "Konnte Entwuerfe nicht laden");
+        toast.error(json.error ?? "Konnte Entwürfe nicht laden");
         setDrafts([]);
         return;
       }
@@ -209,7 +209,7 @@ export default function EntwuerfePage() {
             type="button"
             onClick={() => setSegment(segment === "active_group" ? "storniert" : "active_group")}
             className="kasten kasten-muted"
-            aria-label={segment === "active_group" ? "Zu stornierten Entwuerfen wechseln" : "Zu aktiven Entwuerfen wechseln"}
+            aria-label={segment === "active_group" ? "Zu stornierten Entwürfen wechseln" : "Zu aktiven Entwürfen wechseln"}
           >
             {segment === "active_group" ? (
               <>
@@ -262,7 +262,7 @@ export default function EntwuerfePage() {
               setFilterOwner("");
             }}
             className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
-            data-tooltip="Filter zuruecksetzen"
+            data-tooltip="Filter zurücksetzen"
           >
             <X className="h-3.5 w-3.5" />
             Reset
@@ -320,14 +320,14 @@ export default function EntwuerfePage() {
                 anyFilter
                   ? "Keine Ergebnisse mit diesen Filtern"
                   : segment === "storniert"
-                    ? "Keine stornierten Entwuerfe"
-                    : "Noch keine Entwuerfe. Erster wartet auf dich."
+                    ? "Keine stornierten Entwürfe"
+                    : "Noch keine Entwürfe. Erster wartet auf dich."
               }
               description={
                 anyFilter
-                  ? "Filter zuruecksetzen um alle Entwuerfe zu sehen."
+                  ? "Filter zurücksetzen um alle Entwürfe zu sehen."
                   : segment === "storniert"
-                    ? "Stornierte Entwuerfe erscheinen hier — bisher keiner."
+                    ? "Stornierte Entwürfe erscheinen hier — bisher keiner."
                     : "Anfragen, Ideen, tentative Termine — alles was noch nicht als Auftrag festgezurrt ist."
               }
               action={
@@ -340,7 +340,7 @@ export default function EntwuerfePage() {
                     }}
                     className="kasten kasten-muted"
                   >
-                    Filter zuruecksetzen
+                    Filter zurücksetzen
                   </button>
                 ) : segment === "active_group" ? (
                   <Link href="/entwuerfe/neu" className="kasten kasten-red">

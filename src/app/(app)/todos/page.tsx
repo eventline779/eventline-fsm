@@ -314,7 +314,7 @@ export default function TodosPage() {
     if (newStatus === "erledigt") {
       toast.success("Erledigt", {
         action: {
-          label: "Rueckgaengig",
+          label: "Rückgängig",
           onClick: async () => {
             await supabase.from("todos").update({ status: "offen", completed_at: null }).eq("id", t.id);
             await Promise.all([loadTodos(), refreshCounts()]);
@@ -328,9 +328,9 @@ export default function TodosPage() {
 
   async function deleteTodo(t: TodoRowData) {
     const ok = await confirm({
-      title: "Todo loeschen?",
-      message: "Das Todo verschwindet aus allen Listen. Wiederherstellung nur ueber die Datenbank durch einen Admin.",
-      confirmLabel: "Loeschen",
+      title: "Todo löschen?",
+      message: "Das Todo verschwindet aus allen Listen. Wiederherstellung nur über die Datenbank durch einen Admin.",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
@@ -341,7 +341,7 @@ export default function TodosPage() {
     if (error) { TOAST.deleteError(error.message); return; }
     if (selectedTodo?.id === t.id) setSelectedTodo(null);
     await Promise.all([loadTodos(), refreshCounts()]);
-    toast.success("Todo geloescht");
+    toast.success("Todo gelöscht");
   }
 
   async function remindTodo(t: TodoRowData | Todo) {
@@ -535,7 +535,7 @@ export default function TodosPage() {
                       onChange={(v) => setDetailForm({ ...detailForm, assigned_to: v })}
                       items={profiles.map((p) => ({ id: p.id, label: p.full_name }))}
                       clearable={false}
-                      placeholder="Person auswaehlen ..."
+                      placeholder="Person auswählen ..."
                     />
                   </div>
                 </div>

@@ -420,7 +420,7 @@ export default function AuftraegePage() {
           {fromDashboard && <BackButton fallbackHref="/dashboard" />}
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {segment === "archiv" ? "Auftraege — Archiv" : "Auftraege"}
+              {segment === "archiv" ? "Aufträge — Archiv" : "Aufträge"}
             </h1>
             {/* Leerer Subtitle-Platzhalter — sorgt dafuer dass die Header-Hoehe
                 identisch zu /kunden etc. ist, sodass die Action-Buttons rechts
@@ -440,7 +440,7 @@ export default function AuftraegePage() {
             type="button"
             onClick={() => selectSegment(segment === "aktiv" ? "archiv" : "aktiv")}
             className="kasten kasten-muted"
-            aria-label={segment === "aktiv" ? "Zum Archiv wechseln" : "Zu aktiven Auftraegen wechseln"}
+            aria-label={segment === "aktiv" ? "Zum Archiv wechseln" : "Zu aktiven Aufträgen wechseln"}
           >
             {segment === "aktiv" ? (
               <>
@@ -603,7 +603,7 @@ export default function AuftraegePage() {
               <CardContent className="p-0">
                 <EmptyState
                   icon={ClipboardList}
-                  title={hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Auftraege"}
+                  title={hasFilter ? "Keine Ergebnisse mit diesen Filtern" : "Noch keine Aufträge"}
                   description={
                     hasFilter
                       ? `${totalForSource} Auftrag${totalForSource === 1 ? "" : "e"} insgesamt — passt nichts auf deine Filter.`

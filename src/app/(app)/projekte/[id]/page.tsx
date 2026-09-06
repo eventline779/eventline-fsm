@@ -315,20 +315,20 @@ export default function ProjektDetailPage() {
 
   async function deleteProject() {
     const ok = await confirm({
-      title: "Projekt loeschen?",
-      message: "Das Projekt wird als geloescht markiert. Zeit-Eintraege bleiben in der Historie erhalten.",
-      confirmLabel: "Loeschen",
+      title: "Projekt löschen?",
+      message: "Das Projekt wird als gelöscht markiert. Zeit-Einträge bleiben in der Historie erhalten.",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     const { error } = await supabase.from("projects").update({ is_deleted: true }).eq("id", projectId);
-    if (error) { toast.error("Loeschen fehlgeschlagen: " + error.message); return; }
-    toast.success("Projekt geloescht");
+    if (error) { toast.error("Löschen fehlgeschlagen: " + error.message); return; }
+    toast.success("Projekt gelöscht");
     router.push("/projekte");
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "uebersicht", label: "Uebersicht",          icon: <LayoutGrid className="h-4 w-4" /> },
+    { key: "uebersicht", label: "Übersicht",          icon: <LayoutGrid className="h-4 w-4" /> },
     { key: "zeit",       label: "Zeit & Stempel",      icon: <Clock className="h-4 w-4" /> },
     { key: "dokumente",  label: "Dokumente & Historie", icon: <FolderOpen className="h-4 w-4" /> },
   ];
@@ -374,7 +374,7 @@ export default function ProjektDetailPage() {
             </p>
           </div>
           {isAdmin && (
-            <button onClick={deleteProject} className="kasten kasten-muted" data-tooltip="Projekt loeschen" aria-label="Projekt loeschen">
+            <button onClick={deleteProject} className="kasten kasten-muted" data-tooltip="Projekt löschen" aria-label="Projekt löschen">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}

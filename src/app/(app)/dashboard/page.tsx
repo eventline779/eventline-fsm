@@ -554,7 +554,7 @@ function NaechsterEinsatzCard({ einsatz }: { einsatz: NaechsterEinsatz | null })
     >
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
         <CalendarDays className="h-3.5 w-3.5 text-accent" />
-        Naechster Einsatz
+        Nächster Einsatz
       </div>
       <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-semibold tabular-nums">{fmtDateTime(einsatz.start_time)}</span>

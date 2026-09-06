@@ -186,7 +186,7 @@ export default function EntwurfNeuPage() {
             value={form.customer_id}
             onChange={(id) => update("customer_id", id)}
             items={customers.map((c) => ({ id: c.id, label: c.name }))}
-            placeholder="Bestehenden Kunden waehlen oder eintippen…"
+            placeholder="Bestehenden Kunden wählen oder eintippen…"
             clearable
             onCreateNew={(q) => {
               setForm((p) => ({ ...p, customer_id: "", customer_name: q }));
@@ -251,7 +251,7 @@ export default function EntwurfNeuPage() {
               label: l.name,
               sub: [l.address_street, l.address_zip, l.address_city].filter(Boolean).join(", "),
             }))}
-            placeholder="Location waehlen oder eintippen…"
+            placeholder="Location wählen oder eintippen…"
             clearable
             onCreateNew={(q) => {
               setForm((p) => ({ ...p, location_id: "", location_name: q }));
