@@ -16,8 +16,10 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { usePermissions } from "@/lib/use-permissions";
+import { escapeForIlike } from "@/lib/search-escape";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
@@ -189,8 +191,9 @@ export function TicketsView() {
       const numMaybe = /^\d+$/.test(numRaw) ? parseInt(numRaw, 10) : NaN;
       const numOk = Number.isFinite(numMaybe) && numMaybe <= 2147483647;
 
-      const escaped = titleQ.replace(/[\\"]/g, "\\$&");
-      const like = `"%${escaped}%"`;
+      // Zentraler Escape-Helper (siehe src/lib/search-escape.ts):
+      // eskaliert LIKE-Wildcards % _ und OR-Grammar-Zeichen , ( ) * \.
+      const like = `"%${escapeForIlike(titleQ)}%"`;
       if (numOk) {
         q = q.or(`title.ilike.${like},description.ilike.${like},ticket_number.eq.${numMaybe}`);
       } else {
@@ -205,10 +208,11 @@ export function TicketsView() {
   //
   // Fuer Stempel-Tickets im Modus "Korrektur" (time_entry_id gesetzt) wollen
   // wir in der Liste "08:15 -> 08:00" zeigen. Der Vorher-Wert liegt auf
-  // time_entries.start_time/end_time — mit einer .in()-Query (statt N+1)
-  // fuer die aktuell sichtbaren Ticket-Rows batch-geladen.
+  // time_entries.clock_in/clock_out (echte Spaltennamen laut Migration 005
+  // + 055) — mit einer .in()-Query (statt N+1) fuer die aktuell sichtbaren
+  // Ticket-Rows batch-geladen.
   // ------------------------------------------------------------------
-  const [entryBefore, setEntryBefore] = useState<Record<string, { start_time: string | null; end_time: string | null }>>({});
+  const [entryBefore, setEntryBefore] = useState<Record<string, { clock_in: string | null; clock_out: string | null }>>({});
   const loadedEntryIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -223,14 +227,20 @@ export function TicketsView() {
     if (needed.length === 0) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("time_entries")
-        .select("id, start_time, end_time")
+        .select("id, clock_in, clock_out")
         .in("id", needed);
       if (cancelled) return;
-      const additions: Record<string, { start_time: string | null; end_time: string | null }> = {};
-      for (const row of (data ?? []) as { id: string; start_time: string | null; end_time: string | null }[]) {
-        additions[row.id] = { start_time: row.start_time, end_time: row.end_time };
+      if (error) {
+        // Query-Fehler NIE verschlucken (CLAUDE.md §15) — die Vorher-Zeile
+        // fehlt sonst still und der Approver sieht keinen Diff.
+        toast.error("Vorher-Werte konnten nicht geladen werden: " + error.message);
+        return;
+      }
+      const additions: Record<string, { clock_in: string | null; clock_out: string | null }> = {};
+      for (const row of (data ?? []) as { id: string; clock_in: string | null; clock_out: string | null }[]) {
+        additions[row.id] = { clock_in: row.clock_in, clock_out: row.clock_out };
         loadedEntryIdsRef.current.add(row.id);
       }
       // IDs die nix zurueckgegeben haben trotzdem markieren, sonst
@@ -366,8 +376,8 @@ export function TicketsView() {
               if (d.time_entry_id) {
                 // Modus Korrektur — Vorher-Werte aus geladenem time_entry.
                 const before = entryBefore[d.time_entry_id];
-                const oldStart = before ? formatTime(before.start_time) : null;
-                const oldEnd = before ? formatTime(before.end_time) : null;
+                const oldStart = before ? formatTime(before.clock_in) : null;
+                const oldEnd = before ? formatTime(before.clock_out) : null;
                 // Nur die Werte zeigen die sich unterscheiden — wenn nur der
                 // Start korrigiert wird ist die End-Zeile unnoetig laut.
                 const startChanged = oldStart && newStart && oldStart !== newStart;

@@ -193,11 +193,17 @@ export default function TicketDetailPage() {
     if (!ticket || ticket.type !== "stempel_aenderung" || ticket.status !== "offen") return;
     if (!can("tickets:manage")) return;
     (async () => {
+      // Status-Filter bewusst weggelassen — an new-ticket-modal angeglichen:
+      // Der frueher gelistete 'entwurf'-Status existiert im heutigen jobs-
+      // Lifecycle (partner_entwurf/partner_anfrage/anfrage/offen/
+      // abgeschlossen/storniert) nur noch als Legacy, dafuer fehlt
+      // 'storniert', wodurch nachtraegliche Stempel-Korrekturen fuer
+      // stornierte Auftraege stumm herausgefiltert wurden. Der Admin
+      // approvet ohnehin manuell — nur is_deleted ausschliessen genuegt.
       const { data } = await supabase
         .from("jobs")
         .select("id, job_number, title, start_date, end_date")
         .neq("is_deleted", true)
-        .in("status", ["offen", "abgeschlossen", "entwurf"])
         .order("job_number", { ascending: false })
         .limit(500);
       setSelectableJobs((data as typeof selectableJobs) ?? []);

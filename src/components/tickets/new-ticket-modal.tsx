@@ -69,6 +69,40 @@ function isoToZurichDatetimeLocal(iso: string): string {
   return `${date}T${time}`;
 }
 
+/** 'YYYY-MM-DDTHH:MM' aus <input type="datetime-local"> → ISO-timestamptz.
+ *
+ *  KRITISCH (§4 CLAUDE.md): `new Date("2026-06-15T09:30")` interpretiert
+ *  den String in der TZ des Endgeraets. Bei Nutzern ausserhalb der Schweiz
+ *  (z.B. Support-Handy in DE mit anderer System-TZ, Windows-Laptop mit
+ *  falsch gesetzter Zone) wird die vom Mitarbeiter gewaehlte Wall-Clock-
+ *  Zeit als lokale UTC-Konversion in die DB geschrieben — die Stempel-
+ *  Korrektur landet dann verschoben (1-2h daneben je nach Offset).
+ *
+ *  Wir interpretieren das datetime-local IMMER als Zurich-Wall-Clock und
+ *  konvertieren zwei-Pass ueber Intl.DateTimeFormat nach UTC — DST-safe,
+ *  keine externe Library. Muster identisch zu zurichWallToUtcMs in
+ *  src/app/api/hr/anfragen/route.ts. */
+function zurichDatetimeLocalToIso(local: string): string {
+  const [datePart, timePart = "00:00"] = local.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [h, mi] = timePart.split(":").map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi, 0);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Zurich",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(guess));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  const gh = get("hour");
+  const seen = Date.UTC(
+    get("year"), get("month") - 1, get("day"),
+    gh === 24 ? 0 : gh, get("minute"), get("second"),
+  );
+  const offset = seen - guess;
+  return new Date(guess - offset).toISOString();
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -235,8 +269,13 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
         grund: "",
       });
     }
+    // initialData?.timeEntryId in Deps: sonst haengt bei einem Kontext-
+    // Wechsel (z.B. User klickt in /stempelzeiten von Row A auf Row B ohne
+    // Modal-Close dazwischen) noch der Prefill von Row A im Formular. Ohne
+    // Deps-Eintrag reagiert der Effect nur auf open→false→true, aber nicht
+    // auf einen wechselnden Prefill-Datensatz waehrend offener Modal-Session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialData?.timeEntryId]);
 
   // Stempel-Eintraege laden wenn Typ Stempel-Aenderung gewaehlt wird.
   // Separate Queries fuer time_entries und jobs — der nested join
@@ -632,7 +671,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       // Lock-Check: neu_start (nur Vergessen-Modus — Korrektur-Modus haerte
       // apply_ticket serverseitig ab, dort ist die Alt-Row-Info verfuegbar).
       // Client-Warnung erspart dem User das Absenden + Ablehnen-Toast.
-      if (stempelMode === "vergessen" && stempel.neu_start && isTimeEntryLocked(new Date(stempel.neu_start).toISOString())) {
+      if (stempelMode === "vergessen" && stempel.neu_start && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start))) {
         return TIME_ENTRY_LOCK_MESSAGE;
       }
       // Kontext-abhaengige Pflichtfelder — gelten in beiden Modi, weil der
@@ -693,19 +732,23 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
           contextFields.beschreibung = stempel.beschreibung.trim() || undefined;
         }
 
+        // datetime-local IMMER als Zurich-Wall-Clock interpretieren
+        // (siehe zurichDatetimeLocalToIso). Ein naives new Date(...) wuerde
+        // die vom Mitarbeiter gewaehlte Zeit in der TZ des Endgeraets lesen
+        // und bei nicht-CH-Zonen verschoben in die DB schreiben.
         if (stempelMode === "korrektur") {
           data = {
             ...contextFields,
             time_entry_id: stempel.time_entry_id,
-            neu_start: stempel.neu_start ? new Date(stempel.neu_start).toISOString() : undefined,
-            neu_end: stempel.neu_end ? new Date(stempel.neu_end).toISOString() : undefined,
+            neu_start: stempel.neu_start ? zurichDatetimeLocalToIso(stempel.neu_start) : undefined,
+            neu_end: stempel.neu_end ? zurichDatetimeLocalToIso(stempel.neu_end) : undefined,
             grund: stempel.grund,
           };
         } else {
           data = {
             ...contextFields,
-            neu_start: new Date(stempel.neu_start).toISOString(),
-            neu_end: new Date(stempel.neu_end).toISOString(),
+            neu_start: zurichDatetimeLocalToIso(stempel.neu_start),
+            neu_end: zurichDatetimeLocalToIso(stempel.neu_end),
             grund: stempel.grund,
           };
         }
@@ -1250,7 +1293,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                       nicht mehr anlegen. Wir zeigen es sofort im Modal, damit
                       der User nicht ausfuellt + abgelehnt wird. Der Submit-
                       Guard in validate() blockt zusaetzlich. */}
-                  {stempel.neu_start && isTimeEntryLocked(new Date(stempel.neu_start).toISOString()) && (
+                  {stempel.neu_start && isTimeEntryLocked(zurichDatetimeLocalToIso(stempel.neu_start)) && (
                     <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
                       <Lock className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                       <div className="text-xs text-amber-800 dark:text-amber-200">
