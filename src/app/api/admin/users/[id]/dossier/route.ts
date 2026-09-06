@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCompanySettings } from "@/lib/company-settings";
+import { isUuid } from "@/lib/search-escape";
 import JSZip from "jszip";
 
 const DOSSIER_BUCKET = "personal-dossiers";
@@ -31,6 +32,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
   const { id: profileId } = await params;
+
+  // profileId landet u.a. ungeschuetzt in einem .or()-Filter (jobs).
+  // Ohne Format-Check koennte ein manipulierter Wert die Filter-Grammar
+  // sprengen oder unnoetig DB-Zeit fressen. UUID-Validation vor
+  // jeglicher Query.
+  if (!isUuid(profileId)) {
+    return NextResponse.json({ success: false, error: "Ungültige Profil-ID" }, { status: 400 });
+  }
 
   const admin = createAdminClient();
   const company = await loadCompanySettings(admin);

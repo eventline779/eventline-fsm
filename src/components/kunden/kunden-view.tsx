@@ -21,6 +21,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { escapeForIlike } from "@/lib/search-escape";
 import { Input } from "@/components/ui/input";
 import { CUSTOMER_TYPES } from "@/lib/constants";
 import type { Customer, CustomerType } from "@/types";
@@ -121,7 +122,11 @@ export function KundenView({ embedded = false }: Props = {}) {
     else if (filterBexio === "unlinked") q = q.is("bexio_contact_id", null);
     const term = search.trim();
     if (term.length > 0) {
-      const like = `%${term}%`;
+      // escapeForIlike: escaped erst LIKE-Wildcards (% _) und danach
+      // .or()-Grammar (, () * \) — sonst zerbricht ein Term mit Komma
+      // oder Klammer die Query still, und % / _ triggert unerwartete
+      // Datenbank-weite Matches.
+      const like = `%${escapeForIlike(term)}%`;
       q = q.or(`name.ilike.${like},email.ilike.${like},bexio_nr.ilike.${like}`);
     }
     if (cursor !== null) {
