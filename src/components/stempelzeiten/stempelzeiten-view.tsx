@@ -29,7 +29,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase, FileText, Clock, Calendar, Trash2,
-  AlertTriangle, Moon, Search, X, Users,
+  AlertTriangle, Moon, Search, X, Users, Edit3,
 } from "lucide-react";
 import { useStempel, formatStempelDuration } from "@/lib/use-stempel";
 import { useConfirm } from "@/components/ui/use-confirm";
@@ -70,6 +70,15 @@ interface OwnEntry {
   job: { job_number: number; title: string } | null;
 }
 
+/** Payload fuer den Row-"Korrigieren"-Button — wandert 1:1 in
+ *  NewTicketModal.initialData rein und belegt das Stempel-Form vor. */
+interface CorrectPayload {
+  timeEntryId: string;
+  clockIn: string;
+  clockOut: string | null;
+  jobId: string | null;
+}
+
 /** Ergebniszeile fuer den Auftragsnummer-Filter (Join zu profiles). */
 interface JobFilterEntry {
   id: string;
@@ -92,6 +101,9 @@ interface JobFilterHeader {
 
 interface NormalizedEntry {
   id: string;
+  /** user_id des Eintrag-Owners — wird gebraucht um zu entscheiden, ob der
+   *  Row-"Korrigieren"-Button gezeigt wird (nur eigene Eintraege). */
+  userId: string | null;
   userName: string | null;
   jobId: string | null;
   jobLabel: string | null;
@@ -161,6 +173,7 @@ function monthLastIso(iso: string): string {
 function normalizeAdmin(e: AdminEntry): NormalizedEntry {
   return {
     id: e.id,
+    userId: e.user_id,
     userName: e.user_name,
     jobId: e.job_id,
     jobLabel: e.job_id && e.job_number ? `INT-${e.job_number} · ${e.job_title}` : null,
@@ -172,12 +185,13 @@ function normalizeAdmin(e: AdminEntry): NormalizedEntry {
   };
 }
 
-function normalizeOwn(e: OwnEntry): NormalizedEntry {
+function normalizeOwn(e: OwnEntry, currentUserId: string | null): NormalizedEntry {
   const dur = e.clock_out
     ? Math.max(0, Math.floor((new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000))
     : null;
   return {
     id: e.id,
+    userId: currentUserId, // eigene Sicht -> per Definition der eingeloggte User
     userName: null,
     jobId: e.job_id,
     jobLabel: e.job_id && e.job ? `INT-${e.job.job_number} · ${e.job.title}` : null,
@@ -197,6 +211,7 @@ function normalizeJobFilter(e: JobFilterEntry, jobHeader: JobFilterHeader): Norm
     : null;
   return {
     id: e.id,
+    userId: e.user_id,
     userName: e.user?.full_name ?? "Unbekannt",
     jobId: e.job_id,
     jobLabel: `INT-${jobHeader.job_number} · ${jobHeader.title}`,
@@ -292,6 +307,11 @@ export function StempelzeitenView() {
   const { confirm, ConfirmModalElement } = useConfirm();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showStempelTicket, setShowStempelTicket] = useState(false);
+  /** Inline-Context: Payload fuer den Row-"Korrigieren"-Button (oder den
+   *  "Vergessen auszustempeln?"-Link im Aktiv-Banner). Ist gesetzt →
+   *  Modal oeffnet mit vorbelegten Feldern; null → normaler Fallback-
+   *  Aufruf (leeres Form). */
+  const [correctPayload, setCorrectPayload] = useState<CorrectPayload | null>(null);
   const { can } = usePermissions();
   // "Fremd-Sicht" (Admin-Selector + andere MA laden) gated ueber Permission,
   // nicht ueber die admin-Rolle direkt — so kann HR/Team-Leitung ebenfalls
@@ -454,6 +474,14 @@ export function StempelzeitenView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobFilterInput]);
 
+  /** Oeffnet das Ticket-Modal fuer eine Stempel-Korrektur mit vorbelegten
+   *  Feldern. Kombi aus: Payload merken + Modal aufmachen. `payload` kann null
+   *  sein — dann ist es der Fallback ohne Prefill (klassischer Top-Button). */
+  const openCorrect = useCallback((payload: CorrectPayload | null) => {
+    setCorrectPayload(payload);
+    setShowStempelTicket(true);
+  }, []);
+
   async function deleteEntry(id: string) {
     const ok = await confirm({
       title: "Eintrag löschen?",
@@ -476,8 +504,8 @@ export function StempelzeitenView() {
       if (!jobFilterHeader) return [];
       return jobFilterEntries.map((e) => normalizeJobFilter(e, jobFilterHeader));
     }
-    return viewingOther ? adminEntries.map(normalizeAdmin) : ownEntries.map(normalizeOwn);
-  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, viewingOther, adminEntries, ownEntries]);
+    return viewingOther ? adminEntries.map(normalizeAdmin) : ownEntries.map((e) => normalizeOwn(e, currentUserId));
+  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, viewingOther, adminEntries, ownEntries, currentUserId]);
 
   // Aggregat fuer den Auftrags-Header: Total-Minuten + Anzahl unique
   // Mitarbeiter, die auf dem Auftrag gestempelt haben.
@@ -542,7 +570,7 @@ export function StempelzeitenView() {
           {can("tickets:create") && (
             <button
               type="button"
-              onClick={() => setShowStempelTicket(true)}
+              onClick={() => openCorrect(null)}
               className="kasten kasten-green"
               data-tooltip="Stempel-Aenderung anfragen"
             >
@@ -569,9 +597,30 @@ export function StempelzeitenView() {
                 </p>
               </div>
             </div>
-            <span className="font-mono text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
-              {formatStempelDuration(active.clock_in, now)}
-            </span>
+            <div className="flex items-center gap-3">
+              {/* Inline-Context: falls dieser laufende Stempel-In eigentlich
+                  laengst haette out-gestempelt werden sollen — 1-Klick-Weg
+                  ins Ticket-Formular mit vorbelegtem time_entry + Start-Zeit.
+                  User tippt nur noch die Endzeit + den Grund. */}
+              {can("tickets:create") && (
+                <button
+                  type="button"
+                  onClick={() => openCorrect({
+                    timeEntryId: active.id,
+                    clockIn: active.clock_in,
+                    clockOut: null,
+                    jobId: active.job_id ?? null,
+                  })}
+                  className="text-xs font-medium text-green-700 dark:text-green-400 underline underline-offset-2 hover:text-green-800 dark:hover:text-green-300"
+                  data-tooltip="Ticket mit vorbelegten Zeiten oeffnen"
+                >
+                  Vergessen auszustempeln?
+                </button>
+              )}
+              <span className="font-mono text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
+                {formatStempelDuration(active.clock_in, now)}
+              </span>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -683,19 +732,33 @@ export function StempelzeitenView() {
           </CardContent>
         </Card>
       ) : (
-        <GroupedList entries={normalized} now={now} onDelete={deleteEntry} />
+        <GroupedList
+          entries={normalized}
+          now={now}
+          currentUserId={currentUserId}
+          canCreateTicket={can("tickets:create")}
+          onDelete={deleteEntry}
+          onCorrect={openCorrect}
+        />
       )}
 
       {ConfirmModalElement}
 
       <NewTicketModal
         open={showStempelTicket}
-        onClose={() => setShowStempelTicket(false)}
+        onClose={() => { setShowStempelTicket(false); setCorrectPayload(null); }}
         onCreated={() => {
           setShowStempelTicket(false);
+          setCorrectPayload(null);
           toast.success("Ticket erstellt — Admin wurde benachrichtigt");
         }}
         initialType="stempel_aenderung"
+        initialData={correctPayload ? {
+          timeEntryId: correctPayload.timeEntryId,
+          clockIn: correctPayload.clockIn,
+          clockOut: correctPayload.clockOut,
+          jobId: correctPayload.jobId,
+        } : undefined}
       />
     </div>
   );
@@ -803,11 +866,14 @@ function JobFilterSummaryCard({
 // ------------------ Grouped List ------------------
 
 function GroupedList({
-  entries, now, onDelete,
+  entries, now, currentUserId, canCreateTicket, onDelete, onCorrect,
 }: {
   entries: NormalizedEntry[];
   now: number;
+  currentUserId: string | null;
+  canCreateTicket: boolean;
   onDelete: (id: string) => void;
+  onCorrect: (payload: CorrectPayload) => void;
 }) {
   // Gruppieren nach clock_in.localDate. Sortiert: neueste Tage zuerst.
   const groups = useMemo(() => {
@@ -839,7 +905,20 @@ function GroupedList({
             </div>
             <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
               {list.map((e) => (
-                <EntryCard key={e.id} entry={e} anomaly={detectAnomaly(e, now)} onDelete={() => onDelete(e.id)} />
+                <EntryCard
+                  key={e.id}
+                  entry={e}
+                  anomaly={detectAnomaly(e, now)}
+                  isOwn={!!currentUserId && e.userId === currentUserId}
+                  canCreateTicket={canCreateTicket}
+                  onDelete={() => onDelete(e.id)}
+                  onCorrect={() => onCorrect({
+                    timeEntryId: e.id,
+                    clockIn: e.clockIn,
+                    clockOut: e.clockOut,
+                    jobId: e.jobId,
+                  })}
+                />
               ))}
             </div>
           </div>
@@ -852,11 +931,17 @@ function GroupedList({
 // ------------------ Entry-Card (mit Anomalien-Chips inline) ------------------
 
 function EntryCard({
-  entry, anomaly, onDelete,
+  entry, anomaly, isOwn, canCreateTicket, onDelete, onCorrect,
 }: {
   entry: NormalizedEntry;
   anomaly: Anomaly;
+  /** True wenn dieser Eintrag dem eingeloggten User gehoert — nur dann darf
+   *  der Row-"Korrigieren"-Button erscheinen (Ticket-Erstellung fuer fremde
+   *  Eintraege macht keinen Sinn, das Ticket landet immer auf created_by). */
+  isOwn: boolean;
+  canCreateTicket: boolean;
   onDelete: () => void;
+  onCorrect: () => void;
 }) {
   const isRunning = !entry.clockOut;
   return (
@@ -922,6 +1007,21 @@ function EntryCard({
       <span className="font-mono font-semibold text-sm tabular-nums shrink-0">
         {entry.durationMinutes !== null ? formatDuration(entry.durationMinutes) : "läuft…"}
       </span>
+      {/* Row-"Korrigieren" — Inline-Context, oeffnet Stempel-Aenderungs-Ticket
+          mit vorbelegtem time_entry + Start + Ende. Nur bei eigenen Eintraegen
+          (fremde Korrekturen sind nicht Sinn der Sache), nur wenn User Rechte
+          fuer Ticket-Erstellung hat. */}
+      {isOwn && canCreateTicket && (
+        <button
+          type="button"
+          onClick={onCorrect}
+          className="p-1 rounded text-muted-foreground/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors shrink-0"
+          aria-label="Eintrag korrigieren"
+          data-tooltip="Korrigieren — Ticket mit vorbelegten Zeiten oeffnen"
+        >
+          <Edit3 className="h-3.5 w-3.5" />
+        </button>
+      )}
       <button
         type="button"
         onClick={onDelete}
