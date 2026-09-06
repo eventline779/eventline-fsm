@@ -13,7 +13,7 @@
 -- Bereitstellung erfordert bewusste Akzeptanz (Logging mit Timestamp
 -- + Version damit aenderungen nachvollziehbar sind).
 
-create table public.wage_documents (
+create table if not exists public.wage_documents (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
   doc_type text not null check (doc_type in ('lohnabrechnung', 'lohnausweis')),
@@ -25,6 +25,8 @@ create table public.wage_documents (
   uploaded_at timestamptz not null default now(),
   uploaded_by uuid references public.profiles(id),
   notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   -- Unique-Constraint pro Mitarbeiter+Jahr+Typ+Monat (verhindert Duplikate
   -- beim Re-Upload — alter Storage-File wird ueberschrieben, Row geupdated).
   constraint wage_doc_unique_per_period unique (profile_id, doc_type, year, period_month),
@@ -35,16 +37,29 @@ create table public.wage_documents (
   )
 );
 
-create index wage_documents_profile_year_idx on public.wage_documents (profile_id, year desc);
+-- Idempotenter Nachzug fuer bereits angelegte Tabellen (Migration hat urspruenglich
+-- keine created_at/updated_at gehabt).
+alter table public.wage_documents
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+drop trigger if exists wage_documents_updated_at on public.wage_documents;
+create trigger wage_documents_updated_at
+  before update on public.wage_documents
+  for each row execute function public.update_updated_at();
+
+create index if not exists wage_documents_profile_year_idx on public.wage_documents (profile_id, year desc);
 
 alter table public.wage_documents enable row level security;
 
 -- SELECT: User sieht eigene, Admin sieht alle
+drop policy if exists "wage_documents_select" on public.wage_documents;
 create policy "wage_documents_select" on public.wage_documents
   for select to authenticated
   using (profile_id = auth.uid() or public.is_admin());
 
 -- INSERT/UPDATE/DELETE: Admin only
+drop policy if exists "wage_documents_admin_write" on public.wage_documents;
 create policy "wage_documents_admin_write" on public.wage_documents
   for all to authenticated
   using (public.is_admin())

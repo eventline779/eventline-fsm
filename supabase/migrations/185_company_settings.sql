@@ -21,10 +21,20 @@ create table if not exists public.company_settings (
   website text not null default '',
   uid_number text not null default '',   -- MWST-/UID-Nummer, z.B. CHE-123.456.789
   iban text not null default '',
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   updated_by uuid references public.profiles(id),
   constraint company_settings_singleton check (id = 'default')
 );
+
+-- Idempotenter Nachzug fuer bereits existierende Tabellen ohne created_at.
+alter table public.company_settings
+  add column if not exists created_at timestamptz not null default now();
+
+drop trigger if exists company_settings_updated_at on public.company_settings;
+create trigger company_settings_updated_at
+  before update on public.company_settings
+  for each row execute function public.update_updated_at();
 
 -- Seed default-Row (idempotent). Nur einfuegen wenn noch nichts da ist.
 insert into public.company_settings (id, name, street, zip, city, country, phone, email, website)
@@ -35,11 +45,13 @@ alter table public.company_settings enable row level security;
 
 -- SELECT: eingeloggte User duerfen Firmen-Stammdaten lesen (harmlos, in
 -- vielen UI-Stellen z.B. Absender-Hinweise, Footer, Verifikations-Angaben).
+drop policy if exists "company_settings_select" on public.company_settings;
 create policy "company_settings_select" on public.company_settings
   for select to authenticated using (true);
 
 -- INSERT/UPDATE/DELETE: nur Admin. Delete faktisch nicht sinnvoll da
 -- Singleton — Policy setzt aber sauber die Grenze.
+drop policy if exists "company_settings_admin_write" on public.company_settings;
 create policy "company_settings_admin_write" on public.company_settings
   for all to authenticated
   using (public.is_admin())

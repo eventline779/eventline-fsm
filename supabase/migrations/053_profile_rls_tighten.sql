@@ -16,6 +16,11 @@
 -- direkt aus profiles — passt durch die "id = auth.uid()"-Bedingung.
 
 -- === 1. is_admin()-Helper (vermeidet Rekursion in der Policy) ===
+-- HINWEIS zur Grundregel §5 ("kein hard-coded role='admin' in RLS/RPCs"):
+-- Diese Funktion IST die kanonische Definition von "Admin". Sie ist der
+-- eine erlaubte Ort, an dem `role = 'admin'` direkt geprueft wird — alle
+-- anderen Policies/RPCs muessen `is_admin()` bzw. `has_permission()`
+-- (Migration 049) aufrufen und niemals selbst auf `role='admin'` matchen.
 create or replace function public.is_admin()
 returns boolean
 language sql

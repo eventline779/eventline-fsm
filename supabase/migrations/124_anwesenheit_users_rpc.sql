@@ -19,8 +19,11 @@ as $$
   join public.roles r on r.slug = p.role
   where p.is_active = true
     and p.role <> 'partner'
+    -- Admin-Rolle wird hier bewusst in derselben SQL-Klausel via r.slug
+    -- eingebunden wie die has_permission()-Funktion in Migration 049 —
+    -- Admin sieht immer alles, andere Rollen brauchen anwesenheit:view.
     and (
-      p.role = 'admin'
+      r.slug = 'admin'
       or r.permissions ? 'anwesenheit:view'
     )
   order by p.full_name;

@@ -20,7 +20,7 @@
 -- kompromittiert ist, kann er kein Geraet selbst freischalten. Nur wer
 -- die Admin-Mailbox kontrolliert (Leo) kann Geraete approven.
 
-create table public.trusted_devices (
+create table if not exists public.trusted_devices (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
 
@@ -52,23 +52,27 @@ create table public.trusted_devices (
   revoked_at timestamptz
 );
 
-create unique index trusted_devices_cookie_unique on public.trusted_devices(cookie_token_hash);
-create index trusted_devices_user_idx on public.trusted_devices(user_id);
-create index trusted_devices_confirm_idx on public.trusted_devices(confirm_token_hash) where confirm_token_hash is not null;
-create index trusted_devices_status_idx on public.trusted_devices(status);
+create unique index if not exists trusted_devices_cookie_unique on public.trusted_devices(cookie_token_hash);
+create index if not exists trusted_devices_user_idx on public.trusted_devices(user_id);
+create index if not exists trusted_devices_confirm_idx on public.trusted_devices(confirm_token_hash) where confirm_token_hash is not null;
+create index if not exists trusted_devices_status_idx on public.trusted_devices(status);
 
 -- RLS: User sieht/aendert nur eigene Geraete. Admin darf alle (via
 -- has_permission durchlaufen-Logik). Confirm-Token-Resolution laeuft
 -- ueber service_role (kein User-RLS noetig).
 alter table public.trusted_devices enable row level security;
 
+drop policy if exists "trusted_devices_self_select" on public.trusted_devices;
 create policy "trusted_devices_self_select" on public.trusted_devices for select to authenticated
   using (user_id = auth.uid() or public.has_permission('admin:audit'));
+drop policy if exists "trusted_devices_self_insert" on public.trusted_devices;
 create policy "trusted_devices_self_insert" on public.trusted_devices for insert to authenticated
   with check (user_id = auth.uid());
+drop policy if exists "trusted_devices_self_revoke" on public.trusted_devices;
 create policy "trusted_devices_self_revoke" on public.trusted_devices for update to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+drop policy if exists "trusted_devices_self_delete" on public.trusted_devices;
 create policy "trusted_devices_self_delete" on public.trusted_devices for delete to authenticated
   using (user_id = auth.uid());
 

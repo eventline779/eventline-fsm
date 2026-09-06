@@ -16,7 +16,22 @@
 -- 'tickets:manage') sieht alle und kann assignen + entscheiden.
 
 -- 1. Alte tickets-Tabelle weg (Migration 012 hatte ein zu schwaches Schema).
-DROP TABLE IF EXISTS public.tickets CASCADE;
+--    Der DROP feuert nur wenn das ALTE 012-Schema noch da ist (erkennbar
+--    an einer Spalte, die es hier nicht mehr gibt) — sonst wuerde ein
+--    Re-Run dieser Migration die aktuelle Ticket-Tabelle wiping. Idempotent.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = 'tickets'
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'tickets' AND column_name = 'data'
+  ) THEN
+    DROP TABLE public.tickets CASCADE;
+  END IF;
+END $$;
 
 -- 2. ENUMs.
 DO $$ BEGIN
@@ -28,7 +43,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Tickets-Tabelle.
-CREATE TABLE public.tickets (
+CREATE TABLE IF NOT EXISTS public.tickets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   type public.ticket_type NOT NULL,
   status public.ticket_status NOT NULL DEFAULT 'offen',
@@ -48,19 +63,20 @@ CREATE TABLE public.tickets (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX tickets_created_by_idx ON public.tickets(created_by);
-CREATE INDEX tickets_assigned_to_idx ON public.tickets(assigned_to);
-CREATE INDEX tickets_status_idx ON public.tickets(status);
-CREATE INDEX tickets_type_idx ON public.tickets(type);
-CREATE INDEX tickets_created_at_idx ON public.tickets(created_at DESC);
+CREATE INDEX IF NOT EXISTS tickets_created_by_idx ON public.tickets(created_by);
+CREATE INDEX IF NOT EXISTS tickets_assigned_to_idx ON public.tickets(assigned_to);
+CREATE INDEX IF NOT EXISTS tickets_status_idx ON public.tickets(status);
+CREATE INDEX IF NOT EXISTS tickets_type_idx ON public.tickets(type);
+CREATE INDEX IF NOT EXISTS tickets_created_at_idx ON public.tickets(created_at DESC);
 
 -- Auto-update updated_at on UPDATE.
+DROP TRIGGER IF EXISTS tickets_updated_at ON public.tickets;
 CREATE TRIGGER tickets_updated_at
   BEFORE UPDATE ON public.tickets
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
 -- 4. Attachments-Tabelle.
-CREATE TABLE public.ticket_attachments (
+CREATE TABLE IF NOT EXISTS public.ticket_attachments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ticket_id uuid NOT NULL REFERENCES public.tickets(id) ON DELETE CASCADE,
   storage_path text NOT NULL,
@@ -71,7 +87,7 @@ CREATE TABLE public.ticket_attachments (
   uploaded_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX ticket_attachments_ticket_id_idx ON public.ticket_attachments(ticket_id);
+CREATE INDEX IF NOT EXISTS ticket_attachments_ticket_id_idx ON public.ticket_attachments(ticket_id);
 
 -- 5. RLS aktivieren.
 ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
@@ -79,6 +95,7 @@ ALTER TABLE public.ticket_attachments ENABLE ROW LEVEL SECURITY;
 
 -- 6. RLS-Policies tickets.
 -- SELECT: eigene Tickets ODER admin/manage-permission.
+DROP POLICY IF EXISTS "tickets_select_own_or_admin" ON public.tickets;
 CREATE POLICY "tickets_select_own_or_admin" ON public.tickets
   FOR SELECT TO authenticated
   USING (
@@ -89,26 +106,31 @@ CREATE POLICY "tickets_select_own_or_admin" ON public.tickets
   );
 
 -- INSERT: jeder authentifizierte User kann Tickets erstellen, created_by muss er selbst sein.
+DROP POLICY IF EXISTS "tickets_insert_self" ON public.tickets;
 CREATE POLICY "tickets_insert_self" ON public.tickets
   FOR INSERT TO authenticated
   WITH CHECK (created_by = auth.uid());
 
 -- UPDATE: Admin/manager kann immer; Ersteller nur waehrend status='offen'.
+DROP POLICY IF EXISTS "tickets_update_admin" ON public.tickets;
 CREATE POLICY "tickets_update_admin" ON public.tickets
   FOR UPDATE TO authenticated
   USING (public.is_admin() OR public.has_permission('tickets:manage'));
 
+DROP POLICY IF EXISTS "tickets_update_own_open" ON public.tickets;
 CREATE POLICY "tickets_update_own_open" ON public.tickets
   FOR UPDATE TO authenticated
   USING (created_by = auth.uid() AND status = 'offen')
   WITH CHECK (created_by = auth.uid() AND status = 'offen');
 
 -- DELETE: nur Admin (Mitarbeiter koennen nicht loeschen sondern nur abgelehnt-status).
+DROP POLICY IF EXISTS "tickets_delete_admin" ON public.tickets;
 CREATE POLICY "tickets_delete_admin" ON public.tickets
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
 -- 7. RLS-Policies ticket_attachments — folgen dem Parent-Ticket.
+DROP POLICY IF EXISTS "ticket_attachments_select" ON public.ticket_attachments;
 CREATE POLICY "ticket_attachments_select" ON public.ticket_attachments
   FOR SELECT TO authenticated
   USING (
@@ -124,6 +146,7 @@ CREATE POLICY "ticket_attachments_select" ON public.ticket_attachments
     )
   );
 
+DROP POLICY IF EXISTS "ticket_attachments_insert" ON public.ticket_attachments;
 CREATE POLICY "ticket_attachments_insert" ON public.ticket_attachments
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -135,6 +158,7 @@ CREATE POLICY "ticket_attachments_insert" ON public.ticket_attachments
     )
   );
 
+DROP POLICY IF EXISTS "ticket_attachments_delete" ON public.ticket_attachments;
 CREATE POLICY "ticket_attachments_delete" ON public.ticket_attachments
   FOR DELETE TO authenticated
   USING (

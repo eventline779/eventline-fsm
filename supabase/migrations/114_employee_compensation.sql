@@ -19,7 +19,7 @@
 
 -- === 1. Tabelle ===
 
-create table public.employee_compensation (
+create table if not exists public.employee_compensation (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles(id) on delete cascade,
 
@@ -44,9 +44,10 @@ create table public.employee_compensation (
   constraint emp_comp_range_valid check (effective_to is null or effective_to >= effective_from)
 );
 
-create index emp_comp_profile_idx on public.employee_compensation(profile_id);
-create index emp_comp_effective_idx on public.employee_compensation(profile_id, effective_from desc);
+create index if not exists emp_comp_profile_idx on public.employee_compensation(profile_id);
+create index if not exists emp_comp_effective_idx on public.employee_compensation(profile_id, effective_from desc);
 
+drop trigger if exists emp_comp_updated_at on public.employee_compensation;
 create trigger emp_comp_updated_at
   before update on public.employee_compensation
   for each row execute function public.update_updated_at();
@@ -56,12 +57,16 @@ create trigger emp_comp_updated_at
 
 alter table public.employee_compensation enable row level security;
 
+drop policy if exists "emp_comp_select" on public.employee_compensation;
 create policy "emp_comp_select" on public.employee_compensation for select to authenticated
   using (public.has_permission('lohn:manage'));
+drop policy if exists "emp_comp_insert" on public.employee_compensation;
 create policy "emp_comp_insert" on public.employee_compensation for insert to authenticated
   with check (public.has_permission('lohn:manage'));
+drop policy if exists "emp_comp_update" on public.employee_compensation;
 create policy "emp_comp_update" on public.employee_compensation for update to authenticated
   using (public.has_permission('lohn:manage'));
+drop policy if exists "emp_comp_delete" on public.employee_compensation;
 create policy "emp_comp_delete" on public.employee_compensation for delete to authenticated
   using (public.has_permission('lohn:manage'));
 

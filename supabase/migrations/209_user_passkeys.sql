@@ -70,9 +70,28 @@ create index if not exists user_passkey_challenges_challenge_idx on public.user_
 create index if not exists user_passkey_challenges_expires_idx on public.user_passkey_challenges(expires_at);
 
 alter table public.user_passkey_challenges enable row level security;
--- Bewusst KEINE policies für authenticated: nur service_role (Admin-
--- Client aus den API-Routen) darf lesen/schreiben. So kann kein User
--- die Challenge eines anderen abgreifen.
+-- Bewusst KEINE authenticated-Zugriffe: nur service_role (Admin-Client
+-- aus den API-Routen) darf lesen/schreiben. So kann kein User die
+-- Challenge eines anderen abgreifen. Die 4-Verben-Regel wird mit
+-- explizit-verbotenen Policies dokumentiert.
+drop policy if exists passkey_challenges_select_none on public.user_passkey_challenges;
+create policy passkey_challenges_select_none on public.user_passkey_challenges
+  for select to authenticated using (false);
+
+drop policy if exists passkey_challenges_insert_none on public.user_passkey_challenges;
+create policy passkey_challenges_insert_none on public.user_passkey_challenges
+  for insert to authenticated with check (false);
+
+drop policy if exists passkey_challenges_update_none on public.user_passkey_challenges;
+create policy passkey_challenges_update_none on public.user_passkey_challenges
+  for update to authenticated using (false) with check (false);
+
+drop policy if exists passkey_challenges_delete_none on public.user_passkey_challenges;
+create policy passkey_challenges_delete_none on public.user_passkey_challenges
+  for delete to authenticated using (false);
+
+comment on table public.user_passkey_challenges is
+  'WebAuthn-Nonces, kurzlebig (5 min). Zugriff ausschliesslich via service_role — alle authenticated-Verben bewusst mit using(false) geblockt.';
 
 -- Aufräum-Helfer: alte Challenges löschen (der Server ruft die vor jedem
 -- register/auth einmal auf — kein separater Cron nötig).

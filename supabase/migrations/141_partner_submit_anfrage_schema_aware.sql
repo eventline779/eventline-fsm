@@ -109,9 +109,16 @@ begin
 
   perform set_config('app.partner_status_change_ok', 'off', true);
 
-  -- In-App-Notification an alle aktiven Admins (keine Mail per Leos Wunsch).
+  -- In-App-Notification an alle aktiven Admins bzw. Lead-Rollen mit
+  -- auftraege:see-all-Berechtigung (keine Mail per Leos Wunsch).
+  -- Permission-basierte Auswahl statt hardcoded role='admin' — spiegelt
+  -- die kanonische has_permission()-Logik (Migration 049).
   for v_admin_id in
-    select id from public.profiles where role = 'admin' and is_active = true
+    select p.id
+      from public.profiles p
+      join public.roles r on r.slug = p.role
+     where p.is_active = true
+       and (r.slug = 'admin' or r.permissions ? 'auftraege:see-all')
   loop
     insert into public.notifications (user_id, title, message, link)
     values (

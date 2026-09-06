@@ -24,8 +24,13 @@ create table if not exists public.user_notification_settings (
   quiet_hours_start time not null default '22:00'::time,
   quiet_hours_end time not null default '07:00'::time,
   digest_enabled boolean not null default false,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Idempotenter Nachzug fuer bereits angelegte Tabellen ohne created_at.
+alter table public.user_notification_settings
+  add column if not exists created_at timestamptz not null default now();
 
 -- Updated_at-Trigger
 create or replace function public.user_notification_settings_touch()

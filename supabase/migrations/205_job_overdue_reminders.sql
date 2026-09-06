@@ -32,22 +32,39 @@ CREATE INDEX IF NOT EXISTS job_overdue_reminders_job_idx
   ON public.job_overdue_reminders (job_id);
 
 COMMENT ON TABLE public.job_overdue_reminders IS
-  'Audit-Trail: welche Ueberfaelligkeits-Erinnerung (Notification/Mail) wurde fuer welchen Auftrag wann verschickt.';
+  'Append-Only-Audit-Trail: welche Ueberfaelligkeits-Erinnerung (Notification/Mail) wurde fuer welchen Auftrag wann verschickt. Zeitspalte ist sent_at (kein created_at/updated_at). Schreiben ausschliesslich via Cron/Service-Role — INSERT/UPDATE/DELETE fuer authenticated bewusst verboten.';
 
 ALTER TABLE public.job_overdue_reminders ENABLE ROW LEVEL SECURITY;
 
 -- Nur Admins duerfen den Audit-Trail einsehen. Insert/Update/Delete
--- passiert ausschliesslich vom Cron (Service-Role) — es gibt bewusst
--- KEINE authenticated-Insert-Policy.
+-- passiert ausschliesslich vom Cron (Service-Role) — die 4-Verben-Regel
+-- wird mit explizit-verbotenen Policies dokumentiert.
 DROP POLICY IF EXISTS "job_overdue_reminders_select_admin"
   ON public.job_overdue_reminders;
 CREATE POLICY "job_overdue_reminders_select_admin"
   ON public.job_overdue_reminders
   FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-       WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  USING (public.is_admin());
+
+DROP POLICY IF EXISTS "job_overdue_reminders_insert_none"
+  ON public.job_overdue_reminders;
+CREATE POLICY "job_overdue_reminders_insert_none"
+  ON public.job_overdue_reminders
+  FOR INSERT TO authenticated
+  WITH CHECK (false);
+
+DROP POLICY IF EXISTS "job_overdue_reminders_update_none"
+  ON public.job_overdue_reminders;
+CREATE POLICY "job_overdue_reminders_update_none"
+  ON public.job_overdue_reminders
+  FOR UPDATE TO authenticated
+  USING (false)
+  WITH CHECK (false);
+
+DROP POLICY IF EXISTS "job_overdue_reminders_delete_none"
+  ON public.job_overdue_reminders;
+CREATE POLICY "job_overdue_reminders_delete_none"
+  ON public.job_overdue_reminders
+  FOR DELETE TO authenticated
+  USING (false);
