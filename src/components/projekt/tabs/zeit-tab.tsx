@@ -59,15 +59,31 @@ function StampWidget({
     if (budgetAufgebraucht) return toast.error("Budget aufgebraucht.");
     if (!me) return;
     setBusy(true);
+    // Konsolidierung Migration 212: Projekt-Stempel leben jetzt in
+    // time_entries. Der Doppelstempel-Check muss deshalb ueber ALLE
+    // offenen Eintraege laufen (Auftrag/Projekt/Andere Arbeit); die
+    // DB-Constraint time_entries_one_active_per_user haerte das ab.
     const { data: existing } = await supabase
-      .from("project_time_entries")
-      .select("id")
+      .from("time_entries")
+      .select("id, project_id, job_id")
       .eq("user_id", me)
       .is("clock_out", null)
       .maybeSingle();
-    if (existing) { setBusy(false); toast.error("Du bist bereits auf einem anderen Projekt eingestempelt."); return; }
-    const { error } = await supabase.from("project_time_entries").insert({
-      project_id: projectId, user_id: me, clock_in: new Date().toISOString(), description: note.trim() || null,
+    if (existing) {
+      setBusy(false);
+      const msg = existing.project_id
+        ? "Du bist bereits auf einem anderen Projekt eingestempelt."
+        : existing.job_id
+          ? "Du bist bereits auf einem Auftrag eingestempelt. Stempel dort erst aus."
+          : "Du bist bereits eingestempelt (Andere Arbeit). Stempel erst aus.";
+      toast.error(msg);
+      return;
+    }
+    const { error } = await supabase.from("time_entries").insert({
+      project_id: projectId,
+      user_id: me,
+      clock_in: new Date().toISOString(),
+      description: note.trim() || null,
     });
     setBusy(false);
     if (error) { toast.error("Einstempeln fehlgeschlagen: " + error.message); return; }
@@ -79,7 +95,7 @@ function StampWidget({
   async function stampOut() {
     if (!openEntry) return;
     setBusy(true);
-    const { error } = await supabase.from("project_time_entries").update({
+    const { error } = await supabase.from("time_entries").update({
       clock_out: new Date().toISOString(),
       description: note.trim() || openEntry.description || null,
     }).eq("id", openEntry.id);

@@ -148,11 +148,17 @@ export default function ProjektDetailPage() {
       } as Project);
     }
     const [entriesRes, apptsRes, childrenRes, membersRes, auditRes] = await Promise.all([
+      // Konsolidierung Migration 212: Projekt-Stempel liegen jetzt in
+      // time_entries (Spalte project_id). entry_date + minutes werden nicht
+      // mehr gespeichert, sondern aus clock_in / clock_out abgeleitet
+      // (siehe .map() unten). Damit die Tab-Sub-Components (Overview / Zeit)
+      // unveraendert bleiben, behaelt das TimeEntry-Interface entry_date +
+      // minutes als abgeleitete Felder.
       supabase
-        .from("project_time_entries")
-        .select("id, entry_date, minutes, clock_in, clock_out, description, user_id, created_at, user:profiles!project_time_entries_user_id_fkey(full_name)")
+        .from("time_entries")
+        .select("id, clock_in, clock_out, description, user_id, created_at, user:profiles(full_name)")
         .eq("project_id", projectId)
-        .order("entry_date", { ascending: false })
+        .order("clock_in", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase
         .from("project_appointments")
@@ -176,7 +182,26 @@ export default function ProjektDetailPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: false }),
     ]);
-    setEntries((entriesRes.data ?? []).map((e) => ({ ...e, user: Array.isArray(e.user) ? e.user[0] : e.user })) as TimeEntry[]);
+    // entry_date + minutes hier ableiten: entry_date = lokaler Tag (ZRH)
+    // des clock_in im ISO-Format YYYY-MM-DD (sv-SE liefert genau das);
+    // minutes = ceil((clock_out - clock_in) / 60000). Offene Stempel
+    // (clock_out=null) => minutes=null, damit Consumer wie TimeEntriesCard
+    // "Laeuft ..." rendern statt "0.00 h".
+    const zrhDateFmt = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    setEntries((entriesRes.data ?? []).map((e) => {
+      const user = Array.isArray(e.user) ? e.user[0] : e.user;
+      const clockInMs = e.clock_in ? new Date(e.clock_in).getTime() : null;
+      const clockOutMs = e.clock_out ? new Date(e.clock_out).getTime() : null;
+      const minutes = clockInMs != null && clockOutMs != null
+        ? Math.max(1, Math.ceil((clockOutMs - clockInMs) / 60000))
+        : null;
+      const entry_date = e.clock_in
+        ? zrhDateFmt.format(new Date(e.clock_in))
+        : zrhDateFmt.format(new Date(e.created_at));
+      return { ...e, user, entry_date, minutes };
+    }) as TimeEntry[]);
 
     // Termine + Teilnehmer + Notiz-Count in einem Rutsch.
     const apptsBase = (apptsRes.data ?? []).map((a) => ({

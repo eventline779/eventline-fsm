@@ -31,6 +31,15 @@ export interface Project {
   parent?: { id: string; project_number: number | null; title: string } | null;
 }
 
+/**
+ * TimeEntry — nach Migration 212 aus `time_entries WHERE project_id = <id>`.
+ *
+ * `entry_date` (YYYY-MM-DD, Europe/Zurich) und `minutes` liegen NICHT in der
+ * DB; sie werden im Loader (`projekte/[id]/page.tsx`) aus `clock_in`/`clock_out`
+ * abgeleitet, damit die Tab-Sub-Components (Overview / Zeit) das gewohnte
+ * Row-Shape unveraendert weiterverwenden koennen. Offener Stempel
+ * (`clock_out === null`) => `minutes === null`.
+ */
 export interface TimeEntry {
   id: string;
   entry_date: string;
