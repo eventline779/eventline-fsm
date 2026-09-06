@@ -22,7 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/spinner";
-import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, Send, MoreVertical } from "lucide-react";
+import { Receipt, FileText, Clock, CheckCircle2, FolderArchive, XCircle, Eye, Ban, Info, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import { usePermissions } from "@/lib/use-permissions";
@@ -212,8 +212,6 @@ export default function AbrechnungPage() {
   // Karte wird gescrollt + border-flash animiert.
   const highlightId = searchParams.get("highlight");
   const [flashJobId, setFlashJobId] = useState<string | null>(null);
-  // In-flight-Guard fuer "In Bexio anlegen"-Buttons (pro Job).
-  const [bexioBusyId, setBexioBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -443,46 +441,6 @@ export default function AbrechnungPage() {
 
   const canEdit = useMemo(() => can("abrechnung:edit"), [can]);
 
-  async function createInBexio(job: UnbilledJob) {
-    setBexioBusyId(job.id);
-    // try/finally garantiert, dass bexioBusyId auch bei Netzwerkfehler
-    // resetted wird — sonst bleibt der Spinner-Button ewig „Legt an…".
-    try {
-      const res = await fetch(`/api/bexio/create-invoice`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: job.id }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | { success: boolean; error?: string; bexio_id?: number; bexio_url?: string; preview?: { billable_hours?: number; customer_name?: string | null } }
-        | null;
-      if (!res.ok || !json?.success) {
-        // 501 = Bexio-Setup fehlt / Erstellung noch nicht produktiv. Wir
-        // zeigen dem User die Server-Meldung + ggf. den berechneten Vorschlag
-        // damit klar ist warum's noch nicht klappt.
-        const msg = json?.error ?? "Rechnung konnte nicht in Bexio angelegt werden";
-        const preview = json?.preview;
-        toast.error(msg, {
-          description: preview?.billable_hours != null
-            ? `Vorschlag: ${preview.billable_hours}h${preview.customer_name ? ` für ${preview.customer_name}` : ""}.`
-            : undefined,
-          duration: 8000,
-        });
-        return;
-      }
-      toast.success("Rechnung in Bexio angelegt", {
-        action: json.bexio_url
-          ? { label: "Öffnen", onClick: () => window.open(json.bexio_url, "_blank", "noopener,noreferrer") }
-          : undefined,
-      });
-      load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Netzwerkfehler beim Bexio-Aufruf");
-    } finally {
-      setBexioBusyId(null);
-    }
-  }
-
   if (!ready) return null;
 
   const modalKind = modal?.kind ?? null;
@@ -567,8 +525,6 @@ export default function AbrechnungPage() {
                     job={job}
                     onMarkBilled={() => openJobModal(job)}
                     onSkip={() => openJobSkipModal(job)}
-                    onCreateInBexio={() => createInBexio(job)}
-                    bexioBusy={bexioBusyId === job.id}
                     canEdit={canEdit}
                     onPreview={setPreviewDoc}
                     namesById={namesById}
@@ -771,8 +727,6 @@ interface JobCardProps {
   job: UnbilledJob;
   onMarkBilled: () => void;
   onSkip: () => void;
-  onCreateInBexio: () => void;
-  bexioBusy: boolean;
   canEdit: boolean;
   onPreview: (doc: { url: string; title: string }) => void;
   namesById: Map<string, string>;
@@ -780,7 +734,7 @@ interface JobCardProps {
   flash: boolean;
 }
 
-function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdit, onPreview, namesById, flash }: JobCardProps) {
+function JobCard({ job, onMarkBilled, onSkip, canEdit, onPreview, namesById, flash }: JobCardProps) {
   const report = job.service_reports[0] ?? null;
   const stempelByUser = aggregatePerUser(job.time_entries);
   const { billable: rapportByUser, notBillable: notBillableByUser, notBillableReasons } = aggregateReportPerUser(job.service_reports);
@@ -832,16 +786,13 @@ function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdi
           <MetaLine items={[job.customer?.name, dateRange, job.location?.name]} />
         </div>
         {canEdit && (
-          // Visuelle Grammatik (Audit Thema 5, Regel 1): EINE Primaer-
-          // Aktion pro Card. "In Bexio anlegen" ist der Happy-Path
-          // (blau/primary), "Rechnung gestellt" bleibt als sekundaere
-          // manuelle Alternative (muted). Skip liegt im Overflow-Menu
-          // damit die Karte visuell ruhig bleibt.
+          // Visuelle Grammatik: "Rechnung gestellt" ist die einzige positive
+          // Aktion (Rechnungen werden manuell in Bexio erstellt und hier nur
+          // als abgerechnet markiert). Skip liegt im Overflow-Menu damit die
+          // Karte visuell ruhig bleibt.
           <JobCardActions
             onSkip={onSkip}
-            onCreateInBexio={onCreateInBexio}
             onMarkBilled={onMarkBilled}
-            bexioBusy={bexioBusy}
           />
         )}
       </div>
@@ -980,19 +931,15 @@ function JobCard({ job, onMarkBilled, onSkip, onCreateInBexio, bexioBusy, canEdi
 }
 
 /** JobCardActions — Rechte Header-Aktionen der JobCard.
- *  Primaerer Happy-Path: "In Bexio anlegen" (kasten-blue).
- *  Sekundaer: "Rechnung gestellt" (kasten-muted, manuell).
+ *  Primaer: "Rechnung gestellt" — Rechnungen werden manuell in Bexio erstellt,
+ *  hier nur als abgerechnet markiert (Nummer aus Bexio zurueckschreiben).
  *  Destruktiv/negativ: "Keine Rechnung stellen" im Overflow-Menu. */
 function JobCardActions({
   onSkip,
-  onCreateInBexio,
   onMarkBilled,
-  bexioBusy,
 }: {
   onSkip: () => void;
-  onCreateInBexio: () => void;
   onMarkBilled: () => void;
-  bexioBusy: boolean;
 }) {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement | null>(null);
@@ -1017,25 +964,11 @@ function JobCardActions({
       <button
         type="button"
         onClick={onMarkBilled}
-        className="kasten kasten-muted"
-        data-tooltip="Rechnung wurde ausserhalb Bexio gestellt — nur als abgerechnet markieren"
+        className="kasten kasten-green"
+        data-tooltip="Rechnung in Bexio erstellt — hier Nummer hinterlegen"
       >
         <Receipt className="h-3.5 w-3.5" />
         Rechnung gestellt
-      </button>
-      <button
-        type="button"
-        onClick={onCreateInBexio}
-        disabled={bexioBusy}
-        className="kasten kasten-blue"
-        data-tooltip="Rechnung direkt in Bexio anlegen (falls verbunden)"
-      >
-        {bexioBusy ? (
-          <span className="h-3.5 w-3.5 inline-block border-2 border-current border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <Send className="h-3.5 w-3.5" />
-        )}
-        {bexioBusy ? "Legt an…" : "In Bexio anlegen"}
       </button>
       <div className="relative" ref={overflowRef}>
         <button
