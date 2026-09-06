@@ -952,6 +952,7 @@ export function StempelzeitenView() {
               disabled={exporting}
               className="kasten kasten-muted"
               data-tooltip="Sichtbare Stempelzeiten als Excel herunterladen"
+              data-tooltip-align="end"
             >
               <Download className="h-3.5 w-3.5" />
               {exporting ? "Wird exportiert…" : "Excel"}
@@ -963,6 +964,7 @@ export function StempelzeitenView() {
               onClick={() => openCorrect(null)}
               className="kasten kasten-green"
               data-tooltip="Stempel-Änderung anfragen"
+              data-tooltip-align="end"
             >
               <Clock className="h-3.5 w-3.5" />
               Stempel-Änderung
