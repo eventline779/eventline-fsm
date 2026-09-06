@@ -33,6 +33,13 @@ export const TRUSTED_DEVICE_COOKIE = "eventline_trusted_device";
  *  und behandelt die Session als normal. */
 export const IMPERSONATE_COOKIE = "eventline_impersonate_user_id";
 
+/** Zusaetzliches Write-Cookie. Nur wenn dieses Cookie explizit auf "1"
+ *  steht, sind Schreibvorgaenge waehrend Impersonation erlaubt. Default
+ *  (Cookie nicht gesetzt oder != "1") = read-only. So kann der Admin
+ *  sicher hospitieren ohne versehentlich Daten des Users zu veraendern —
+ *  und muss den Write-Modus bewusst einschalten (mit Confirm im Overlay). */
+export const IMPERSONATE_WRITE_COOKIE = "eventline_impersonate_write";
+
 /** SHA-256-Hash eines Tokens — Server vergleicht damit gegen die DB. Wir
  *  speichern niemals raw Tokens (nur Hashes), damit ein DB-Leak nicht
  *  alle Geraete kompromittiert. */

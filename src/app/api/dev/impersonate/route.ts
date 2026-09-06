@@ -15,7 +15,7 @@
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { requireUser, IMPERSONATE_COOKIE } from "@/lib/api-auth";
+import { requireUser, IMPERSONATE_COOKIE, IMPERSONATE_WRITE_COOKIE } from "@/lib/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -57,10 +57,12 @@ export async function GET() {
     .select("id, full_name, role")
     .eq("id", targetId)
     .maybeSingle();
+  const writeEnabled = store.get(IMPERSONATE_WRITE_COOKIE)?.value === "1";
   return NextResponse.json({
     active: true,
     target_user_id: targetId,
     target,
+    write_enabled: writeEnabled,
   });
 }
 
@@ -102,11 +104,15 @@ export async function POST(request: Request) {
     path: "/",
     // Session-Cookie (kein maxAge) — nur solange Browser offen.
   });
+  // Bei jedem Wechsel/Start: Write-Modus zuruecksetzen. Der Admin muss
+  // pro Ziel-User bewusst neu 'Bearbeitung aktivieren' bestaetigen.
+  store.delete(IMPERSONATE_WRITE_COOKIE);
   return NextResponse.json({ success: true, target });
 }
 
 export async function DELETE() {
   const store = await cookies();
   store.delete(IMPERSONATE_COOKIE);
+  store.delete(IMPERSONATE_WRITE_COOKIE);
   return NextResponse.json({ success: true });
 }

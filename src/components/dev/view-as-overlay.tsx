@@ -24,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, ChevronDown, LogOut, Loader2, Search, Power } from "lucide-react";
+import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Candidate {
@@ -36,6 +36,7 @@ interface CurrentState {
   active: boolean;
   target_user_id?: string;
   target?: { id: string; full_name: string; role: string } | null;
+  write_enabled?: boolean;
 }
 
 export function ViewAsOverlay() {
@@ -168,6 +169,37 @@ export function ViewAsOverlay() {
     }
   }
 
+  /** Write-Modus fuer die aktive Impersonation ein-/ausschalten. Beim
+   *  Einschalten wird eine Bestaetigung verlangt — Aenderungen landen dann
+   *  echt in den Daten des impersonierten Users. */
+  async function toggleWriteMode(next: boolean) {
+    if (next) {
+      const name = current?.target?.full_name ?? "diesen User";
+      // Simpler window.confirm — schneller Weg zum expliziten OK. Kein
+      // eigenes Modal noetig fuer diesen einen sicherheitsrelevanten Klick.
+      const ok = window.confirm(
+        `Bearbeitung aktivieren?\n\nDu machst dann echte Änderungen im Namen von ${name}. Alle Aktionen werden in der DB gespeichert und sind nicht rückgängig zu machen.`,
+      );
+      if (!ok) return;
+    }
+    setLoading(true);
+    try {
+      const r = await fetch("/api/dev/impersonate/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const json = (await r.json()) as { success?: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? "Fehler");
+      setCurrent((c) => (c ? { ...c, write_enabled: next } : c));
+      toast.success(next ? "Bearbeitung aktiviert" : "Nur-Lesen-Modus");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Fehler");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /** Developer Mode komplett ausschalten — auch von hier aus, damit der
    *  Admin nicht zurueck in die Team-Einstellungen navigieren muss. Server
    *  loescht dabei auch das Impersonation-Cookie (siehe /api/dev/toggle).
@@ -214,16 +246,21 @@ export function ViewAsOverlay() {
           <div
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider shadow-sm"
             style={{
-              background: "color-mix(in oklab, var(--card) 92%, var(--accent))",
-              color: "var(--accent)",
-              border: "1px solid color-mix(in oklab, var(--accent) 45%, transparent)",
+              background: current!.write_enabled
+                ? "color-mix(in oklab, var(--card) 88%, #dc2626)"
+                : "color-mix(in oklab, var(--card) 92%, var(--accent))",
+              color: current!.write_enabled ? "#dc2626" : "var(--accent)",
+              border: `1px solid ${current!.write_enabled
+                ? "color-mix(in oklab, #dc2626 55%, transparent)"
+                : "color-mix(in oklab, var(--accent) 45%, transparent)"}`,
               backdropFilter: "blur(6px)",
             }}
           >
-            <Eye className="h-3 w-3" />
+            {current!.write_enabled ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
             <span>
               als {current!.target!.full_name}
               {current!.target!.role === "partner" ? " · Partner" : ""}
+              {current!.write_enabled ? " · Bearbeitung" : " · nur lesen"}
             </span>
           </div>
         </div>
@@ -281,35 +318,69 @@ export function ViewAsOverlay() {
             {/* Current-Status */}
             {active ? (
               <div
-                className="px-3 py-2.5 border-b flex items-center gap-2"
+                className="border-b"
                 style={{ borderColor: "var(--border)" }}
               >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Aktuell simuliert
-                  </p>
-                  <p className="text-sm font-medium truncate">
-                    {current!.target!.full_name}
-                    <span className="text-muted-foreground font-normal ml-1.5">
-                      · {current!.target!.role}
-                    </span>
-                  </p>
+                <div className="px-3 pt-2.5 pb-2 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Aktuell simuliert
+                    </p>
+                    <p className="text-sm font-medium truncate">
+                      {current!.target!.full_name}
+                      <span className="text-muted-foreground font-normal ml-1.5">
+                        · {current!.target!.role}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={stopImpersonation}
+                    disabled={loading}
+                    className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition-colors"
+                    style={{
+                      borderColor: "var(--border)",
+                      color: "var(--foreground)",
+                      background: "transparent",
+                      cursor: loading ? "wait" : "pointer",
+                    }}
+                  >
+                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
+                    Beenden
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={stopImpersonation}
-                  disabled={loading}
-                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition-colors"
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                    background: "transparent",
-                    cursor: loading ? "wait" : "pointer",
-                  }}
-                >
-                  {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
-                  Beenden
-                </button>
+                {/* Read-Only vs Bearbeitung — expliziter Toggle. Default:
+                    read-only. Enable braucht Confirm. */}
+                <div className="px-3 pb-2.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleWriteMode(!current!.write_enabled)}
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition-colors"
+                    style={{
+                      borderColor: current!.write_enabled
+                        ? "color-mix(in oklab, #dc2626 55%, transparent)"
+                        : "var(--border)",
+                      background: current!.write_enabled
+                        ? "color-mix(in oklab, #dc2626 10%, transparent)"
+                        : "color-mix(in oklab, var(--foreground) 3%, transparent)",
+                      color: current!.write_enabled ? "#dc2626" : "var(--foreground)",
+                      cursor: loading ? "wait" : "pointer",
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {current!.write_enabled ? (
+                        <Pencil className="h-3 w-3" />
+                      ) : (
+                        <Lock className="h-3 w-3" />
+                      )}
+                      {current!.write_enabled ? "Bearbeitung aktiv" : "Nur Lesen"}
+                    </span>
+                    <span className="text-[10px] opacity-75">
+                      {current!.write_enabled ? "sperren" : "aktivieren"}
+                    </span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div
@@ -380,8 +451,18 @@ export function ViewAsOverlay() {
                 type="button"
                 onClick={disableDevMode}
                 disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground rounded-md transition-colors"
-                style={{ cursor: loading ? "wait" : "pointer" }}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium rounded-md transition-colors"
+                style={{
+                  color: "#dc2626",
+                  background: "transparent",
+                  cursor: loading ? "wait" : "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "color-mix(in oklab, #dc2626 10%, transparent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
                 {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Power className="h-3 w-3" />}
                 Developer Mode ausschalten
