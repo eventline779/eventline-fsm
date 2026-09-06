@@ -92,12 +92,15 @@ export async function GET() {
       appointmentsRes,
       absencesRes,
     ] = await Promise.all([
-      // Aktive Techniker fuer die Ampel.
+      // Aktive interne MA fuer die Ampel — Partner sind extern (eigenes
+      // Portal, kein HR-Handling), deshalb ausgeschlossen. Alle anderen
+      // Rollen (Admin/Team-Leiter/Techniker/Projekt-Leiter/Vertrieb) sind
+      // "intern" und gehoeren in die HR-Sicht.
       admin
         .from("profiles")
         .select("id, full_name")
         .eq("is_active", true)
-        .eq("role", "techniker")
+        .neq("role", "partner")
         .order("full_name", { ascending: true }),
       // Ferienantraege — noch nicht entschieden.
       admin
