@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ success: false, error: "Zu viele Dokumente" }, { status: 400 });
   }
   if (!body.docs.every(isValidDoc)) {
-    return NextResponse.json({ success: false, error: "Ungueltiges Doc-Schema" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültiges Doc-Schema" }, { status: 400 });
   }
 
   const supabase = createAdminClient();

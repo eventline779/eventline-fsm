@@ -32,7 +32,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .maybeSingle();
   if (reportErr) return NextResponse.json({ success: false, error: reportErr.message }, { status: 500 });
   if (!report) {
-    return NextResponse.json({ success: false, error: "Kein abgeschlossener Rapport vom User fuer diesen Auftrag" }, { status: 403 });
+    return NextResponse.json({ success: false, error: "Kein abgeschlossener Rapport vom User für diesen Auftrag" }, { status: 403 });
   }
 
   // Job auf abgeschlossen setzen (idempotent — wenn schon abgeschlossen,

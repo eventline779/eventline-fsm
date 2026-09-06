@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Bexio-Integration ist nicht konfiguriert. BEXIO_CLIENT_ID und BEXIO_REDIRECT_URI muessen in den Vercel-Environment-Variables gesetzt sein.",
+        error: "Bexio-Integration ist nicht konfiguriert. BEXIO_CLIENT_ID und BEXIO_REDIRECT_URI müssen in den Vercel-Environment-Variables gesetzt sein.",
       },
       { status: 500 },
     );

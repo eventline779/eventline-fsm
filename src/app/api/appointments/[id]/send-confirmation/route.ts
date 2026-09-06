@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const customMessage = body.custom_message ? String(body.custom_message).trim() : null;
 
   if (!EMAIL_RE.test(customerEmail)) {
-    return NextResponse.json({ success: false, error: "Ungueltige Email-Adresse" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültige Email-Adresse" }, { status: 400 });
   }
 
   // RLS-User-Client fuer den Termin-Read — wer ihn nicht sehen darf,

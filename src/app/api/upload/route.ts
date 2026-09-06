@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       } else if (/payload|too large|size/i.test(msg)) {
         userMsg = "Datei zu gross";
       } else if (/forbidden|permission|denied/i.test(msg)) {
-        userMsg = "Keine Berechtigung fuer diesen Pfad";
+        userMsg = "Keine Berechtigung für diesen Pfad";
       }
       return NextResponse.json({ success: false, error: userMsg }, { status: 500 });
     }

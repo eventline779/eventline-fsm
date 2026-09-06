@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   // Mitarbeiter sein — sonst kann man ueber die Route beliebige Fremd-Adressen
   // (fruehere Ex-Mitarbeiter, ausgeschiedene Profile) anschreiben.
   if (typeof assignedTo !== "string" || !/^[0-9a-f-]{36}$/i.test(assignedTo)) {
-    return NextResponse.json({ success: false, error: "Ungueltiger Empfaenger" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültiger Empfänger" }, { status: 400 });
   }
 
   const resendKey = process.env.RESEND_API_KEY;

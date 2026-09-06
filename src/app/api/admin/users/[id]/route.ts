@@ -29,7 +29,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   // Selbstschutz: Admin darf sich nicht selbst aussperren oder degradieren.
   // Ohne diesen Check kann der einzige Admin sich auf is_active=false setzen
@@ -102,7 +102,7 @@ export async function PATCH(
   }
 
   if (Object.keys(update).length === 0 && !Array.isArray(body.team_members)) {
-    return NextResponse.json({ success: false, error: "Keine Aenderungen" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Keine Änderungen" }, { status: 400 });
   }
 
   // team_members (optional): Vollstaendige Liste der MA-UUIDs die diesem
@@ -123,7 +123,7 @@ export async function PATCH(
     const dedup = Array.from(new Set(raw));
     if (dedup.includes(id)) {
       return NextResponse.json(
-        { success: false, error: "Ein Teamleiter kann sich nicht selbst als Team-Mitglied waehlen" },
+        { success: false, error: "Ein Teamleiter kann sich nicht selbst als Team-Mitglied wählen" },
         { status: 400 },
       );
     }
@@ -290,7 +290,7 @@ export async function DELETE(
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json(
-      { success: false, error: "Server-Konfiguration unvollstaendig" },
+      { success: false, error: "Server-Konfiguration unvollständig" },
       { status: 500 },
     );
   }
@@ -300,7 +300,7 @@ export async function DELETE(
   // Selbstschutz: Admin darf sich nicht selbst loeschen.
   if (auth.user.id === id) {
     return NextResponse.json(
-      { success: false, error: "Du kannst dich nicht selbst loeschen" },
+      { success: false, error: "Du kannst dich nicht selbst löschen" },
       { status: 400 },
     );
   }
@@ -324,7 +324,7 @@ export async function DELETE(
   // damit der Admin auch verwaiste Auth-User beseitigen kann.
   if (profile && profile.is_active) {
     return NextResponse.json(
-      { success: false, error: "Nur deaktivierte Benutzer koennen geloescht werden" },
+      { success: false, error: "Nur deaktivierte Benutzer können gelöscht werden" },
       { status: 400 },
     );
   }
@@ -371,7 +371,7 @@ export async function DELETE(
     const body = await authRes.text().catch(() => "");
     logError("admin.users.delete.auth", { status: authRes.status, body }, { userId: id });
     return NextResponse.json(
-      { success: false, error: `Auth-Loeschung fehlgeschlagen: ${body || authRes.status}` },
+      { success: false, error: `Auth-Löschung fehlgeschlagen: ${body || authRes.status}` },
       { status: 500 },
     );
   }

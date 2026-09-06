@@ -115,7 +115,7 @@ export async function DELETE(
 
   if (error) {
     logError("api.auftraege.customer-contacted.delete", error, { userId: auth.user.id, jobId: id });
-    return NextResponse.json({ success: false, error: "Rueckgaengig fehlgeschlagen" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Rückgängig fehlgeschlagen" }, { status: 500 });
   }
 
   return NextResponse.json({

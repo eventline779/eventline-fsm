@@ -26,7 +26,7 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   const update: Record<string, unknown> = {};
   if (typeof body.label === "string" && body.label.trim()) {
@@ -44,7 +44,7 @@ export async function PATCH(
   // zusaetzlicher PERMISSIVE-Zweig ausgewertet.
   if (typeof body.scope === "string") {
     if (body.scope !== "self" && body.scope !== "team" && body.scope !== "all") {
-      return NextResponse.json({ success: false, error: "scope ungueltig (self/team/all)" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "scope ungültig (self/team/all)" }, { status: 400 });
     }
     update.scope = body.scope;
   }
@@ -66,11 +66,11 @@ export async function PATCH(
         : [];
       update.dashboard_widgets = { order, hidden };
     } else {
-      return NextResponse.json({ success: false, error: "dashboard_widgets ungueltig" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "dashboard_widgets ungültig" }, { status: 400 });
     }
   }
   if (Object.keys(update).length === 0) {
-    return NextResponse.json({ success: false, error: "Keine Aenderungen" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Keine Änderungen" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -105,7 +105,7 @@ export async function DELETE(
   // System-Rollen sind nicht loeschbar.
   const { data: role } = await admin.from("roles").select("is_system").eq("slug", slug).single();
   if (role?.is_system) {
-    return NextResponse.json({ success: false, error: "System-Rolle kann nicht geloescht werden" }, { status: 403 });
+    return NextResponse.json({ success: false, error: "System-Rolle kann nicht gelöscht werden" }, { status: 403 });
   }
 
   // User-Check: wenn noch User auf der Rolle haengen, abbrechen.

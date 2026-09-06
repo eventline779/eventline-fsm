@@ -84,14 +84,14 @@ export async function POST(req: Request) {
   const headBytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
   const magic = String.fromCharCode(...headBytes);
   if (magic !== "%PDF-") {
-    return NextResponse.json({ success: false, error: "Datei ist keine gueltige PDF" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Datei ist keine gültige PDF" }, { status: 400 });
   }
   if (!profileId) return NextResponse.json({ success: false, error: "profile_id fehlt" }, { status: 400 });
-  if (!["lohnabrechnung", "lohnausweis"].includes(docType)) return NextResponse.json({ success: false, error: "doc_type ungueltig" }, { status: 400 });
-  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungueltig" }, { status: 400 });
+  if (!["lohnabrechnung", "lohnausweis"].includes(docType)) return NextResponse.json({ success: false, error: "doc_type ungültig" }, { status: 400 });
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungültig" }, { status: 400 });
   if (docType === "lohnabrechnung") {
     if (!Number.isInteger(month) || (month as number) < 1 || (month as number) > 12) {
-      return NextResponse.json({ success: false, error: "period_month (1-12) fehlt fuer Lohnabrechnung" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "period_month (1-12) fehlt für Lohnabrechnung" }, { status: 400 });
     }
   } else if (month != null) {
     return NextResponse.json({ success: false, error: "Lohnausweis darf keinen Monat haben" }, { status: 400 });

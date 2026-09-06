@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const invalid = send_to_emails.filter((e: unknown) => typeof e !== "string" || !emailRegex.test(e));
     if (invalid.length > 0) {
-      return NextResponse.json({ success: false, error: "Ungueltige Email-Adresse(n)" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Ungültige Email-Adresse(n)" }, { status: 400 });
     }
     for (const email of send_to_emails) {
       try {

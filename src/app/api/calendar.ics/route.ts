@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (!profile || !profile.is_active) {
-      return new NextResponse("Token ungueltig", { status: 401 });
+      return new NextResponse("Token ungültig", { status: 401 });
     }
 
     // Rollen-Permissions laden — statt hardcoded role === 'admin' pruefen

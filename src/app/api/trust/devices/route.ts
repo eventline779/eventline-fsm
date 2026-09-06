@@ -64,11 +64,11 @@ export async function POST(request: NextRequest) {
   if (auth.error) return auth.error;
 
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   const device_name = typeof body.device_name === "string" ? body.device_name.trim() : "";
-  if (!device_name) return NextResponse.json({ success: false, error: "Geraete-Name fehlt" }, { status: 400 });
-  if (device_name.length > 60) return NextResponse.json({ success: false, error: "Geraete-Name max. 60 Zeichen" }, { status: 400 });
+  if (!device_name) return NextResponse.json({ success: false, error: "Geräte-Name fehlt" }, { status: 400 });
+  if (device_name.length > 60) return NextResponse.json({ success: false, error: "Geräte-Name max. 60 Zeichen" }, { status: 400 });
 
   // 256-Bit Random Tokens — Cookie + Confirm-Link.
   const cookieToken = randomBytes(32).toString("base64url");
@@ -155,28 +155,28 @@ export async function POST(request: NextRequest) {
       await resend.emails.send({
         from: "EVENTLINE <noreply@eventline-basel.com>",
         to: APPROVAL_EMAIL_RECIPIENT,
-        subject: `[EVENTLINE] Neues vertrautes Geraet: ${device_name}`,
+        subject: `[EVENTLINE] Neues vertrautes Gerät: ${device_name}`,
         html: `
           <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
-            <h2 style="margin:0 0 16px;font-size:18px">Neues vertrautes Geraet anfragen</h2>
+            <h2 style="margin:0 0 16px;font-size:18px">Neues vertrautes Gerät anfragen</h2>
             <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#444">
-              <strong>${escapeHtml(userLabel)}</strong> hat angefragt, ein neues Geraet als vertraut zu markieren.
-              Erst nach Bestaetigung dieses Links kann das Geraet auf Finanzen + Loehne zugreifen.
+              <strong>${escapeHtml(userLabel)}</strong> hat angefragt, ein neues Gerät als vertraut zu markieren.
+              Erst nach Bestätigung dieses Links kann das Gerät auf Finanzen + Löhne zugreifen.
             </p>
             <table style="border-collapse:collapse;margin:16px 0;font-size:13px;color:#444">
-              <tr><td style="padding:4px 12px 4px 0;color:#888">Geraete-Name</td><td><strong>${escapeHtml(device_name)}</strong></td></tr>
+              <tr><td style="padding:4px 12px 4px 0;color:#888">Geräte-Name</td><td><strong>${escapeHtml(device_name)}</strong></td></tr>
               <tr><td style="padding:4px 12px 4px 0;color:#888">Browser/OS</td><td>${escapeHtml(userAgentHint ?? "—")}</td></tr>
               <tr><td style="padding:4px 12px 4px 0;color:#888">IP</td><td>${escapeHtml(ipHint ?? "—")}</td></tr>
               <tr><td style="padding:4px 12px 4px 0;color:#888">Zeitpunkt</td><td>${new Date().toLocaleString("de-CH", { timeZone: "Europe/Zurich" })}</td></tr>
             </table>
             <p style="margin:24px 0">
               <a href="${confirmUrl}" style="display:inline-block;padding:10px 18px;background:#10b981;color:white;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500">
-                Geraet bestaetigen
+                Gerät bestätigen
               </a>
             </p>
             <p style="margin:0;font-size:12px;color:#888;line-height:1.5">
-              Wenn diese Anfrage NICHT von ${escapeHtml(userLabel)} kommt: einfach diese Mail ignorieren — das Geraet bleibt blockiert
-              und der Zugriff auf Finanzen/Loehne ist verweigert.
+              Wenn diese Anfrage NICHT von ${escapeHtml(userLabel)} kommt: einfach diese Mail ignorieren — das Gerät bleibt blockiert
+              und der Zugriff auf Finanzen/Löhne ist verweigert.
             </p>
           </div>
         `,

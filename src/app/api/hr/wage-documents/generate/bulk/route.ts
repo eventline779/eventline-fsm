@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   const overwriteManual = body.overwrite_manual === true;
   if (profileIds.length === 0) return NextResponse.json({ success: false, error: "profile_ids leer" }, { status: 400 });
   if (profileIds.length > 100) return NextResponse.json({ success: false, error: "Max 100 Mitarbeiter pro Bulk-Request" }, { status: 400 });
-  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungueltig" }, { status: 400 });
-  if (!Number.isInteger(month) || month < 1 || month > 12) return NextResponse.json({ success: false, error: "month ungueltig" }, { status: 400 });
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungültig" }, { status: 400 });
+  if (!Number.isInteger(month) || month < 1 || month > 12) return NextResponse.json({ success: false, error: "month ungültig" }, { status: 400 });
 
   // Sequentiell rufen — jspdf-Generation ist schon CPU-intensiv,
   // parallel waere fuer den Node-Worker zu viel.

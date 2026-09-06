@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) {
-    return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
   }
 
   const effective_from = coerceDate(body.effective_from);
@@ -169,20 +169,20 @@ export async function PATCH(request: Request) {
     if (!(col in body)) continue;
     const v = coerceNum(body[col]);
     if (v == null || v < 0 || v > 100) {
-      return NextResponse.json({ success: false, error: `${col} ungueltig (0-100)` }, { status: 400 });
+      return NextResponse.json({ success: false, error: `${col} ungültig (0-100)` }, { status: 400 });
     }
     patch[col] = v;
   }
   if ("bvg_threshold_chf" in body) {
     const bvg = coerceNum(body.bvg_threshold_chf);
     if (bvg == null || bvg < 0) {
-      return NextResponse.json({ success: false, error: "bvg_threshold_chf ungueltig" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "bvg_threshold_chf ungültig" }, { status: 400 });
     }
     patch.bvg_threshold_chf = bvg;
   }
   if ("effective_from" in body) {
     const ef = coerceDate(body.effective_from);
-    if (!ef) return NextResponse.json({ success: false, error: "effective_from ungueltig" }, { status: 400 });
+    if (!ef) return NextResponse.json({ success: false, error: "effective_from ungültig" }, { status: 400 });
     patch.effective_from = ef;
   }
   if ("notes" in body) {
@@ -234,7 +234,7 @@ export async function DELETE(request: Request) {
   if (row.effective_from <= today) {
     return NextResponse.json({
       success: false,
-      error: "Nur zukuenftige/geplante Eintraege koennen geloescht werden — historische Werte bleiben fuer die Nachvollziehbarkeit der Lohnabrechnungen erhalten.",
+      error: "Nur zukünftige/geplante Einträge können gelöscht werden — historische Werte bleiben für die Nachvollziehbarkeit der Lohnabrechnungen erhalten.",
     }, { status: 400 });
   }
 
@@ -244,7 +244,7 @@ export async function DELETE(request: Request) {
     .from("payroll_defaults")
     .select("id", { count: "exact", head: true });
   if ((count ?? 0) <= 1) {
-    return NextResponse.json({ success: false, error: "Der letzte Eintrag kann nicht geloescht werden." }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Der letzte Eintrag kann nicht gelöscht werden." }, { status: 400 });
   }
 
   const { error: delErr } = await admin.from("payroll_defaults").delete().eq("id", id);

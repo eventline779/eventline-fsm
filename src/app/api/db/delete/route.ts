@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const { table, id } = body as { table?: string; id?: string };
   if (!table || !id || !ALLOWED_TABLES.has(table)) {
     return NextResponse.json(
-      { ok: false, error: "Tabelle oder ID ungueltig" },
+      { ok: false, error: "Tabelle oder ID ungültig" },
       { status: 400 },
     );
   }

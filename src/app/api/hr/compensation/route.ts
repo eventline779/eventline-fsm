@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
 
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   const toNum = (v: unknown): number | null => {
     if (v == null) return null;
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   // Zahl = expliziter Override.
   const ferienanteil_pct_override: number | null = toNum(body.ferienanteil_pct_override);
   if (ferienanteil_pct_override != null && (ferienanteil_pct_override < 0 || ferienanteil_pct_override > 100)) {
-    return NextResponse.json({ success: false, error: "Ferienanteil ungueltig" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ferienanteil ungültig" }, { status: 400 });
   }
 
   if (!profile_id) return NextResponse.json({ success: false, error: "profile_id fehlt" }, { status: 400 });
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
   // ist forciert auf 0 und wir ueberspringen die Range-Checks.
   if (!wage_exempt) {
     if (hourly_wage_chf === null || hourly_wage_chf < 0) {
-      return NextResponse.json({ success: false, error: "hourly_wage_chf ungueltig" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "hourly_wage_chf ungültig" }, { status: 400 });
     }
     if (hourly_wage_chf > 9999.99) {
       return NextResponse.json({ success: false, error: "Stundenlohn unrealistisch (> 9999 CHF/h)" }, { status: 400 });
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
   for (const col of PCT_COLUMNS) {
     const v = toNum((body as Record<string, unknown>)[col]);
     if (v != null && (v < 0 || v > 100)) {
-      pctError = `${col} ungueltig (erwartet 0-100)`;
+      pctError = `${col} ungültig (erwartet 0-100)`;
       break;
     }
     pctValues[col] = v;

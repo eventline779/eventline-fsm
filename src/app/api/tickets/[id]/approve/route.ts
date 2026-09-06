@@ -63,7 +63,7 @@ export async function POST(
   }
   if (existing.type !== "stempel_aenderung") {
     return NextResponse.json(
-      { success: false, error: "Auto-Approve nur fuer Stempeltickets" },
+      { success: false, error: "Auto-Approve nur für Stempeltickets" },
       { status: 400 },
     );
   }

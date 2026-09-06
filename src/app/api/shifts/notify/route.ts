@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const { profile_id, shift_title, shift_date, start_time, end_time } = body;
 
   if (!profile_id || typeof profile_id !== "string" || !/^[0-9a-f-]{36}$/i.test(profile_id)) {
-    return NextResponse.json({ error: "Kein/ungueltiger Mitarbeiter angegeben" }, { status: 400 });
+    return NextResponse.json({ error: "Kein/ungültiger Mitarbeiter angegeben" }, { status: 400 });
   }
 
   const supabase = createAdminClient();

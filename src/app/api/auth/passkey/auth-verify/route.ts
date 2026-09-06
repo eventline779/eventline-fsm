@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     expectedChallenge = clientData.challenge;
   } catch {
     return NextResponse.json(
-      { success: false, error: "Ungueltige clientDataJSON." },
+      { success: false, error: "Ungültige clientDataJSON." },
       { status: 400 },
     );
   }

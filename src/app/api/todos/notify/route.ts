@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const todoId = typeof body?.todo_id === "string" ? body.todo_id : null;
 
   if (!todoId || !/^[0-9a-f-]{36}$/i.test(todoId)) {
-    return NextResponse.json({ success: false, error: "todo_id fehlt oder ungueltig" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "todo_id fehlt oder ungültig" }, { status: 400 });
   }
 
   // Todo per User-Client laden — RLS entscheidet, ob der User diesen Todo

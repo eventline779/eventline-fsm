@@ -63,8 +63,8 @@ export async function POST(req: Request) {
   const month = Number(body.month);
   const overwriteManual = body.overwrite_manual === true;
   if (!profileId) return NextResponse.json({ success: false, error: "profile_id fehlt" }, { status: 400 });
-  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungueltig" }, { status: 400 });
-  if (!Number.isInteger(month) || month < 1 || month > 12) return NextResponse.json({ success: false, error: "month ungueltig" }, { status: 400 });
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return NextResponse.json({ success: false, error: "year ungültig" }, { status: 400 });
+  if (!Number.isInteger(month) || month < 1 || month > 12) return NextResponse.json({ success: false, error: "month ungültig" }, { status: 400 });
 
   const admin = createAdminClient();
 
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  if (!comp) return NextResponse.json({ success: false, error: "Kein Lohn fuer diesen Monat hinterlegt" }, { status: 400 });
+  if (!comp) return NextResponse.json({ success: false, error: "Kein Lohn für diesen Monat hinterlegt" }, { status: 400 });
 
   // Existierende Row pruefen — wenn manuelle Upload existiert, ohne
   // overwrite_manual-Flag abbrechen (verhindert Datenverlust bei
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
   if (existingDoc?.source === "manual" && !overwriteManual) {
     return NextResponse.json({
       success: false,
-      error: "Es existiert bereits eine manuell hochgeladene Lohnabrechnung fuer diesen Monat. Bestaetigen mit overwrite_manual=true zum Ueberschreiben.",
+      error: "Es existiert bereits eine manuell hochgeladene Lohnabrechnung für diesen Monat. Bestätigen mit overwrite_manual=true zum Überschreiben.",
       requires_confirm: "manual_overwrite",
     }, { status: 409 });
   }

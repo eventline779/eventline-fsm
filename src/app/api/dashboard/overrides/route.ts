@@ -76,7 +76,7 @@ export async function PUT(request: Request) {
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
   }
   const hidden = sanitizeIdList((body as { hidden?: unknown }).hidden);
   const widget_order = sanitizeIdList((body as { widget_order?: unknown }).widget_order);

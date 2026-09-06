@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
 
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   const label = typeof body.label === "string" ? body.label.trim() : "";
   if (!label) return NextResponse.json({ success: false, error: "Label ist Pflicht" }, { status: 400 });
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   if (!slug) {
-    return NextResponse.json({ success: false, error: "Ungueltiger Name" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültiger Name" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   let scope: "self" | "team" | "all" | undefined;
   if (typeof body.scope === "string") {
     if (body.scope !== "self" && body.scope !== "team" && body.scope !== "all") {
-      return NextResponse.json({ success: false, error: "scope ungueltig (self/team/all)" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "scope ungültig (self/team/all)" }, { status: 400 });
     }
     scope = body.scope;
   }

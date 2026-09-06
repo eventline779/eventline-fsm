@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (!supabaseUrl || !serviceKey) {
       logError("admin.users.create.env", { hasUrl: !!supabaseUrl, hasKey: !!serviceKey });
       return NextResponse.json(
-        { success: false, error: "Server-Konfiguration unvollstaendig (SUPABASE-ENV fehlt)" },
+        { success: false, error: "Server-Konfiguration unvollständig (SUPABASE-ENV fehlt)" },
         { status: 500 },
       );
     }
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
 
   const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ success: false, error: "Ungueltiger Body" }, { status: 400 });
+  if (!body) return NextResponse.json({ success: false, error: "Ungültiger Body" }, { status: 400 });
 
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const full_name = typeof body.full_name === "string" ? body.full_name.trim() : "";
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Email und Name sind Pflicht" }, { status: 400 });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ success: false, error: "Ungueltige Email-Adresse" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Ungültige Email-Adresse" }, { status: 400 });
   }
 
   const admin = createAdminClient();

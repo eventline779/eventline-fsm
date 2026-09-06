@@ -60,7 +60,7 @@ export async function POST(
       {
         success: false,
         error:
-          "Rueckgaengig nur innerhalb 5 Minuten oder durch den User moeglich, der die Rechnung gesetzt hat.",
+          "Rückgängig nur innerhalb 5 Minuten oder durch den User möglich, der die Rechnung gesetzt hat.",
       },
       { status: 403 },
     );
@@ -84,7 +84,7 @@ export async function POST(
 
   if (error) {
     logError("api.jobs.undo-mark-invoiced", error, { userId: auth.user.id, jobId: id });
-    return NextResponse.json({ success: false, error: "Rueckgaengig fehlgeschlagen" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Rückgängig fehlgeschlagen" }, { status: 500 });
   }
   if (count === 0) {
     return NextResponse.json(
