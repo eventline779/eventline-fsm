@@ -22,7 +22,6 @@ export type WidgetId =
   | "zu-erledigen"
   | "team-status"
   | "anwesenheitskalender"
-  | "stempel-status"
   | "ma-monat-stunden"
   | "ma-prognose"
   | "ma-naechster-einsatz"
@@ -115,13 +114,6 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
     size: "2x2",
     requires: ["anwesenheit:view"],
     defaultRoles: ["admin", "techniker"],
-  },
-  {
-    id: "stempel-status",
-    title: "Stempel-Status",
-    size: "1x1",
-    requires: ["stempelzeiten:view"],
-    defaultRoles: ["techniker"],
   },
   {
     id: "ma-monat-stunden",

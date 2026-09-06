@@ -32,7 +32,6 @@ import { JobNumber } from "@/components/job-number";
 import { localHour } from "@/lib/swiss-time";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
-import { StempelStatusCard } from "@/components/dashboard/stempel-status-card";
 import { DashboardPreferencesModal } from "@/components/dashboard/dashboard-preferences-modal";
 
 // ---------------------------------------------------------------------------
@@ -148,7 +147,6 @@ const WIDGET_SPAN: Record<string, string> = {
   "zu-erledigen": "col-span-12 lg:col-span-6",
   "team-status": "col-span-12 lg:col-span-6",
   "anwesenheitskalender": "col-span-12",
-  "stempel-status": "col-span-12 lg:col-span-6",
   "ma-monat-stunden": "col-span-12 lg:col-span-6",
   "ma-prognose": "col-span-12 lg:col-span-6",
   "ma-naechster-einsatz": "col-span-12",
@@ -201,7 +199,6 @@ const WIDGET_RENDERERS: Record<string, (ctx: RenderContext) => React.ReactNode> 
   "zu-erledigen": ({ admin }) => admin && <ZuErledigenCard data={admin.zu_erledigen} />,
   "team-status": ({ admin }) => admin && <TeamStatusCard data={admin.team_status} />,
   "anwesenheitskalender": () => <AnwesenheitskalenderCard />,
-  "stempel-status": () => <StempelStatusCard />,
   "ma-monat-stunden": ({ ma }) => ma && <MaMonatStundenCard ma={ma} />,
   "ma-prognose": ({ ma }) => ma && <MaPrognoseCard ma={ma} />,
   "ma-naechster-einsatz": ({ ma }) => ma && <NaechsterEinsatzCard einsatz={ma.naechster_einsatz} />,

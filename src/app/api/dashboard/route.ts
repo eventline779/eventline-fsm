@@ -466,9 +466,8 @@ async function loadAdminData(): Promise<AdminPayload> {
  *  hier lokal (nicht in der Registry) — die Registry bleibt UI-neutrales
  *  Config-Data, das Loader-Mapping ist ein Backend-Detail dieser Route.
  *
- *  Widgets ohne Eintrag (anwesenheitskalender, stempel-status, partner-
- *  willkommen) laden ihre Daten selbst clientseitig — sie brauchen nichts
- *  aus admin/ma-Payload. */
+ *  Widgets ohne Eintrag (anwesenheitskalender, partner-willkommen) laden
+ *  ihre Daten selbst clientseitig — sie brauchen nichts aus admin/ma-Payload. */
 type WidgetLoader = "admin" | "ma";
 const WIDGET_LOADERS: Partial<Record<WidgetId, WidgetLoader>> = {
   "kpi-offene-auftraege": "admin",
