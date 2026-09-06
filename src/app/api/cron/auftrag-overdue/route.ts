@@ -15,6 +15,10 @@
 //       MA ohne Team-Leader werden geskippt (kein Crash).
 //       Mehrere MA mit demselben Team-Leader → nur EINE Mail pro Leader
 //       pro Auftrag (Dedup nach lead_id).
+//       Zusaetzlich CC an alle aktiven Admins (profiles.role='admin',
+//       is_active=true, email IS NOT NULL). Admin-Emails werden gegen
+//       die Team-Lead-Empfaenger-Adresse dedupliziert (falls Team-Lead
+//       selbst Admin ist → nur TO, kein doppelter CC).
 //
 // Idempotenz: pro (job_id, kind) genau EINE Row in job_overdue_reminders
 // (Migration 205; kind-Set erweitert um 'mail_lead' in Migration 210).
@@ -212,6 +216,19 @@ export async function GET(request: Request) {
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://eventline-basel.com";
   const fromAddress = formatMailFrom(company, "noreply@eventline-basel.com");
 
+  // Admin-Empfaenger fuer den Tag+3-CC einmalig laden (aktive Admins mit
+  // Email). Wird pro Lead-Mail als CC beigelegt, mit Dedup gegen die TO-
+  // Adresse (Team-Lead selbst Admin → nicht doppelt).
+  const { data: adminRows } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("role", "admin")
+    .eq("is_active", true)
+    .not("email", "is", null);
+  const adminEmails = ((adminRows ?? []) as Array<{ email: string | null }>)
+    .map((r) => r.email)
+    .filter((e): e is string => !!e);
+
   let totalNotified = 0;
   let totalMailed = 0;
   let totalLeadMailed = 0;
@@ -393,10 +410,15 @@ export async function GET(request: Request) {
           ? `[EVENTLINE] Team-Mitglied ${members[0].full_name || members[0].email || "MA"} hat Auftrag INT-${job.job_number} noch nicht abgeschlossen (3 Tage ueberfaellig)`
           : `[EVENTLINE] ${members.length} Team-Mitglieder haben Auftrag INT-${job.job_number} noch nicht abgeschlossen (3 Tage ueberfaellig)`;
         const greeting = lead.full_name ? lead.full_name.split(" ")[0] : "";
+        // CC an alle aktiven Admins — case-insensitiv gegen die TO-Adresse
+        // dedupliziert (falls Team-Lead selbst Admin ist → nur TO).
+        const leadEmailLc = lead.email.toLowerCase();
+        const ccEmails = adminEmails.filter((e) => e.toLowerCase() !== leadEmailLc);
         try {
           await resend.emails.send({
             from: fromAddress,
             to: lead.email,
+            cc: ccEmails.length > 0 ? ccEmails : undefined,
             subject,
             html: `
               <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">
