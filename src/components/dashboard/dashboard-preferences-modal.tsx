@@ -85,6 +85,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MeasuringStrategy,
   PointerSensor,
   pointerWithin,
   useDraggable,
@@ -192,6 +193,74 @@ const WIDTH_OPTIONS: { value: number; label: string }[] = [
   { value: 8, label: "2/3" },
   { value: 12, label: "Voll" },
 ];
+
+/** Slot-Marker im gemischten Render-Array (Kacheln + leere Slots).
+ *  `beforeIndex` referenziert den Index im items-Array (OHNE dragged raus-
+ *  gefiltert), vor dem der Slot erscheinen soll. `items.length` = trailing
+ *  slot. `span` ist die freie Breite in col-Einheiten (4/8/12 sind moeglich).
+ */
+interface EmptySlot {
+  kind: "slot";
+  beforeIndex: number;
+  span: number;
+  key: string;
+}
+
+/** Berechnet leere Slots in einem 12-col-Grid basierend auf der aktuellen
+ *  items-Reihenfolge und den Span-Overrides. `draggedId` wird vor der
+ *  Berechnung rausgefiltert — die Slots zeigen also wo der User seine
+ *  Kachel HINLEGEN kann (Zustand NACH dem Drop, ohne die dragged Kachel).
+ *
+ *  Algorithmus:
+ *   - Zeilen-Position `colPos` mod 12 trackt wo wir in der aktuellen Zeile
+ *     stehen.
+ *   - Passt das naechste Widget nicht mehr in die Zeile → emit slot mit
+ *     der restlichen Zeilenbreite, dann Zeile neu starten mit dem Widget.
+ *   - Nach der Schleife: wenn die letzte Zeile nicht voll ist, emit
+ *     trailing slot.
+ *   - Slots mit span < 4 werden gedroppt (kein Widget kann rein).
+ */
+function computeEmptySlots(
+  items: PreferenceItem[],
+  spanOverrides: Record<string, number>,
+  mobile: boolean,
+  draggedId: string | null,
+): EmptySlot[] {
+  const src = draggedId ? items.filter((i) => i.id !== draggedId) : items;
+  const slots: EmptySlot[] = [];
+  let colPos = 0;
+  src.forEach((item, idx) => {
+    const s = spanNumberFor(item.id, spanOverrides, mobile);
+    if (colPos + s > 12) {
+      // Zeile bricht ab — Rest der alten Zeile ist ein Slot.
+      const gap = 12 - colPos;
+      if (gap >= 4) {
+        slots.push({
+          kind: "slot",
+          beforeIndex: idx,
+          span: gap,
+          key: `slot:before-${idx}`,
+        });
+      }
+      colPos = s % 12;
+      if (s === 12) colPos = 0;
+    } else {
+      colPos = (colPos + s) % 12;
+    }
+  });
+  if (colPos > 0 && colPos < 12) {
+    const gap = 12 - colPos;
+    if (gap >= 4) {
+      slots.push({
+        kind: "slot",
+        beforeIndex: src.length,
+        span: gap,
+        key: `slot:end`,
+      });
+    }
+  }
+  return slots;
+}
 
 /** Applies fn inside a View Transition if the browser supports it (Chromium,
  *  Safari 18+, Firefox 145+). Falls es nicht geht: fn direkt aufrufen. */
@@ -385,22 +454,81 @@ export function DashboardPreferencesModal({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    setActiveId(null);
-    setActiveSize(null);
-    setOverId(null);
     setDraggingCursor(false);
-    if (!over || active.id === over.id) return;
-    // Reorder committen und via View-Transition sanft animieren. Widget-
-    // Breiten aendern sich NIE beim Drag — die legt der User explizit via
-    // Breiten-Selector unten in der Kachel fest.
+    if (!over || active.id === over.id) {
+      setActiveId(null);
+      setActiveSize(null);
+      setOverId(null);
+      return;
+    }
+    const overStr = String(over.id);
+    const activeStr = String(active.id);
+    // ALLE relevanten setStates (drag-cleanup + items-Reorder) MUESSEN im
+    // selben withViewTransition-Callback sitzen, damit der Browser
+    // beide DOM-Zustaende (mit slots + placeholder-Kachel vs. finales
+    // Grid) in einem einzigen OLD/NEW-Paar snapshotted. Sonst konkurrieren
+    // Slot-Verschwinden und Reorder-Animation um die view-transition
+    // frame.
     withViewTransition(() => {
+      setActiveId(null);
+      setActiveSize(null);
+      setOverId(null);
       setItems((prev) => {
-        const oldIdx = prev.findIndex((i) => i.id === active.id);
-        const newIdx = prev.findIndex((i) => i.id === over.id);
-        if (oldIdx === -1 || newIdx === -1) return prev;
-        const next = [...prev];
-        const [moved] = next.splice(oldIdx, 1);
-        next.splice(newIdx, 0, moved);
+        // items-Konvention: visible zuerst, hidden am Ende. Alle Sort-
+        // Operationen laufen im VISIBLE-Space; hidden werden unveraendert
+        // hinten angehaengt. Das matcht die Load-Reihenfolge und haelt
+        // beim Drag im Modal-Grid (das nur visible zeigt) alles konsistent.
+        const visible = prev.filter((i) => !i.hidden);
+        const hidden = prev.filter((i) => i.hidden);
+        const oldIdx = visible.findIndex((i) => i.id === activeStr);
+        if (oldIdx === -1) return prev;
+
+        let newVisible: PreferenceItem[];
+
+        // (1) Drop auf leeren Slot: `slot:before-<N>` oder `slot:end`.
+        //     beforeIndex ist im VISIBLE-GEFILTERTEN Array (ohne dragged),
+        //     kommt aus computeEmptySlots das mit visibleItems arbeitet.
+        //     Also splice-out dragged, splice-in an beforeIndex direkt.
+        if (overStr.startsWith("slot:")) {
+          const filtered = visible.filter((i) => i.id !== activeStr);
+          let insertAt = filtered.length;
+          if (overStr !== "slot:end") {
+            const m = overStr.match(/^slot:before-(\d+)$/);
+            if (m) {
+              const parsed = parseInt(m[1], 10);
+              if (Number.isFinite(parsed)) {
+                insertAt = Math.max(0, Math.min(filtered.length, parsed));
+              }
+            }
+          }
+          newVisible = [...filtered];
+          const moved = visible[oldIdx];
+          newVisible.splice(insertAt, 0, moved);
+        } else {
+          // (2) Drop auf eine andere Kachel.
+          const newIdx = visible.findIndex((i) => i.id === overStr);
+          if (newIdx === -1) return prev;
+
+          const draggedSpan = spanNumberFor(activeStr, spanOverrides, mobilePreview);
+          const targetSpan = spanNumberFor(overStr, spanOverrides, mobilePreview);
+
+          if (draggedSpan === targetSpan) {
+            // (2a) Gleiche Groesse -> SWAP in-place (kein Shift der Nachbarn).
+            newVisible = [...visible];
+            const tmp = newVisible[oldIdx];
+            newVisible[oldIdx] = newVisible[newIdx];
+            newVisible[newIdx] = tmp;
+          } else {
+            // (2b) Unterschiedliche Groesse -> move-and-shift (Standard-
+            //      Sortable-Semantik, weil swap zwischen z.B. 4 und 12
+            //      den 12er in einen 4-col-Slot zwingen wuerde).
+            newVisible = [...visible];
+            const [moved] = newVisible.splice(oldIdx, 1);
+            newVisible.splice(newIdx, 0, moved);
+          }
+        }
+
+        const next = [...newVisible, ...hidden];
         scheduleSave(next, spanOverrides);
         return next;
       });
@@ -408,10 +536,14 @@ export function DashboardPreferencesModal({
   }
 
   function handleDragCancel(_event: DragCancelEvent) {
-    setActiveId(null);
-    setActiveSize(null);
-    setOverId(null);
     setDraggingCursor(false);
+    // View-Transition wraps das Cleanup — sonst spring der Placeholder-/
+    // Slot-Zustand hart in "kein Drag" zurueck; mit VT gleitet er sanft.
+    withViewTransition(() => {
+      setActiveId(null);
+      setActiveSize(null);
+      setOverId(null);
+    });
   }
 
   /** Setzt die Breite eines Widgets explizit (User-Klick auf Segment). Wird
@@ -484,6 +616,41 @@ export function DashboardPreferencesModal({
     [activeId, items],
   );
 
+  /** Gemischtes Render-Array: gefilterte items (ohne dragged) + leere
+   *  Slots dazwischen. Waehrend Drag wird die gezogene Kachel visuell
+   *  KOMPLETT aus dem Grid genommen (der Ghost am Cursor ist ihre einzige
+   *  Repraesentation) — damit Slots dort erscheinen koennen wo sie
+   *  vorher war. Ohne Drag: einfach items.
+   */
+  // Visible = im Grid gerenderte Widgets. Hidden werden UNTER dem Grid als
+  // Chip-Liste angezeigt (siehe HiddenSection) — genau wie im echten
+  // Dashboard, wo hidden Widgets gar nicht rendern. So matcht die Modal-
+  // Vorschau 1:1 was der User danach im Dashboard sieht.
+  const visibleItems = useMemo(() => items.filter((i) => !i.hidden), [items]);
+  const hiddenItems = useMemo(() => items.filter((i) => i.hidden), [items]);
+
+  const renderList = useMemo<Array<PreferenceItem | EmptySlot>>(() => {
+    if (!activeId) return visibleItems;
+    const filtered = visibleItems.filter((i) => i.id !== activeId);
+    // Slots computen (basierend auf visible-items ohne dragged) und filtern:
+    // nur Slots die MINDESTENS die dragged-Breite haben, sonst wuerde
+    // der User in einen zu kleinen Slot droppen und die Kachel wuerde
+    // beim Reflow in eine ganz andere Zeile fallen.
+    const draggedSpan = spanNumberFor(activeId, spanOverrides, mobilePreview);
+    const slots = computeEmptySlots(visibleItems, spanOverrides, mobilePreview, activeId)
+      .filter((s) => s.span >= draggedSpan);
+    if (slots.length === 0) return filtered;
+    // Slots werden vor `beforeIndex` (im gefilterten Array) eingefuegt.
+    // Sortiere absteigend nach beforeIndex, damit ein splice-insert die
+    // Indizes der noch-nicht-eingefuegten Slots nicht verschiebt.
+    const sortedSlots = [...slots].sort((a, b) => b.beforeIndex - a.beforeIndex);
+    const arr: Array<PreferenceItem | EmptySlot> = [...filtered];
+    for (const slot of sortedSlots) {
+      arr.splice(slot.beforeIndex, 0, slot);
+    }
+    return arr;
+  }, [activeId, visibleItems, spanOverrides, mobilePreview]);
+
   return (
     <Modal open={open} onClose={handleFinish} title="Dashboard anpassen" size="4xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -512,6 +679,11 @@ export function DashboardPreferencesModal({
         <DndContext
           sensors={sensors}
           collisionDetection={pointerWithin}
+          // Slots mounten mid-drag (nur wenn activeId gesetzt). Ohne
+          // MeasuringStrategy.Always cached dnd-kit die Droppable-Rects
+          // aus dem drag-start snapshot → neue Slots werden vom
+          // pointerWithin collision-check nicht gesehen.
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
@@ -528,23 +700,45 @@ export function DashboardPreferencesModal({
                 : undefined,
             }}
           >
-            <div className="grid grid-cols-12 gap-2">
-              {items.map((it) => (
-                <GridTile
-                  key={it.id}
-                  item={it}
-                  spanClass={spanClassFor(it.id, spanOverrides, mobilePreview)}
-                  currentSpan={spanNumberFor(it.id, spanOverrides, mobilePreview)}
-                  mobilePreview={mobilePreview}
-                  onToggle={() => toggleHidden(it.id)}
-                  onSetSpan={(span) => setWidgetSpan(it.id, span)}
-                  isDragging={activeId === it.id}
-                  isOverTarget={overId === it.id && activeId !== it.id}
-                  anyDragActive={activeId !== null}
-                />
-              ))}
-            </div>
+            {visibleItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">
+                Alle Widgets sind ausgeblendet. Blende unten wieder eins ein.
+              </p>
+            ) : (
+              <div className="grid grid-cols-12 gap-2">
+                {renderList.map((entry) => {
+                  if ("kind" in entry && entry.kind === "slot") {
+                    return (
+                      <EmptySlotTile
+                        key={entry.key}
+                        slotId={entry.key}
+                        span={entry.span}
+                        isOverTarget={overId === entry.key}
+                      />
+                    );
+                  }
+                  const it = entry as PreferenceItem;
+                  return (
+                    <GridTile
+                      key={it.id}
+                      item={it}
+                      spanClass={spanClassFor(it.id, spanOverrides, mobilePreview)}
+                      currentSpan={spanNumberFor(it.id, spanOverrides, mobilePreview)}
+                      mobilePreview={mobilePreview}
+                      onToggle={() => toggleHidden(it.id)}
+                      onSetSpan={(span) => setWidgetSpan(it.id, span)}
+                      isDragging={activeId === it.id}
+                      isOverTarget={overId === it.id && activeId !== it.id}
+                      anyDragActive={activeId !== null}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
+          {hiddenItems.length > 0 && (
+            <HiddenSection items={hiddenItems} onShow={(id) => toggleHidden(id)} />
+          )}
 
           <DragOverlay zIndex={1200} dropAnimation={null}>
             {activeItem && activeSize ? (
@@ -883,6 +1077,127 @@ function GridTile({
         }
       />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EmptySlotTile — droppable-Placeholder fuer eine leere Stelle im Grid.
+// Nur wahrend Drag gerendert (siehe renderList in der Parent-Component).
+// Zeigt eine gestrichelte "Hier ablegen"-Zone in der passenden Grid-Breite.
+// Der span kommt aus der Slot-Berechnung; die col-span-Klasse ist LITERAL
+// gemapped (Tailwind kompiliert keine dynamischen Klassen).
+// ---------------------------------------------------------------------------
+
+function EmptySlotTile({
+  slotId,
+  span,
+  isOverTarget,
+}: {
+  slotId: string;
+  span: number;
+  isOverTarget: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: slotId });
+  const show = isOver || isOverTarget;
+  const spanClass =
+    span === 4
+      ? "col-span-4"
+      : span === 8
+        ? "col-span-8"
+        : span === 6
+          ? "col-span-6"
+          : "col-span-12";
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${spanClass} rounded-lg flex items-center justify-center min-h-16 transition-all duration-150`}
+      style={{
+        border: show
+          ? "2px dashed var(--accent)"
+          : "2px dashed color-mix(in oklab, var(--foreground) 25%, transparent)",
+        backgroundColor: show
+          ? "color-mix(in oklab, var(--accent) 12%, transparent)"
+          : "color-mix(in oklab, var(--foreground) 3%, transparent)",
+      }}
+      aria-label="Leere Position — hier ablegen"
+    >
+      <span
+        className="text-[10px] font-medium uppercase tracking-wider"
+        style={{
+          color: show ? "var(--accent)" : "color-mix(in oklab, var(--foreground) 45%, transparent)",
+        }}
+      >
+        + Hier ablegen
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HiddenSection — unter dem Grid: kompakte Chip-Liste der ausgeblendeten
+// Widgets. Ein Klick auf ein Chip blendet das Widget wieder ein (fuegt es
+// zurueck ins Grid). Frueher wurden hidden Widgets IM Grid grau-mit-
+// Overlay gerendert — das kollidierte mit der Slot-Berechnung und stimmte
+// nicht mit dem echten Dashboard ueberein (das hidden ganz weg-rendert).
+// ---------------------------------------------------------------------------
+
+function HiddenSection({
+  items,
+  onShow,
+}: {
+  items: PreferenceItem[];
+  onShow: (id: string) => void;
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-dashed p-2.5"
+      style={{
+        borderColor: "color-mix(in oklab, var(--foreground) 12%, transparent)",
+        backgroundColor: "color-mix(in oklab, var(--foreground) 2%, transparent)",
+      }}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+        Ausgeblendet · Klick zum Einblenden
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((it) => (
+          <HiddenChip key={it.id} item={it} onShow={() => onShow(it.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HiddenChip({
+  item,
+  onShow,
+}: {
+  item: PreferenceItem;
+  onShow: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onShow}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-colors"
+      style={{
+        backgroundColor: hover
+          ? "color-mix(in oklab, var(--accent) 10%, var(--card))"
+          : "var(--card)",
+        borderColor: hover
+          ? "var(--accent)"
+          : "color-mix(in oklab, var(--foreground) 15%, transparent)",
+        color: "var(--foreground)",
+        cursor: "pointer",
+      }}
+      data-tooltip="Wieder einblenden"
+    >
+      <EyeOff className="h-3 w-3 text-muted-foreground" />
+      <span className="text-accent">{iconFor(item.id)}</span>
+      <span className="truncate max-w-40">{item.title}</span>
+    </button>
   );
 }
 
