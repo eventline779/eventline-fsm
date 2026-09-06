@@ -310,8 +310,12 @@ export default function ProjektDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
-      {/* Sticky Header: Nummer, Titel, Status, Meta, Tab-Nav */}
-      <div className="sticky top-0 z-20 -mx-4 px-4 pt-2 pb-0 bg-background/95 backdrop-blur border-b border-border/60">
+      {/* Sticky Header: Nummer, Titel, Status, Meta, Tab-Nav.
+          Optik 1:1 wie Auftrag-Detail (src/components/auftrag/tabs/sticky-header.tsx):
+          kein Kasten-Look, kein -mx-Bleed, kein border-b — BG matcht den Body-Grau
+          (#f5f5f7 light / #0a0a0a dark). Die visuelle Trennung zum Body macht
+          die TabsNav-eigene border-b, nicht der Wrapper. */}
+      <div className="sticky top-0 z-20 bg-[#f5f5f7]/85 dark:bg-[#0a0a0a]/85 backdrop-blur-md pt-1 pb-4 mb-8">
         <div className="flex items-start gap-2">
           <BackButton fallbackHref="/projekte" size="sm" />
           <div className="min-w-0 flex-1">
@@ -356,7 +360,7 @@ export default function ProjektDetailPage() {
           tabs={tabs}
           active={tab}
           onChange={(k) => selectTab(k as Tab)}
-          className="mt-2"
+          className="mt-3"
           ariaLabel="Projekt-Bereiche"
         />
       </div>
