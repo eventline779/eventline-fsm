@@ -265,46 +265,6 @@ export async function GET(req: Request) {
   // historisierbar seit Migration 195; asOf=Monatsanfang.
   const bvgThresholdChf = await loadBvgThreshold(adminClient, monthStartIso);
 
-  // Fuer den Jahres-Breakdown weiter unten brauchen wir die zum jeweiligen
-  // MONAT gueltigen defaults (sonst rechnet der Breakdown Vergangenheit mit
-  // aktuellen Saetzen — Bug vor dem 195-Follow-Up-Fix). Alle payroll_defaults-
-  // Zeilen die im Fenster [Jahresanfang, Jahresende+1] relevant sind holen,
-  // dann pro Monat picken.
-  const { data: allPd } = await adminClient
-    .from("payroll_defaults")
-    .select("effective_from, default_ahv_iv_eo_pct, default_alv_pct, default_nbu_pct, default_bvg_pct, default_ktg_pct, default_quellensteuer_pct, default_employer_ahv_pct, default_employer_alv_pct, default_employer_fak_pct, default_employer_bu_pct, default_employer_bvg_pct, default_employer_verwaltung_pct, bvg_threshold_chf")
-    .order("effective_from", { ascending: false });
-  interface PdRow {
-    effective_from: string;
-    default_ahv_iv_eo_pct: number; default_alv_pct: number; default_nbu_pct: number;
-    default_bvg_pct: number; default_ktg_pct: number; default_quellensteuer_pct: number;
-    default_employer_ahv_pct: number; default_employer_alv_pct: number; default_employer_fak_pct: number;
-    default_employer_bu_pct: number; default_employer_bvg_pct: number; default_employer_verwaltung_pct: number;
-    bvg_threshold_chf: number;
-  }
-  const pdRows = (allPd ?? []) as PdRow[];
-  function pdForDate(iso: string): PdRow | null {
-    for (const r of pdRows) if (r.effective_from <= iso) return r;
-    return null;
-  }
-  function defaultsFromPd(r: PdRow | null) {
-    if (!r) return defaults;
-    return {
-      ahvIvEoPct: Number(r.default_ahv_iv_eo_pct),
-      alvPct: Number(r.default_alv_pct),
-      nbuPct: Number(r.default_nbu_pct),
-      bvgPct: Number(r.default_bvg_pct),
-      ktgPct: Number(r.default_ktg_pct),
-      quellensteuerPct: Number(r.default_quellensteuer_pct),
-      employerAhvPct: Number(r.default_employer_ahv_pct),
-      employerAlvPct: Number(r.default_employer_alv_pct),
-      employerFakPct: Number(r.default_employer_fak_pct),
-      employerBuPct: Number(r.default_employer_bu_pct),
-      employerBvgPct: Number(r.default_employer_bvg_pct),
-      employerVerwaltungPct: Number(r.default_employer_verwaltung_pct),
-    };
-  }
-
   // 3-Monats-BVG-Forecast: selected month + 2 forward. Holt alle geplanten
   // job_appointments fuer die Mitarbeiter im 3-Monats-Fenster.
   const monthNum = Number(monthStr);
@@ -317,108 +277,22 @@ export async function GET(req: Request) {
   const m2 = monthRange(mNext2Year, mNext2Month);
   const FORECAST_MONTHS = [m0, m1, m2];
 
-  // Termine bis Jahresende laden — die Jahres-Prognose (payrollAnnual) braucht
-  // alle Termine des laufenden Kalenderjahres, nicht nur die naechsten 3 Monate.
-  // location_id kommt via job-Join fuer die Location-basierte Historie-Prognose.
-  const yearEnd = `${year}-12-31`;
+  // Geplante Termine fuers 3-Monats-BVG-Forecast-Fenster laden.
   const { data: forecastAppts } = await adminClient
     .from("job_appointments")
-    .select("assigned_to, start_time, end_time, job_id, job:jobs(location_id)")
+    .select("assigned_to, start_time, end_time")
     .in("assigned_to", profileIds)
     .gte("start_time", `${m0.start}T00:00:00Z`)
-    .lt("start_time", `${yearEnd}T23:59:59Z`)
+    .lt("start_time", `${m2.end}T23:59:59Z`)
     .not("assigned_to", "is", null);
   type ApptRow = {
     assigned_to: string; start_time: string; end_time: string | null;
-    job_id: string | null; job: { location_id: string | null } | null;
   };
   const apptsByProfile = new Map<string, { start_time: string; end_time: string | null }[]>();
-  // Zusaetzliche Struktur: pro Monat pro Location wie viele Termine geplant.
-  // Key: `${YYYY-MM}::${location_id_or_NONE}` -> count.
-  const plannedByMonthLocation = new Map<string, number>();
   for (const a of (forecastAppts as ApptRow[] | null) ?? []) {
     if (!apptsByProfile.has(a.assigned_to)) apptsByProfile.set(a.assigned_to, []);
     apptsByProfile.get(a.assigned_to)!.push({ start_time: a.start_time, end_time: a.end_time });
-    const monthKey = a.start_time.slice(0, 7); // YYYY-MM (UTC ist ok fuer Grob-Bucket)
-    const locKey = a.job?.location_id ?? "NONE";
-    const k = `${monthKey}::${locKey}`;
-    plannedByMonthLocation.set(k, (plannedByMonthLocation.get(k) ?? 0) + 1);
   }
-
-  // ---------------------------------------------------------------
-  // Location-Historie: letzte 12 Monate abgeschlossene Termine + gestempelte
-  // Personenstunden pro Termin. Damit koennen wir fuer zukuenftige Monate
-  // schaetzen: "an Location X kommen historisch N Termine/Monat mit Ø Y
-  // Personenstunden je Termin". Fuer Termine die schon geplant sind, zaehlen
-  // wir die (nicht verdoppeln); nur die noch fehlenden addieren wir dazu.
-  // ---------------------------------------------------------------
-  const historyLookbackMonths = 12;
-  const historyStartDate = new Date();
-  historyStartDate.setUTCMonth(historyStartDate.getUTCMonth() - historyLookbackMonths);
-  const historyStartIso = historyStartDate.toISOString();
-  const nowIsoForHistory = new Date().toISOString();
-
-  const { data: historyAppts } = await adminClient
-    .from("job_appointments")
-    .select("id, assigned_to, start_time, job_id, job:jobs(location_id)")
-    .lt("end_time", nowIsoForHistory)
-    .gte("start_time", historyStartIso)
-    .not("assigned_to", "is", null)
-    .not("end_time", "is", null);
-  type HistoryApptRow = {
-    id: string; assigned_to: string; start_time: string;
-    job_id: string | null; job: { location_id: string | null } | null;
-  };
-  const historyRows = (historyAppts as HistoryApptRow[] | null) ?? [];
-
-  // Fuer die Personenstunden pro Termin: time_entries pro (job_id, user_id)
-  // fuer die Jobs der Historien-Termine.
-  const historyJobIds = Array.from(new Set(historyRows.map((r) => r.job_id).filter((x): x is string => !!x)));
-  const { data: historyEntries } = historyJobIds.length > 0 ? await adminClient
-    .from("time_entries")
-    .select("job_id, user_id, clock_in, clock_out")
-    .in("job_id", historyJobIds)
-    .not("clock_out", "is", null) : { data: [] as Array<{ job_id: string; user_id: string; clock_in: string; clock_out: string }> };
-
-  // Aggregation: pro (job_id, user_id) die Ist-Minuten. Ein Termin =
-  // 1 assigned_to auf 1 job_id — matcht 1:1 mit time_entries.
-  const minutesByJobUser = new Map<string, number>();
-  for (const e of (historyEntries as { job_id: string; user_id: string; clock_in: string; clock_out: string }[] | null) ?? []) {
-    const k = `${e.job_id}::${e.user_id}`;
-    const min = Math.max(0, (new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60000);
-    minutesByJobUser.set(k, (minutesByJobUser.get(k) ?? 0) + min);
-  }
-
-  // Location-Statistik. locKey = location_id oder "NONE".
-  interface LocStat {
-    apptCount: number;
-    totalMinutes: number;
-    // Ø-Termine pro Monat = apptCount / historyLookbackMonths.
-    // Ø-Personenstunden pro Termin = totalMinutes / apptCount.
-  }
-  const locStats = new Map<string, LocStat>();
-  for (const r of historyRows) {
-    const locKey = r.job?.location_id ?? "NONE";
-    const min = r.job_id ? (minutesByJobUser.get(`${r.job_id}::${r.assigned_to}`) ?? 0) : 0;
-    const stat = locStats.get(locKey) ?? { apptCount: 0, totalMinutes: 0 };
-    stat.apptCount += 1;
-    stat.totalMinutes += min;
-    locStats.set(locKey, stat);
-  }
-
-  // Firmen-weiter Ø als Fallback fuer neue Locations ohne Historie.
-  const totalHistoryAppts = historyRows.length;
-  const totalHistoryMinutes = Array.from(minutesByJobUser.values()).reduce((s, v) => s + v, 0);
-  const companyAvgApptsPerMonth = totalHistoryAppts / historyLookbackMonths;
-  const companyAvgMinutesPerAppt = totalHistoryAppts > 0 ? totalHistoryMinutes / totalHistoryAppts : 0;
-
-  // Firmen-weiter Ø-Lohn (fuer die Umrechnung zusaetzlicher Minuten -> CHF).
-  const activeWages = data
-    .filter((r) => r.is_active && r.hourly_wage_chf != null && Number(r.hourly_wage_chf) > 0)
-    .map((r) => Number(r.hourly_wage_chf));
-  const companyAvgWage = activeWages.length > 0
-    ? activeWages.reduce((s, v) => s + v, 0) / activeWages.length
-    : 0;
 
   const employees = data.map((r) => {
     // RPC liefert stempel_minutes als UTC-Delta-Summe — DST-broken. Wir
@@ -469,14 +343,6 @@ export async function GET(req: Request) {
     const ytdNightSoFar = myBuckets.filter((b) => b.night_minutes > 0 && b.date <= m0.end).length;
     const ytdSunholSoFar = myBuckets.filter((b) => b.is_sunhol && b.total_minutes > 0 && b.date <= m0.end).length;
     let bvgForecast3Months: number[];
-    // Fuer die Firmen-Prognose brauchen wir pro Forecast-Monat auch die
-    // Plan-Minuten (fuer die 'Geplant'-Spalte); Netto/Vollkosten leiten
-    // wir spaeter aus dem Brutto ab (siehe Aggregation weiter unten).
-    const planMinutesPerForecastMonth: number[] = [0, 0, 0];
-    // OHNE Puffer — fuer die Jahres-Prognose, wo der Historien-Zusatz
-    // separat die Rolle des Puffers uebernimmt.
-    const planBruttoNoPufferPerMonth: number[] = [0, 0, 0];
-    const planMinutesNoPufferPerMonth: number[] = [0, 0, 0];
     if (wage == null) {
       bvgForecast3Months = [0, 0, 0];
     } else {
@@ -512,17 +378,6 @@ export async function GET(req: Request) {
           ? (lohnkostenWithSurcharge ?? 0) + planBruttoMitPuffer
           : planBruttoMitPuffer;
         bvgForecast3Months.push(total);
-        // Plan-Stunden fuer die Firmen-Prognose (mit selbem Puffer;
-        // im laufenden Monat + IST-Stempelzeiten).
-        const istMinutesThisMonth = isCurrentMonth ? stempelDstSafe : 0;
-        planMinutesPerForecastMonth[mi] = istMinutesThisMonth + Math.round(f.total_minutes * PUFFER_FAKTOR);
-        // Version ohne Puffer fuer die Jahres-Prognose — der 20%-Puffer
-        // fuer schon-geplante-Termine wird dort durch den Historien-Zusatz
-        // fuer noch-nicht-geplante-Termine ersetzt.
-        planBruttoNoPufferPerMonth[mi] = isCurrentMonth
-          ? (lohnkostenWithSurcharge ?? 0) + f.total_chf
-          : f.total_chf;
-        planMinutesNoPufferPerMonth[mi] = istMinutesThisMonth + f.total_minutes;
         // Counter fuer naechsten Monat hochziehen — sowohl eligible als
         // auch over-limit Naechte/Sonntage zaehlen fuer's Limit.
         // Wir brauchen die Tage-Counts, nicht Minuten — naehern mit
@@ -571,12 +426,6 @@ export async function GET(req: Request) {
       // 3-Monats-BVG-Forecast aus job_appointments (siehe oben).
       // Reihenfolge: selected month, +1, +2.
       bvg_forecast_3_months_chf: bvgForecast3Months,
-      // Interne Felder fuer die Firmen-Prognose-Aggregation weiter unten:
-      _plan_minutes_per_month: planMinutesPerForecastMonth,
-      _plan_brutto_no_puffer_per_month: planBruttoNoPufferPerMonth,
-      _plan_minutes_no_puffer_per_month: planMinutesNoPufferPerMonth,
-      _employer_multiplier: wage != null && wage > 0 ? (wage + employerPerHour) / wage : 1,
-      _netto_multiplier: 1 - totalDeductionPct / 100,
       // Zeitkomp-Tracking (ArG 17b Abs. 3): ab Nacht 25 -> 10% Zeitkomp.
       night_time_comp_minutes_this_month: surcharges.night_time_comp_minutes_this_month,
       ytd_night_time_comp_minutes: surcharges.ytd_night_time_comp_minutes,
@@ -588,260 +437,11 @@ export async function GET(req: Request) {
     };
   });
 
-  // ---------------------------------------------------------------
-  // Jahres-Lohnsummen-Prognose fuer die Ausgleichskasse/Versicherungen.
-  //
-  // Kombiniert:
-  //   - Vergangene Monate (Jan bis Vor-Monat des ausgewaehlten): IST-Brutto
-  //     aus perProfileDays (Stempelzeiten × Lohn + Zuschlaege pro Monat).
-  //   - Laufender Monat: IST + geplante Termine × 1.20 Puffer
-  //     (schon in bvg_forecast_3_months_chf[0]).
-  //   - Zukunftsmonate (aktuell+1 bis Dezember): geplante Termine × 1.20
-  //     Puffer (calculateForecast pro Monat).
-  //
-  // Alle Betraege inkl. Nacht-/Sonntag-Zuschlaegen gemaess ArG.
-  // Netto/Vollkosten pro Mitarbeiter mit individuellen Multiplikatoren.
-  // ---------------------------------------------------------------
-
-  // Helper: Ist-Zuschlaege fuer einen beliebigen Monat aus den Jahres-
-  // Buckets. Nutzt die gleiche YTD-Rank-Logik wie computeSurcharges (24
-  // Naechte / 6 Sonntage pro Jahr), aber fuer einen frei waehlbaren Monat.
-  function computeSurchargesForMonth(buckets: DayBucket[], hourlyWage: number, monthPrefixArg: string): { night_chf: number; sunhol_chf: number; total_chf: number } {
-    const sorted = [...buckets].sort((a, b) => a.date.localeCompare(b.date));
-    const nightDays = sorted.filter((d) => d.night_minutes > 0);
-    const sunholDays = sorted.filter((d) => d.is_sunhol && d.total_minutes > 0);
-
-    let nightEligibleMin = 0;
-    let nightRank = 0;
-    for (const d of nightDays) {
-      nightRank++;
-      if (d.date.startsWith(monthPrefixArg) && nightRank <= 24) {
-        nightEligibleMin += d.night_minutes;
-      }
-    }
-    let sunholEligibleMin = 0;
-    let sunholRank = 0;
-    for (const d of sunholDays) {
-      sunholRank++;
-      if (d.date.startsWith(monthPrefixArg) && sunholRank <= 6) {
-        sunholEligibleMin += d.total_minutes;
-      }
-    }
-    const nightChf = (nightEligibleMin / 60) * hourlyWage * 0.25;
-    const sunholChf = (sunholEligibleMin / 60) * hourlyWage * 0.5;
-    return { night_chf: nightChf, sunhol_chf: sunholChf, total_chf: nightChf + sunholChf };
-  }
-
-  type EmpWithPrivateForAnnual = typeof employees[number] & {
-    _plan_minutes_per_month: number[];
-    _plan_brutto_no_puffer_per_month: number[];
-    _plan_minutes_no_puffer_per_month: number[];
-    _employer_multiplier: number;
-    _netto_multiplier: number;
-  };
-
-  const PUFFER = 1.20;
-  const MONTH_LABELS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-
-  const annualMonths = Array.from({ length: 12 }, (_, i) => {
-    const mm = i + 1;
-    const prefix = `${yearStr}-${String(mm).padStart(2, "0")}`;
-    const range = monthRange(year, mm);
-    const kind: "past" | "current" | "future" =
-      mm < monthNum ? "past" : mm === monthNum ? "current" : "future";
-    return { mm, prefix, range, kind };
-  });
-
-  // Firmen-Durchschnitts-Multiplikatoren (fuer Historien-Zusatz — der laeuft
-  // nicht pro Employee, sondern firmen-weit). Ø aus aktiven Employees mit Wage.
-  const activeEmps = (employees as EmpWithPrivateForAnnual[]).filter((e) => e.hourly_wage_chf != null && e.hourly_wage_chf > 0);
-  const avgNettoMult = activeEmps.length > 0
-    ? activeEmps.reduce((s, e) => s + e._netto_multiplier, 0) / activeEmps.length
-    : 1;
-  const avgEmployerMult = activeEmps.length > 0
-    ? activeEmps.reduce((s, e) => s + e._employer_multiplier, 0) / activeEmps.length
-    : 1;
-
-  const monthlyBreakdown = annualMonths.map((m) => {
-    let brutto = 0;
-    let netto = 0;
-    let vollkosten = 0;
-    let planMinutes = 0;
-    // Historien-Zusatz getrennt tracken damit wir im Frontend
-    // 'davon geplant X · davon historisch geschaetzt Y' zeigen koennen.
-    let historyAdditionalMinutes = 0;
-    let historyAdditionalBrutto = 0;
-
-    for (const e of employees as EmpWithPrivateForAnnual[]) {
-      const wage = e.hourly_wage_chf;
-      // Mitarbeiter ohne gueltigen Lohn KOMPLETT skippen — sonst wuerden
-      // ihre geplanten Termine (aus _plan_minutes_per_month) mitzaehlen
-      // aber der Brutto-Wert leer bleiben ("Stunden ohne Loehne"-Bug).
-      if (wage == null || wage <= 0) continue;
-
-      let empBrutto = 0;
-      let empMinutes = 0;
-
-      if (m.kind === "past") {
-        // Ist: monatliche Stempel-Minuten × Wage + Ist-Zuschlaege.
-        const buckets = Array.from(perProfileDays.get(e.profile_id)?.values() ?? []);
-        const monthBuckets = buckets.filter((b) => b.date.startsWith(m.prefix));
-        const min = monthBuckets.reduce((s, b) => s + b.total_minutes, 0);
-        const surch = computeSurchargesForMonth(buckets, wage, m.prefix);
-        empBrutto = (min / 60) * wage + surch.total_chf;
-        empMinutes = min;
-      } else if (m.kind === "current") {
-        // IST + genau geplant (ohne 20% Puffer — der Historien-Zusatz
-        // unten uebernimmt die 'noch nicht geplanten Termine'-Rolle).
-        empBrutto = e._plan_brutto_no_puffer_per_month[0] ?? 0;
-        empMinutes = e._plan_minutes_no_puffer_per_month[0] ?? 0;
-      } else {
-        // Zukunft: pro Monat forecasten OHNE Puffer. Fuer +1/+2 gibt's
-        // die vorberechneten no-Puffer-Werte; ab +3 rechnen wir manuell.
-        const idx = m.mm - monthNum;
-        if (idx === 1 || idx === 2) {
-          empBrutto = e._plan_brutto_no_puffer_per_month[idx] ?? 0;
-          empMinutes = e._plan_minutes_no_puffer_per_month[idx] ?? 0;
-        } else {
-          const myAppts = apptsByProfile.get(e.profile_id) ?? [];
-          const f = calculateForecast(myAppts, wage, m.range.start, m.range.end);
-          empBrutto = f.total_chf;
-          empMinutes = f.total_minutes;
-        }
-      }
-
-      // Multiplikatoren pro-Monat neu berechnen — die zum Monat gueltigen
-      // payroll_defaults nehmen (Migration 195). Sonst wuerde ein Monat mit
-      // einem Rate-Wechsel dazwischen den Netto/Vollkosten falsch ausweisen
-      // gegenueber der tatsaechlich generierten Lohnabrechnung.
-      const pdForMonth = pdForDate(m.range.start);
-      const effForMonth = effectivePcts(
-        // effectivePcts erwartet PctComp-shape; wir bauen aus employee-Row
-        // die minimale Repraesentation (uses_standard_lohn + ggf. Overrides).
-        {
-          uses_standard_lohn: (e as unknown as { uses_standard_lohn?: boolean | null }).uses_standard_lohn ?? true,
-          ahv_iv_eo_pct: (e as unknown as { ahv_iv_eo_pct?: number | null }).ahv_iv_eo_pct ?? null,
-          alv_pct: (e as unknown as { alv_pct?: number | null }).alv_pct ?? null,
-          nbu_pct: (e as unknown as { nbu_pct?: number | null }).nbu_pct ?? null,
-          bvg_pct: (e as unknown as { bvg_pct?: number | null }).bvg_pct ?? null,
-          ktg_pct: (e as unknown as { ktg_pct?: number | null }).ktg_pct ?? null,
-          quellensteuer_pct: (e as unknown as { quellensteuer_pct?: number | null }).quellensteuer_pct ?? null,
-          employer_ahv_pct: (e as unknown as { employer_ahv_pct?: number | null }).employer_ahv_pct ?? null,
-          employer_alv_pct: (e as unknown as { employer_alv_pct?: number | null }).employer_alv_pct ?? null,
-          employer_fak_pct: (e as unknown as { employer_fak_pct?: number | null }).employer_fak_pct ?? null,
-          employer_bu_pct: (e as unknown as { employer_bu_pct?: number | null }).employer_bu_pct ?? null,
-          employer_bvg_pct: (e as unknown as { employer_bvg_pct?: number | null }).employer_bvg_pct ?? null,
-          employer_verwaltung_pct: (e as unknown as { employer_verwaltung_pct?: number | null }).employer_verwaltung_pct ?? null,
-        },
-        defaultsFromPd(pdForMonth),
-      );
-      const nettoMultForMonth = 1 - sumEmployeePct(effForMonth) / 100;
-      const employerMultForMonth = 1 + sumEmployerPct(effForMonth) / 100;
-
-      brutto += empBrutto;
-      netto += empBrutto * nettoMultForMonth;
-      vollkosten += empBrutto * employerMultForMonth;
-      planMinutes += empMinutes;
-    }
-
-    // Location-Historien-Zusatz — nur fuer zukuenftige und laufende Monate.
-    // Vergangene Monate haben ihre echten Ist-Zahlen, da braucht's nichts.
-    if (m.kind === "future" || m.kind === "current") {
-      // Alle historischen Locations durchgehen: fuer jede pruefen wie viele
-      // Termine dieses Monats schon geplant sind, und die Differenz zur
-      // historischen Ø-Anzahl-Termine addieren.
-      const allLocKeys = new Set<string>(locStats.keys());
-      // Auch Locations die schon geplante Termine im Monat haben aber keine
-      // Historie: zaehlen wir spaeter separat (via companyAvg-Fallback).
-      const monthKey = m.prefix;
-      for (const [k] of plannedByMonthLocation) {
-        if (k.startsWith(`${monthKey}::`)) {
-          allLocKeys.add(k.slice(monthKey.length + 2));
-        }
-      }
-
-      for (const locKey of allLocKeys) {
-        const stat = locStats.get(locKey);
-        const historicalAvgApptsPerMonth = stat
-          ? stat.apptCount / historyLookbackMonths
-          : companyAvgApptsPerMonth;
-        const avgMinutesPerAppt = stat && stat.apptCount > 0
-          ? stat.totalMinutes / stat.apptCount
-          : companyAvgMinutesPerAppt;
-
-        const plannedCount = plannedByMonthLocation.get(`${monthKey}::${locKey}`) ?? 0;
-        const additionalCount = Math.max(0, historicalAvgApptsPerMonth - plannedCount);
-        if (additionalCount <= 0) continue;
-
-        const additionalMinutes = additionalCount * avgMinutesPerAppt;
-        historyAdditionalMinutes += additionalMinutes;
-        historyAdditionalBrutto += (additionalMinutes / 60) * companyAvgWage;
-      }
-
-      // Historien-Zusatz in die Summen einbauen (mit firmen-Ø-Multiplikatoren
-      // weil die Personenzuordnung noch offen ist).
-      brutto += historyAdditionalBrutto;
-      netto += historyAdditionalBrutto * avgNettoMult;
-      vollkosten += historyAdditionalBrutto * avgEmployerMult;
-      planMinutes += Math.round(historyAdditionalMinutes);
-    }
-
-    return {
-      month: m.mm,
-      label: MONTH_LABELS_DE[m.mm - 1],
-      kind: m.kind,
-      plan_minutes: planMinutes,
-      brutto_chf: brutto,
-      netto_chf: netto,
-      vollkosten_chf: vollkosten,
-      // Diagnostics fuers UI: wie viel vom Prognose-Wert kommt aus geplanten
-      // Terminen vs. wie viel wurde aus Location-Historie geschaetzt.
-      history_additional_minutes: Math.round(historyAdditionalMinutes),
-      history_additional_brutto_chf: historyAdditionalBrutto,
-    };
-  });
-
-  const ytdActualBrutto = monthlyBreakdown.filter((m) => m.kind === "past").reduce((s, m) => s + m.brutto_chf, 0);
-  const currentMonthForecast = monthlyBreakdown.find((m) => m.kind === "current")?.brutto_chf ?? 0;
-  const restOfYearForecast = monthlyBreakdown.filter((m) => m.kind === "future").reduce((s, m) => s + m.brutto_chf, 0);
-  const totalYearBrutto = ytdActualBrutto + currentMonthForecast + restOfYearForecast;
-  const totalYearNetto = monthlyBreakdown.reduce((s, m) => s + m.netto_chf, 0);
-  const totalYearVollkosten = monthlyBreakdown.reduce((s, m) => s + m.vollkosten_chf, 0);
-
-  const annualPayrollSummary = {
-    year,
-    ytd_actual_brutto_chf: ytdActualBrutto,
-    current_month_forecast_chf: currentMonthForecast,
-    rest_of_year_forecast_chf: restOfYearForecast,
-    total_year_brutto_chf: totalYearBrutto,
-    total_year_netto_chf: totalYearNetto,
-    total_year_vollkosten_chf: totalYearVollkosten,
-    monthly: monthlyBreakdown,
-  };
-
-  // Interne Helper-Felder aus der Response herausstrippen (nur intern
-  // fuer die Jahres-Aggregation gebraucht).
-  const employeesPublic = (employees as EmpWithPrivateForAnnual[]).map((e) => {
-    const {
-      _plan_minutes_per_month,
-      _plan_brutto_no_puffer_per_month,
-      _plan_minutes_no_puffer_per_month,
-      _employer_multiplier,
-      _netto_multiplier,
-      ...rest
-    } = e;
-    void _plan_minutes_per_month; void _plan_brutto_no_puffer_per_month;
-    void _plan_minutes_no_puffer_per_month; void _employer_multiplier;
-    void _netto_multiplier;
-    return rest;
-  });
-
   return NextResponse.json({
     success: true,
     month,
-    employees: employeesPublic,
+    employees,
     bvgThresholdChf,
     bvgForecastMonthLabels: FORECAST_MONTHS.map((m) => m.label),
-    annualPayrollSummary,
   });
 }

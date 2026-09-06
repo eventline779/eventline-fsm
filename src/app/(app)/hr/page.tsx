@@ -19,9 +19,9 @@
  *
  * Lohn-Tab:
  *   - MA-Sicht (default): eigene PDFs + Lohnausweise + Digital-Consent.
- *   - Admin-Sicht (Toggle „Team"): LohnsummenPrognose + Sub-Tabs
- *     Monatsstunden/PDFs/Mitarbeiter/Standardwerte. TrustedDeviceGate
- *     wrapt nur die Team-Sicht.
+ *   - Admin-Sicht (Toggle „Team"): Sub-Tabs Monatsstunden/PDFs/
+ *     Mitarbeiter/Standardwerte. TrustedDeviceGate wrapt nur die
+ *     Team-Sicht.
  *
  * Sub-Tab-Rename Legacy-Mapping bleibt fuer alte Deep-Links.
  *
@@ -45,7 +45,6 @@ import { LohndokumenteAdmin } from "@/components/hr/lohndokumente-admin";
 import { MonatsstundenTable } from "@/components/hr/monatsstunden-table";
 import { LohnStandardwerteCard } from "@/components/hr/loehne/lohn-standardwerte-card";
 import { MitarbeiterLohnTab } from "@/components/hr/loehne/mitarbeiter-lohn-tab";
-import { LohnsummenPrognose } from "@/components/analytics/lohnsummen-prognose";
 import { LohnausweiseList } from "@/components/hr/lohnausweise-list";
 import { BackButton } from "@/components/ui/back-button";
 
@@ -258,9 +257,7 @@ export default function HRPage() {
 
           {effectiveLohnMode === "team" && canManageLohn && (
             <TrustedDeviceGate>
-              <LohnsummenPrognose />
-
-              <div className="mt-6 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 {loehneSubTabs.map((t) => (
                   <button
                     key={t.key}
