@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Stempelzeiten-Portal (vereinfacht — 2026-09-02, Scope-Toggle 2026-09-06).
+ * Stempelzeiten-Portal (vereinfacht — 2026-09-02, User-Dropdown 2026-09-06).
  *
  * Zeigt Stempeleintraege der letzten 30 Tage als flache, nach Tag gruppierte
  * Liste — kein Datums-Picker, keine Quick-Chips, kein Heatmap-/Pivot-Toggle,
@@ -12,22 +12,27 @@
  * KPIs oben (3 Kacheln): Diese Woche / Dieser Monat / Ø pro Arbeitstag Monat.
  * "Heute" faellt weg — steht ohnehin ganz oben in der Liste.
  *
- * Scope-Toggle (Eigene | Team | Alle) — ersetzt den frueheren Admin-User-
- * Selector (SearchableSelect). Sichtbarkeit der Segments haengt an den
- * Rechten des Users (Migration 208 Teamleiter-Scope):
- *   - Eigene: IMMER sichtbar (Default).
- *   - Team:   nur wenn Rolle-scope='team'|'all' ODER Admin, UND der User
- *             tatsaechlich Team-Mitglieder hat (profiles.team_lead_id = ich).
- *             Zeigt eigene + Team-Mitglieder-Eintraege. RLS
- *             (time_entries_select_team via sees_user()) haerte das ab.
- *   - Alle:   nur wenn Permission 'stempelzeiten:see-all' (Admin durch).
- *             Zeigt firm-weit alle Eintraege, sortiert nach clock_in desc.
- *             In Team- und Alle-Modus zeigt jede Row den Mitarbeiter-Namen
- *             (Avatar + Farbcode), sonst waere die Liste unlesbar.
+ * Ansichts-Wechsel ("Eigene" + User-Dropdown) — ersetzt den vorherigen
+ * Team/Alle-Segment-Toggle (2026-09-06). Statt drei Buttons gibt es einen
+ * "Eigene"-Button (Default) plus einen SearchableSelect fuer die Person-
+ * Auswahl. Sichtbarkeit des Dropdowns haengt an den Rechten:
+ *   - Admin (Permission 'stempelzeiten:see-all'): alle aktiven Mitarbeiter
+ *     (ausser Partner, via get_assignable_users RPC).
+ *   - Teamleiter (roles.scope='team'|'all'): nur die eigenen Team-Mitglieder
+ *     (profiles.team_lead_id = current_user).
+ *   - Normal-User (scope='self'): kein Dropdown, nur eigene Ansicht.
+ * Sobald ein Fremd-User gewaehlt ist, filtert die Query strikt auf
+ * `user_id = selectedUserId`. RLS (time_entries_select_team via sees_user())
+ * haerte das serverseitig ab; ein Teamleiter, der jemanden ausserhalb seines
+ * Teams anfragt, bekommt eine leere Liste. Fremd-User-Zeilen zeigen den
+ * Namen des MA (Avatar + Farbcode).
  *
- * Persistenz: URL `?scope=team|alle` + localStorage-Fallback. Eigene hat
- * kein URL-Param (Default-Zustand). Wenn ein URL-Param einen Modus verlangt
- * fuer den der User keine Rechte hat, faellt es auf 'eigene' zurueck.
+ * Persistenz: URL `?user=<uuid>` + localStorage `stempelzeiten-user`.
+ * Eigene hat kein URL-Param (Default). Legacy `?scope=team|alle` wird
+ * toleriert (ignoriert). Ein sanitizer-Effect entfernt ungueltige
+ * selectedUserId-Werte (z.B. alte Links ohne aktuelle Rechte), sobald die
+ * Rolle geladen ist — sonst wuerde der User auf einer leeren Liste ohne
+ * Ausweg festhaengen (kein Dropdown-Button zum Zurueckwechseln).
  *
  * DST-Safety: KPI-Tages-Buckets via per-Minute-Bucketize (Europe/Zurich),
  * damit Nacht-Schichten korrekt auf zwei Tage verteilt werden. Die
@@ -48,6 +53,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { Input } from "@/components/ui/input";
 import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import { JobNumber } from "@/components/job-number";
+import { SearchableSelect, type SelectItem } from "@/components/searchable-select";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 import {
@@ -330,47 +336,45 @@ export function StempelzeitenView() {
   const [ownEntries, setOwnEntries] = useState<OwnEntry[]>([]);
   const [scopedEntries, setScopedEntries] = useState<ScopedEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  // Users-Map (id -> full_name) fuer die Zeilen-Darstellung in Team/Alle-Modi.
-  // Wird bei Bedarf via get_assignable_users (SECURITY DEFINER) geladen —
-  // die Profile-RLS wuerde einen direkten Join fuer Nicht-Admins blockieren.
+  // Users-Map (id -> full_name) fuer Fremd-User-Zeilen und die
+  // Dropdown-Options (inkl. eigener Name mit "(du)"-Marker). Wird bei
+  // Bedarf via get_assignable_users (SECURITY DEFINER) geladen — die
+  // Profile-RLS wuerde einen direkten Join fuer Nicht-Admins blockieren.
   const [usersMap, setUsersMap] = useState<Map<string, string>>(() => new Map());
   const [now, setNow] = useState(() => Date.now());
 
-  // Scope-Toggle (Eigene | Team | Alle) — ersetzt den frueheren
-  // Admin-User-Selector. Details: siehe Doku oben im Datei-Kopf.
-  //
-  // Rolle-Scope kommt aus roles.scope (Migration 208). Admin ist implizit
-  // 'all'. Team-Members kommen aus profiles.team_lead_id = current_user.
-  // Ist die eine oder andere Info noch nicht geladen, wird die Sichtbarkeit
-  // konservativ (weniger anzeigen) berechnet — reload triggert dann Update.
+  // Rolle-Scope + Team-Members steuern die Dropdown-Sichtbarkeit.
+  // Rolle-Scope kommt aus roles.scope (Migration 208), Admin ist implizit
+  // 'all'. Team-Members = profiles.team_lead_id = current_user.
+  // `roleLoaded` flankiert den Sanitizer-Effect fuer selectedUserId — solange
+  // die Rolle noch nicht geladen ist, darf kein legitimer ?user=…-Link
+  // vorschnell geloescht werden.
   const [roleScope, setRoleScope] = useState<"self" | "team" | "all">("self");
+  const [roleLoaded, setRoleLoaded] = useState(false);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
-  const canTeam = (roleScope === "team" || roleScope === "all" || canSeeAll)
-    && teamMemberIds.length > 0;
-  const canAll = canSeeAll;
+  /** Dropdown-Sichtbarkeit: Admin (see-all) ODER Teamleiter mit MA. */
+  const canSelectOther = canSeeAll
+    || ((roleScope === "team" || roleScope === "all") && teamMemberIds.length > 0);
 
-  // URL-Param `?scope=team|alle`, Fallback localStorage, Default "eigene".
-  // `useState`-Initializer lest URL SYNCHRON, damit der erste Load die
-  // richtige Query feuert (kein Flicker "Eigene → Team").
-  const [scope, setScope] = useState<"eigene" | "team" | "alle">(() => {
-    if (typeof window === "undefined") return "eigene";
-    const fromUrl = searchParams.get("scope");
-    if (fromUrl === "team" || fromUrl === "alle") return fromUrl;
+  // URL-Param `?user=<uuid>`, Fallback localStorage, Default null (= eigene).
+  // `useState`-Initializer lest die URL SYNCHRON, damit der erste Load
+  // gleich die richtige Query feuert (kein Flicker "eigen → Fremd").
+  // Legacy `?scope=team|alle` wird ignoriert — der User-Dropdown loest die
+  // frueheren Segmente ab.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const fromUrl = searchParams.get("user");
+    if (fromUrl && UUID_RE.test(fromUrl)) return fromUrl;
     try {
-      const stored = localStorage.getItem("stempelzeiten-scope");
-      if (stored === "team" || stored === "alle") return stored;
+      const stored = localStorage.getItem("stempelzeiten-user");
+      if (stored && UUID_RE.test(stored)) return stored;
     } catch { /* SSR/private mode → ignorieren */ }
-    return "eigene";
+    return null;
   });
 
-  // Effektiver Scope = gewaehlter Scope, aber sanitized falls Rechte fehlen.
-  // Passiert typischerweise wenn ein User einen alten URL-Link mit ?scope=alle
-  // aufmacht ohne die Rechte zu haben, oder wenn ein Team-Leiter kein Team
-  // (mehr) hat. Fallback ist immer "eigene" — sicher & funktional.
-  const effectiveScope: "eigene" | "team" | "alle" =
-    scope === "alle" && !canAll ? "eigene"
-    : scope === "team" && !canTeam ? "eigene"
-    : scope;
+  // isOwnView: keine Fremd-Auswahl (oder man selbst gewaehlt → normalisiert).
+  const isOwnView = !selectedUserId || selectedUserId === currentUserId;
 
   // Auftragsnummer-Filter (URL-persistent via ?auftrag=XXXXX). Der Text im
   // Input ist entkoppelt vom "committeten" Filter — Live-Suche mit 300ms
@@ -435,7 +439,7 @@ export function StempelzeitenView() {
       setRoleScope(s);
 
       // Team-Members = Profiles mit team_lead_id = ich. Auch fuer Nicht-
-      // Team-Rollen laden — kostet einen Roundtrip, macht die Toggle-Logik
+      // Team-Rollen laden — kostet einen Roundtrip, macht die Dropdown-Logik
       // aber deterministisch (Anzahl aus dem State ablesbar).
       const { data: members } = await supabase
         .from("profiles")
@@ -444,15 +448,20 @@ export function StempelzeitenView() {
       if (cancelled) return;
       const ids = ((members ?? []) as { id: string }[]).map((r) => r.id);
       setTeamMemberIds(ids);
+      // Erst NACH beiden Queries als "geladen" markieren — der Sanitizer
+      // fuer selectedUserId braucht beide Werte, um korrekt zu entscheiden.
+      setRoleLoaded(true);
     })();
     return () => { cancelled = true; };
   }, [supabase, currentUserId]);
 
-  // Users-Map fuer Zeilen-Darstellung — nur laden wenn Team/Alle-Modus
-  // (oder Auftrags-Filter, der ebenfalls Namen pro Row zeigt) tatsaechlich
-  // nutzbar/aktiv ist. get_assignable_users ist SECURITY DEFINER und
-  // liefert Namen unabhaengig von profiles-RLS.
-  const needsUsersMap = effectiveScope !== "eigene" || jobFilterActive;
+  // Users-Map fuer Zeilen-Darstellung UND Dropdown-Labels — laden wenn:
+  //  - Fremd-Ansicht aktiv (Row-Avatar/Name),
+  //  - Auftrags-Filter aktiv (Row-Name pro MA),
+  //  - User Dropdown-Rechte hat (Options + eigener Name mit "(du)").
+  // get_assignable_users ist SECURITY DEFINER und liefert Namen unabhaengig
+  // von profiles-RLS.
+  const needsUsersMap = !isOwnView || jobFilterActive || canSelectOther;
   useEffect(() => {
     if (!needsUsersMap) return;
     if (usersMap.size > 0) return; // einmal pro Session reicht
@@ -465,26 +474,55 @@ export function StempelzeitenView() {
     })();
   }, [needsUsersMap, supabase, usersMap.size]);
 
-  // Scope wechseln + persistieren (URL + localStorage).
-  // - Default "eigene" → kein URL-Param (haelt die URL clean).
+  // User-Auswahl setzen + persistieren (URL + localStorage).
+  // - null / self → kein URL-Param (haelt die URL clean, "Eigene" ist default).
   // - `history.replaceState` (nicht router.replace) — reiner visueller Update,
   //   kein Next.js Route-Transition (spart Re-Mount und respektiert den
   //   Ticket-System-Workflow der parallel laufen kann).
-  const setScopeAndPersist = useCallback((next: "eigene" | "team" | "alle") => {
-    setScope(next);
-    try { localStorage.setItem("stempelzeiten-scope", next); } catch { /* private mode */ }
+  // - Legacy `?scope=`-Param wird bei jedem Wechsel gleich mitentfernt.
+  const setSelectedUserIdAndPersist = useCallback((next: string | null) => {
+    // Selbst gewaehlt = eigene Ansicht → auf null normalisieren.
+    const normalized = next && next !== currentUserId ? next : null;
+    setSelectedUserId(normalized);
+    try {
+      if (normalized) localStorage.setItem("stempelzeiten-user", normalized);
+      else localStorage.removeItem("stempelzeiten-user");
+    } catch { /* private mode */ }
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    if (next === "eigene") url.searchParams.delete("scope");
-    else url.searchParams.set("scope", next);
+    if (normalized) url.searchParams.set("user", normalized);
+    else url.searchParams.delete("user");
+    url.searchParams.delete("scope"); // Legacy-Param mitentfernen.
     window.history.replaceState({}, "", url.toString());
-  }, []);
+  }, [currentUserId]);
 
-  // Kein Sanitizer-Effect fuer den Scope-Fallback: `effectiveScope` derived
-  // den erlaubten Wert bereits at-render (wenn Rechte fehlen → "eigene").
-  // Wir belassen einen evtl. `?scope=team`-URL-Param stehen — sollte der
-  // Nutzer spaeter Team-Rechte bekommen, springt die Ansicht automatisch
-  // dorthin. Kein cascading setState-in-effect noetig.
+  // Sanitizer: ungueltige selectedUserId aufraeumen, sobald Rolle geladen ist.
+  //  - self → auf null normalisieren (isOwnView deckt das ohnehin ab, aber
+  //    URL/Storage sauber halten).
+  //  - Admin: alle usersMap-Ids OK (wenn usersMap noch leer, warten).
+  //  - Teamleiter: nur teamMemberIds erlaubt.
+  //  - Sonst (Normal-User): raus → sonst wuerde der User in einer leeren
+  //    Ansicht ohne Dropdown festhaengen.
+  useEffect(() => {
+    if (!roleLoaded) return;
+    if (!selectedUserId) return;
+    if (selectedUserId === currentUserId) {
+      setSelectedUserIdAndPersist(null);
+      return;
+    }
+    if (canSeeAll) {
+      if (usersMap.size > 0 && !usersMap.has(selectedUserId)) {
+        setSelectedUserIdAndPersist(null);
+      }
+      return;
+    }
+    if ((roleScope === "team" || roleScope === "all")
+        && teamMemberIds.includes(selectedUserId)) {
+      return;
+    }
+    setSelectedUserIdAndPersist(null);
+  }, [roleLoaded, selectedUserId, currentUserId, canSeeAll, roleScope,
+      teamMemberIds, usersMap, setSelectedUserIdAndPersist]);
 
   // 30-Tage-Cutoff hart — kein UI-Umschalter. Aus dem Render heraus stabil.
   const fromIso = useMemo(
@@ -533,16 +571,16 @@ export function StempelzeitenView() {
       return;
     }
 
-    // Kein Auftrags-Filter → Scope-Toggle steuert die Query.
+    // Kein Auftrags-Filter → User-Auswahl steuert die Query.
     setJobFilterHeader(null);
     setJobFilterEntries([]);
     setJobLookupState("idle");
 
-    // "Eigene" (Default) → wie bisher: nur eigene Eintraege.
+    // Eigene Ansicht (Default oder Selbst-Auswahl im Dropdown).
     // RLS-Bug-Schutz: Admins haetten via RLS Zugriff auf ALLE time_entries —
     // ohne expliziten user_id-Filter zeigt "Eigene Sicht" auch fremde.
     // Daher zwingend nach currentUserId filtern.
-    if (effectiveScope === "eigene") {
+    if (isOwnView) {
       if (!currentUserId) { setLoading(false); return; }
       const { data, error } = await supabase
         .from("time_entries")
@@ -557,31 +595,16 @@ export function StempelzeitenView() {
       return;
     }
 
-    // "Team" → eigene + team_lead_id=ich. `.in(user_id, [self, ...teamIds])`.
-    // RLS (time_entries_select_team via sees_user()) haerte das ab: die
-    // Query bekommt nur Zeilen zurueck fuer die sees_user()=true — bei
-    // scope='team' sind das genau die genannten User.
-    if (effectiveScope === "team") {
-      if (!currentUserId) { setLoading(false); return; }
-      const ids = Array.from(new Set([currentUserId, ...teamMemberIds]));
-      const { data, error } = await supabase
-        .from("time_entries")
-        .select("id, user_id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
-        .in("user_id", ids)
-        .gte("clock_in", fromTs)
-        .order("clock_in", { ascending: false });
-      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
-      setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
-      setOwnEntries([]);
-      setLoading(false);
-      return;
-    }
-
-    // "Alle" → keine user_id-Einschraenkung. Admin/scope='all' sieht via RLS
-    // firm-weit alles. Namen kommen aus usersMap (get_assignable_users).
+    // Fremd-User im Dropdown gewaehlt → nur DIESER User. RLS erlaubt
+    // Admin/see-all alles; Teamleiter (via sees_user()) nur eigene
+    // Team-Mitglieder — ist der gewaehlte User ausserhalb, liefert die
+    // Query eine leere Liste (Empty-State greift, Sanitizer raeumt
+    // beim naechsten Render auf).
+    if (!selectedUserId) { setLoading(false); return; }
     const { data, error } = await supabase
       .from("time_entries")
       .select("id, user_id, job_id, clock_in, clock_out, description, notes, job:jobs(job_number, title)")
+      .eq("user_id", selectedUserId)
       .gte("clock_in", fromTs)
       .order("clock_in", { ascending: false });
     if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
@@ -590,14 +613,15 @@ export function StempelzeitenView() {
     setLoading(false);
   }, [
     supabase, currentUserId, fromIso, jobFilterActive, jobFilterNumber,
-    effectiveScope, teamMemberIds,
+    isOwnView, selectedUserId,
   ]);
 
-  // Legitimer cascading-Effect: `load` haengt an effectiveScope + teamMemberIds
-  // (die aus einem vorgelagerten Effekt gesetzt werden). Der Compiler flaggt
-  // das defensiv, ist hier aber gewollt: sobald der Teamleiter-Scope oder das
-  // Team-Set sich aendert, muss die Query neu feuern. React-Compiler-Warnung
-  // wird gezielt unterdrueckt — Rule-Alternative waere hier ueberkomplex.
+  // Legitimer cascading-Effect: `load` haengt an isOwnView + selectedUserId
+  // (die aus State und den vorgelagerten Effekten kommen). Der Compiler
+  // flaggt das defensiv, ist hier aber gewollt: sobald der User im Dropdown
+  // wechselt (oder eine Auswahl vom Sanitizer verworfen wird), muss die
+  // Query neu feuern. React-Compiler-Warnung wird gezielt unterdrueckt —
+  // Rule-Alternative waere hier ueberkomplex.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
@@ -676,11 +700,11 @@ export function StempelzeitenView() {
       if (!jobFilterHeader) return [];
       return jobFilterEntries.map((e) => normalizeJobFilter(e, jobFilterHeader));
     }
-    if (effectiveScope === "eigene") {
+    if (isOwnView) {
       return ownEntries.map((e) => normalizeOwn(e, currentUserId));
     }
     return scopedEntries.map((e) => normalizeScoped(e, usersMap));
-  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, effectiveScope, ownEntries, scopedEntries, usersMap, currentUserId]);
+  }, [jobFilterActive, jobFilterHeader, jobFilterEntries, isOwnView, ownEntries, scopedEntries, usersMap, currentUserId]);
 
   // Aggregat fuer den Auftrags-Header: Total-Minuten + Anzahl unique
   // Mitarbeiter, die auf dem Auftrag gestempelt haben.
@@ -723,12 +747,40 @@ export function StempelzeitenView() {
     return { weekMin, monthMin, avgPerDay, daysWorked: daysWithEntries.size };
   }, [dayBuckets]);
 
-  // Sub-Header-Text pro Scope. Aussagekraeftig genug, dass der Nutzer beim
-  // Aufmachen der Ansicht sofort weiss "was schaue ich hier gerade an".
-  const scopeSubLabel: string =
-    effectiveScope === "alle" ? "Alle Einträge"
-    : effectiveScope === "team" ? "Team-Einträge"
+  // Sub-Header-Text pro Ansicht. Aussagekraeftig genug, dass der Nutzer beim
+  // Aufmachen sofort weiss "was schaue ich hier gerade an".
+  const viewedUserName: string | null = !isOwnView && selectedUserId
+    ? (usersMap.get(selectedUserId) ?? null)
+    : null;
+  const scopeSubLabel: string = viewedUserName
+    ? `Einträge von ${viewedUserName}`
     : "Deine Einträge";
+
+  // Dropdown-Options: Admin bekommt alle aktiven MA (ausser Partner) via
+  // usersMap. Teamleiter bekommt nur die eigenen Team-Mitglieder.
+  // Eigener Name steht oben mit "(du)"-Marker damit der User visuell sieht,
+  // welche Person aktuell "man selbst" ist — Auswahl darauf normalisiert
+  // aber auf null (isOwnView), s.o. setSelectedUserIdAndPersist.
+  const dropdownItems = useMemo<SelectItem[]>(() => {
+    if (!currentUserId || !canSelectOther) return [];
+    const items: SelectItem[] = [];
+    const selfName = usersMap.get(currentUserId);
+    if (selfName) items.push({ id: currentUserId, label: `${selfName} (du)` });
+    const others: SelectItem[] = [];
+    if (canSeeAll) {
+      for (const [id, name] of usersMap) {
+        if (id !== currentUserId) others.push({ id, label: name });
+      }
+    } else {
+      for (const id of teamMemberIds) {
+        if (id === currentUserId) continue;
+        const name = usersMap.get(id);
+        if (name) others.push({ id, label: name });
+      }
+    }
+    others.sort((a, b) => a.label.localeCompare(b.label, "de-CH"));
+    return [...items, ...others];
+  }, [currentUserId, canSelectOther, canSeeAll, teamMemberIds, usersMap]);
 
   return (
     <div className="space-y-6">
@@ -846,49 +898,36 @@ export function StempelzeitenView() {
           />
         </div>
 
-        {/* Scope-Toggle (Eigene | Team | Alle) — bei Auftrags-Filter ausgeblendet
-            (die Auftrags-Ansicht zeigt bewusst alle MA auf dem Auftrag; ein
-            zusaetzlicher Scope-Filter wuerde das Bild reduzieren, ohne Mehrwert).
-            Segments-Sichtbarkeit: Eigene IMMER, Team nur bei Rolle-scope>=team
-            + tatsaechlichen Team-Mitgliedern, Alle nur bei stempelzeiten:see-all
-            (Admin implizit). Details siehe Doku im Datei-Kopf. */}
-        {!jobFilterActive && (canTeam || canAll) && (
+        {/* Ansichts-Wechsel — bei Auftrags-Filter ausgeblendet (die Auftrags-
+            Ansicht zeigt bewusst alle MA auf dem Auftrag; ein zusaetzlicher
+            Person-Filter waere redundant). Nur sichtbar wenn der User
+            ueberhaupt jemand anderen sehen darf (Admin oder Teamleiter mit
+            Team-Mitgliedern) — Normal-User bekommen nur den Hinweistext. */}
+        {!jobFilterActive && canSelectOther && (
           <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
-              onClick={() => setScopeAndPersist("eigene")}
-              className={effectiveScope === "eigene" ? "kasten-active" : "kasten"}
+              onClick={() => setSelectedUserIdAndPersist(null)}
+              className={isOwnView ? "kasten-active" : "kasten"}
               data-tooltip="Nur eigene Stempel-Einträge"
             >
               Eigene
             </button>
-            {canTeam && (
-              <button
-                type="button"
-                onClick={() => setScopeAndPersist("team")}
-                className={effectiveScope === "team" ? "kasten-active" : "kasten"}
-                data-tooltip={`Eigene + Team (${teamMemberIds.length} MA)`}
-              >
-                <Users className="h-3.5 w-3.5" />
-                Team
-              </button>
-            )}
-            {canAll && (
-              <button
-                type="button"
-                onClick={() => setScopeAndPersist("alle")}
-                className={effectiveScope === "alle" ? "kasten-active" : "kasten"}
-                data-tooltip="Alle Mitarbeiter (firm-weit)"
-              >
-                Alle
-              </button>
-            )}
+            <div className="w-56">
+              <SearchableSelect
+                value={isOwnView ? "" : (selectedUserId ?? "")}
+                onChange={(id) => setSelectedUserIdAndPersist(id || null)}
+                items={dropdownItems}
+                placeholder="Person wählen…"
+                active={!isOwnView}
+              />
+            </div>
           </div>
         )}
 
-        {/* Hinweistext-Fallback, wenn User keinen Team/Alle-Zugriff hat — nur
+        {/* Hinweistext-Fallback, wenn User keine Fremd-Ansicht darf — nur
             Auftrag-Filter da, Rest der Zeile leer wirkt hohl. */}
-        {!jobFilterActive && !canTeam && !canAll && (
+        {!jobFilterActive && !canSelectOther && (
           <p className="text-xs text-muted-foreground hidden md:block ml-auto">
             Stempeleinträge der letzten {DEFAULT_RANGE_DAYS} Tage
           </p>
@@ -930,11 +969,9 @@ export function StempelzeitenView() {
             <p className="text-sm text-muted-foreground mt-1">
               {jobFilterActive
                 ? `Auf INT-${jobFilterNumber} wurde bisher nicht gestempelt.`
-                : effectiveScope === "alle"
-                  ? `In den letzten ${DEFAULT_RANGE_DAYS} Tagen wurde nicht gestempelt.`
-                  : effectiveScope === "team"
-                    ? `Weder du noch dein Team hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen gestempelt.`
-                    : `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
+                : isOwnView
+                  ? `Du hast in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`
+                  : `${viewedUserName ?? "Dieser Mitarbeiter"} hat in den letzten ${DEFAULT_RANGE_DAYS} Tagen nicht gestempelt.`}
             </p>
           </CardContent>
         </Card>
