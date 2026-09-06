@@ -25,6 +25,12 @@
 // (z.B. RESEND-Key fehlt), kann er beim naechsten Cron-Lauf nachgeholt
 // werden, ohne dass der jeweils andere doppelt rausgeht.
 //
+// Nachhol-lauf: der Cron feuert an >=1 (Tag+1-Kinds) bzw. >=3 (mail_lead),
+// nicht auf === Tag 1 / === Tag 3. So holt ein zwischen zwei Cron-Laeufen
+// ausgefallener Vercel-Cron den Reminder am naechsten Tag nach, statt ihn
+// dauerhaft zu verlieren. Die Idempotenz-Row (job_id, kind) verhindert,
+// dass ein Auftrag mehr als einmal je Reminder-Art angepingt wird.
+//
 // Filter fuer "ueberfaellige Auftraege":
 //   - status NOT IN ('abgeschlossen', 'storniert', 'entwurf', 'anfrage')
 //     → nur echte, laufende Auftraege
@@ -227,10 +233,13 @@ export async function GET(request: Request) {
     const endIso = endDateToLocalIso(job.end_date);
     const overdueDays = daysBetweenIso(endIso, today);
 
-    // Nur an exakt Tag 1 bzw. Tag 3 versenden. Cron verpasst einen Tag
-    // (Vercel-Cron-Ausfall) → dieser Reminder faellt aus. Bewusst: „grosser"
-    // Retry ohne Idempotenz wuerde Auftraege 5 Tage lang jeden Tag anpingen.
-    if (overdueDays !== 1 && overdueDays !== 3) {
+    // Alles ab Tag +1 ist ein Kandidat fuer die Tag+1-Reminder, alles ab
+    // Tag +3 zusaetzlich fuer die Tag+3-Lead-Mail. Frueher haben wir hart
+    // auf === 1 bzw. === 3 gefiltert — Nachteil: verpasst der Cron einen
+    // Tag (Vercel-Ausfall), fiel der Reminder DAUERHAFT aus. Jetzt >=1/>=3:
+    // Nachhol-lauf greift, Duplikate verhindert die unique-Constraint
+    // (job_id, kind) via markSent + alreadySent-Check.
+    if (overdueDays < 1) {
       skipped++;
       continue;
     }
@@ -242,7 +251,8 @@ export async function GET(request: Request) {
     // Kein Assignee → alle relevanten Reminder-Kinds trotzdem als Marker
     // eintragen, damit der Cron morgen nicht wieder rein-laeuft.
     if (assigneeIds.length === 0) {
-      const kinds = overdueDays === 1 ? ["notification", "mail"] : ["mail_lead"];
+      const kinds: string[] = ["notification", "mail"];
+      if (overdueDays >= 3) kinds.push("mail_lead");
       for (const kind of kinds) {
         if (alreadySent.has(`${job.id}::${kind}`)) continue;
         await markSent(job.id, kind, []);
@@ -251,8 +261,8 @@ export async function GET(request: Request) {
       continue;
     }
 
-    // ─────────── Tag +1: In-App + Mail an alle MA ───────────
-    if (overdueDays === 1) {
+    // ─────────── Tag +1 (bzw. spaeter im Nachhol-lauf): In-App + Mail an alle MA ───────────
+    if (overdueDays >= 1) {
       // In-App Notification
       if (!alreadySent.has(`${job.id}::notification`)) {
         try {
@@ -332,8 +342,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // ─────────── Tag +3: Mail an den Team-Leader jedes MA ───────────
-    if (overdueDays === 3) {
+    // ─────────── Tag +3 (bzw. spaeter im Nachhol-lauf): Mail an den Team-Leader jedes MA ───────────
+    if (overdueDays >= 3) {
       if (alreadySent.has(`${job.id}::mail_lead`)) {
         skipped++;
         continue;

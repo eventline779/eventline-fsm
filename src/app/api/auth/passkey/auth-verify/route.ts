@@ -93,58 +93,73 @@ export async function POST(request: Request) {
   }
 
   // 2) Passende, noch gültige Auth-Challenge suchen (die wir bei
-  // /auth-challenge angelegt haben). Bei mehreren offenen nehmen wir
-  // die neueste — die alten sind entweder abgelaufen oder wurden nicht
-  // verwendet. Der clientData enthält die Challenge, WebAuthn matched.
+  // /auth-challenge angelegt haben). Frueher haben wir bis zu 20 offene
+  // Challenges nacheinander durchprobiert — das ist eine DoS-Angriffs-
+  // flaeche (jeder Verify ist teuer). Stattdessen ziehen wir die exakte
+  // Challenge aus dem clientDataJSON, das ohnehin base64url-codiert im
+  // Response steckt (WebAuthn-spec: client uebermittelt genau die
+  // Challenge die er signiert hat), und machen einen Equality-Lookup.
+  // → EIN Verify statt bis zu 20, kein Amplification-Vector.
+  let expectedChallenge: string;
+  try {
+    const clientDataJson = Buffer.from(
+      response.response.clientDataJSON,
+      "base64url",
+    ).toString("utf8");
+    const clientData = JSON.parse(clientDataJson) as { challenge?: unknown };
+    if (typeof clientData.challenge !== "string" || clientData.challenge.length === 0) {
+      throw new Error("challenge fehlt");
+    }
+    expectedChallenge = clientData.challenge;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Ungueltige clientDataJSON." },
+      { status: 400 },
+    );
+  }
+
   const { data: chalRow } = await admin
     .from("user_passkey_challenges")
     .select("id, challenge, expires_at")
     .eq("kind", "auth")
+    .eq("challenge", expectedChallenge)
     .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .maybeSingle();
 
-  if (!chalRow || chalRow.length === 0) {
+  if (!chalRow) {
     return NextResponse.json(
       { success: false, error: "Keine gültige Challenge — bitte Login neu starten." },
       { status: 400 },
     );
   }
 
-  // Wir wissen nicht welche exakte Challenge zum Client-Round-Trip
-  // gehört, versuchen alle noch offenen — die richtige matched via
-  // WebAuthn-clientData. Falscher Match → verify wirft, dann next
-  // versuchen. In der Praxis fast immer beim ersten Treffer richtig.
   let verified = false;
   let matchedChallenge: { id: string; challenge: string } | null = null;
   let newCounter = 0;
 
-  for (const c of chalRow) {
-    try {
-      const v = await verifyAuthenticationResponse({
-        response,
-        expectedChallenge: c.challenge,
-        expectedOrigin: passkeyOrigin(),
-        expectedRPID: passkeyRpId(),
-        credential: {
-          id: response.id,
-          publicKey: new Uint8Array(Buffer.from(credRow.public_key, "base64url")),
-          counter: Number(credRow.counter ?? 0),
-          transports: (credRow.transports ?? undefined) as
-            | ("internal" | "hybrid" | "usb" | "nfc" | "ble")[]
-            | undefined,
-        },
-        requireUserVerification: false,
-      });
-      if (v.verified) {
-        verified = true;
-        matchedChallenge = { id: c.id as string, challenge: c.challenge as string };
-        newCounter = v.authenticationInfo.newCounter;
-        break;
-      }
-    } catch {
-      // nicht passende Challenge → nächste probieren
+  try {
+    const v = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: chalRow.challenge,
+      expectedOrigin: passkeyOrigin(),
+      expectedRPID: passkeyRpId(),
+      credential: {
+        id: response.id,
+        publicKey: new Uint8Array(Buffer.from(credRow.public_key, "base64url")),
+        counter: Number(credRow.counter ?? 0),
+        transports: (credRow.transports ?? undefined) as
+          | ("internal" | "hybrid" | "usb" | "nfc" | "ble")[]
+          | undefined,
+      },
+      requireUserVerification: false,
+    });
+    if (v.verified) {
+      verified = true;
+      matchedChallenge = { id: chalRow.id as string, challenge: chalRow.challenge as string };
+      newCounter = v.authenticationInfo.newCounter;
     }
+  } catch {
+    // verify wirft → schlicht als Fehlversuch behandeln
   }
 
   if (!verified || !matchedChallenge) {

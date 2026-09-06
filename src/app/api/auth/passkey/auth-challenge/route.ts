@@ -2,12 +2,20 @@
  * POST /api/auth/passkey/auth-challenge
  * Body: { email?: string }
  *
- * Startet einen Passkey-Login. Wenn eine Email angegeben wurde,
- * beschränken wir die erlaubten Credentials auf die des Users → der
- * Browser zeigt gezielt nur diese Passkeys an. Ohne Email läuft der
- * "discoverable"-Flow: der Browser bietet ALLE für diese Domain
- * registrierten Passkeys zur Auswahl (setzt residentKey=preferred bei
- * Registrierung voraus — das machen wir).
+ * Startet einen Passkey-Login. Wir laufen IMMER im "discoverable"-Flow:
+ * der Browser bietet ALLE für diese Domain registrierten Passkeys zur
+ * Auswahl (setzt residentKey=preferred bei Registrierung voraus — das
+ * machen wir). Wir geben BEWUSST NIE allowCredentials aus, auch wenn
+ * eine Email mitkommt, damit die Response-Shape keine Rueckschluesse
+ * erlaubt (Enumeration-Schutz):
+ *   - existierender User mit Passkey vs.
+ *   - existierender User ohne Passkey vs.
+ *   - Email unbekannt
+ * saehen sonst anhand der Laenge/Existenz von allowCredentials
+ * unterschiedlich aus. So sind alle drei Faelle identisch.
+ *
+ * Die Email im Body wird ignoriert (nur akzeptiert damit alte Clients
+ * nicht scheitern) — kein DB-Lookup mehr auf profiles/user_passkeys.
  *
  * Antwort: WebAuthn-Auth-Optionen (mit Challenge). Client ruft damit
  * `startAuthentication()` und schickt das Ergebnis an /auth-verify.
@@ -18,56 +26,21 @@ import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { passkeyRpId } from "@/lib/passkey";
 
-interface Body {
-  email?: string;
-}
-
 export async function POST(request: Request) {
-  let body: Body = {};
+  // Body wird geparst aber nicht ausgewertet — bewusst discoverable flow.
   try {
-    body = (await request.json()) as Body;
+    await request.json();
   } catch {
-    // Body ist optional — leerer Body ist ok (discoverable flow).
+    // Body ist optional — leerer Body ist ok.
   }
 
-  const email = (body.email ?? "").trim().toLowerCase();
   const admin = createAdminClient();
-
-  let allowCredentials: { id: string; transports?: ("internal" | "hybrid" | "usb" | "nfc" | "ble")[] }[] | undefined;
-
-  if (email) {
-    // User via Email auflösen, dann seine Credentials laden. Wir geben
-    // BEWUSST nicht preis, ob die Email existiert (kein Enumeration-
-    // Vector): wenn kein User → leere Liste aber trotzdem eine Challenge
-    // ausliefern, damit sich das Response-Timing nicht verrät.
-    // Über profiles.email — skaliert (Index), im Gegensatz zu
-    // listUsers() das bei 100+ Mitarbeitern langsam wird.
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (profile) {
-      const { data: creds } = await admin
-        .from("user_passkeys")
-        .select("credential_id, transports")
-        .eq("user_id", profile.id);
-      allowCredentials = (creds ?? []).map((c) => ({
-        id: c.credential_id as string,
-        transports: (c.transports ?? undefined) as
-          | ("internal" | "hybrid" | "usb" | "nfc" | "ble")[]
-          | undefined,
-      }));
-    } else {
-      allowCredentials = [];
-    }
-  }
 
   const options = await generateAuthenticationOptions({
     rpID: passkeyRpId(),
     userVerification: "preferred",
-    allowCredentials,
+    // allowCredentials bewusst weglassen → discoverable flow, keine
+    // Credential-Preisgabe, keine Enumeration ueber die Response-Shape.
   });
 
   await admin.rpc("cleanup_expired_passkey_challenges");

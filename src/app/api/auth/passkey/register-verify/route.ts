@@ -82,6 +82,16 @@ export async function POST(request: Request) {
 
   const nickname = (body.nickname ?? "").trim().slice(0, 60) || null;
 
+  // transports kommen 1:1 vom Client — Runtime-Whitelist (nicht nur
+  // TS-Cast), damit kein beliebiger String in unserer DB landet.
+  const ALLOWED_TRANSPORTS = ["internal", "hybrid", "usb", "nfc", "ble"] as const;
+  type AllowedTransport = (typeof ALLOWED_TRANSPORTS)[number];
+  const rawTransports = Array.isArray(cred.transports) ? cred.transports : [];
+  const cleanTransports = rawTransports.filter(
+    (t): t is AllowedTransport =>
+      typeof t === "string" && (ALLOWED_TRANSPORTS as readonly string[]).includes(t),
+  );
+
   const { error: insErr } = await admin.from("user_passkeys").insert({
     user_id: user.id,
     credential_id: cred.id,
@@ -89,7 +99,7 @@ export async function POST(request: Request) {
     counter: cred.counter ?? 0,
     device_type: info.credentialDeviceType,
     backed_up: info.credentialBackedUp,
-    transports: cred.transports ?? null,
+    transports: cleanTransports.length > 0 ? cleanTransports : null,
     nickname,
   });
 
