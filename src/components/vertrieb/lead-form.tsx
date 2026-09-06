@@ -253,7 +253,7 @@ export function LeadForm({
                           </p>
                           {t.note && <p className="text-muted-foreground text-[11px] italic mt-0.5">{t.note}</p>}
                         </div>
-                        <button type="button" onClick={() => onDeleteTermin(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => onDeleteTermin(t.id)} className="p-1 text-gray-400 hover:text-red-500" aria-label="Termin löschen"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     ))}
                   </div>
@@ -283,7 +283,7 @@ export function LeadForm({
                 {offertePdf ? (
                   <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-card border border-border">
                     <span className="text-sm truncate">{offertePdf.name}</span>
-                    <button type="button" onClick={onRemoveOfferte} className="p-1 text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={onRemoveOfferte} className="p-1 text-muted-foreground hover:text-red-500" aria-label="Offerte entfernen"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 ) : (
                   <label className="mt-1.5 flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed border-border bg-card text-sm text-muted-foreground cursor-pointer hover:border-foreground/30 hover:text-foreground transition-colors">

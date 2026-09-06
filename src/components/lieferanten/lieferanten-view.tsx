@@ -291,6 +291,7 @@ export function LieferantenView({ embedded = false }: Props = {}) {
                         onClick={() => openEdit(p)}
                         className="icon-btn icon-btn-purple"
                         data-tooltip="Bearbeiten"
+                        aria-label="Bearbeiten"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -300,6 +301,7 @@ export function LieferantenView({ embedded = false }: Props = {}) {
                         onClick={() => handleDelete(p)}
                         className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                         data-tooltip="Löschen"
+                        aria-label="Löschen"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

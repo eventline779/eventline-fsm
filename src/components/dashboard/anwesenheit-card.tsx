@@ -246,15 +246,15 @@ export function AnwesenheitskalenderCard({ className }: { className?: string }) 
                               />
                             </div>
                             <div className="flex items-center gap-1">
-                              <button onClick={save} className="icon-btn icon-btn-green !h-6 !w-6" data-tooltip="Speichern">
+                              <button onClick={save} className="icon-btn icon-btn-green !h-6 !w-6" data-tooltip="Speichern" aria-label="Speichern">
                                 <Check className="h-3.5 w-3.5" />
                               </button>
                               {e && (
-                                <button onClick={() => clear(date)} className="icon-btn icon-btn-red !h-6 !w-6" data-tooltip="Entfernen">
+                                <button onClick={() => clear(date)} className="icon-btn icon-btn-red !h-6 !w-6" data-tooltip="Entfernen" aria-label="Entfernen">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              <button onClick={() => setEdit(null)} className="icon-btn !h-6 !w-6" data-tooltip="Abbrechen">
+                              <button onClick={() => setEdit(null)} className="icon-btn !h-6 !w-6" data-tooltip="Abbrechen" aria-label="Abbrechen">
                                 <X className="h-3.5 w-3.5" />
                               </button>
                             </div>

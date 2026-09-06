@@ -151,14 +151,14 @@ function ProjectDocuments({ projectId, isAdmin, canUpload }: { projectId: string
                   </span>
                 </button>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => previewDocInBrowser(d)} className="kasten kasten-blue !py-1 !px-2" data-tooltip="Vorschau">
+                  <button onClick={() => previewDocInBrowser(d)} className="kasten kasten-blue !py-1 !px-2" data-tooltip="Vorschau" aria-label="Vorschau">
                     <Eye className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => downloadDoc(d)} className="kasten kasten-muted !py-1 !px-2" data-tooltip="Herunterladen">
+                  <button onClick={() => downloadDoc(d)} className="kasten kasten-muted !py-1 !px-2" data-tooltip="Herunterladen" aria-label="Herunterladen">
                     <Download className="h-3.5 w-3.5" />
                   </button>
                   {(isAdmin || me === d.uploaded_by) && (
-                    <button onClick={() => deleteDoc(d)} className="kasten kasten-red !py-1 !px-2" data-tooltip="Loeschen">
+                    <button onClick={() => deleteDoc(d)} className="kasten kasten-red !py-1 !px-2" data-tooltip="Loeschen" aria-label="Loeschen">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}

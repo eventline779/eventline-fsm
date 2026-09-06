@@ -242,10 +242,10 @@ function DocRow({ doc, onDownload, onDelete }: { doc: WageDoc; onDownload: () =>
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button type="button" onClick={onDownload} className="kasten kasten-muted" data-tooltip="Herunterladen">
+        <button type="button" onClick={onDownload} className="kasten kasten-muted" data-tooltip="Herunterladen" aria-label="Herunterladen">
           <Download className="h-3.5 w-3.5" />
         </button>
-        <button type="button" onClick={onDelete} className="kasten kasten-red" data-tooltip="Löschen">
+        <button type="button" onClick={onDelete} className="kasten kasten-red" data-tooltip="Löschen" aria-label="Löschen">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>

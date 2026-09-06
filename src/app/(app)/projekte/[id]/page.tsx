@@ -345,7 +345,7 @@ export default function ProjektDetailPage() {
             </p>
           </div>
           {isAdmin && (
-            <button onClick={deleteProject} className="kasten kasten-muted" data-tooltip="Projekt loeschen">
+            <button onClick={deleteProject} className="kasten kasten-muted" data-tooltip="Projekt loeschen" aria-label="Projekt loeschen">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}

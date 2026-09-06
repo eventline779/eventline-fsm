@@ -356,6 +356,7 @@ function RowEditor({
             onClick={onDelete}
             className="kasten kasten-red"
             data-tooltip="Geplanten Eintrag loeschen"
+            aria-label="Geplanten Eintrag loeschen"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
