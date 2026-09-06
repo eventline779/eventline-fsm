@@ -553,7 +553,7 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
       if (!tr.technician_id) missing.push({ id: `time-range-${i}-technician`, label: `${tag}Techniker` });
     }
     if (missing.length > 0) {
-      reportFormErrors({ missing, toastTitle: "Rapport unvollstaendig" });
+      reportFormErrors({ missing, toastTitle: "Rapport unvollständig" });
       return;
     }
     if (!canFinish) {
@@ -673,7 +673,7 @@ export function RapportFormModal({ open, onClose, job, onCompleted, canFinish, f
         const stRes = await fetch(`/api/reports/${reportId}/auto-stempel`, { method: "POST" });
         const stJson = await stRes.json().catch(() => null);
         if (stJson?.success && (stJson.inserted ?? 0) > 0) {
-          const word = stJson.inserted === 1 ? "Stempel-Eintrag" : "Stempel-Eintraege";
+          const word = stJson.inserted === 1 ? "Stempel-Eintrag" : "Stempel-Einträge";
           toast.success(`${stJson.inserted} ${word} aus Rapport erstellt`);
         }
       } catch (err) {

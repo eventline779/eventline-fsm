@@ -66,7 +66,7 @@ export function SignaturesSection({
                   onTechnicianChange(v, sel?.full_name ?? "");
                 }}
                 items={profiles.map((p) => ({ id: p.id, label: p.full_name }))}
-                placeholder="Techniker auswaehlen…"
+                placeholder="Techniker auswählen…"
               />
             )}
           </div>

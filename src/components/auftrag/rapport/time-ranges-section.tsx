@@ -115,7 +115,7 @@ export function TimeRangesSection({ timeRanges, profiles, isReadOnly, onChange }
       </div>
       {overlapIdx.size > 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-          Achtung: zwei oder mehr Zeitbereiche fuer denselben Techniker am gleichen Tag ueberschneiden sich. Stunden werden doppelt gezaehlt.
+          Achtung: zwei oder mehr Zeitbereiche für denselben Techniker am gleichen Tag überschneiden sich. Stunden werden doppelt gezählt.
         </div>
       )}
       {timeRanges.map((tr, i) => (
@@ -178,7 +178,7 @@ export function TimeRangesSection({ timeRanges, profiles, isReadOnly, onChange }
                     value={tr.technician_id}
                     onChange={(v) => updateRange(i, "technician_id", v)}
                     items={profiles.map((p) => ({ id: p.id, label: p.full_name }))}
-                    placeholder="Auswaehlen…"
+                    placeholder="Auswählen…"
                     required
                   />
                 )}

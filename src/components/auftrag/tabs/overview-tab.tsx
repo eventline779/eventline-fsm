@@ -182,7 +182,7 @@ export function OverviewTab({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="kasten kasten-blue shrink-0"
-                      data-tooltip="In Google Maps oeffnen"
+                      data-tooltip="In Google Maps öffnen"
                     >
                       <MapPin className="h-3.5 w-3.5" />
                       Maps

@@ -337,7 +337,7 @@ function KundeKontaktiertButton({
         const msg =
           json?.error ??
           (res.status === 403
-            ? "Keine Berechtigung fuer diese Aktion."
+            ? "Keine Berechtigung für diese Aktion."
             : "Aktion fehlgeschlagen. Bitte erneut versuchen.");
         toast.error(msg);
         return;
