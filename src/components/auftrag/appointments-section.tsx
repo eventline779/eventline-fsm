@@ -539,6 +539,15 @@ export function AppointmentsSection({
                         <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300 font-medium"><UserPlus className="h-3 w-3" />Nicht zugewiesen</span>
                       )}
                     </div>
+                    {/* Notiz inline sichtbar — dezent unter der Titel/Zeit-
+                        Zeile. Vorher: nur im Edit-Modal einsehbar (Stift-
+                        Icon), was Leo genervt hat. `whitespace-pre-wrap`
+                        damit Zeilenumbrueche in der Notiz erhalten bleiben. */}
+                    {appt.description && appt.description.trim() && (
+                      <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                        {appt.description}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
