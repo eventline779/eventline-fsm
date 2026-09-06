@@ -14,11 +14,15 @@ function parseSettings(raw: unknown): ProfileSettings {
   return raw as ProfileSettings;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
-  const userId = request.nextUrl.searchParams.get("userId");
-  if (!userId) return NextResponse.json({ quick_links: [] });
+
+  // Trust-Boundary: IMMER nur die eigenen Settings zurueckgeben.
+  // Vorher: der userId-Query-Param wurde ungeprueft genommen — jeder
+  // authentifizierte User konnte fremde profiles.settings lesen (Audit-
+  // Befund g1: fremde profile.settings lesbar).
+  const userId = auth.user.id;
 
   const supabase = createAdminClient();
   const { data } = await supabase.from("profiles").select("settings").eq("id", userId).single();
@@ -29,15 +33,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
-  const { userId, quick_links } = await request.json() as { userId?: string; quick_links?: QuickLink[] };
-  if (!userId) return NextResponse.json({ success: false }, { status: 400 });
+  const { quick_links } = await request.json() as { quick_links?: QuickLink[] };
 
   // Trust-Boundary: User darf NUR seine eigenen Settings ueberschreiben.
-  // Vorher: Body-userId wurde ungeprueft genommen — jeder konnte fremde
-  // quick_links plattmachen.
-  if (userId !== auth.user.id) {
-    return NextResponse.json({ success: false, error: "Nicht erlaubt" }, { status: 403 });
-  }
+  // userId aus dem Body wird IGNORIERT — wir nutzen ausschliesslich
+  // auth.user.id (Server-Seite ist die Quelle der Wahrheit).
+  const userId = auth.user.id;
 
   const supabase = createAdminClient();
 

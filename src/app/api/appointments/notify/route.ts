@@ -1,18 +1,37 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 import { logError } from "@/lib/log";
 import { loadCompanySettings, formatMailFooter, formatMailFrom } from "@/lib/company-settings";
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  // Audit-Fix g1: vorher nur requireUser() — jeder eingeloggte User konnte
+  // Termin-Mails an Kunden/Techniker triggern. Jetzt kalender:edit-Gate
+  // (Admin passt automatisch durch has_permission()).
+  const auth = await requirePermission("kalender:edit");
   if (auth.error) return auth.error;
   const body = await request.json();
   const { appointment_id, job_id, additional_email, send_to_emails } = body;
 
   if (!appointment_id || !job_id) {
     return NextResponse.json({ error: "Fehlende Parameter" }, { status: 400 });
+  }
+
+  // Termin vorab per USER-Client laden — RLS entscheidet, ob der User
+  // diesen Termin ueberhaupt sehen darf. Erst danach greifen wir mit dem
+  // Admin-Client auf die vollen Joins (Kunde/Location/Techniker-Emails)
+  // zu, ohne dass jemand fremde Termine per Auf-gut-Glueck-ID adressieren
+  // kann (IDOR-Vector, Audit-Befund g1).
+  const userClient = await createClient();
+  const { data: apptCheck } = await userClient
+    .from("job_appointments")
+    .select("id, job_id")
+    .eq("id", appointment_id)
+    .maybeSingle();
+  if (!apptCheck || apptCheck.job_id !== job_id) {
+    return NextResponse.json({ error: "Termin nicht gefunden oder kein Zugriff" }, { status: 404 });
   }
 
   const supabase = createAdminClient();

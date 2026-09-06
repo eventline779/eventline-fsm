@@ -1,28 +1,40 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 import { appUrl } from "@/lib/app-url";
 import { loadCompanySettings, formatMailFooter, formatMailFrom } from "@/lib/company-settings";
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  // Audit-Fix g1: vorher nur requireUser() — jeder eingeloggte User konnte
+  // beliebige Kollegen mit "Dringend"-Mails via unsere Domain spammen.
+  // Jetzt todos:create-Gate (nur wer Todos zuweisen darf).
+  const auth = await requirePermission("todos:create");
   if (auth.error) return auth.error;
   const { assignedTo, title, description, dueDate, creatorName } = await request.json();
+
+  // Basic-Validation gegen Missbrauch: assignedTo muss ein bekannter, aktiver
+  // Mitarbeiter sein — sonst kann man ueber die Route beliebige Fremd-Adressen
+  // (fruehere Ex-Mitarbeiter, ausgeschiedene Profile) anschreiben.
+  if (typeof assignedTo !== "string" || !/^[0-9a-f-]{36}$/i.test(assignedTo)) {
+    return NextResponse.json({ success: false, error: "Ungueltiger Empfaenger" }, { status: 400 });
+  }
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return NextResponse.json({ success: false, error: "Kein RESEND_API_KEY" });
 
   const supabase = createAdminClient();
 
-  // E-Mail des zugewiesenen Users holen
+  // E-Mail des zugewiesenen Users holen — nur aktive Profile.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, full_name")
+    .select("email, full_name, is_active")
     .eq("id", assignedTo)
     .single();
 
-  if (!profile?.email) return NextResponse.json({ success: false, error: "Keine E-Mail gefunden" });
+  if (!profile?.email || profile.is_active === false) {
+    return NextResponse.json({ success: false, error: "Keine E-Mail gefunden" });
+  }
 
   const resend = new Resend(resendKey);
 

@@ -44,6 +44,25 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .maybeSingle();
   if (draftErr) return NextResponse.json({ success: false, error: draftErr.message }, { status: 500 });
   if (!draft) return NextResponse.json({ success: false, error: "Entwurf nicht gefunden" }, { status: 404 });
+
+  // Audit-Fix g1: Owner-Check auf job_drafts.owner_id. Ohne diese Gate
+  // konnte JEDER mit auftraege:edit einen fremden Draft (z.B. "in Klaerung
+  // beim Kollegen") umwandeln und damit dem Kollegen die Arbeit wegnehmen.
+  // Admins duerfen immer.
+  if (draft.owner_id && draft.owner_id !== auth.user.id) {
+    const { data: me } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    if (me?.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Nur der Owner oder ein Admin kann diesen Entwurf umwandeln" },
+        { status: 403 },
+      );
+    }
+  }
+
   if (draft.status === "umgewandelt" || draft.converted_to_job_id) {
     return NextResponse.json(
       { success: false, error: "Dieser Entwurf wurde bereits umgewandelt", jobId: draft.converted_to_job_id },

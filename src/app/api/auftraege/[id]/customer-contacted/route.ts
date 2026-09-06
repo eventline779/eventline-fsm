@@ -76,7 +76,7 @@ export async function DELETE(
 
   const { data: existing } = await admin
     .from("jobs")
-    .select("id, is_deleted")
+    .select("id, is_deleted, customer_contacted_by")
     .eq("id", id)
     .maybeSingle();
   if (!existing) {
@@ -84,6 +84,25 @@ export async function DELETE(
   }
   if (existing.is_deleted) {
     return NextResponse.json({ success: false, error: "Auftrag ist gelöscht" }, { status: 400 });
+  }
+
+  // Audit-Fix g1: Owner-Check auf customer_contacted_by. Ohne diese Gate
+  // konnte JEDER mit auftraege:edit das "Kunde kontaktiert"-Flag des
+  // Kollegen loeschen — Wettbewerbs-/Zweifelsituation. Admins duerfen
+  // immer (via profiles.role, konsistent mit anderen Owner-or-Admin-
+  // Guards in dieser Codebase).
+  if (existing.customer_contacted_by && existing.customer_contacted_by !== auth.user.id) {
+    const { data: me } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    if (me?.role !== "admin") {
+      return NextResponse.json(
+        { success: false, error: "Nur der Ersteller oder ein Admin kann den Kontakt-Vermerk entfernen" },
+        { status: 403 },
+      );
+    }
   }
 
   const { error } = await admin

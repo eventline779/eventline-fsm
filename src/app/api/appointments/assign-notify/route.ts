@@ -1,13 +1,17 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 import { notifyPartnerTerminZugewiesen } from "@/lib/notification-service";
 import { logError } from "@/lib/log";
 import { loadCompanySettings, formatMailFooter, formatMailFrom } from "@/lib/company-settings";
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  // Audit-Fix g1: vorher nur requireUser() — jeder eingeloggte User konnte
+  // fremde Mitarbeiter mit gefaelschten Terminen anschreiben (Phishing-
+  // Vector via client-kontrolliertem assignedTo/Titel/Datum). Jetzt
+  // kalender:create-Gate (gleiche Permission wie fuer Termin-Anlage im UI).
+  const auth = await requirePermission("kalender:create");
   if (auth.error) return auth.error;
   const { assignedTo, title, date, time, endTime, jobTitle, creatorName, jobId } = await request.json();
 

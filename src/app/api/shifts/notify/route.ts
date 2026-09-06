@@ -1,30 +1,33 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { requireUser } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 import { loadCompanySettings, formatMailFooter, formatMailFrom } from "@/lib/company-settings";
 
 export async function POST(request: Request) {
-  const auth = await requireUser();
+  // Audit-Fix g1: vorher nur requireUser() — jeder eingeloggte User konnte
+  // an beliebige profile_id Schicht-Mails schicken (Phishing-Vector via
+  // client-kontrolliertem Titel/Datum/Zeit). Jetzt kalender:create-Gate.
+  const auth = await requirePermission("kalender:create");
   if (auth.error) return auth.error;
   const body = await request.json();
   const { profile_id, shift_title, shift_date, start_time, end_time } = body;
 
-  if (!profile_id) {
-    return NextResponse.json({ error: "Kein Mitarbeiter angegeben" }, { status: 400 });
+  if (!profile_id || typeof profile_id !== "string" || !/^[0-9a-f-]{36}$/i.test(profile_id)) {
+    return NextResponse.json({ error: "Kein/ungueltiger Mitarbeiter angegeben" }, { status: 400 });
   }
 
   const supabase = createAdminClient();
   const company = await loadCompanySettings(supabase);
 
-  // Mitarbeiter-Profil laden
+  // Mitarbeiter-Profil laden — nur aktive.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email")
+    .select("full_name, email, is_active")
     .eq("id", profile_id)
     .single();
 
-  if (!profile || !profile.email) {
+  if (!profile || !profile.email || profile.is_active === false) {
     return NextResponse.json({ error: "Mitarbeiter nicht gefunden" }, { status: 404 });
   }
 
@@ -73,7 +76,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, emailSent: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, emailSent: false, error: err.message });
+  } catch (err: unknown) {
+    // catch(any) -> unknown + instanceof Error (LOW-Finding im gleichen Sweep).
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    return NextResponse.json({ success: false, emailSent: false, error: message });
   }
 }
