@@ -61,6 +61,7 @@ interface DraftDetail {
   contact_email: string | null;
   contact_phone: string | null;
   location_id: string | null;
+  location_name: string | null;
   room_id: string | null;
   expected_start_date: string | null;
   expected_end_date: string | null;
@@ -316,7 +317,11 @@ export default function EntwurfDetailPage() {
         toast.error(json.error ?? "Umwandlung fehlgeschlagen");
         return;
       }
-      toast.success(`Auftrag angelegt`);
+      toast.success(
+        json.customerCreated
+          ? `Auftrag angelegt · Kunde neu erstellt`
+          : `Auftrag angelegt`,
+      );
       window.dispatchEvent(new Event("jobs:invalidate"));
       router.push(json.redirectUrl as string);
     } finally {
@@ -421,7 +426,7 @@ export default function EntwurfDetailPage() {
             <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate mt-0.5">
               {draft.title}
             </h1>
-            {(draft.customer?.name || draft.customer_name || draft.location?.name || draft.expected_start_date || draft.expected_end_date) && (
+            {(draft.customer?.name || draft.customer_name || draft.location?.name || draft.location_name || draft.expected_start_date || draft.expected_end_date) && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
                 {(draft.customer?.name || draft.customer_name) && (
                   <span className="inline-flex items-center gap-1 min-w-0">
@@ -429,10 +434,10 @@ export default function EntwurfDetailPage() {
                     <span className="truncate">{draft.customer?.name ?? draft.customer_name}</span>
                   </span>
                 )}
-                {draft.location?.name && (
+                {(draft.location?.name || draft.location_name) && (
                   <span className="inline-flex items-center gap-1 min-w-0">
                     <MapPin className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{draft.location.name}</span>
+                    <span className="truncate">{draft.location?.name ?? draft.location_name}</span>
                   </span>
                 )}
                 {(draft.expected_start_date || draft.expected_end_date) && (
@@ -537,8 +542,12 @@ export default function EntwurfDetailPage() {
                       })
                     }
                     items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                    placeholder="— kein Kunden-Datensatz —"
+                    placeholder="— kein Kunden-Datensatz — oder Freitext eintippen…"
                     clearable
+                    onCreateNew={(q) =>
+                      patch({ customer_id: null, customer_name: q })
+                    }
+                    createNewLabel="Neuer Kunde"
                   />
                 </div>
                 {!draft.customer_id && (
@@ -609,7 +618,14 @@ export default function EntwurfDetailPage() {
             <CardContent className="space-y-2">
               <SearchableSelect
                 value={draft.location_id ?? ""}
-                onChange={(id) => patch({ location_id: id || null })}
+                onChange={(id) =>
+                  patch({
+                    location_id: id || null,
+                    // Analog Kunde: bei Auswahl einer echten Location
+                    // location_name leeren.
+                    location_name: id ? null : draft.location_name,
+                  })
+                }
                 items={locations.map((l) => ({
                   id: l.id,
                   label: l.name,
@@ -617,9 +633,28 @@ export default function EntwurfDetailPage() {
                     .filter(Boolean)
                     .join(", "),
                 }))}
-                placeholder="— keine Location —"
+                placeholder="— keine Location — oder Freitext eintippen…"
                 clearable
+                onCreateNew={(q) =>
+                  patch({ location_id: null, location_name: q })
+                }
+                createNewLabel="Externer Ort"
               />
+              {!draft.location_id && (
+                <div className="pt-1">
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Externer Ort / Adresse (Freitext, wird nicht als Location gespeichert)
+                  </label>
+                  <Input
+                    defaultValue={draft.location_name ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (draft.location_name ?? "")) patch({ location_name: v || null });
+                    }}
+                    placeholder="z.B. Restaurant Krone, Basel"
+                  />
+                </div>
+              )}
               {draft.location && (
                 <p className="text-xs text-muted-foreground">
                   {[draft.location.address_street, draft.location.address_zip, draft.location.address_city]

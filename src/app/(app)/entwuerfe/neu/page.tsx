@@ -63,6 +63,9 @@ export default function EntwurfNeuPage() {
     contact_email: "",
     contact_phone: "",
     location_id: "",
+    // Freitext-Fallback fuer Location — analog customer_name. Kein
+    // locations-Record wird erzeugt, auch nicht bei Konversion.
+    location_name: "",
     expected_start_date: "",
     expected_end_date: "",
     guest_count: "",
@@ -126,6 +129,7 @@ export default function EntwurfNeuPage() {
           contact_email: form.contact_email || null,
           contact_phone: form.contact_phone || null,
           location_id: form.location_id || null,
+          location_name: form.location_id ? null : form.location_name || null,
           expected_start_date: form.expected_start_date || null,
           expected_end_date: form.expected_end_date || null,
           guest_count: form.guest_count ? parseInt(form.guest_count, 10) : null,
@@ -172,15 +176,22 @@ export default function EntwurfNeuPage() {
 
         <hr className="border-border/50" />
 
-        {/* Kunde — SearchableSelect ODER Freitext-Fallback */}
+        {/* Kunde — SearchableSelect ODER Freitext-Fallback.
+            "Neu anlegen: X"-Option im Dropdown legt den Namen als Freitext ab
+            (customer_name); der eigentliche customers-Datensatz entsteht erst
+            beim Umwandeln in einen Auftrag (Leo 2026-09-06). */}
         <div className="space-y-2">
           <SectionLabel>Kunde</SectionLabel>
           <SearchableSelect
             value={form.customer_id}
             onChange={(id) => update("customer_id", id)}
             items={customers.map((c) => ({ id: c.id, label: c.name }))}
-            placeholder="Bestehenden Kunden waehlen…"
+            placeholder="Bestehenden Kunden waehlen oder eintippen…"
             clearable
+            onCreateNew={(q) => {
+              setForm((p) => ({ ...p, customer_id: "", customer_name: q }));
+            }}
+            createNewLabel="Neuer Kunde"
           />
           {!form.customer_id && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -226,7 +237,10 @@ export default function EntwurfNeuPage() {
 
         <hr className="border-border/50" />
 
-        {/* Location */}
+        {/* Location — SearchableSelect ODER Freitext (analog Kunde).
+            "Neu anlegen: X" legt den Namen als Freitext ab; bei Umwandlung
+            landet der Text in jobs.external_address — es wird KEINE
+            locations-Row angelegt (Leo 2026-09-06). */}
         <div className="space-y-2">
           <SectionLabel>Location</SectionLabel>
           <SearchableSelect
@@ -237,9 +251,25 @@ export default function EntwurfNeuPage() {
               label: l.name,
               sub: [l.address_street, l.address_zip, l.address_city].filter(Boolean).join(", "),
             }))}
-            placeholder="Location auswählen…"
+            placeholder="Location waehlen oder eintippen…"
             clearable
+            onCreateNew={(q) => {
+              setForm((p) => ({ ...p, location_id: "", location_name: q }));
+            }}
+            createNewLabel="Externer Ort"
           />
+          {!form.location_id && (
+            <div className="space-y-1 pt-1">
+              <p className="text-[10px] text-muted-foreground/70 ml-1">
+                Externer Ort / Adresse (Freitext, wird nicht als Location gespeichert)
+              </p>
+              <Input
+                placeholder="z.B. Restaurant Krone, Basel"
+                value={form.location_name}
+                onChange={(e) => update("location_name", e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         <hr className="border-border/50" />

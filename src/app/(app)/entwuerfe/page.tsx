@@ -39,6 +39,7 @@ interface DraftListRow {
   owner_id: string | null;
   customer_id: string | null;
   customer_name: string | null;
+  location_name: string | null;
   contact_person: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -361,7 +362,7 @@ export default function EntwuerfePage() {
         <div className="space-y-1.5">
           {drafts.map((d) => {
             const kundeName = d.customer?.name ?? d.customer_name ?? d.contact_person ?? "—";
-            const location = d.location?.name ?? null;
+            const location = d.location?.name ?? d.location_name ?? null;
             const dateText = formatDateRange(d.expected_start_date, d.expected_end_date);
             const notesCount = d.notes_count?.[0]?.count ?? 0;
             const statusChip = STATUS_CHIP[d.status];
@@ -465,7 +466,7 @@ export default function EntwuerfePage() {
  */
 function DraftCard({ d }: { d: DraftListRow }) {
   const kundeName = d.customer?.name ?? d.customer_name ?? d.contact_person ?? "—";
-  const location = d.location?.name ?? null;
+  const location = d.location?.name ?? d.location_name ?? null;
   const dateText = formatDateRange(d.expected_start_date, d.expected_end_date);
   const notesCount = d.notes_count?.[0]?.count ?? 0;
   const statusChip = STATUS_CHIP[d.status];

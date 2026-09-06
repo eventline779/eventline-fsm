@@ -30,6 +30,7 @@ const LIST_SELECT = `
   contact_email,
   contact_phone,
   location_id,
+  location_name,
   created_at,
   updated_at,
   converted_to_job_id,
@@ -86,7 +87,7 @@ export async function GET(req: Request) {
       q = q.or(`draft_number.eq.${asNum}`);
     } else {
       q = q.or(
-        `title.ilike.%${safeSearch}%,customer_name.ilike.%${safeSearch}%,contact_person.ilike.%${safeSearch}%${numericPart}`,
+        `title.ilike.%${safeSearch}%,customer_name.ilike.%${safeSearch}%,contact_person.ilike.%${safeSearch}%,location_name.ilike.%${safeSearch}%${numericPart}`,
       );
     }
   }
@@ -105,6 +106,7 @@ interface CreateBody {
   contact_email?: string | null;
   contact_phone?: string | null;
   location_id?: string | null;
+  location_name?: string | null;
   room_id?: string | null;
   expected_start_date?: string | null;
   expected_end_date?: string | null;
@@ -136,6 +138,9 @@ export async function POST(req: Request) {
     contact_email: body.contact_email?.trim() || null,
     contact_phone: body.contact_phone?.trim() || null,
     location_id: body.location_id || null,
+    // Freitext-Fallback: nur wenn KEIN location_id gesetzt ist (analog zu
+    // customer_name). Sonst haetten wir zwei Quellen und die UI muesste raten.
+    location_name: body.location_id ? null : body.location_name?.trim() || null,
     room_id: body.room_id || null,
     expected_start_date: body.expected_start_date || null,
     expected_end_date: body.expected_end_date || null,

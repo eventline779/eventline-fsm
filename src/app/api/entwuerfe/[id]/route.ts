@@ -23,6 +23,7 @@ const DETAIL_SELECT = `
   contact_email,
   contact_phone,
   location_id,
+  location_name,
   room_id,
   expected_start_date,
   expected_end_date,
@@ -78,6 +79,7 @@ interface PatchBody {
   contact_email?: string | null;
   contact_phone?: string | null;
   location_id?: string | null;
+  location_name?: string | null;
   room_id?: string | null;
   expected_start_date?: string | null;
   expected_end_date?: string | null;
@@ -103,7 +105,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     "title", "description",
     "customer_id", "customer_name",
     "contact_person", "contact_email", "contact_phone",
-    "location_id", "room_id",
+    "location_id", "location_name", "room_id",
     "expected_start_date", "expected_end_date",
     "guest_count", "owner_id",
     "status", "general_notes",
