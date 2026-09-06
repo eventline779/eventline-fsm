@@ -22,6 +22,11 @@ interface Props {
 export function JobStempelButton({ jobId, jobNumber }: Props) {
   const { active, clockIn, clockOut, loading } = useStempel();
   const { role } = usePermissions();
+  // Bewusst rollen-basiert: Admins haben einen anderen Zeit-Erfassungs-
+  // Workflow (Auto-Stempel aus Rapport-Abschluss), nicht weniger Rechte.
+  // Kein Permission-Slug — das ist eine Workflow-Weiche, keine Zugriffs-
+  // Frage. Falls in Zukunft granularer noetig (z.B. andere Rollen sollen
+  // auch auto-gestempelt werden), Permission-Slug einfuehren.
   const isAdmin = role === "admin";
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);

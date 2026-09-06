@@ -48,6 +48,11 @@ export function StempelModal({ open, onClose }: Props) {
   const router = useRouter();
   const { clockIn } = useStempel();
   const { role } = usePermissions();
+  // Bewusst rollen-basiert: Admins haben einen anderen Zeit-Erfassungs-
+  // Workflow (Auto-Stempel aus Rapport-Abschluss), nicht weniger Rechte.
+  // Kein Permission-Slug — das ist eine Workflow-Weiche, keine Zugriffs-
+  // Frage. Falls in Zukunft granularer noetig (z.B. andere Rollen sollen
+  // auch auto-gestempelt werden), Permission-Slug einfuehren.
   const isAdmin = role === "admin";
   const [mode, setMode] = useState<"choose" | "job" | "projekt" | "other">("choose");
   const [jobs, setJobs] = useState<JobOption[]>([]);
