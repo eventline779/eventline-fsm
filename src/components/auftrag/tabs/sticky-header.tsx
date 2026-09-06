@@ -10,7 +10,7 @@
  * gruen=abschliessen, rot=destruktiv) verhindert Klick-Verwechslungen.
  */
 
-import { type ReactNode, useTransition } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import {
   MapPin,
   User,
@@ -278,11 +278,20 @@ function KundeKontaktiertButton({
   contactedByName: string | null;
   onReload?: () => void | Promise<void>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const isContacted = !!contactedAt;
+  // Optimistic-State: UI reagiert SOFORT, POST laeuft im Hintergrund.
+  // Kein loadAll()-Warten mehr — der Button fuehlt sich instant an.
+  // Falls Server ablehnt: revert + Toast.
+  const [localContactedAt, setLocalContactedAt] = useState<string | null>(contactedAt);
+  const [localContactedByName, setLocalContactedByName] = useState<string | null>(contactedByName);
+  const [saving, setSaving] = useState(false);
 
-  const fullDateTooltip = contactedAt
-    ? new Date(contactedAt).toLocaleString("de-CH", {
+  useEffect(() => setLocalContactedAt(contactedAt), [contactedAt]);
+  useEffect(() => setLocalContactedByName(contactedByName), [contactedByName]);
+
+  const isContacted = !!localContactedAt;
+
+  const fullDateTooltip = localContactedAt
+    ? new Date(localContactedAt).toLocaleString("de-CH", {
         timeZone: "Europe/Zurich",
         day: "2-digit",
         month: "2-digit",
@@ -292,36 +301,64 @@ function KundeKontaktiertButton({
       })
     : "";
   const tooltip = isContacted
-    ? contactedByName
-      ? `Kontaktiert am ${fullDateTooltip} von ${contactedByName}. Klick zum Rueckgaengig-Machen.`
+    ? localContactedByName
+      ? `Kontaktiert am ${fullDateTooltip} von ${localContactedByName}. Klick zum Rueckgaengig-Machen.`
       : `Kontaktiert am ${fullDateTooltip}. Klick zum Rueckgaengig-Machen.`
     : "Als 'Kunde kontaktiert' markieren, damit niemand doppelt anruft.";
 
-  const onClick = () => {
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/auftraege/${jobId}/customer-contacted`, {
-          method: isContacted ? "DELETE" : "POST",
-        });
-        const json = (await res.json().catch(() => null)) as
-          | { success: boolean; error?: string }
-          | null;
-        if (!res.ok || !json?.success) {
-          const msg =
-            json?.error ??
-            (res.status === 403
-              ? "Keine Berechtigung fuer diese Aktion."
-              : "Aktion fehlgeschlagen. Bitte erneut versuchen.");
-          toast.error(msg);
-          return;
-        }
-        toast.success(isContacted ? "Markierung entfernt" : "Als kontaktiert markiert");
-        await onReload?.();
-      } catch {
-        toast.error("Netzwerkfehler — bitte erneut versuchen.");
+  const onClick = async () => {
+    if (saving) return;
+    const wasContacted = isContacted;
+    const prevAt = localContactedAt;
+    const prevBy = localContactedByName;
+
+    // Optimistic-Update: UI aendert sofort.
+    if (wasContacted) {
+      setLocalContactedAt(null);
+      setLocalContactedByName(null);
+    } else {
+      setLocalContactedAt(new Date().toISOString());
+      // contactedByName wird beim naechsten echten Reload gesetzt.
+      // Fuer den Optimistic-Case: leer lassen (Tooltip zeigt trotzdem Datum).
+    }
+    setSaving(true);
+
+    try {
+      const res = await fetch(`/api/auftraege/${jobId}/customer-contacted`, {
+        method: wasContacted ? "DELETE" : "POST",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success: boolean; error?: string; customer_contacted_at?: string | null }
+        | null;
+      if (!res.ok || !json?.success) {
+        // Revert.
+        setLocalContactedAt(prevAt);
+        setLocalContactedByName(prevBy);
+        const msg =
+          json?.error ??
+          (res.status === 403
+            ? "Keine Berechtigung fuer diese Aktion."
+            : "Aktion fehlgeschlagen. Bitte erneut versuchen.");
+        toast.error(msg);
+        return;
       }
-    });
+      // Server-Timestamp adoptieren (praeziser als client-side new Date()).
+      if (!wasContacted && json.customer_contacted_at) {
+        setLocalContactedAt(json.customer_contacted_at);
+      }
+      // Kein blockendes onReload — der Parent-State wird bei naechster
+      // Navigation eh frisch geladen. Falls doch synchronisiert werden soll:
+      // im Hintergrund feuern (kein await).
+      void onReload?.();
+    } catch {
+      setLocalContactedAt(prevAt);
+      setLocalContactedByName(prevBy);
+      toast.error("Netzwerkfehler — bitte erneut versuchen.");
+    } finally {
+      setSaving(false);
+    }
   };
+  const pending = saving;
 
   if (isContacted) {
     return (
@@ -337,7 +374,7 @@ function KundeKontaktiertButton({
         ) : (
           <PhoneCall className="h-4 w-4" />
         )}
-        Kontaktiert · {relativeSince(contactedAt!)}
+        Kontaktiert · {relativeSince(localContactedAt!)}
       </button>
     );
   }
