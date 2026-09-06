@@ -454,23 +454,39 @@ export function StempelzeitenView() {
   // ?auftrag=... in die URL fuer Reload-Persist + Teilbarkeit. Leerer Input
   // → param loeschen. Andere URL-Params (z.B. tab=stempelzeiten im HR-Hub)
   // bleiben erhalten.
+  //
+  // Zwei Fallen die dieser Effekt bewusst vermeidet:
+  //  1. Initial-Mount-Guard: jobFilterInput ist beim Mount auf den URL-Wert
+  //     initialisiert (bereits synchron). Der Effekt darf NICHT beim ersten
+  //     Render feuern — sonst wuerde nach 300ms unnoetig die URL neu-geschrieben
+  //     und dabei ein via `history.replaceState` gerade gesetzter tab-Param
+  //     (z.B. "?tab=stempelzeiten" nach HR-Tab-Klick) aus dem stale searchParams-
+  //     Closure heraus wieder ueberschrieben → Tab springt zurueck.
+  //  2. `window.history.replaceState` statt `router.replace()`: rein visueller
+  //     URL-Update, KEIN Next.js Route-Transition. So triggert der Filter-Rewrite
+  //     nicht die URL-Sync-useEffects auf der HR-Seite (die sonst den Tab-State
+  //     aus alten Params rekonstruieren wuerden).
+  const jobFilterDidMount = useRef(false);
   useEffect(() => {
+    if (!jobFilterDidMount.current) {
+      jobFilterDidMount.current = true;
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const parsed = parseJobNumber(jobFilterInput);
       setJobFilterNumber(parsed);
-      const params = new URLSearchParams(searchParams.toString());
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
       if (parsed !== null) {
-        params.set("auftrag", String(parsed));
+        url.searchParams.set("auftrag", String(parsed));
       } else {
-        params.delete("auftrag");
+        url.searchParams.delete("auftrag");
       }
-      const qs = params.toString();
-      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+      window.history.replaceState({}, "", url.toString());
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    // searchParams/pathname bewusst NICHT im dep-array: sonst Loop wenn wir
-    // die URL selbst rewriten. Sie werden nur beim Aendern des Inputs gelesen.
+    // jobFilterInput ist die einzige echte Trigger-Quelle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobFilterInput]);
 
