@@ -15,6 +15,7 @@ import { DatenschutzAcceptModal } from "@/components/datenschutz-accept-modal";
 import { DATENSCHUTZ_VERSION } from "@/lib/datenschutz";
 import { ViewAsOverlay } from "@/components/dev/view-as-overlay";
 import { LiveBroadcastReceiver } from "@/components/dev/live-broadcast-receiver";
+import { PresenceProvider } from "@/lib/use-online-presence";
 
 // Partner-Portal-Layout: minimal Topbar, KEINE Sidebar, KEINE Eve.
 // Auth-Guard: nur eingeloggte 'partner'-Profile mit partner_location_id
@@ -166,6 +167,7 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
     // Damit bleibt der Header garantiert fix oben — sticky greift in
     // manchen Layout-Kombinationen unzuverlaessig, fixed-Height +
     // internal-scroll ist robuster.
+    <PresenceProvider>
     <div className="h-screen overflow-hidden flex flex-col bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       <header className="border-b bg-card shrink-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
@@ -243,5 +245,6 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
           wenn Admin gerade eine Live-Session zu diesem Partner faehrt. */}
       <LiveBroadcastReceiver userId={profile?.id ?? null} />
     </div>
+    </PresenceProvider>
   );
 }

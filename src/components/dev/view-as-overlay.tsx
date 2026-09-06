@@ -28,6 +28,7 @@ import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil, Radio }
 import { createClient } from "@/lib/supabase/client";
 import { LiveBroadcastSender } from "@/components/dev/live-broadcast-sender";
 import { MobilePreviewFrame } from "@/components/dev/mobile-preview-frame";
+import { useOnlinePresence } from "@/lib/use-online-presence";
 
 interface Candidate {
   id: string;
@@ -43,6 +44,7 @@ interface CurrentState {
 
 export function ViewAsOverlay() {
   const supabase = createClient();
+  const presenceSet = useOnlinePresence();
   const [realUserRole, setRealUserRole] = useState<string | null>(null);
   const [realUserId, setRealUserId] = useState<string | null>(null);
   const [realUserName, setRealUserName] = useState<string>("Admin");
@@ -305,16 +307,20 @@ export function ViewAsOverlay() {
           }}
         >
           <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider shadow-sm"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider shadow-lg"
             style={{
+              // Semi-transparent Kasten (rounded-xl matcht kasten-System
+              // aus globals.css). Backdrop-blur damit die Farbe des Content
+              // dahinter subtil durchscheint.
               background: current!.write_enabled
-                ? "color-mix(in oklab, var(--card) 88%, #dc2626)"
-                : "color-mix(in oklab, var(--card) 92%, var(--accent))",
+                ? "color-mix(in oklab, #dc2626 22%, transparent)"
+                : "color-mix(in oklab, var(--accent) 18%, transparent)",
               color: current!.write_enabled ? "#dc2626" : "var(--accent)",
               border: `1px solid ${current!.write_enabled
-                ? "color-mix(in oklab, #dc2626 55%, transparent)"
-                : "color-mix(in oklab, var(--accent) 45%, transparent)"}`,
-              backdropFilter: "blur(6px)",
+                ? "color-mix(in oklab, #dc2626 60%, transparent)"
+                : "color-mix(in oklab, var(--accent) 50%, transparent)"}`,
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
             }}
           >
             {current!.write_enabled ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
@@ -633,6 +639,29 @@ export function ViewAsOverlay() {
                   }}
                 />
               </div>
+              {/* Presence-Status: "N online" = alle User im app-presence
+                  channel MINUS uns selbst. Grüner Punkt in derselben
+                  view-as-live-blink-Animation wie im Live-Chip oben. */}
+              {(() => {
+                const othersOnline = Math.max(
+                  0,
+                  presenceSet.size - (realUserId && presenceSet.has(realUserId) ? 1 : 0),
+                );
+                return (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full"
+                      style={{
+                        background: "#10b981",
+                        boxShadow: "0 0 6px #10b981",
+                        animation: "view-as-live-blink 1s ease-in-out infinite",
+                      }}
+                      aria-hidden
+                    />
+                    <span>{othersOnline} online</span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Kandidaten — gruppiert nach Team / Partner */}
@@ -650,6 +679,7 @@ export function ViewAsOverlay() {
                       currentId={current?.target_user_id ?? null}
                       loading={loading}
                       onPick={startImpersonation}
+                      presenceSet={presenceSet}
                     />
                   )}
                   {partnerList.length > 0 && (
@@ -659,6 +689,7 @@ export function ViewAsOverlay() {
                       currentId={current?.target_user_id ?? null}
                       loading={loading}
                       onPick={startImpersonation}
+                      presenceSet={presenceSet}
                     />
                   )}
                 </div>
@@ -698,20 +729,26 @@ export function ViewAsOverlay() {
             type="button"
             onClick={() => setOpen(true)}
             aria-label="View-As öffnen"
-            className="inline-flex items-center gap-2 pl-2.5 pr-3 py-2 rounded-full shadow-md transition-all hover:shadow-lg"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl shadow-lg transition-all hover:shadow-xl"
             style={{
-              background: "var(--card)",
-              border: `1px solid ${liveActive
-                ? "#dc2626"
+              // Kasten-Form (rounded-xl), semi-transparent mit backdrop-blur.
+              // Farbtinte richtet sich nach Zustand: live > active > idle.
+              background: liveActive
+                ? "color-mix(in oklab, #dc2626 20%, transparent)"
                 : active
-                  ? "var(--accent)"
+                  ? "color-mix(in oklab, var(--accent) 16%, transparent)"
+                  : "color-mix(in oklab, var(--card) 88%, transparent)",
+              border: `1px solid ${liveActive
+                ? "color-mix(in oklab, #dc2626 60%, transparent)"
+                : active
+                  ? "color-mix(in oklab, var(--accent) 50%, transparent)"
                   : "var(--border)"}`,
               color: liveActive ? "#dc2626" : active ? "var(--accent)" : "var(--foreground)",
-              // Wenn Live: doppelter Rand als Alarm-Signal auch bei ganz
-              // geschlossener UI. Der Admin soll nie vergessen dass er
-              // gerade broadcastet.
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              // Live: zusaetzlicher Halo-Ring als Alarm-Signal.
               boxShadow: liveActive
-                ? "0 0 0 3px color-mix(in oklab, #dc2626 30%, transparent), 0 4px 12px rgba(0,0,0,0.15)"
+                ? "0 0 0 3px color-mix(in oklab, #dc2626 25%, transparent), 0 6px 16px rgba(0,0,0,0.2)"
                 : undefined,
             }}
           >
@@ -726,9 +763,9 @@ export function ViewAsOverlay() {
                 aria-label="Live"
               />
             ) : (
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="h-4 w-4" />
             )}
-            <span className="text-[11px] font-medium">
+            <span className="text-xs font-semibold">
               {active ? current!.target!.full_name.split(" ")[0] : "View-As"}
               {liveActive && " · LIVE"}
             </span>
@@ -756,12 +793,14 @@ function CandidateGroup({
   currentId,
   loading,
   onPick,
+  presenceSet,
 }: {
   label: string;
   users: Candidate[];
   currentId: string | null;
   loading: boolean;
   onPick: (id: string) => void;
+  presenceSet: Set<string>;
 }) {
   return (
     <div className="pb-1">
@@ -771,6 +810,7 @@ function CandidateGroup({
       <ul>
         {users.map((u) => {
           const isCurrent = currentId === u.id;
+          const isOnline = presenceSet.has(u.id);
           return (
             <li key={u.id}>
               <button
@@ -804,7 +844,21 @@ function CandidateGroup({
                   {initials(u.full_name)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium truncate leading-tight">{u.full_name}</p>
+                  <p className="text-xs font-medium truncate leading-tight flex items-center gap-1.5">
+                    <span className="truncate">{u.full_name}</span>
+                    {isOnline && (
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{
+                          background: "#10b981",
+                          boxShadow: "0 0 6px #10b981",
+                          animation: "view-as-live-blink 1s ease-in-out infinite",
+                        }}
+                        aria-label="Online"
+                        data-tooltip="Online"
+                      />
+                    )}
+                  </p>
                   <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">{u.role}</p>
                 </div>
                 {isCurrent && (

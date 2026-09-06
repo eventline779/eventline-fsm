@@ -30,6 +30,7 @@ import { useEnterAsTab } from "@/lib/use-enter-as-tab";
 import { useScrollRestoration } from "@/lib/use-scroll-restoration";
 import { PermissionsProvider, usePermissions } from "@/lib/use-permissions";
 import { StempelProvider } from "@/lib/use-stempel";
+import { PresenceProvider } from "@/lib/use-online-presence";
 import { NavCountsProvider, useNavCounts, getBadgeForHref } from "@/lib/use-nav-counts";
 import { MeinKontoOnboardingProvider, useMeinKontoOnboarding } from "@/lib/use-mein-konto-onboarding";
 import { MeinKontoIntroModal } from "@/components/onboarding/mein-konto-intro-modal";
@@ -43,7 +44,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PermissionsProvider>
       <StempelProvider>
-        <AppLayoutInner>{children}</AppLayoutInner>
+        <PresenceProvider>
+          <AppLayoutInner>{children}</AppLayoutInner>
+        </PresenceProvider>
       </StempelProvider>
     </PermissionsProvider>
   );
