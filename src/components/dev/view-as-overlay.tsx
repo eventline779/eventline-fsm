@@ -20,8 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bug, ChevronUp, ChevronDown, LogOut, Loader2, Search, X } from "lucide-react";
-import { usePermissions } from "@/lib/use-permissions";
+import { Bug, ChevronUp, ChevronDown, LogOut, Loader2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Candidate {
@@ -37,8 +36,14 @@ interface CurrentState {
 }
 
 export function ViewAsOverlay() {
-  const { profile, ready } = usePermissions();
   const supabase = createClient();
+  // Eigenes Profile-Load statt usePermissions — der Hook ist nicht in allen
+  // Layouts verfuegbar (z.B. /partner hat keinen PermissionsProvider). Das
+  // Overlay muss aber ueberall funktionieren, sonst kommt der impersonierende
+  // Admin aus dem Partner-Portal nie wieder raus.
+  const [realUserRole, setRealUserRole] = useState<string | null>(null);
+  const [realUserId, setRealUserId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [devModeEnabled, setDevModeEnabled] = useState<boolean | null>(null);
   const [current, setCurrent] = useState<CurrentState | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -46,16 +51,40 @@ export function ViewAsOverlay() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"alle" | "team" | "partner">("alle");
   const [loading, setLoading] = useState(false);
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = realUserRole === "admin";
 
-  // Load dev-mode-enabled flag + current impersonation state
+  // Beim Mount: hole den ECHTEN eingeloggten User + sein role/devmode-flag.
+  // WICHTIG: hier NICHT effectiveUser — auch bei aktiver Impersonation muss
+  // das Overlay den echten Admin identifizieren, sonst wuerde bei einem
+  // impersonierten Partner das Overlay verschwinden.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) { setReady(true); return; }
+      setRealUserId(user.id);
+      const { data } = await supabase
+        .from("profiles")
+        .select("role, developer_mode_enabled")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setRealUserRole((data?.role as string) ?? null);
+      setDevModeEnabled(Boolean(data?.developer_mode_enabled));
+      setReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [supabase]);
+
   const refresh = useCallback(async () => {
-    if (!isAdmin || !profile?.id) return;
+    if (!realUserId) return;
     const { data } = await supabase
       .from("profiles")
-      .select("developer_mode_enabled")
-      .eq("id", profile.id)
+      .select("developer_mode_enabled, role")
+      .eq("id", realUserId)
       .maybeSingle();
+    setRealUserRole((data?.role as string) ?? realUserRole);
     setDevModeEnabled(Boolean(data?.developer_mode_enabled));
     if (data?.developer_mode_enabled) {
       const r = await fetch("/api/dev/impersonate");
@@ -63,11 +92,17 @@ export function ViewAsOverlay() {
     } else {
       setCurrent({ active: false });
     }
-  }, [isAdmin, profile?.id, supabase]);
+  }, [realUserId, realUserRole, supabase]);
 
+  // Impersonation-Status beim Mount holen (falls Cookie schon gesetzt ist).
   useEffect(() => {
-    if (ready) void refresh();
-  }, [ready, refresh]);
+    if (ready && isAdmin && devModeEnabled) {
+      (async () => {
+        const r = await fetch("/api/dev/impersonate");
+        if (r.ok) setCurrent(await r.json());
+      })();
+    }
+  }, [ready, isAdmin, devModeEnabled]);
 
   // Listen for toggle-changes from settings page
   useEffect(() => {
@@ -111,7 +146,24 @@ export function ViewAsOverlay() {
       });
       const json = await r.json();
       if (!json.success) throw new Error(json.error ?? "Fehler");
-      // Reload damit alle RSC-Fetches die neue Perspektive holen.
+      // Portal-Wechsel: Partner-User leben ausschliesslich im /partner-Portal
+      // (das (app)/-Portal redirected sie eh sofort weg). Wenn wir einen
+      // Partner impersonieren muss die Navigation direkt dorthin, sonst
+      // landet der Admin auf dem Firmenportal und sieht 'seine' Admin-View
+      // statt der Partner-Perspektive. Umgekehrt: wenn wir einen Nicht-
+      // Partner impersonieren und aktuell im /partner-Portal sind, zurueck
+      // zum Firmen-Dashboard.
+      const targetRole = json.target?.role as string | undefined;
+      const targetIsPartner = targetRole === "partner";
+      const currentIsPartnerPortal = window.location.pathname.startsWith("/partner");
+      if (targetIsPartner && !currentIsPartnerPortal) {
+        window.location.href = "/partner/anfragen";
+        return;
+      }
+      if (!targetIsPartner && currentIsPartnerPortal) {
+        window.location.href = "/dashboard";
+        return;
+      }
       window.location.reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Fehler beim Wechsel");
@@ -123,6 +175,14 @@ export function ViewAsOverlay() {
     setLoading(true);
     try {
       await fetch("/api/dev/impersonate", { method: "DELETE" });
+      // Beim Stop: wenn wir gerade im Partner-Portal sind (weil wir einen
+      // Partner impersoniert hatten), zurueck zum Firmen-Dashboard —
+      // sonst wuerde der Admin am Partner-Portal haengen bleiben ohne
+      // Berechtigung dort etwas zu tun.
+      if (window.location.pathname.startsWith("/partner")) {
+        window.location.href = "/dashboard";
+        return;
+      }
       window.location.reload();
     } catch {
       toast.error("Beenden fehlgeschlagen");

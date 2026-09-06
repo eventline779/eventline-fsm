@@ -13,6 +13,7 @@ import { useScrollRestoration } from "@/lib/use-scroll-restoration";
 import { Sun, Moon, LogOut, FileText, Calendar, User } from "lucide-react";
 import { DatenschutzAcceptModal } from "@/components/datenschutz-accept-modal";
 import { DATENSCHUTZ_VERSION } from "@/lib/datenschutz";
+import { ViewAsOverlay } from "@/components/dev/view-as-overlay";
 
 // Partner-Portal-Layout: minimal Topbar, KEINE Sidebar, KEINE Eve.
 // Auth-Guard: nur eingeloggte 'partner'-Profile mit partner_location_id
@@ -201,6 +202,10 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
       )}
 
       <Toaster />
+      {/* Developer-Mode View-As Overlay — auch im Partner-Portal, damit ein
+          impersonierender Admin hier wieder rauskommt oder zwischen Partnern
+          wechseln kann. Self-renders null wenn kein Admin / kein DevMode. */}
+      <ViewAsOverlay />
     </div>
   );
 }
