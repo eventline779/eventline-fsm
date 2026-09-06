@@ -257,7 +257,7 @@ export function LieferantenView({ embedded = false }: Props = {}) {
             description={
               lieferanten.length === 0
                 ? "Lege deinen ersten Lieferanten an, um Rechnungen und Kontakte zentral zu verwalten."
-                : "Andere Suche oder Filter zuruecksetzen."
+                : "Andere Suche oder Filter zurücksetzen."
             }
             action={
               lieferanten.length === 0 && can("lieferanten:create") ? (

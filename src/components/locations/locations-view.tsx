@@ -327,7 +327,7 @@ export function LocationsView() {
               title={search || filterType !== "all" ? "Keine Ergebnisse" : "Noch keine Locations"}
               description={
                 search || filterType !== "all"
-                  ? "Andere Suche oder Filter zuruecksetzen."
+                  ? "Andere Suche oder Filter zurücksetzen."
                   : "Erfasse deine erste Verwaltung oder einen Raum."
               }
             />

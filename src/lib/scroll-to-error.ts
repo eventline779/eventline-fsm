@@ -74,7 +74,7 @@ export function highlightFields(fieldIds: string[]): void {
 /** All-in-one: Toast mit Liste der fehlenden Felder, Scroll zum ersten,
  *  Highlight aller fehlerhaften Felder (bis User darauf reagiert). */
 export function reportFormErrors(opts: { missing: FormError[]; toastTitle?: string }) {
-  const { missing, toastTitle = "Bitte ergaenze" } = opts;
+  const { missing, toastTitle = "Bitte ergänze" } = opts;
   if (missing.length === 0) return;
   const labels = missing.map((m) => m.label);
   const message = labels.length === 1

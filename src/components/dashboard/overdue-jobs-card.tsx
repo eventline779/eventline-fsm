@@ -38,7 +38,7 @@ interface Props {
 }
 
 function overdueLabel(days: number): string {
-  if (days <= 0) return "heute faellig";
+  if (days <= 0) return "heute fällig";
   if (days === 1) return "seit 1 Tag";
   return `seit ${days} Tagen`;
 }

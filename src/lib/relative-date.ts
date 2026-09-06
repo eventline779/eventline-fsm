@@ -72,8 +72,8 @@ export function relativeDueLabel(dueIso: string, todayIsoStr: string = todayIso(
   const tooltip = formatIsoDate(dueIso);
   if (diff === 0) return { label: "Heute", tooltip, overdue: false, today: true, thisWeek: false };
   if (diff === 1) return { label: "Morgen", tooltip, overdue: false, today: false, thisWeek: true };
-  if (diff === -1) return { label: "Gestern ueberfaellig", tooltip, overdue: true, today: false, thisWeek: false };
-  if (diff < -1) return { label: `Ueberfaellig ${Math.abs(diff)} Tage`, tooltip, overdue: true, today: false, thisWeek: false };
+  if (diff === -1) return { label: "Gestern überfällig", tooltip, overdue: true, today: false, thisWeek: false };
+  if (diff < -1) return { label: `Überfällig ${Math.abs(diff)} Tage`, tooltip, overdue: true, today: false, thisWeek: false };
   if (diff <= 7) return { label: `In ${diff} Tagen`, tooltip, overdue: false, today: false, thisWeek: true };
   // Alles darueber: hartes Datum
   return { label: tooltip, tooltip, overdue: false, today: false, thisWeek: false };
@@ -93,7 +93,7 @@ export function bucketForDue(dueIso: string | null, todayIsoStr: string = todayI
 }
 
 export const GROUP_LABEL: Record<GroupBucket, string> = {
-  overdue: "Ueberfaellig",
+  overdue: "Überfällig",
   today: "Heute",
   tomorrow: "Morgen",
   thisWeek: "Diese Woche",

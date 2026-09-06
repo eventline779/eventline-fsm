@@ -508,7 +508,7 @@ function NewRowForm({
 
   async function save() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
-      toast.error("Gueltiges Datum eingeben");
+      toast.error("Gültiges Datum eingeben");
       return;
     }
     if (effectiveFrom <= today) {
@@ -540,7 +540,7 @@ function NewRowForm({
   return (
     <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/5 space-y-3">
       <div className="flex items-center gap-3">
-        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Gueltig ab</label>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Gültig ab</label>
         <input
           type="date"
           value={effectiveFrom}
@@ -573,7 +573,7 @@ function NewRowForm({
           type="text"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="z.B. Neue SUVA-Praemie 2027"
+          placeholder="z.B. Neue SUVA-Prämie 2027"
           className="h-8 text-xs flex-1"
         />
       </div>

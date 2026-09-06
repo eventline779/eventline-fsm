@@ -49,9 +49,9 @@ type WidgetConfig = { order: string[]; hidden: string[] };
 type RoleScope = "self" | "team" | "all";
 
 const SCOPE_OPTIONS: Array<{ id: RoleScope; label: string; sub: string }> = [
-  { id: "self", label: "Nur eigene", sub: "Sieht ausschliesslich die eigenen Datensaetze — Default." },
-  { id: "team", label: "Nur Team",   sub: "Sieht zusaetzlich Datensaetze der Mitarbeiter, die auf sie als Teamleiter zeigen." },
-  { id: "all",  label: "Alle",       sub: "Sieht alle Datensaetze der Firma. Wie *:see-all fuer jedes Modul." },
+  { id: "self", label: "Nur eigene", sub: "Sieht ausschliesslich die eigenen Datensätze — Default." },
+  { id: "team", label: "Nur Team",   sub: "Sieht zusätzlich Datensätze der Mitarbeiter, die auf sie als Teamleiter zeigen." },
+  { id: "all",  label: "Alle",       sub: "Sieht alle Datensätze der Firma. Wie *:see-all für jedes Modul." },
 ];
 
 function scopeLabel(scope: RoleScope): string {
@@ -424,7 +424,7 @@ export function RollenTab({ scope = "firma" }: RollenTabProps = {}) {
                   <th
                     key={a}
                     className={`text-center pb-1 px-1 w-16 ${isFirstAdvanced ? "border-l border-border" : ""}`}
-                    data-tooltip={ADVANCED_ACTIONS.includes(a) ? "Erweiterte Permission — nur in einzelnen Bereichen verfuegbar." : undefined}
+                    data-tooltip={ADVANCED_ACTIONS.includes(a) ? "Erweiterte Permission — nur in einzelnen Bereichen verfügbar." : undefined}
                   >
                     {ACTION_LABELS[a]}
                   </th>

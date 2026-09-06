@@ -441,7 +441,7 @@ function MitarbeiterZeile({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{ backgroundColor: hover ? "var(--muted)" : "transparent" }}
-      data-tooltip="Stempelzeiten oeffnen"
+      data-tooltip="Stempelzeiten öffnen"
       className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
     >
       <span className="shrink-0 h-8 w-8 rounded-full bg-muted text-foreground/70 inline-flex items-center justify-center text-xs font-semibold">

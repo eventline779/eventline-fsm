@@ -326,7 +326,7 @@ function PushSubscriptionCard() {
 
   async function subscribe() {
     if (!vapidKey) {
-      toast.error("VAPID-Schluessel ist auf dem Server nicht konfiguriert.");
+      toast.error("VAPID-Schlüssel ist auf dem Server nicht konfiguriert.");
       return;
     }
     setBusy(true);

@@ -172,7 +172,7 @@ export function StempelWidget() {
                 border: "2px solid var(--stempel-color, #14b8a6)",
                 boxShadow: hovered ? "0 8px 20px -6px rgba(20,184,166,0.30)" : "0 3px 10px -3px rgba(20,184,166,0.18)",
               }}
-              aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details oeffnen"}
+              aria-label={expanded ? "Stempel-Details schliessen" : "Stempel-Details öffnen"}
             >
               <span className="relative flex shrink-0">
                 <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-50" style={{ backgroundColor: "rgb(20,184,166)" }} />

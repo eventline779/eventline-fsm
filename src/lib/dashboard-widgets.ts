@@ -68,7 +68,7 @@ export interface DashboardWidget {
 export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   {
     id: "kpi-offene-auftraege",
-    title: "Offene Auftraege",
+    title: "Offene Aufträge",
     size: "1x1",
     requires: ["auftraege:view"],
     defaultRoles: ["admin"],
@@ -89,7 +89,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   },
   {
     id: "overdue-jobs",
-    title: "Ueberfaellige Auftraege",
+    title: "Überfällige Aufträge",
     size: "2x1",
     requires: ["auftraege:view"],
     defaultRoles: ["admin"],
@@ -114,7 +114,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   },
   {
     id: "anwesenheitskalender",
-    title: "Buero-Anwesenheit",
+    title: "Büro-Anwesenheit",
     size: "2x2",
     requires: ["anwesenheit:view"],
     defaultRoles: ["admin", "techniker"],
@@ -135,7 +135,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidget[] = [
   },
   {
     id: "ma-naechster-einsatz",
-    title: "Naechster Einsatz",
+    title: "Nächster Einsatz",
     size: "2x1",
     requires: ["kalender:view"],
     defaultRoles: ["techniker"],

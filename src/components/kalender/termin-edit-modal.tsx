@@ -401,7 +401,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
               value={confMessage}
               onChange={(e) => setConfMessage(e.target.value)}
               rows={3}
-              placeholder="z.B. 'Bitte bringen Sie die Plaene mit.'"
+              placeholder="z.B. 'Bitte bringen Sie die Pläne mit.'"
               className="mt-1 w-full px-3 py-2 text-sm rounded-lg border bg-card resize-none"
               disabled={confSending}
             />

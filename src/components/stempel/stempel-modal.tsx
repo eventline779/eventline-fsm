@@ -252,7 +252,7 @@ export function StempelModal({ open, onClose }: Props) {
             </div>
             <div>
               <p className="font-medium text-sm">Auf einen Auftrag</p>
-              <p className="text-xs text-muted-foreground">{isAdmin ? "Fuer Admins deaktiviert — Auto-Stempel aus Rapport" : "Zeit auf einen offenen Auftrag stempeln"}</p>
+              <p className="text-xs text-muted-foreground">{isAdmin ? "Für Admins deaktiviert — Auto-Stempel aus Rapport" : "Zeit auf einen offenen Auftrag stempeln"}</p>
             </div>
           </button>
           {/* Auf ein Projekt — jeder darf, kein isAdmin-Block. */}

@@ -606,7 +606,7 @@ export function StempelzeitenView() {
         .select("id, user_id, job_id, project_id, clock_in, clock_out, description, notes, user:profiles(full_name), project:projects(project_number, title)")
         .eq("job_id", jobHeader.id)
         .order("clock_in", { ascending: false });
-      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
       setJobFilterEntries((data as unknown as JobFilterEntry[]) ?? []);
       setOwnEntries([]);
       setScopedEntries([]);
@@ -631,7 +631,7 @@ export function StempelzeitenView() {
         .eq("user_id", currentUserId)
         .gte("clock_in", fromTs)
         .order("clock_in", { ascending: false });
-      if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+      if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
       setOwnEntries((data as unknown as OwnEntry[]) ?? []);
       setScopedEntries([]);
       setLoading(false);
@@ -650,7 +650,7 @@ export function StempelzeitenView() {
       .eq("user_id", selectedUserId)
       .gte("clock_in", fromTs)
       .order("clock_in", { ascending: false });
-    if (error) TOAST.supabaseError(error, "Stempel-Eintraege konnten nicht geladen werden");
+    if (error) TOAST.supabaseError(error, "Stempel-Einträge konnten nicht geladen werden");
     setScopedEntries((data as unknown as ScopedEntry[]) ?? []);
     setOwnEntries([]);
     setLoading(false);
@@ -887,7 +887,7 @@ export function StempelzeitenView() {
                     jobId: active.job_id ?? null,
                   })}
                   className="text-xs font-medium text-green-700 dark:text-green-400 underline underline-offset-2 hover:text-green-800 dark:hover:text-green-300"
-                  data-tooltip="Ticket mit vorbelegten Zeiten oeffnen"
+                  data-tooltip="Ticket mit vorbelegten Zeiten öffnen"
                 >
                   Vergessen auszustempeln?
                 </button>
@@ -1323,7 +1323,7 @@ function EntryCard({
             : "text-muted-foreground/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10"
           }`}
           aria-label="Eintrag korrigieren"
-          data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : "Korrigieren — Ticket mit vorbelegten Zeiten oeffnen"}
+          data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : "Korrigieren — Ticket mit vorbelegten Zeiten öffnen"}
         >
           <Edit3 className="h-3.5 w-3.5" />
         </button>

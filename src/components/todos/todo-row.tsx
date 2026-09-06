@@ -295,7 +295,7 @@ export function TodoRow({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleComplete(todo); }}
-        aria-label={isDone ? "Wieder oeffnen" : "Als erledigt markieren"}
+        aria-label={isDone ? "Wieder öffnen" : "Als erledigt markieren"}
         className={`mt-0.5 shrink-0 h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all ${
           isDone
             ? "bg-green-500 border-green-500 text-white"

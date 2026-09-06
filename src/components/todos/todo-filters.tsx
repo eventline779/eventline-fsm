@@ -66,7 +66,7 @@ export function TodoFilters({ state, counts, canSeeAll, onChange }: Props) {
     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
       {/* Links: Scope-Segment mit Counts. Bei canSeeAll dazu "Alle". */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <Seg value="mine"      current={state.scope} label="Fuer mich" onClick={(v) => onChange({ scope: v })} badge={counts.mine} />
+        <Seg value="mine"      current={state.scope} label="Für mich" onClick={(v) => onChange({ scope: v })} badge={counts.mine} />
         <Seg value="delegated" current={state.scope} label="Delegiert" onClick={(v) => onChange({ scope: v })} badge={counts.delegated} />
         {canSeeAll && (
           <Seg value="all" current={state.scope} label="Alle" onClick={(v) => onChange({ scope: v })} badge={counts.all} />
