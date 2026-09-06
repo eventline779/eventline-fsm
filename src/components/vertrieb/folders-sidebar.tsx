@@ -187,7 +187,7 @@ export function VertriebFoldersSidebar({ selected, onSelect, counts, onChanged, 
       : (parentId ? "Unterordner anlegen" : "Ordner anlegen");
     const name = await prompt({
       title,
-      label: isShared ? "Name (fuer alle sichtbar)" : "Name",
+      label: isShared ? "Name (für alle sichtbar)" : "Name",
       placeholder: isShared ? "z.B. Weihnachtsfeier 2026, Kampagne Basel..." : "z.B. Hot Leads, Q3 2026, Basel...",
       confirmLabel: "Anlegen",
       variant: "blue",
@@ -231,18 +231,18 @@ export function VertriebFoldersSidebar({ selected, onSelect, counts, onChanged, 
     const childCount = (childrenBy.get(f.id) ?? []).length;
     const leadCount = counts.get(f.id) ?? 0;
     const extra = childCount > 0 || leadCount > 0
-      ? `\n\nEnthaelt ${childCount} Unterordner und ${leadCount} Lead-Zuordnung(en). Beides wird mit-geloescht (Leads selbst bleiben — nur die Zuordnung).`
+      ? `\n\nEnthält ${childCount} Unterordner und ${leadCount} Lead-Zuordnung(en). Beides wird mit-gelöscht (Leads selbst bleiben — nur die Zuordnung).`
       : "";
     const ok = await confirm({
-      title: `Ordner "${f.name}" loeschen?`,
+      title: `Ordner "${f.name}" löschen?`,
       message: `Aus deinem Postfach entfernt.${extra}`,
-      confirmLabel: "Loeschen",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     const { error } = await supabase.from("vertrieb_folders").delete().eq("id", f.id);
     if (error) { TOAST.supabaseError(error); return; }
-    toast.success("Geloescht");
+    toast.success("Gelöscht");
     if (selected.kind === "folder" && selected.id === f.id) onSelect({ kind: "all" });
     await load();
     onChanged();
@@ -343,8 +343,8 @@ export function VertriebFoldersSidebar({ selected, onSelect, counts, onChanged, 
                 type="button"
                 onClick={(e) => { e.stopPropagation(); deleteFolder(f); }}
                 className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-red-500/15 text-red-600 dark:text-red-400"
-                data-tooltip="Loeschen"
-                aria-label="Loeschen"
+                data-tooltip="Löschen"
+                aria-label="Löschen"
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -397,7 +397,7 @@ export function VertriebFoldersSidebar({ selected, onSelect, counts, onChanged, 
               type="button"
               onClick={() => createFolder(null, { isShared: true })}
               className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-blue-500/15 text-blue-600 dark:text-blue-400"
-              data-tooltip="Neuer geteilter Ordner (fuer alle)"
+              data-tooltip="Neuer geteilter Ordner (für alle)"
               aria-label="Neuer geteilter Ordner"
             >
               <Users className="h-3.5 w-3.5" />

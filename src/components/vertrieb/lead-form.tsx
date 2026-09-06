@@ -381,7 +381,7 @@ export function LeadForm({
                       value={selectedCustomerId}
                       onChange={(v) => onSelectExistingCustomer(v)}
                       items={customers.map((c) => ({ id: c.id, label: c.name }))}
-                      placeholder="— Kunde waehlen —"
+                      placeholder="— Kunde wählen —"
                       required
                     />
                   </div>
