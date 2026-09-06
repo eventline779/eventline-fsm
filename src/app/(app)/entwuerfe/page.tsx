@@ -300,7 +300,7 @@ export default function EntwuerfePage() {
         view === "karten" ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
+              <Skeleton key={i} className="h-24 rounded-xl" />
             ))}
           </div>
         ) : (
@@ -457,11 +457,11 @@ export default function EntwuerfePage() {
 }
 
 /**
- * DraftCard — Karten-Ansicht analog /projekte (Grid 1/2/3).
- * Kopf: ENT-Nr + Status-Chip. Titel. Meta (Kunde/Location/Datum).
- * Bottom: Owner-Initial-Avatar + Notiz-Count.
- * Storniert/Umgewandelt visuell zurueckgenommen (opacity-70), Border-Tint
- * je Status damit die Karte schon vor dem Chip lesbar ist.
+ * DraftCard — Karten-Ansicht als Grid-Zelle, aber visuell IDENTISCH zur
+ * Liste-Row (gleicher Card-Wrapper, gleiche Chip-Styles, gleiche Icons,
+ * gleicher ENT-Badge). Unterschied nur: Felder stacken vertikal statt
+ * horizontal, damit sie in die Zelle passen. KEIN eigener Projekt-Card-Look
+ * (kein Status-Chip-oben, kein Grosstitel, keine Status-Border-Tints).
  */
 function DraftCard({ d }: { d: DraftListRow }) {
   const kundeName = d.customer?.name ?? d.customer_name ?? d.contact_person ?? "—";
@@ -473,105 +473,88 @@ function DraftCard({ d }: { d: DraftListRow }) {
   const isCancelled = d.status === "storniert";
   const muted = isConverted || isCancelled;
 
-  // Dezente Border-Tints je Status — analog /projekte.
-  const statusBorderClass: Record<DraftListRow["status"], string> = {
-    aktiv:             "border-emerald-300/70 dark:border-emerald-500/30",
-    wartet_auf_kunde:  "border-amber-300/70 dark:border-amber-500/30",
-    storniert:         "border-gray-300/60 dark:border-gray-500/25",
-    umgewandelt:       "border-blue-300/60 dark:border-blue-500/30",
-  };
-
-  const ownerInitials = d.owner
-    ? d.owner.full_name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((s) => s[0]?.toUpperCase() ?? "")
-        .join("")
-    : "";
-
   return (
-    <div
-      className={[
-        "card-hover group relative flex flex-col gap-2 rounded-xl border bg-card p-3",
-        statusBorderClass[d.status] ?? "",
-        muted ? "opacity-70" : "",
-      ].join(" ")}
+    <Link
+      href={`/entwuerfe/${d.id}`}
+      className={`block group h-full ${muted ? "opacity-70" : ""}`}
     >
-      <Link href={`/entwuerfe/${d.id}`} className="absolute inset-0 rounded-xl" aria-label={d.title} />
+      <Card className="auftrag-card-hover bg-card cursor-pointer h-full">
+        <CardContent className="px-4 py-2.5 flex flex-col gap-2">
+          {/* Nummer + Titel — identisch zur Liste-Row */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-foreground/[0.08] text-[11px] font-mono font-semibold tabular-nums shrink-0">
+              ENT-{d.draft_number}
+            </span>
+            <span className="font-medium text-sm truncate">{d.title}</span>
+          </div>
 
-      {/* Kopf: Nr + Status-Chip */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-mono font-semibold text-muted-foreground tabular-nums">
-          ENT-{d.draft_number}
-        </span>
-        <div className="flex items-center gap-1.5">
-          {isConverted && d.converted_to_job_id && (
+          {/* Meta-Zeile: Kunde | Location | Datum — identisch zur Liste-Row */}
+          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-muted-foreground min-w-0">
+            <span className="inline-flex items-center gap-1 min-w-0">
+              <UserIcon className="h-3 w-3 shrink-0" />
+              <span className="truncate">{kundeName}</span>
+            </span>
+            {location && (
+              <span className="inline-flex items-center gap-1 min-w-0">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="truncate">{location}</span>
+              </span>
+            )}
+            {dateText && (
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="tabular-nums whitespace-nowrap">{dateText}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Bottom: Owner (links) + Notiz-Count + Status-Chip (rechts) —
+              gleiche Chips wie Liste-Row, nur mit justify-between statt
+              justify-end weil Zelle keinen langen Freiraum davor hat. */}
+          <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
+            {d.owner ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground min-w-0 mr-auto"
+                data-tooltip={`Verantwortlich: ${d.owner.full_name}`}
+              >
+                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-foreground/[0.08] text-[10px] font-semibold shrink-0">
+                  {d.owner.full_name
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((s) => s[0]?.toUpperCase() ?? "")
+                    .join("")}
+                </span>
+                <span className="truncate">{d.owner.full_name}</span>
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/60 italic mr-auto">niemand zugeteilt</span>
+            )}
+            {notesCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
+                data-tooltip={`${notesCount} Notiz${notesCount === 1 ? "" : "en"}`}
+              >
+                <MessageSquare className="h-3 w-3" />
+                {notesCount}
+              </span>
+            )}
             <span
-              className="inline-flex items-center text-[11px] text-blue-600 dark:text-blue-400"
-              data-tooltip="Zum Auftrag umgewandelt"
+              className={`inline-flex items-center px-1.5 py-0 text-[10px] font-medium rounded-full ${statusChip.color}`}
             >
-              <ArrowRightCircle className="h-3.5 w-3.5" />
+              {statusChip.label}
             </span>
-          )}
-          <span
-            className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${statusChip.color}`}
-          >
-            {statusChip.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Titel */}
-      <h3 className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-        {d.title}
-      </h3>
-
-      {/* Meta: Kunde / Location / Datum */}
-      <div className="flex flex-col gap-1 text-[11px] text-muted-foreground min-w-0">
-        <span className="inline-flex items-center gap-1.5 min-w-0">
-          <UserIcon className="h-3 w-3 shrink-0" />
-          <span className="truncate">{kundeName}</span>
-        </span>
-        {location && (
-          <span className="inline-flex items-center gap-1.5 min-w-0">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{location}</span>
-          </span>
-        )}
-        {dateText && (
-          <span className="inline-flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 shrink-0" />
-            <span className="tabular-nums whitespace-nowrap">{dateText}</span>
-          </span>
-        )}
-      </div>
-
-      {/* Bottom: Owner-Avatar + Notiz-Count */}
-      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-        {d.owner ? (
-          <span
-            className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0"
-            data-tooltip={`Verantwortlich: ${d.owner.full_name}`}
-          >
-            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-foreground/10 dark:bg-foreground/15 text-[9px] font-bold text-foreground/80 shrink-0">
-              {ownerInitials || "?"}
-            </span>
-            <span className="truncate">{d.owner.full_name}</span>
-          </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/60 italic">niemand zugeteilt</span>
-        )}
-        {notesCount > 0 && (
-          <span
-            className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground shrink-0"
-            data-tooltip={`${notesCount} Notiz${notesCount === 1 ? "" : "en"}`}
-          >
-            <MessageSquare className="h-3 w-3" />
-            {notesCount}
-          </span>
-        )}
-      </div>
-    </div>
+            {isConverted && d.converted_to_job_id && (
+              <span
+                className="inline-flex items-center text-[11px] text-blue-600 dark:text-blue-400"
+                data-tooltip="Zum Auftrag umgewandelt"
+              >
+                <ArrowRightCircle className="h-3.5 w-3.5" />
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
