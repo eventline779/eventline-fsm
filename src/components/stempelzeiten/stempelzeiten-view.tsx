@@ -1669,6 +1669,7 @@ function EntryCard({
           }`}
           aria-label="Eintrag korrigieren"
           data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : "Korrigieren — Ticket mit vorbelegten Zeiten öffnen"}
+          data-tooltip-align="end"
         >
           <Edit3 className="h-3.5 w-3.5" />
         </button>
@@ -1683,6 +1684,7 @@ function EntryCard({
         }`}
         aria-label="Eintrag löschen"
         data-tooltip={locked ? TIME_ENTRY_LOCK_MESSAGE : undefined}
+        data-tooltip-align="end"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
