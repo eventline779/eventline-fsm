@@ -159,13 +159,28 @@ function spanNumberFor(
 
 /** Fuer die Modal-Vorschau: baut die col-span-N-Klasse (ohne responsive
  *  Prefix — das Modal ist immer Desktop-simulation, Mobile wird per
- *  mobilePreview-Toggle erzwungen). */
+ *  mobilePreview-Toggle erzwungen).
+ *
+ *  WICHTIG: Klassen-Strings sind LITERAL — dynamisch zusammengebaute Tailwind-
+ *  Klassen wie `col-span-${n}` werden vom Compiler nicht erkannt und landen
+ *  NICHT im Bundle. Deshalb ein festes Mapping. */
 function spanClassFor(
   id: string,
   overrides: Record<string, number>,
   mobile: boolean,
 ): string {
-  return `col-span-${spanNumberFor(id, overrides, mobile)}`;
+  const n = spanNumberFor(id, overrides, mobile);
+  switch (n) {
+    case 4:
+      return "col-span-4";
+    case 6:
+      return "col-span-6";
+    case 8:
+      return "col-span-8";
+    case 12:
+    default:
+      return "col-span-12";
+  }
 }
 
 /** Erlaubte Widget-Breiten im 12-col-Grid (auch server-seitig validiert

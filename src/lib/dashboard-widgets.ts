@@ -236,11 +236,26 @@ export function widgetDefaultSpan(id: string): number {
 
 /** Baut die effektive Grid-Klasse aus dem User-Override (falls vorhanden)
  *  oder dem Registry-Default. Mobil (col-span-12) bleibt immer identisch —
- *  Overrides gelten nur ab dem sm:-Breakpoint (echtes Dashboard-Grid). */
+ *  Overrides gelten nur ab dem sm:-Breakpoint (echtes Dashboard-Grid).
+ *
+ *  WICHTIG: Klassen-Strings sind LITERAL — dynamisch zusammengebaute Tailwind-
+ *  Klassen wie `sm:col-span-${n}` werden vom Tailwind-Compiler nicht erkannt
+ *  und landen NICHT im CSS-Bundle (die Kachel bleibt dann silent auf 12).
+ *  Deshalb hier ein festes Mapping mit allen erlaubten Werten als Literale. */
 export function widgetEffectiveSpanClass(
   id: string,
   override: number | undefined,
 ): string {
   const span = override ?? widgetDefaultSpan(id);
-  return `col-span-12 sm:col-span-${span}`;
+  switch (span) {
+    case 4:
+      return "col-span-12 sm:col-span-4";
+    case 6:
+      return "col-span-12 sm:col-span-6";
+    case 8:
+      return "col-span-12 sm:col-span-8";
+    case 12:
+    default:
+      return "col-span-12";
+  }
 }
