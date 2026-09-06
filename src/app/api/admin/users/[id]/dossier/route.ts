@@ -183,7 +183,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // ZIP erstellen + hochladen
   const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const safeName = (profile.full_name ?? "user").replace(/[\\/:*?"<>|]/g, "_").substring(0, 50);
+  // Supabase Storage lehnt Unicode-Zeichen (ú, ä, ö, ...), Leerzeichen und
+  // die meisten Sonderzeichen im Key ab ("Invalid key"). Wir normalisieren
+  // deshalb aggressiv: NFD-decompose loest Akzente auf ("Raúl" → "Raul"),
+  // dann alles ausser ASCII-Alphanumerisch/-Unterstrich zu _ ersetzen,
+  // doppelte _ zusammenziehen, Rand-_ trimmen.
+  const safeName = (profile.full_name ?? "user")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .substring(0, 50) || "user";
   const path = `${profileId}/dossier_${safeName}_${timestamp}.zip`;
 
   const { error: upErr } = await admin.storage.from(DOSSIER_BUCKET).upload(path, zipBuffer, {
