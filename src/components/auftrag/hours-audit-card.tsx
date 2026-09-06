@@ -146,7 +146,7 @@ export function HoursAuditCard({ rows }: Props) {
           </table>
         </div>
         <p className="text-[10px] text-muted-foreground/70 mt-3">
-          Differenz = gesamte Rapport-Zeit (verrechenbar + nicht verrechnet) − Stempel. Misst ob alle gestempelten Stunden im Rapport dokumentiert sind. Gruen ≤ 15min (Rundung), gelb bis 1h, rot &gt; 1h.
+          Differenz = gesamte Rapport-Zeit (verrechenbar + nicht verrechnet) − Stempel. Misst ob alle gestempelten Stunden im Rapport dokumentiert sind. Grün ≤ 15min (Rundung), gelb bis 1h, rot &gt; 1h.
         </p>
       </CardContent>
     </Card>

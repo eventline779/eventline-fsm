@@ -136,7 +136,7 @@ export function StempelModal({ open, onClose }: Props) {
     // Rapport-Abschluss legt die Stempelzeiten an. Doppel-Stempelung
     // verhindern.
     if (isAdmin) {
-      toast.error("Admins stempeln nicht auf Auftraege — die Stunden werden automatisch aus dem Rapport-Abschluss gestempelt.", { duration: 6000 });
+      toast.error("Admins stempeln nicht auf Aufträge — die Stunden werden automatisch aus dem Rapport-Abschluss gestempelt.", { duration: 6000 });
       return;
     }
     if (!selectedJob) {
@@ -219,15 +219,15 @@ export function StempelModal({ open, onClose }: Props) {
             <div className="flex items-start gap-2 p-3 rounded-lg border border-blue-500/30 bg-blue-500/5 text-xs">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-300 mt-0.5 shrink-0" />
               <p className="text-foreground/80">
-                <span className="font-medium">Auftrag-Stempel ist fuer Admins deaktiviert.</span>
+                <span className="font-medium">Auftrag-Stempel ist für Admins deaktiviert.</span>
                 {" "}Deine Stunden werden automatisch beim Abschliessen des Rapports gestempelt.
-                „Andere Arbeit" geht weiter (z.B. Buero-Zeit).
+                „Andere Arbeit" geht weiter (z.B. Büro-Zeit).
               </p>
             </div>
           )}
           <button
             type="button"
-            onClick={() => isAdmin ? toast.error("Auftrag-Stempel ist fuer Admins deaktiviert — Stunden kommen aus dem Rapport-Abschluss.", { duration: 6000 }) : setMode("job")}
+            onClick={() => isAdmin ? toast.error("Auftrag-Stempel ist für Admins deaktiviert — Stunden kommen aus dem Rapport-Abschluss.", { duration: 6000 }) : setMode("job")}
             onMouseEnter={() => !isAdmin && setHoveredCard("job")}
             onMouseLeave={() => { setHoveredCard(null); setPressedCard(null); }}
             onMouseDown={() => !isAdmin && setPressedCard("job")}

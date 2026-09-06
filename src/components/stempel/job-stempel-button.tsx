@@ -49,7 +49,7 @@ export function JobStempelButton({ jobId, jobNumber }: Props) {
       else TOAST.stempelError(r.error);
     } else {
       if (isAdmin) {
-        toast.error("Admins stempeln nicht auf Auftraege — die Stunden werden automatisch aus dem Rapport-Abschluss gestempelt.", { duration: 6000 });
+        toast.error("Admins stempeln nicht auf Aufträge — die Stunden werden automatisch aus dem Rapport-Abschluss gestempelt.", { duration: 6000 });
         return;
       }
       const r = await clockIn({ jobId });

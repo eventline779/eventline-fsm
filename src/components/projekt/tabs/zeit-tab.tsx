@@ -199,7 +199,7 @@ function TimeEntriesCard({ entries, isAdmin }: { entries: TimeEntry[]; isAdmin: 
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Zeit-Eintraege ({entries.length})</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Zeit-Einträge ({entries.length})</p>
         </div>
         {entries.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">Noch keine Zeit gebucht.</p>
@@ -213,7 +213,7 @@ function TimeEntriesCard({ entries, isAdmin }: { entries: TimeEntry[]; isAdmin: 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       {isOpen
-                        ? <span className="text-sm font-medium text-green-600 dark:text-green-400">Laeuft …</span>
+                        ? <span className="text-sm font-medium text-green-600 dark:text-green-400">Läuft …</span>
                         : <span className="text-sm font-medium tabular-nums">{formatHours(e.minutes)}</span>
                       }
                       <span className="text-[11px] text-muted-foreground">

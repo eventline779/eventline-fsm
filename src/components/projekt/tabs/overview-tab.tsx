@@ -116,7 +116,7 @@ function InfoCard({ project, canEdit, onSaved }: { project: Project; canEdit: bo
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
-                placeholder="Gedanken, Zwischenstaende, Kontakte …"
+                placeholder="Gedanken, Zwischenstände, Kontakte …"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40"
               />
             </Field>
@@ -153,7 +153,7 @@ function InfoCard({ project, canEdit, onSaved }: { project: Project; canEdit: bo
                         ? <span className="ml-2 text-muted-foreground/70">(in {daysToGoal} Tagen)</span>
                         : daysToGoal === 0
                           ? <span className="ml-2 text-amber-600 dark:text-amber-400">(heute)</span>
-                          : <span className="ml-2 text-red-600 dark:text-red-400">({-daysToGoal} Tage ueberfaellig)</span>
+                          : <span className="ml-2 text-red-600 dark:text-red-400">({-daysToGoal} Tage überfällig)</span>
                     )}
                   </p>
                 )}
@@ -192,15 +192,15 @@ function AppointmentsCard({ projectId, appts, canAdd, onOpen, onOpenNotes, onRel
   const { confirm, ConfirmModalElement } = useConfirm();
   async function del(id: string, title: string) {
     const ok = await confirm({
-      title: "Termin loeschen?",
-      message: `"${title}" wird endgueltig entfernt.`,
-      confirmLabel: "Loeschen",
+      title: "Termin löschen?",
+      message: `"${title}" wird endgültig entfernt.`,
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     const { error } = await supabase.from("project_appointments").delete().eq("id", id);
-    if (error) { toast.error("Loeschen fehlgeschlagen: " + error.message); return; }
-    toast.success("Geloescht");
+    if (error) { toast.error("Löschen fehlgeschlagen: " + error.message); return; }
+    toast.success("Gelöscht");
     onReload();
   }
   const _projectId = projectId; void _projectId;
@@ -256,7 +256,7 @@ function AppointmentsCard({ projectId, appts, canAdd, onOpen, onOpenNotes, onRel
                     <button
                       onClick={() => onOpenNotes(a)}
                       className="kasten kasten-muted text-[10px] py-0.5 px-1.5"
-                      data-tooltip="Gespraechs-Notizen"
+                      data-tooltip="Gesprächs-Notizen"
                     >
                       <MessageSquare className="h-3 w-3" /> Notizen ({a.notesCount})
                     </button>
@@ -265,7 +265,7 @@ function AppointmentsCard({ projectId, appts, canAdd, onOpen, onOpenNotes, onRel
                 {canAdd && (
                   <div className="flex items-start gap-1 shrink-0">
                     <button onClick={() => onOpen(a)} className="text-muted-foreground hover:text-foreground" aria-label="Bearbeiten"><Edit3 className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => del(a.id, a.title)} className="text-muted-foreground hover:text-destructive" aria-label="Loeschen"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => del(a.id, a.title)} className="text-muted-foreground hover:text-destructive" aria-label="Löschen"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 )}
               </div>
@@ -367,7 +367,7 @@ function TeamBudgetPanel({
   async function logout() {
     const ok = await confirm({
       title: "Vom Projekt ausloggen?",
-      message: "Zeit-Eintraege bleiben erhalten. Zum Stempeln muesstest du dich neu einloggen.",
+      message: "Zeit-Einträge bleiben erhalten. Zum Stempeln müsstest du dich neu einloggen.",
       confirmLabel: "Ausloggen", variant: "red",
     });
     if (!ok || !me) return;
@@ -425,8 +425,8 @@ function TeamBudgetPanel({
     setBusy(true);
     const { error } = await supabase.from("project_members").insert({ project_id: project.id, user_id: uid });
     setBusy(false);
-    if (error) { toast.error("Hinzufuegen fehlgeschlagen: " + error.message); return; }
-    toast.success("Mitglied hinzugefuegt"); setAddOpen(false); onDone();
+    if (error) { toast.error("Hinzufügen fehlgeschlagen: " + error.message); return; }
+    toast.success("Mitglied hinzugefügt"); setAddOpen(false); onDone();
   }
 
   const CHF = new Intl.NumberFormat("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -474,7 +474,7 @@ function TeamBudgetPanel({
           <div className="flex items-center justify-between">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Projekt-Team</p>
             {isAdmin && (
-              <button onClick={() => setAddOpen(true)} className="icon-btn p-1 rounded hover:bg-muted transition-colors" data-tooltip="Mitarbeiter hinzufuegen">
+              <button onClick={() => setAddOpen(true)} className="icon-btn p-1 rounded hover:bg-muted transition-colors" data-tooltip="Mitarbeiter hinzufügen">
                 <Plus className="h-3.5 w-3.5" />
               </button>
             )}
@@ -537,7 +537,7 @@ function TeamBudgetPanel({
 
       {ConfirmModalElement}
       {addOpen && (
-        <Modal open onClose={() => setAddOpen(false)} title="Mitarbeiter hinzufuegen" size="md">
+        <Modal open onClose={() => setAddOpen(false)} title="Mitarbeiter hinzufügen" size="md">
           <p className="text-xs text-muted-foreground mb-3">Ist danach direkt eingeloggt und kann stempeln.</p>
           {available.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">Alle Mitarbeiter sind bereits eingeloggt.</p>

@@ -88,8 +88,8 @@ export function TodoFilters({ state, counts, canSeeAll, onChange }: Props) {
               type="button"
               onClick={() => onChange({ search: "" })}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
-              data-tooltip="Suche zuruecksetzen"
-              aria-label="Suche zuruecksetzen"
+              data-tooltip="Suche zurücksetzen"
+              aria-label="Suche zurücksetzen"
             >
               <X className="h-3.5 w-3.5" />
             </button>

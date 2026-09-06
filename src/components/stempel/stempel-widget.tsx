@@ -192,8 +192,8 @@ export function StempelWidget() {
                 onClick={() => setShowTicket(true)}
                 onMouseEnter={() => setTicketHovered(true)}
                 onMouseLeave={() => setTicketHovered(false)}
-                aria-label="Stempel-Aenderung anfragen"
-                data-tooltip="Stempel-Aenderung anfragen"
+                aria-label="Stempel-Änderung anfragen"
+                data-tooltip="Stempel-Änderung anfragen"
                 className="shrink-0 w-11 flex items-center justify-center rounded-xl bg-card"
                 style={{
                   transition: "background-color 180ms, color 180ms, border-color 180ms",
@@ -235,8 +235,8 @@ export function StempelWidget() {
               onClick={() => setShowTicket(true)}
               onMouseEnter={() => setTicketHovered(true)}
               onMouseLeave={() => setTicketHovered(false)}
-              aria-label="Stempel-Aenderung anfragen"
-              data-tooltip="Stempel-Aenderung anfragen"
+              aria-label="Stempel-Änderung anfragen"
+              data-tooltip="Stempel-Änderung anfragen"
               className="shrink-0 w-11 flex items-center justify-center rounded-xl bg-card"
               style={{
                 transition: "background-color 180ms, color 180ms, border-color 180ms",

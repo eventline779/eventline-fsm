@@ -52,8 +52,8 @@ export function LegendButton() {
               <Item swatch={<span className="w-1 h-3.5 rounded-full bg-emerald-500" />} label="4 — Operations" />
             </Section>
             <Section title="Icons">
-              <Item swatch={<Flame className="h-3 w-3 text-orange-500" />} label="Top-Prioritaet" />
-              <Item swatch={<AlertTriangle className="h-3 w-3 text-amber-500" />} label="Auffaellig (Stale, Hot+Offen, Event-bald, Vergessen)" />
+              <Item swatch={<Flame className="h-3 w-3 text-orange-500" />} label="Top-Priorität" />
+              <Item swatch={<AlertTriangle className="h-3 w-3 text-amber-500" />} label="Auffällig (Stale, Hot+Offen, Event-bald, Vergessen)" />
               <Item swatch={<PartyPopper className="h-3 w-3 text-purple-500" />} label="Event-Datum" />
             </Section>
             <Section title="Text">

@@ -73,7 +73,7 @@ export function LeadRow({ contact: c, selected, onClick, draggable = true }: Pro
             </span>
             <p className="text-xs font-semibold truncate">{c.firma}</p>
             {isHot && <Flame className="h-2.5 w-2.5 text-orange-500 shrink-0" data-tooltip="Top-Prio" />}
-            {flagged && <AlertTriangle className="h-2.5 w-2.5 text-amber-500 shrink-0" data-tooltip="Auffaellig" />}
+            {flagged && <AlertTriangle className="h-2.5 w-2.5 text-amber-500 shrink-0" data-tooltip="Auffällig" />}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap text-[10px] text-muted-foreground">
             {statusConf && <span className={`px-1 py-0 rounded ${statusConf.color} text-[9px] font-medium border`}>{statusConf.label}</span>}

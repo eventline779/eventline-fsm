@@ -48,12 +48,12 @@ function ProjectDocuments({ projectId, isAdmin, canUpload }: { projectId: string
 
   async function previewDocInBrowser(doc: DocRow) {
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
-    if (error || !data?.signedUrl) { toast.error("Datei nicht verfuegbar"); return; }
+    if (error || !data?.signedUrl) { toast.error("Datei nicht verfügbar"); return; }
     setPreviewDoc({ url: data.signedUrl, title: doc.name });
   }
   async function downloadDoc(doc: DocRow) {
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.storage_path, 3600);
-    if (error || !data?.signedUrl) { toast.error("Datei nicht verfuegbar"); return; }
+    if (error || !data?.signedUrl) { toast.error("Datei nicht verfügbar"); return; }
     const a = document.createElement("a");
     a.href = data.signedUrl;
     a.download = doc.name;
@@ -107,16 +107,16 @@ function ProjectDocuments({ projectId, isAdmin, canUpload }: { projectId: string
 
   async function deleteDoc(doc: DocRow) {
     const ok = await confirm({
-      title: "Dokument loeschen?",
+      title: "Dokument löschen?",
       message: `"${doc.name}" wird unwiderruflich entfernt.`,
-      confirmLabel: "Loeschen",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     await supabase.storage.from("documents").remove([doc.storage_path]);
     const { error } = await supabase.from("documents").delete().eq("id", doc.id);
-    if (error) { toast.error("Loeschen fehlgeschlagen: " + error.message); return; }
-    toast.success("Geloescht");
+    if (error) { toast.error("Löschen fehlgeschlagen: " + error.message); return; }
+    toast.success("Gelöscht");
     load();
   }
 
@@ -130,12 +130,12 @@ function ProjectDocuments({ projectId, isAdmin, canUpload }: { projectId: string
         {canUpload && (
           <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors cursor-pointer">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-            {uploading ? "Laedt hoch…" : "Dateien auswaehlen…"}
+            {uploading ? "Lädt hoch…" : "Dateien auswählen…"}
             <input type="file" multiple className="sr-only" disabled={uploading} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
           </label>
         )}
         {loading ? (
-          <p className="text-xs text-muted-foreground italic">Laedt…</p>
+          <p className="text-xs text-muted-foreground italic">Lädt…</p>
         ) : docs.length === 0 ? (
           !canUpload && <p className="text-xs text-muted-foreground italic">Keine Dokumente.</p>
         ) : (
@@ -158,7 +158,7 @@ function ProjectDocuments({ projectId, isAdmin, canUpload }: { projectId: string
                     <Download className="h-3.5 w-3.5" />
                   </button>
                   {(isAdmin || me === d.uploaded_by) && (
-                    <button onClick={() => deleteDoc(d)} className="kasten kasten-red !py-1 !px-2" data-tooltip="Loeschen" aria-label="Loeschen">
+                    <button onClick={() => deleteDoc(d)} className="kasten kasten-red !py-1 !px-2" data-tooltip="Löschen" aria-label="Löschen">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -216,7 +216,7 @@ function HistoryCard({ project, children_, audit }: { project: Project; children
           <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/20 text-sm">
             <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] text-muted-foreground">Vorgaenger</p>
+              <p className="text-[10px] text-muted-foreground">Vorgänger</p>
               <Link href={`/projekte/${project.parent.id}`} className="font-medium truncate hover:underline">
                 {formatProjectNumber(project.parent.project_number)} · {project.parent.title}
               </Link>
@@ -245,12 +245,12 @@ function HistoryCard({ project, children_, audit }: { project: Project; children
 
         {audit.length > 0 && (
           <div className="space-y-1 pt-2 border-t border-border/60">
-            <p className="text-[10px] text-muted-foreground">Aenderungen:</p>
+            <p className="text-[10px] text-muted-foreground">Änderungen:</p>
             {audit.map((a) => (
               <div key={a.id} className="p-2 rounded-lg bg-muted/20 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold">
-                    {a.kind === "budget" ? "Budget geaendert" : a.kind === "status" ? "Status geaendert" : "Zuweisung geaendert"}
+                    {a.kind === "budget" ? "Budget geändert" : a.kind === "status" ? "Status geändert" : "Zuweisung geändert"}
                   </span>
                   {a.old_value != null && (
                     <span className="text-muted-foreground tabular-nums">{a.old_value} → <strong>{a.new_value}</strong></span>

@@ -158,7 +158,7 @@ export function GeneralColumn({ contacts, selectedId, onSelect, onUnassign, canR
       {/* Hint fuer Drop-Target */}
       {!canReassign && (
         <p className="text-[9px] text-muted-foreground/70 p-2 border-t border-border shrink-0">
-          Hierhin droppen = aus persoenlicher Spalte zurueckgeben.
+          Hierhin droppen = aus persönlicher Spalte zurückgeben.
         </p>
       )}
     </div>

@@ -173,7 +173,7 @@ function PushActivationRow() {
 
   async function subscribe() {
     if (!vapidKey) {
-      toast.error("VAPID-Schluessel ist auf dem Server nicht konfiguriert.");
+      toast.error("VAPID-Schlüssel ist auf dem Server nicht konfiguriert.");
       return;
     }
     setBusy(true);
@@ -194,7 +194,7 @@ function PushActivationRow() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "Subscribe fehlgeschlagen");
       setSubscribed(true);
-      toast.success("Push auf diesem Geraet aktiviert");
+      toast.success("Push auf diesem Gerät aktiviert");
     } catch (e) {
       toast.error("Aktivierung fehlgeschlagen: " + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -216,7 +216,7 @@ function PushActivationRow() {
         await sub.unsubscribe();
       }
       setSubscribed(false);
-      toast.success("Push auf diesem Geraet deaktiviert");
+      toast.success("Push auf diesem Gerät deaktiviert");
     } catch (e) {
       toast.error("Deaktivierung fehlgeschlagen: " + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -227,7 +227,7 @@ function PushActivationRow() {
   if (permission === "unsupported") {
     return (
       <p className="text-xs text-muted-foreground">
-        Push-Benachrichtigungen werden in diesem Browser nicht unterstuetzt.
+        Push-Benachrichtigungen werden in diesem Browser nicht unterstützt.
       </p>
     );
   }

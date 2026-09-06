@@ -46,7 +46,7 @@ const ACTION_REQUIRED_TYPES = new Set<NotificationType>([
 const SNOOZE_OPTIONS = [
   { key: "1h", label: "1 Stunde", mins: 60 },
   { key: "morgen", label: "Morgen 8:00", mins: -1 }, // -1 = special "tomorrow 8am"
-  { key: "1week", label: "Naechste Woche", mins: 60 * 24 * 7 },
+  { key: "1week", label: "Nächste Woche", mins: 60 * 24 * 7 },
 ] as const;
 function computeSnoozeUntil(key: typeof SNOOZE_OPTIONS[number]["key"]): string {
   if (key === "morgen") {
@@ -597,8 +597,8 @@ export function NotificationsBell() {
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); deleteOne(n.id); }}
                                     className="p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                                    data-tooltip="Loeschen"
-                                    aria-label="Loeschen"
+                                    data-tooltip="Löschen"
+                                    aria-label="Löschen"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>

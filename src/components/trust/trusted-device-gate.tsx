@@ -50,7 +50,7 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
   async function handleRequest() {
     const name = deviceName.trim();
     if (!name) {
-      toast.error("Geraete-Name eingeben");
+      toast.error("Geräte-Name eingeben");
       return;
     }
     setSubmitting(true);
@@ -65,7 +65,7 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
         toast.error(json.error || "Anfrage fehlgeschlagen");
         return;
       }
-      toast.success("Bestaetigungs-Mail an admin@eventline-basel.com gesendet");
+      toast.success("Bestätigungs-Mail an admin@eventline-basel.com gesendet");
       await load();
     } finally {
       setSubmitting(false);
@@ -73,7 +73,7 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
   }
 
   if (status === null) {
-    return <div className="p-8 text-center text-sm text-muted-foreground">Pruefe Geraete-Vertrauen ...</div>;
+    return <div className="p-8 text-center text-sm text-muted-foreground">Prüfe Geräte-Vertrauen ...</div>;
   }
 
   if (status.trusted) {
@@ -88,21 +88,21 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                 <Clock className="h-5 w-5" />
-                <h2 className="font-semibold">Wartet auf Bestaetigung</h2>
+                <h2 className="font-semibold">Wartet auf Bestätigung</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Eine Bestaetigungs-Mail wurde an <span className="font-mono">admin@eventline-basel.com</span>{" "}
-                gesendet. Sobald der Link aus der Mail geklickt wurde, hat dieses Geraet Zugriff auf
-                Finanzen + Loehne.
+                Eine Bestätigungs-Mail wurde an <span className="font-mono">admin@eventline-basel.com</span>{" "}
+                gesendet. Sobald der Link aus der Mail geklickt wurde, hat dieses Gerät Zugriff auf
+                Finanzen + Löhne.
               </p>
               {status.deviceName && (
                 <p className="text-xs text-muted-foreground">
-                  Geraete-Name: <span className="font-mono">{status.deviceName}</span>
+                  Geräte-Name: <span className="font-mono">{status.deviceName}</span>
                 </p>
               )}
               <div className="pt-2">
                 <button type="button" onClick={load} className="kasten kasten-muted text-sm">
-                  Status neu pruefen
+                  Status neu prüfen
                 </button>
               </div>
             </div>
@@ -110,19 +110,19 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h2 className="font-semibold">Vertrautes Geraet noetig</h2>
+                <h2 className="font-semibold">Vertrautes Gerät nötig</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Dieser Bereich (Finanzen, Loehne) ist nur auf vertrauten Geraeten zugaenglich.
+                Dieser Bereich (Finanzen, Löhne) ist nur auf vertrauten Geräten zugänglich.
                 Damit kann ein gestohlenes Login allein keine sensiblen Daten einsehen — der Angreifer
-                braeuchte zusaetzlich Zugriff auf <span className="font-mono">admin@eventline-basel.com</span>.
+                bräuchte zusätzlich Zugriff auf <span className="font-mono">admin@eventline-basel.com</span>.
               </p>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Geraete-Name</label>
+                <label className="text-xs font-medium text-muted-foreground">Geräte-Name</label>
                 <Input
                   value={deviceName}
                   onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="z.B. 'Buero-MacBook' oder 'iPhone Leo'"
+                  placeholder="z.B. 'Büro-MacBook' oder 'iPhone Leo'"
                   maxLength={60}
                 />
               </div>
@@ -134,14 +134,14 @@ export function TrustedDeviceGate({ children }: { children: ReactNode }) {
                   className="kasten kasten-green"
                 >
                   <MailCheck className="h-3.5 w-3.5" />
-                  {submitting ? "Sende ..." : "Bestaetigungs-Mail anfragen"}
+                  {submitting ? "Sende ..." : "Bestätigungs-Mail anfragen"}
                 </button>
               </div>
               <div className="flex items-start gap-2 text-xs text-muted-foreground p-3 rounded-lg bg-muted/40 mt-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>
                   Die Mail geht zentral an <strong>admin@eventline-basel.com</strong> — nicht an deine
-                  eigene Adresse. Nur wer diese Mailbox kontrolliert kann neue Geraete freischalten.
+                  eigene Adresse. Nur wer diese Mailbox kontrolliert kann neue Geräte freischalten.
                 </span>
               </div>
             </div>

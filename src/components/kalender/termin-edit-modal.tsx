@@ -125,7 +125,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
   async function sendConfirmation() {
     if (!appt) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(confEmail.trim())) {
-      toast.error("Bitte gueltige Email-Adresse eingeben");
+      toast.error("Bitte gültige Email-Adresse eingeben");
       return;
     }
     setConfSending(true);
@@ -144,7 +144,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
         toast.error(json?.error || "Versand fehlgeschlagen");
         return;
       }
-      toast.success(`Bestaetigung an ${confEmail.trim()} gesendet`);
+      toast.success(`Bestätigung an ${confEmail.trim()} gesendet`);
       // Termin-State im Modal aktualisieren damit die Status-Pille
       // gleich sichtbar wird ohne Reload.
       setAppt((prev) => prev ? {
@@ -322,7 +322,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
             <div className="rounded-lg border border-border bg-card p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Bestaetigung an Kunde</span>
+                <span className="text-sm font-medium">Bestätigung an Kunde</span>
                 {appt.confirmation_sent_at && (
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
                     <Check className="h-2.5 w-2.5" />gesendet
@@ -342,7 +342,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
                 disabled={saving || deleting}
               >
                 <Mail className="h-3.5 w-3.5" />
-                {appt.confirmation_sent_at ? "Nochmals senden" : "Bestaetigung senden"}
+                {appt.confirmation_sent_at ? "Nochmals senden" : "Bestätigung senden"}
               </button>
             </div>
 
@@ -374,7 +374,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
       <Modal
         open={showConfirm}
         onClose={() => !confSending && setShowConfirm(false)}
-        title="Bestaetigung an Kunde senden"
+        title="Bestätigung an Kunde senden"
         icon={<Mail className="h-4 w-4 text-blue-600" />}
         size="md"
         closable={!confSending}
@@ -383,7 +383,7 @@ export function TerminEditModal({ apptId, onClose, onChanged }: Props) {
           <p className="text-xs text-muted-foreground">
             Sendet eine HTML-Email mit Termin-Datum + Uhrzeit + Titel +
             Beschreibung an die angegebene Adresse. Email + Name werden
-            am Termin gespeichert (fuer das naechste Mal).
+            am Termin gespeichert (für das nächste Mal).
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 sm:col-span-1">

@@ -124,7 +124,7 @@ function AssigneePopover({
         onChange={(id) => { onChange(id); setOpen(false); }}
         items={options.map((p) => ({ id: p.id, label: p.full_name }))}
         clearable={false}
-        placeholder="Person auswaehlen ..."
+        placeholder="Person auswählen ..."
       />
     </div>,
     document.body,
@@ -196,9 +196,9 @@ export function TodoDetail({
 
   async function deleteAttachment(att: TodoAttachment) {
     const ok = await confirm({
-      title: "Anhang loeschen?",
+      title: "Anhang löschen?",
       message: `"${att.name}" wird unwiderruflich entfernt.`,
-      confirmLabel: "Loeschen",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
@@ -206,12 +206,12 @@ export function TodoDetail({
     await supabase.from("todo_attachments").delete().eq("id", att.id);
     await loadAttachments();
     onAttachmentsChanged?.();
-    toast.success("Datei geloescht");
+    toast.success("Datei gelöscht");
   }
 
   async function getSignedUrl(path: string): Promise<string | null> {
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) { toast.error("Datei nicht verfuegbar"); return null; }
+    if (error || !data?.signedUrl) { toast.error("Datei nicht verfügbar"); return null; }
     return data.signedUrl;
   }
   async function previewFile(path: string, filename: string) {
@@ -242,7 +242,7 @@ export function TodoDetail({
             Selektion aufheben, nicht in der Browser-History zuruecknavigieren. */}
         <button
           type="button"
-          aria-label="Zurueck zur Liste"
+          aria-label="Zurück zur Liste"
           onClick={onBack}
           className="p-2 rounded-lg shrink-0 border border-border bg-card md:border-transparent md:bg-transparent hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors"
         >
@@ -286,7 +286,7 @@ export function TodoDetail({
             )}
             {todo.status === "offen" && (
               <button onClick={onDelete} className="kasten kasten-red">
-                <Trash2 className="h-3.5 w-3.5" />Loeschen
+                <Trash2 className="h-3.5 w-3.5" />Löschen
               </button>
             )}
           </div>
@@ -393,7 +393,7 @@ export function TodoDetail({
                       <Download className="h-4 w-4" />
                     </button>
                     {isOpen && (
-                      <button onClick={() => deleteAttachment(a)} className="icon-btn icon-btn-red" data-tooltip="Loeschen">
+                      <button onClick={() => deleteAttachment(a)} className="icon-btn icon-btn-red" data-tooltip="Löschen">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}

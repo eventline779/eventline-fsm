@@ -53,7 +53,7 @@ export function DecisionModal({ mode, project, onClose, onDone }: {
     const b = parseFloat(budget.replace(",", "."));
     if (!Number.isFinite(b) || b <= 0) { toast.error("Bitte Budget-Stunden angeben"); setSaving(false); return; }
     if (mode === "edit-budget" && !note.trim()) {
-      toast.error("Bitte Begruendung fuer die Budget-Aenderung angeben");
+      toast.error("Bitte Begründung für die Budget-Änderung angeben");
       setSaving(false); return;
     }
     const oldBudget = project.budget_hours;
@@ -88,14 +88,14 @@ export function DecisionModal({ mode, project, onClose, onDone }: {
         )}
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground/70 ml-1">
-            {mode === "reject" ? "Kommentar (empfohlen)" : mode === "edit-budget" ? "Begruendung *" : "Kommentar"}
+            {mode === "reject" ? "Kommentar (empfohlen)" : mode === "edit-budget" ? "Begründung *" : "Kommentar"}
           </p>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40"
-            placeholder={mode === "reject" ? "Warum wird abgelehnt?" : mode === "edit-budget" ? "Warum wird das Budget geaendert?" : "Optional"}
+            placeholder={mode === "reject" ? "Warum wird abgelehnt?" : mode === "edit-budget" ? "Warum wird das Budget geändert?" : "Optional"}
           />
         </div>
         <div className="flex gap-2 pt-1">
@@ -115,7 +115,7 @@ export function CancelModal({ projectId, onClose, onDone }: { projectId: string;
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   async function submit() {
-    if (!reason.trim()) return toast.error("Begruendung ist Pflicht");
+    if (!reason.trim()) return toast.error("Begründung ist Pflicht");
     setSaving(true);
     const { error } = await supabase.rpc("cancel_project", { p_project_id: projectId, p_reason: reason.trim() });
     setSaving(false);
@@ -126,9 +126,9 @@ export function CancelModal({ projectId, onClose, onDone }: { projectId: string;
   return (
     <Modal open onClose={onClose} title="Projekt stornieren" size="md">
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">Wird als storniert ins Archiv verschoben. Zeit-Eintraege bleiben.</p>
+        <p className="text-xs text-muted-foreground">Wird als storniert ins Archiv verschoben. Zeit-Einträge bleiben.</p>
         <div className="space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Begruendung *</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Begründung *</p>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={4} autoFocus className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring/40" placeholder="Warum wird das Projekt storniert?" />
         </div>
         <div className="flex gap-2 pt-1">
@@ -150,7 +150,7 @@ export function CloseModal({ projectId, onClose, onDone }: { projectId: string; 
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    if (success === null) return toast.error("Bitte Erfolg oder Nicht-Erfolg waehlen");
+    if (success === null) return toast.error("Bitte Erfolg oder Nicht-Erfolg wählen");
     setSaving(true);
     const { error } = await supabase.from("projects").update({
       status: "abgeschlossen",
@@ -383,7 +383,7 @@ export function AppointmentNotesModal({
     });
     setSaving(false);
     if (error) { toast.error("Notiz speichern fehlgeschlagen: " + error.message); return; }
-    toast.success("Notiz hinzugefuegt");
+    toast.success("Notiz hinzugefügt");
     setDraft("");
     await load();
     onChanged();
@@ -391,15 +391,15 @@ export function AppointmentNotesModal({
 
   async function delNote(n: AppointmentNote) {
     const ok = await confirm({
-      title: "Notiz loeschen?",
-      message: "Die Notiz wird endgueltig entfernt.",
-      confirmLabel: "Loeschen",
+      title: "Notiz löschen?",
+      message: "Die Notiz wird endgültig entfernt.",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
     const { error } = await supabase.from("project_appointment_notes").delete().eq("id", n.id);
-    if (error) { toast.error("Loeschen fehlgeschlagen: " + error.message); return; }
-    toast.success("Geloescht");
+    if (error) { toast.error("Löschen fehlgeschlagen: " + error.message); return; }
+    toast.success("Gelöscht");
     await load();
     onChanged();
   }
@@ -408,7 +408,7 @@ export function AppointmentNotesModal({
     <Modal open onClose={onClose} title={`Notizen: ${appointmentTitle}`} size="md">
       <div className="space-y-3">
         {loading ? (
-          <p className="text-xs text-muted-foreground italic">Laedt …</p>
+          <p className="text-xs text-muted-foreground italic">Lädt …</p>
         ) : notes.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">Noch keine Notizen.</p>
         ) : (
@@ -427,7 +427,7 @@ export function AppointmentNotesModal({
                       <p className="whitespace-pre-wrap mt-0.5">{n.content}</p>
                     </div>
                     {canDelete && (
-                      <button onClick={() => delNote(n)} className="text-muted-foreground hover:text-destructive shrink-0" aria-label="Loeschen">
+                      <button onClick={() => delNote(n)} className="text-muted-foreground hover:text-destructive shrink-0" aria-label="Löschen">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -449,7 +449,7 @@ export function AppointmentNotesModal({
             <button onClick={onClose} disabled={saving} className="kasten kasten-muted flex-1">Schliessen</button>
             <button onClick={addNote} disabled={saving || !draft.trim()} className="kasten kasten-red flex-1">
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              {saving ? "…" : "Notiz hinzufuegen"}
+              {saving ? "…" : "Notiz hinzufügen"}
             </button>
           </div>
         </div>

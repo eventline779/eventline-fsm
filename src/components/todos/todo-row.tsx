@@ -207,7 +207,7 @@ function AssigneePopover({
         onChange={(id) => { onChange(id); setOpen(false); }}
         items={options.map((p) => ({ id: p.id, label: p.full_name }))}
         clearable={false}
-        placeholder="Person auswaehlen ..."
+        placeholder="Person auswählen ..."
       />
     </div>,
     document.body,
@@ -260,7 +260,7 @@ export function TodoRow({
     },
     {
       key: "snooze-woche",
-      label: "Snooze auf naechste Woche",
+      label: "Snooze auf nächste Woche",
       icon: <Clock className="h-4 w-4" />,
       onClick: () => onDueChange(todo, addDaysIso(todayIso(), 7)),
       disabled: !canEditRow,
@@ -276,7 +276,7 @@ export function TodoRow({
       : []),
     {
       key: "delete",
-      label: "Loeschen",
+      label: "Löschen",
       icon: <Trash2 className="h-4 w-4" />,
       onClick: () => onDelete(todo),
       danger: true,

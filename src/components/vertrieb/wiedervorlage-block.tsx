@@ -111,7 +111,7 @@ export function WiedervorlageBlock({
     // Wenn der User in einer anderen TZ ist, fallen wir auf seine lokale
     // Zeit zurueck (akzeptabel weil App Schweiz-only ist).
     const local = new Date(`${formDate}T${formTime}:00`);
-    if (Number.isNaN(local.getTime())) { toast.error("Ungueltiges Datum"); setSaving(false); return; }
+    if (Number.isNaN(local.getTime())) { toast.error("Ungültiges Datum"); setSaving(false); return; }
     const { error } = await supabase
       .from("vertrieb_contacts")
       .update({

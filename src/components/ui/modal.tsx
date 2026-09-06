@@ -200,7 +200,7 @@ export function Modal({ open, onClose, title, icon, size = "sm", closable = true
                   type="button"
                   onClick={onClose}
                   className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                  aria-label="Schliessen"
+                  aria-label="Schließen"
                 >
                   <X className="h-4 w-4 text-muted-foreground" />
                 </button>

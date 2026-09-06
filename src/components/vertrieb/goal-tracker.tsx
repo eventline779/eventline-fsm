@@ -135,7 +135,7 @@ export function GoalTracker({ contacts, isAdmin, salesPeople }: Props) {
   async function save() {
     const target = Number(draft.target_count);
     if (!draft.start_date || !draft.end_date || !target || target <= 0) {
-      toast.error("Start, Ende und Ziel-Anzahl ausfuellen");
+      toast.error("Start, Ende und Ziel-Anzahl ausfüllen");
       return;
     }
     if (draft.end_date < draft.start_date) {
@@ -212,7 +212,7 @@ export function GoalTracker({ contacts, isAdmin, salesPeople }: Props) {
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Zaehlt Leads die in der Periode auf Step ≥ 2 (kontaktiert) sind.
+            Zählt Leads die in der Periode auf Step ≥ 2 (kontaktiert) sind.
           </p>
         </CardContent>
       </Card>
@@ -304,7 +304,7 @@ export function GoalTracker({ contacts, isAdmin, salesPeople }: Props) {
               <span className={stats.projectedShortfall > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
                 {stats.projectedShortfall > 0
                   ? `Verfehlt um ${stats.projectedShortfall}`
-                  : `+${Math.abs(stats.projectedShortfall)} ueber Ziel`}
+                  : `+${Math.abs(stats.projectedShortfall)} über Ziel`}
               </span>
               <span className="text-muted-foreground ml-auto tabular-nums">{stats.dailyRate.toFixed(1)}/Tag</span>
             </div>

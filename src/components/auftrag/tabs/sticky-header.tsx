@@ -302,8 +302,8 @@ function KundeKontaktiertButton({
     : "";
   const tooltip = isContacted
     ? localContactedByName
-      ? `Kontaktiert am ${fullDateTooltip} von ${localContactedByName}. Klick zum Rueckgaengig-Machen.`
-      : `Kontaktiert am ${fullDateTooltip}. Klick zum Rueckgaengig-Machen.`
+      ? `Kontaktiert am ${fullDateTooltip} von ${localContactedByName}. Klick zum Rückgängig-Machen.`
+      : `Kontaktiert am ${fullDateTooltip}. Klick zum Rückgängig-Machen.`
     : "Als 'Kunde kontaktiert' markieren, damit niemand doppelt anruft.";
 
   const onClick = async () => {
