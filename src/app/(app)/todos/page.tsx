@@ -3,27 +3,27 @@
 /**
  * Todos-Seite — Redesign (2026-09).
  *
- * Vorher: monolithischer 780-Zeilen-Client mit /auftraege-1:1-Layout,
- * kein Rollen-Segment, kein Checkbox-Erledigen, kein Quick-Add, keine
- * Gruppierung nach Zeit, Archiv mischt Erledigt+Geloescht.
+ * Iteration 2 (Filter drastisch reduziert):
+ *  Vorher hatte die Seite 7+ Filter-Elemente (Scope×Zeit×Status×Prio +
+ *  Personen-Select + Suche + Dringend-Toggle) — Leo: "das ueberfordert
+ *  den User". Jetzt nur noch: EIN Scope-Segment (Fuer mich / Delegiert
+ *  [/ Alle wenn canSeeAll]) + Suche + "Erledigte anzeigen"-Toggle.
  *
- * Jetzt (Recon-Plan-Umsetzung):
- *   - Scope-Segment "An mich | Von mir delegiert | Team | Alle" mit
- *     live Server-Counts (loeschbar via canSeeAll).
- *   - Zeit-Segment "Alles | Heute+Ueberfaellig | Diese Woche" +
- *     Status-Segment "Offen | Erledigt | Geloescht" (mischt nichts mehr).
- *   - Prio-Toggle "Nur dringend"; Sortierung: priority asc + due_date asc
- *     -> dringend zuerst, statt nur due-date.
- *   - Immer-sichtbares Quick-Add unter der Filter-Leiste, Enter=Speichern,
- *     Defaults (an mich, in 7 Tagen, normal).
+ *  Weitere Details:
+ *   - Immer-sichtbares Quick-Add unter der Filter-Leiste, Enter=Speichern
+ *     (per onKeyDown im Input — der globale useEnterAsTab-Hook wuerde
+ *     sonst zum naechsten Chip springen).
  *   - Zeilen mit Checkbox links, inline-editierbaren Chips (Faellig,
- *     Assignee) und Ellipsis-Menue (Snooze morgen/naechste Woche, Erinnern,
- *     Loeschen).
+ *     Assignee) und Ellipsis-Menue (Snooze morgen/naechste Woche,
+ *     Erinnern, Loeschen).
  *   - Gruppierung nach Zeit (Ueberfaellig / Heute / Morgen / Diese Woche /
- *     Spaeter / Ohne Datum), Sticky-Sub-Header, einklappbar (localStorage).
- *   - Filter-State via URL-Query + localStorage (§10 Reload-Persistenz).
+ *     Spaeter / Ohne Datum), einklappbar (localStorage).
+ *   - Filter-State via URL-Query + localStorage v2 (v1 tolerant ignoriert).
  *
- * Backend unangetastet — nur andere Where-Klauseln auf 'todos'.
+ *  Geloeschte Todos werden nirgends mehr angezeigt (soft-delete bleibt fuer
+ *  Recovery via DB durch Admin) — der "Geloescht"-View ist weg.
+ *
+ *  Backend unangetastet.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,7 +42,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { TOAST } from "@/lib/messages";
 import {
   buildTodosQuery, loadScopeCounts,
-  type TodoScope, type TodoStatus, type TodoTimeFilter,
+  type TodoScope,
 } from "@/lib/todos-query";
 import { bucketForDue, GROUP_LABEL, GROUP_ORDER, type GroupBucket } from "@/lib/relative-date";
 import { TodoFilters, type FilterState } from "@/components/todos/todo-filters";
@@ -53,7 +53,9 @@ import { TodoDetail } from "@/components/todos/todo-detail";
 import type { Profile, Todo, JobPriority } from "@/types";
 
 const PAGE_SIZE = 50;
-const LS_KEY = "todos-filters-v1";
+// v2 nach Filter-Reduktion 2026-09 — alte v1-Keys (status/time/urgent/…)
+// werden bewusst ignoriert und nicht migriert.
+const LS_KEY = "todos-filters-v2";
 const LS_COLLAPSE = "todos-groups-collapsed-v1";
 
 /* -------------------------------------------------------------------------
@@ -62,12 +64,11 @@ const LS_COLLAPSE = "todos-groups-collapsed-v1";
 
 const DEFAULT_STATE: FilterState = {
   scope: "mine",
-  status: "offen",
-  timeFilter: "all",
-  onlyUrgent: false,
+  showCompleted: false,
   search: "",
-  assigneeFilter: "all",
 };
+
+const VALID_SCOPES: TodoScope[] = ["mine", "delegated", "all"];
 
 function readInitialState(url: URLSearchParams): FilterState {
   const fromLs = (() => {
@@ -79,13 +80,14 @@ function readInitialState(url: URLSearchParams): FilterState {
     } catch { return null; }
   })();
   // URL wins ueber LS (teilbarer Link soll gewinnen).
-  const scope   = (url.get("scope")  as TodoScope)      ?? fromLs?.scope   ?? DEFAULT_STATE.scope;
-  const status  = (url.get("status") as TodoStatus)     ?? fromLs?.status  ?? DEFAULT_STATE.status;
-  const time    = (url.get("time")   as TodoTimeFilter) ?? fromLs?.timeFilter ?? DEFAULT_STATE.timeFilter;
-  const urgent  = url.get("urgent") === "1"             ? true : url.get("urgent") === "0" ? false : (fromLs?.onlyUrgent ?? DEFAULT_STATE.onlyUrgent);
-  const search  = url.get("q") ?? ""; // Suche NICHT persistieren (aus LS holen macht bei Reload komische Loops)
-  const assignee = url.get("assignee") ?? fromLs?.assigneeFilter ?? DEFAULT_STATE.assigneeFilter;
-  return { scope, status, timeFilter: time, onlyUrgent: urgent, search, assigneeFilter: assignee };
+  const rawScope = (url.get("scope") ?? fromLs?.scope ?? DEFAULT_STATE.scope) as TodoScope;
+  const scope = VALID_SCOPES.includes(rawScope) ? rawScope : DEFAULT_STATE.scope;
+  const showCompleted =
+    url.get("completed") === "1" ? true
+    : url.get("completed") === "0" ? false
+    : (fromLs?.showCompleted ?? DEFAULT_STATE.showCompleted);
+  const search = url.get("q") ?? ""; // Suche NICHT persistieren
+  return { scope, showCompleted, search };
 }
 
 /* -------------------------------------------------------------------------
@@ -108,7 +110,7 @@ export default function TodosPage() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [counts, setCounts] = useState({ mine: 0, delegated: 0, team: 0, all: 0 });
+  const [counts, setCounts] = useState({ mine: 0, delegated: 0, all: 0 });
   const [reminded, setReminded] = useState<Set<string>>(new Set());
   const [selectedTodo, setSelectedTodo] = useState<TodoRowData | null>(null);
   const [showFullForm, setShowFullForm] = useState(false);
@@ -139,10 +141,7 @@ export default function TodosPage() {
     // Zwischenstaende speichert.
     const sp = new URLSearchParams();
     if (state.scope !== DEFAULT_STATE.scope) sp.set("scope", state.scope);
-    if (state.status !== DEFAULT_STATE.status) sp.set("status", state.status);
-    if (state.timeFilter !== DEFAULT_STATE.timeFilter) sp.set("time", state.timeFilter);
-    if (state.onlyUrgent) sp.set("urgent", "1");
-    if (state.assigneeFilter !== "all") sp.set("assignee", state.assigneeFilter);
+    if (state.showCompleted) sp.set("completed", "1");
     if (state.search) sp.set("q", state.search);
     const qs = sp.toString();
     const target = qs ? `${pathname}?${qs}` : pathname;
@@ -330,7 +329,7 @@ export default function TodosPage() {
   async function deleteTodo(t: TodoRowData) {
     const ok = await confirm({
       title: "Todo loeschen?",
-      message: "Das Todo wird ins Archiv verschoben (mit 'Geloescht'-Tag). Anhaenge bleiben erhalten.",
+      message: "Das Todo verschwindet aus allen Listen. Wiederherstellung nur ueber die Datenbank durch einen Admin.",
       confirmLabel: "Loeschen",
       variant: "red",
     });
@@ -342,17 +341,7 @@ export default function TodosPage() {
     if (error) { TOAST.deleteError(error.message); return; }
     if (selectedTodo?.id === t.id) setSelectedTodo(null);
     await Promise.all([loadTodos(), refreshCounts()]);
-    toast.success("Todo geloescht — im Archiv");
-  }
-
-  async function restoreTodo(t: TodoRowData) {
-    const { error } = await supabase.from("todos")
-      .update({ deleted_at: null, deleted_by: null })
-      .eq("id", t.id);
-    if (error) { toast.error("Wiederherstellen fehlgeschlagen: " + error.message); return; }
-    if (selectedTodo?.id === t.id) setSelectedTodo({ ...selectedTodo, deleted_at: null });
-    await Promise.all([loadTodos(), refreshCounts()]);
-    toast.success("Todo wiederhergestellt");
+    toast.success("Todo geloescht");
   }
 
   async function remindTodo(t: TodoRowData | Todo) {
@@ -429,10 +418,6 @@ export default function TodosPage() {
     if (!selectedTodo) return;
     await deleteTodo(selectedTodo);
   }
-  async function detailRestore() {
-    if (!selectedTodo) return;
-    await restoreTodo(selectedTodo);
-  }
   async function detailRemind() {
     if (!selectedTodo) return;
     await remindTodo(selectedTodo);
@@ -475,7 +460,6 @@ export default function TodosPage() {
         onBack={() => setSelectedTodo(null)}
         onToggleComplete={detailToggle}
         onDelete={detailDelete}
-        onRestore={detailRestore}
         onRemind={detailRemind}
         onDueChange={(iso) => changeDue(selectedTodo as TodoRowData, iso)}
         onAssigneeChange={(id) => changeAssignee(selectedTodo as TodoRowData, id)}
@@ -516,12 +500,11 @@ export default function TodosPage() {
         state={state}
         counts={counts}
         canSeeAll={canSeeAll}
-        profiles={profiles}
         onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
       />
 
-      {/* Quick-Add (nur im Offen-Modus & wenn User erstellen darf) */}
-      {canCreate && state.status === "offen" && meId && (
+      {/* Quick-Add ist immer sichtbar wenn User erstellen darf. */}
+      {canCreate && meId && (
         <QuickAdd
           profiles={profiles}
           meProfileId={meId}
@@ -588,13 +571,12 @@ export default function TodosPage() {
         <EmptyState
           icon={CheckSquare}
           title={
-            state.status === "geloescht" ? "Keine geloeschten Todos"
-            : state.status === "erledigt" ? "Keine erledigten Todos"
-            : state.search ? "Keine Treffer"
+            state.search ? "Keine Treffer"
+            : state.scope === "delegated" ? "Nichts delegiert"
             : "Alles erledigt"
           }
           description={
-            state.status === "offen" && !state.search
+            !state.search
               ? "Nutze das Feld oben um schnell etwas festzuhalten."
               : undefined
           }
@@ -623,7 +605,6 @@ export default function TodosPage() {
                           todo={t}
                           meId={meId}
                           scope={state.scope}
-                          status={state.status}
                           profiles={profiles}
                           canRemind={canRemind}
                           canEditRow={canEditRow}
@@ -634,7 +615,6 @@ export default function TodosPage() {
                           onAssigneeChange={changeAssignee}
                           onRemind={remindTodo}
                           onDelete={deleteTodo}
-                          onRestore={restoreTodo}
                         />
                       );
                     })}

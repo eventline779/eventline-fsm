@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Check, AlertCircle, Paperclip, User as UserIcon, Calendar, MoreHorizontal,
-  Trash2, Bell, ArrowRight, Clock,
+  Trash2, Bell, Clock,
 } from "lucide-react";
 import { DatePopover } from "./date-popover";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -37,8 +37,7 @@ export type TodoRowData = Omit<Todo, "assignee"> & {
 interface Props {
   todo: TodoRowData;
   meId: string;
-  scope: "mine" | "delegated" | "team" | "all";
-  status: "offen" | "erledigt" | "geloescht";
+  scope: "mine" | "delegated" | "all";
   profiles: Profile[];
   canRemind: boolean;
   canEditRow: boolean; // aendern (Datum, Zuweisen)
@@ -49,7 +48,6 @@ interface Props {
   onAssigneeChange: (t: TodoRowData, assigneeId: string) => void;
   onRemind: (t: TodoRowData) => void;
   onDelete: (t: TodoRowData) => void;
-  onRestore: (t: TodoRowData) => void;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -230,12 +228,14 @@ function AssigneePopover({
 /* ------------------------------------------------------------------------- */
 
 export function TodoRow({
-  todo, meId, scope, status, profiles, canRemind, canEditRow, reminded,
-  onOpen, onToggleComplete, onDueChange, onAssigneeChange, onRemind, onDelete, onRestore,
+  todo, meId, scope, profiles, canRemind, canEditRow, reminded,
+  onOpen, onToggleComplete, onDueChange, onAssigneeChange, onRemind, onDelete,
 }: Props) {
-  const isDeleted = !!todo.deleted_at;
+  // Geloeschte Todos werden in der Liste server-seitig ausgefiltert und
+  // erreichen diese Component nicht mehr. Der isDeleted-Pfad ist damit
+  // 2026-09 komplett rausgeflogen (siehe todos-query.ts).
   const isDone = todo.status === "erledigt";
-  const isOpenStatus = todo.status === "offen" && !isDeleted;
+  const isOpenStatus = todo.status === "offen";
 
   const dueMeta = todo.due_date ? relativeDueLabel(todo.due_date) : null;
   const overdue = isOpenStatus && dueMeta?.overdue === true;
@@ -256,14 +256,14 @@ export function TodoRow({
       label: "Snooze auf morgen",
       icon: <Clock className="h-4 w-4" />,
       onClick: () => onDueChange(todo, addDaysIso(todayIso(), 1)),
-      disabled: !canEditRow || isDeleted,
+      disabled: !canEditRow,
     },
     {
       key: "snooze-woche",
       label: "Snooze auf naechste Woche",
       icon: <Clock className="h-4 w-4" />,
       onClick: () => onDueChange(todo, addDaysIso(todayIso(), 7)),
-      disabled: !canEditRow || isDeleted,
+      disabled: !canEditRow,
     },
     ...(canRemind && isOpenStatus && todo.assigned_to
       ? [{
@@ -274,20 +274,13 @@ export function TodoRow({
           disabled: reminded,
         }]
       : []),
-    ...(isDeleted
-      ? [{
-          key: "restore",
-          label: "Wiederherstellen",
-          icon: <ArrowRight className="h-4 w-4" />,
-          onClick: () => onRestore(todo),
-        }]
-      : [{
-          key: "delete",
-          label: "Loeschen",
-          icon: <Trash2 className="h-4 w-4" />,
-          onClick: () => onDelete(todo),
-          danger: true,
-        }]),
+    {
+      key: "delete",
+      label: "Loeschen",
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: () => onDelete(todo),
+      danger: true,
+    },
   ];
 
   return (
@@ -295,39 +288,32 @@ export function TodoRow({
       onClick={() => onOpen(todo)}
       className={`group relative flex items-start gap-3 px-3 py-2 rounded-xl bg-card border border-border transition-colors cursor-pointer hover:bg-foreground/[0.03] dark:hover:bg-foreground/[0.06] ${
         overdue ? "border-l-[3px] border-l-red-500" : ""
-      } ${isDone || isDeleted ? "opacity-70" : ""}`}
+      } ${isDone ? "opacity-70" : ""}`}
     >
       {/* Checkbox — Standard-Todo-UX-Grammatik: das ist die primaere
-          Erledigen-Interaktion. Bei geloeschten Todos deaktiviert. */}
+          Erledigen-Interaktion. */}
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); if (!isDeleted) onToggleComplete(todo); }}
-        disabled={isDeleted}
+        onClick={(e) => { e.stopPropagation(); onToggleComplete(todo); }}
         aria-label={isDone ? "Wieder oeffnen" : "Als erledigt markieren"}
         className={`mt-0.5 shrink-0 h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all ${
           isDone
             ? "bg-green-500 border-green-500 text-white"
             : "border-foreground/30 hover:border-foreground/70 hover:bg-foreground/5"
-        } ${isDeleted ? "opacity-40 cursor-not-allowed" : ""}`}
+        }`}
       >
         {isDone && <Check className="h-4 w-4" strokeWidth={3} />}
       </button>
 
       <div className="flex-1 min-w-0 flex flex-col gap-1">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`font-medium text-sm truncate ${isDone || isDeleted ? "line-through text-muted-foreground" : ""}`}>
+          <span className={`font-medium text-sm truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
             {todo.title}
           </span>
           {todo.priority === "dringend" && isOpenStatus && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
               <AlertCircle className="h-2.5 w-2.5" />
               Dringend
-            </span>
-          )}
-          {isDeleted && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 shrink-0">
-              <Trash2 className="h-2.5 w-2.5" />
-              Geloescht
             </span>
           )}
         </div>
@@ -411,14 +397,9 @@ export function TodoRow({
             </span>
           )}
 
-          {status === "erledigt" && todo.completed_at && (
+          {isDone && todo.completed_at && (
             <span className="text-green-700 dark:text-green-400">
               Abgeschlossen: {new Date(todo.completed_at).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
-            </span>
-          )}
-          {isDeleted && todo.deleted_at && (
-            <span className="text-red-600 dark:text-red-400">
-              Geloescht: {new Date(todo.deleted_at).toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" })}
             </span>
           )}
         </div>

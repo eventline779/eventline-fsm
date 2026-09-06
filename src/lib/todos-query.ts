@@ -1,30 +1,26 @@
 /**
- * Todos — Query-Builder mit Scope/Zeit/Status/Prio/Suche + Server-Counts.
+ * Todos — Query-Builder (drastisch vereinfacht 2026-09).
  *
- * Warum: Die alte Seite hatte alle Filter direkt inline im Component; die
- * Ableitung "an mich vs. von mir delegiert vs. Team" war gar nicht
- * moeglich (RLS mischt eigene + zugewiesene). Hier bauen wir die Query
- * einmal an einer Stelle und liefern sie fuer Liste + Segment-Badges.
+ * Vorher hatten wir 4 Filter-Achsen (scope × status × timeFilter × onlyUrgent)
+ * + Personen-Filter + Suche. Das war zu viel — der User war ueberfordert.
  *
- * Backend bleibt unangetastet — nur andere Where-Klauseln auf der
- * bestehenden 'todos'-Tabelle.
+ * Jetzt nur noch: scope (mine/delegated/all) + showCompleted (an/aus) +
+ * Suche. Sortierung (Prio > Faelligkeit > Erstellungsdatum) macht die
+ * Reihenfolge selbst-erklaerend — Zeit-/Prio-Filter braucht keiner mehr.
+ *
+ * Geloeschte Todos werden IMMER ausgeblendet (kein "Geloescht"-View mehr).
+ * Wer wiederherstellen will: aus DB via Admin.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { todayIso, addDaysIso } from "@/lib/relative-date";
 
-export type TodoScope = "mine" | "delegated" | "team" | "all";
-export type TodoStatus = "offen" | "erledigt" | "geloescht";
-export type TodoTimeFilter = "urgent" | "week" | "all";
+export type TodoScope = "mine" | "delegated" | "all";
 
 export interface TodoQueryParams {
   scope: TodoScope;
-  status: TodoStatus;
-  timeFilter: TodoTimeFilter;
-  onlyUrgent: boolean;
+  /** Wenn true: erledigte MIT anzeigen. Sonst nur offene. */
+  showCompleted: boolean;
   search: string;
-  /** Fuer Team/Alle-Modus: optional weitere Filterung auf ein Profil. */
-  assigneeFilter: string; // "all" | UUID
   /** ID des angemeldeten Users (Pflicht — sonst kein scope moeglich). */
   userId: string;
 }
@@ -48,48 +44,24 @@ export function buildTodosQuery(
     .from("todos")
     .select("*, assignee:profiles!assigned_to(full_name), creator:profiles!created_by(full_name), attachments:todo_attachments(id)");
 
-  // Status-Filter
-  if (params.status === "offen") {
-    q = q.eq("status", "offen").is("deleted_at", null);
-  } else if (params.status === "erledigt") {
-    q = q.eq("status", "erledigt").is("deleted_at", null);
-  } else {
-    // geloescht
-    q = q.not("deleted_at", "is", null);
+  // Nie geloeschte Todos anzeigen.
+  q = q.is("deleted_at", null);
+
+  // Status-Filter: default = nur offen. Mit showCompleted: offen + erledigt.
+  if (!params.showCompleted) {
+    q = q.eq("status", "offen");
   }
 
-  // Scope-Filter (ueberlagert die RLS-Sicht):
+  // Scope-Filter:
   //  - mine:      assigned_to = self
   //  - delegated: created_by = self AND assigned_to != self (echtes Delegieren)
-  //  - team:      alles was die RLS mit see-all liefert (ohne extra Einschraenkung)
-  //  - all:       ebenfalls alles — semantisch identisch zu team, aber die UI
-  //               nutzt es als "Alle inkl. anderer Personen"-Position.
+  //  - all:       alles was die RLS mit see-all liefert (nur wenn canSeeAll)
   if (params.scope === "mine") {
     q = q.eq("assigned_to", params.userId);
   } else if (params.scope === "delegated") {
     q = q.eq("created_by", params.userId).neq("assigned_to", params.userId);
   }
-  // team/all: keine Zusatz-Filter — RLS entscheidet via todos:see-all.
-
-  // Personen-Filter (nur relevant fuer team/all): (created_by=X OR assigned_to=X)
-  if ((params.scope === "team" || params.scope === "all") && params.assigneeFilter !== "all") {
-    q = q.or(`created_by.eq.${params.assigneeFilter},assigned_to.eq.${params.assigneeFilter}`);
-  }
-
-  // Prio-Filter
-  if (params.onlyUrgent) {
-    q = q.eq("priority", "dringend");
-  }
-
-  // Zeit-Filter
-  if (params.timeFilter === "urgent") {
-    // Heute + Ueberfaellig = due_date <= heute (inkl. NULL nicht — die haben ja kein Datum).
-    q = q.lte("due_date", todayIso());
-  } else if (params.timeFilter === "week") {
-    // Naechste 7 Tage inkl. heute.
-    q = q.gte("due_date", todayIso()).lte("due_date", addDaysIso(todayIso(), 7));
-  }
-  // "all": kein Zeit-Filter.
+  // all: keine Zusatz-Filter — RLS entscheidet via todos:see-all.
 
   // Volltext-Suche (title + description).
   const term = params.search.trim();
@@ -117,36 +89,30 @@ export function buildTodosQuery(
 }
 
 /**
- * Liefert die vier Scope-Counts fuer die Segment-Badges.
- * Alle Counts gehen gegen offen-und-nicht-geloescht — die Zahl im Header
- * soll "so viele offene Todos hast du in diesem Scope" bedeuten.
- * Ohne see-all sind team/all identisch zu mine+delegated (die RLS klemmt);
- * das ist ok, die Buttons werden dann sowieso ausgeblendet.
+ * Liefert die Scope-Counts fuer die Segment-Badges. Alle Counts gegen
+ * "offen und nicht geloescht" — die Zahl im Segment soll bedeuten
+ * "so viele offene Todos hast du in diesem Scope".
+ * Ohne see-all ist "all" 0 (der Button wird sowieso ausgeblendet).
  */
 export async function loadScopeCounts(
   supabase: SupabaseClient,
   userId: string,
   canSeeAll: boolean,
-): Promise<{ mine: number; delegated: number; team: number; all: number }> {
+): Promise<{ mine: number; delegated: number; all: number }> {
   const base = () =>
     supabase.from("todos").select("id", { count: "exact", head: true }).eq("status", "offen").is("deleted_at", null);
 
   // PostgREST-Query-Builder ist PromiseLike, kein echtes Promise — deshalb
   // hier explizit "await Promise.resolve(...)" um Promise-typing zu bekommen.
-  const [mineRes, delRes, teamRes] = await Promise.all([
+  const [mineRes, delRes, allRes] = await Promise.all([
     Promise.resolve(base().eq("assigned_to", userId)),
     Promise.resolve(base().eq("created_by", userId).neq("assigned_to", userId)),
     canSeeAll ? Promise.resolve(base()) : Promise.resolve({ count: 0 as number | null }),
   ]);
 
-  const teamCount = teamRes.count ?? 0;
   return {
     mine: mineRes.count ?? 0,
     delegated: delRes.count ?? 0,
-    // team + all bekommen dieselbe unbeschraenkte Sicht (Segment-Semantik:
-    // "team" = alles was RLS mich sehen laesst; "all" = extra-explizit gleiche
-    // Zahl — wir zeigen sie NUR wenn see-all).
-    team: teamCount,
-    all: teamCount,
+    all: allRes.count ?? 0,
   };
 }

@@ -162,9 +162,19 @@ export function QuickAdd({ profiles, meProfileId, meProfileName, disabled, onCre
         placeholder="Was ist zu tun? — Enter zum Speichern"
         className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
         disabled={busy}
-        // Quick-Add ist Enter=Submit (der globale useEnterAsTab-Hook
-        // greift nur wenn der Handler NICHT preventDefault ruft; native
-        // <form>-Submit ruft preventDefault via unser submit()).
+        // Enter=Submit. Der globale useEnterAsTab-Hook (siehe
+        // src/lib/use-enter-as-tab.ts) faengt sonst Enter ab und
+        // springt zum naechsten Fokus-Element (Assignee-Chip) statt zu
+        // submitten — deshalb hier explizit e.preventDefault() +
+        // submit(). Shift/Ctrl/Meta/Alt+Enter reichen wir durch (falls
+        // spaeter jemand Multi-Line braucht, macht der Browser nichts
+        // im <input>, aber wir blockieren es zumindest nicht).
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+          e.preventDefault();
+          submit();
+        }}
       />
 
       <AssigneePopover value={assignee} options={profiles} onChange={setAssignee}>

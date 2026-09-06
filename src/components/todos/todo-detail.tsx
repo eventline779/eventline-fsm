@@ -29,7 +29,7 @@ import { relativeDueLabel } from "@/lib/relative-date";
 import type { Todo, Profile } from "@/types";
 import {
   Check, Calendar, User as UserIcon, Trash2, Upload, FileText, Image as ImageIcon,
-  Download, Eye, Bell, RotateCcw, AlertCircle,
+  Download, Eye, Bell, AlertCircle,
 } from "lucide-react";
 
 interface TodoAttachment {
@@ -55,7 +55,6 @@ interface Props {
   onBack: () => void;
   onToggleComplete: () => Promise<void>;
   onDelete: () => Promise<void>;
-  onRestore: () => Promise<void>;
   onRemind: () => Promise<void>;
   onDueChange: (iso: string | null) => Promise<void>;
   onAssigneeChange: (id: string) => Promise<void>;
@@ -143,7 +142,7 @@ function AssigneePopover({
 
 export function TodoDetail({
   supabase, todo, profiles, canEdit, canRemind, reminded,
-  onBack, onToggleComplete, onDelete, onRestore, onRemind,
+  onBack, onToggleComplete, onDelete, onRemind,
   onDueChange, onAssigneeChange, onAttachmentsChanged,
 }: Props) {
   const [attachments, setAttachments] = useState<TodoAttachment[]>([]);
@@ -228,8 +227,10 @@ export function TodoDetail({
     a.click();
   }
 
-  const isDeleted = !!todo.deleted_at;
-  const isOpen = todo.status === "offen" && !isDeleted;
+  // Geloeschte Todos werden in der Liste server-seitig ausgeblendet und
+  // koennen nicht mehr angeklickt / in der Detail-View geoeffnet werden
+  // (isDeleted-Pfad ist 2026-09 komplett rausgeflogen).
+  const isOpen = todo.status === "offen";
   const dueMeta = todo.due_date ? relativeDueLabel(todo.due_date) : null;
   const overdue = isOpen && dueMeta?.overdue === true;
 
@@ -252,12 +253,7 @@ export function TodoDetail({
             <h1 className={`text-2xl font-bold tracking-tight ${(!isOpen) ? "line-through text-muted-foreground" : ""}`}>
               {todo.title}
             </h1>
-            {isDeleted && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                <Trash2 className="h-3 w-3" />Geloescht
-              </span>
-            )}
-            {!isDeleted && todo.priority === "dringend" && todo.status === "offen" && (
+            {todo.priority === "dringend" && todo.status === "offen" && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                 <AlertCircle className="h-3 w-3" />Dringend
               </span>
@@ -269,11 +265,7 @@ export function TodoDetail({
       <Card className="bg-card">
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            {isDeleted ? (
-              <button onClick={onRestore} className="kasten kasten-muted">
-                <RotateCcw className="h-3.5 w-3.5" />Wiederherstellen
-              </button>
-            ) : todo.status === "offen" ? (
+            {todo.status === "offen" ? (
               <button onClick={onToggleComplete} className="kasten kasten-green">
                 <Check className="h-3.5 w-3.5" />Abschliessen
               </button>
@@ -282,7 +274,7 @@ export function TodoDetail({
                 Wieder oeffnen
               </button>
             )}
-            {!isDeleted && todo.status === "offen" && canRemind && todo.assigned_to && (
+            {todo.status === "offen" && canRemind && todo.assigned_to && (
               <button
                 onClick={onRemind}
                 disabled={reminded}
@@ -292,7 +284,7 @@ export function TodoDetail({
                 {reminded ? "Erinnerung gesendet" : "Erinnern"}
               </button>
             )}
-            {!isDeleted && todo.status === "offen" && (
+            {todo.status === "offen" && (
               <button onClick={onDelete} className="kasten kasten-red">
                 <Trash2 className="h-3.5 w-3.5" />Loeschen
               </button>
@@ -373,7 +365,7 @@ export function TodoDetail({
             <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <FileText className="h-4 w-4" />Anhaenge ({attachments.length})
             </h2>
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading || isDeleted}>
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
               <Upload className="h-4 w-4 mr-1" />{uploading ? "Hochladen..." : "Datei hochladen"}
             </Button>
             <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif" onChange={uploadFile} className="hidden" />

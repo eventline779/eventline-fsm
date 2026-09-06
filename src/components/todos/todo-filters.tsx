@@ -1,40 +1,41 @@
 "use client";
 
 /**
- * Filter-Leiste der Todos-Seite.
+ * Filter-Leiste der Todos-Seite (drastisch reduziert 2026-09).
  *
- * Drei Zonen (§10 URL-Query + localStorage; alle Filter server-seitig
- * ausgewertet):
- *   Links  — Scope-Segment (An mich / Von mir delegiert / Team / Alle)
- *            mit Live-Counts. Team/Alle nur wenn canSeeAll.
- *   Mitte  — Zeit-Segment (Heute+Ueberfaellig / Diese Woche / Alles)
- *            + Status-Segment (Offen / Erledigt / Geloescht)
- *   Rechts — Suche + Prio-Toggle "Nur dringend" + optional Personen-
- *            Filter (nur bei team/alle).
+ * Vorher: Scope-Segment (4) + Zeit-Segment (3) + Status-Segment (3) +
+ * Suche + Prio-Toggle + Personen-Filter — insgesamt 7+ Filter-Elemente,
+ * der User war ueberfordert.
+ *
+ * Jetzt: EIN Scope-Segment links (mine / delegated [/ all wenn canSeeAll])
+ * mit Live-Counts + rechts Search + "Erledigte anzeigen"-Toggle. Fertig.
+ *
+ * Rationale:
+ *  - Zeit-Filter weg — die Sortierung (dringend > ueberfaellig > heute >
+ *    Rest) macht das eh sichtbar.
+ *  - "Nur dringend"-Filter weg — Dringend-Chips sind in der Liste
+ *    sichtbar, Sortierung stellt sie oben.
+ *  - "Geloescht"-View weg — geloeschte Todos sind soft-deleted und in
+ *    der UI komplett unsichtbar. Wer wiederherstellen will: Admin/DB.
+ *  - Personen-Filter weg — kommt zurueck wenn Bedarf da ist.
  */
 
-import { Search, X, AlertCircle } from "lucide-react";
+import { Search, X, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "@/components/searchable-select";
-import type { TodoScope, TodoStatus, TodoTimeFilter } from "@/lib/todos-query";
-import type { Profile } from "@/types";
+import type { TodoScope } from "@/lib/todos-query";
 
 export interface FilterState {
   scope: TodoScope;
-  status: TodoStatus;
-  timeFilter: TodoTimeFilter;
-  onlyUrgent: boolean;
+  showCompleted: boolean;
   search: string;
-  assigneeFilter: string;
 }
 
-export interface ScopeCounts { mine: number; delegated: number; team: number; all: number }
+export interface ScopeCounts { mine: number; delegated: number; all: number }
 
 interface Props {
   state: FilterState;
   counts: ScopeCounts;
   canSeeAll: boolean;
-  profiles: Profile[];
   onChange: (patch: Partial<FilterState>) => void;
 }
 
@@ -60,85 +61,50 @@ function Seg<T extends string>({
   );
 }
 
-export function TodoFilters({ state, counts, canSeeAll, profiles, onChange }: Props) {
-  const showAssigneeFilter = canSeeAll && (state.scope === "team" || state.scope === "all");
+export function TodoFilters({ state, counts, canSeeAll, onChange }: Props) {
   return (
-    <div className="flex flex-col gap-3">
-      {/* Scope + Zeit + Status in einer Reihe wo Platz reicht */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Seg value="mine"       current={state.scope} label="An mich"           onClick={(v) => onChange({ scope: v })} badge={counts.mine} />
-          <Seg value="delegated"  current={state.scope} label="Von mir delegiert" onClick={(v) => onChange({ scope: v })} badge={counts.delegated} />
-          {canSeeAll && <Seg value="team" current={state.scope} label="Team" onClick={(v) => onChange({ scope: v })} badge={counts.team} />}
-          {canSeeAll && <Seg value="all"  current={state.scope} label="Alle" onClick={(v) => onChange({ scope: v })} badge={counts.all} />}
-        </div>
-
-        <span className="mx-1 h-6 w-px bg-border hidden sm:inline-block" aria-hidden />
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Seg value="all"    current={state.timeFilter} label="Alles"              onClick={(v) => onChange({ timeFilter: v })} />
-          <Seg value="urgent" current={state.timeFilter} label="Heute+Ueberfaellig" onClick={(v) => onChange({ timeFilter: v })} />
-          <Seg value="week"   current={state.timeFilter} label="Diese Woche"        onClick={(v) => onChange({ timeFilter: v })} />
-        </div>
-
-        <span className="mx-1 h-6 w-px bg-border hidden sm:inline-block" aria-hidden />
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Seg value="offen"     current={state.status} label="Offen"     onClick={(v) => onChange({ status: v })} />
-          <Seg value="erledigt"  current={state.status} label="Erledigt"  onClick={(v) => onChange({ status: v })} />
-          <Seg value="geloescht" current={state.status} label="Geloescht" onClick={(v) => onChange({ status: v })} />
-        </div>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      {/* Links: Scope-Segment mit Counts. Bei canSeeAll dazu "Alle". */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Seg value="mine"      current={state.scope} label="Fuer mich" onClick={(v) => onChange({ scope: v })} badge={counts.mine} />
+        <Seg value="delegated" current={state.scope} label="Delegiert" onClick={(v) => onChange({ scope: v })} badge={counts.delegated} />
+        {canSeeAll && (
+          <Seg value="all" current={state.scope} label="Alle" onClick={(v) => onChange({ scope: v })} badge={counts.all} />
+        )}
       </div>
 
-      {/* Suche + Prio + Personen-Filter */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      {/* Rechts: Suche + "Erledigte anzeigen"-Toggle (Kasten). */}
+      <div className="flex items-center gap-2 sm:ml-auto sm:flex-1 sm:max-w-md">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Titel oder Beschreibung suchen ..."
+            placeholder="Suchen ..."
             value={state.search}
             onChange={(e) => onChange({ search: e.target.value })}
             className="pl-9 h-9"
           />
+          {state.search && (
+            <button
+              type="button"
+              onClick={() => onChange({ search: "" })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+              data-tooltip="Suche zuruecksetzen"
+              aria-label="Suche zuruecksetzen"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         <button
           type="button"
-          onClick={() => onChange({ onlyUrgent: !state.onlyUrgent })}
-          className={state.onlyUrgent ? "kasten kasten-red" : "kasten-toggle-off"}
-          data-tooltip="Nur dringende Todos zeigen"
+          onClick={() => onChange({ showCompleted: !state.showCompleted })}
+          className={state.showCompleted ? "kasten-active" : "kasten-toggle-off"}
+          data-tooltip="Auch erledigte Todos in der Liste anzeigen"
         >
-          <AlertCircle className="h-3.5 w-3.5" />
-          Nur dringend
+          <Check className="h-3.5 w-3.5" />
+          Erledigte
         </button>
-
-        {showAssigneeFilter && (
-          <div className="w-full sm:w-56">
-            <SearchableSelect
-              value={state.assigneeFilter}
-              onChange={(v) => onChange({ assigneeFilter: v || "all" })}
-              items={[
-                { id: "all", label: "Alle Personen" },
-                ...profiles.map((p) => ({ id: p.id, label: p.full_name })),
-              ]}
-              clearable={false}
-              active={state.assigneeFilter !== "all"}
-              placeholder="Person filtern ..."
-            />
-          </div>
-        )}
-
-        {state.search && (
-          <button
-            type="button"
-            onClick={() => onChange({ search: "" })}
-            className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg flex items-center gap-1.5 transition-colors"
-            data-tooltip="Suche zuruecksetzen"
-          >
-            <X className="h-3.5 w-3.5" />
-            Reset
-          </button>
-        )}
       </div>
     </div>
   );
