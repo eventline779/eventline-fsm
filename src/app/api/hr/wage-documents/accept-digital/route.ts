@@ -19,7 +19,8 @@ export async function POST() {
       lohndokumente_digital_accepted_at: new Date().toISOString(),
       lohndokumente_digital_accepted_version: WAGE_DIGITAL_CONSENT_VERSION,
     })
-    .eq("id", auth.user.id);
+    // dev-mode: effective user
+    .eq("id", auth.effectiveUserId);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

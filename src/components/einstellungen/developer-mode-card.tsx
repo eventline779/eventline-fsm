@@ -1,18 +1,21 @@
 "use client";
 
 /**
- * DeveloperModeCard — Admin-only Toggle in Mein-Konto → Sicherheit.
+ * DeveloperModeCard — dezenter Admin-only Toggle fuer Developer-Mode / View-As.
  *
  * Aktiviert profiles.developer_mode_enabled fuer den eingeloggten Admin.
- * Wenn AN, erscheint global das ViewAsOverlay (im (app)/layout.tsx
- * gemountet) mit dem er die Perspektive anderer Mitarbeiter simulieren
- * kann. Sicherheit dabei: waehrend aktiver Impersonation blockiert die
- * Server-Middleware alle Schreibvorgaenge — es kann nichts kaputt gehen.
+ * Wenn AN, erscheint global das ViewAsOverlay mit dem der Admin die
+ * Perspektive anderer Mitarbeiter simulieren kann. Waehrend aktiver
+ * Impersonation blockiert die Server-Middleware alle Schreibvorgaenge —
+ * es kann nichts kaputt gehen.
+ *
+ * Design: bewusst SCHLICHT (nicht wie eine Marketing-Feature-Card). Passt
+ * sich ohne Hervorhebung in die Team-Liste ein.
  */
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { usePermissions } from "@/lib/use-permissions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,17 +30,12 @@ export function DeveloperModeCard() {
     if (!ready || !isAdmin || !profile?.id) return;
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("developer_mode_enabled")
         .eq("id", profile.id)
         .maybeSingle();
       if (cancelled) return;
-      if (error) {
-        toast.error("Developer-Mode-Status konnte nicht geladen werden");
-        setEnabled(false);
-        return;
-      }
       setEnabled(Boolean(data?.developer_mode_enabled));
     })();
     return () => {
@@ -59,9 +57,6 @@ export function DeveloperModeCard() {
       if (!json.success) throw new Error(json.error ?? "Fehler");
       setEnabled(next);
       toast.success(next ? "Developer Mode aktiviert" : "Developer Mode deaktiviert");
-      // Beim Aus: Overlay ausblenden + evtl. Impersonation ist auch weg.
-      // Beim An: Overlay erscheint (via Layout-Watcher).
-      // Kurz reload triggern damit UI-State frisch ist.
       window.dispatchEvent(new CustomEvent("developer-mode-changed"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Fehler");
@@ -71,67 +66,51 @@ export function DeveloperModeCard() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 mt-4">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-500/25 dark:text-purple-200 shrink-0">
-          <ShieldAlert className="h-4 w-4" />
-        </span>
+    <div className="mt-6 pt-4 border-t border-dashed border-border/60">
+      <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold">Developer Mode (View As)</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Zeigt ein Overlay zum Simulieren anderer Mitarbeiter- oder Partner-Perspektiven — ohne echte Datenaenderungen.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={saving || enabled === null}
-              onClick={() => toggle(!enabled)}
-              aria-pressed={enabled === true}
-              className="shrink-0"
-              style={{
-                width: 44,
-                height: 24,
-                borderRadius: 999,
-                position: "relative",
-                background: enabled
-                  ? "var(--accent)"
-                  : "color-mix(in oklab, var(--foreground) 15%, transparent)",
-                cursor: saving ? "wait" : "pointer",
-                transition: "background 160ms ease",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: enabled ? 22 : 2,
-                  width: 20,
-                  height: 20,
-                  borderRadius: 999,
-                  background: "white",
-                  transition: "left 180ms cubic-bezier(0.25, 1, 0.5, 1)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-                }}
-              />
-            </button>
-          </div>
-          {saving && (
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-2">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Wird gespeichert…
-            </div>
-          )}
-          {enabled && !saving && (
-            <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5 text-[11px] text-amber-800 dark:text-amber-200">
-              <p className="font-semibold">Aktiv — Overlay unten rechts</p>
-              <p className="mt-0.5">
-                Waehrend eine Impersonation laeuft, sind alle Schreibvorgaenge (POST/PUT/DELETE) auf dem Server geblockt. So passiert nichts in der DB.
-              </p>
-            </div>
-          )}
+          <p className="text-xs font-medium text-foreground/85">
+            Developer-Modus
+            {saving && <Loader2 className="inline h-3 w-3 animate-spin ml-1.5 text-muted-foreground align-[-1px]" />}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+            Overlay unten rechts zum Simulieren anderer Mitarbeiter- oder Partner-Perspektiven. Schreibvorgänge sind während der Simulation gesperrt.
+          </p>
         </div>
+        <button
+          type="button"
+          disabled={saving || enabled === null}
+          onClick={() => toggle(!enabled)}
+          aria-pressed={enabled === true}
+          aria-label={enabled ? "Developer Mode deaktivieren" : "Developer Mode aktivieren"}
+          className="shrink-0"
+          style={{
+            width: 38,
+            height: 22,
+            borderRadius: 999,
+            position: "relative",
+            background: enabled
+              ? "var(--accent)"
+              : "color-mix(in oklab, var(--foreground) 18%, transparent)",
+            cursor: saving ? "wait" : "pointer",
+            transition: "background 160ms ease",
+            border: "none",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 2,
+              left: enabled ? 18 : 2,
+              width: 18,
+              height: 18,
+              borderRadius: 999,
+              background: "white",
+              transition: "left 180ms cubic-bezier(0.25, 1, 0.5, 1)",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+            }}
+          />
+        </button>
       </div>
     </div>
   );

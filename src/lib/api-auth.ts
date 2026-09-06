@@ -141,12 +141,27 @@ export async function requireUser(): Promise<RequireUserResult> {
   };
 }
 
-export async function requireAdmin() {
+type RequireAdminOk = {
+  user: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>["auth"]["getUser"]>>["data"]["user"]>;
+  effectiveUserId: string;
+  isImpersonating: boolean;
+  error: null;
+};
+type RequireAdminFail = {
+  user: null;
+  effectiveUserId: null;
+  isImpersonating: false;
+  error: NextResponse;
+};
+
+export async function requireAdmin(): Promise<RequireAdminOk | RequireAdminFail> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "Nicht authentifiziert" },
         { status: 401 },
@@ -161,13 +176,21 @@ export async function requireAdmin() {
   if (profile?.role !== "admin") {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "Nur fuer Administratoren" },
         { status: 403 },
       ),
     };
   }
-  return { user, error: null };
+  const { impersonatedUserId, isImpersonating } = await resolveImpersonation(user.id);
+  return {
+    user,
+    effectiveUserId: impersonatedUserId ?? user.id,
+    isImpersonating,
+    error: null,
+  };
 }
 
 // requirePermission(perm): nutzt die SQL-Funktion has_permission() — Admin
@@ -181,12 +204,27 @@ export async function requireAdmin() {
 // Auf Routen die nur den User-Client nutzen wird die Permission ueber
 // die RLS-Policy direkt geprueft — diese Helfer-Funktion ist nur noetig
 // wo wir die RLS umgehen.
-export async function requirePermission(perm: string) {
+type RequirePermissionOk = {
+  user: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>["auth"]["getUser"]>>["data"]["user"]>;
+  effectiveUserId: string;
+  isImpersonating: boolean;
+  error: null;
+};
+type RequirePermissionFail = {
+  user: null;
+  effectiveUserId: null;
+  isImpersonating: false;
+  error: NextResponse;
+};
+
+export async function requirePermission(perm: string): Promise<RequirePermissionOk | RequirePermissionFail> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "Nicht authentifiziert" },
         { status: 401 },
@@ -197,13 +235,21 @@ export async function requirePermission(perm: string) {
   if (error || data !== true) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: `Keine Berechtigung: ${perm}` },
         { status: 403 },
       ),
     };
   }
-  return { user, error: null };
+  const { impersonatedUserId, isImpersonating } = await resolveImpersonation(user.id);
+  return {
+    user,
+    effectiveUserId: impersonatedUserId ?? user.id,
+    isImpersonating,
+    error: null,
+  };
 }
 
 // =====================================================================
@@ -227,7 +273,7 @@ export async function requirePermission(perm: string) {
 // des Threat-Models. has_permission lasst Admin durch fuer die NORMALE
 // Permission, der trusted-device-Check kommt zusaetzlich.
 
-export async function requireTrustedDevice(perm: string) {
+export async function requireTrustedDevice(perm: string): Promise<RequirePermissionOk | RequirePermissionFail> {
   const auth = await requirePermission(perm);
   if (auth.error) return auth;
 
@@ -237,6 +283,8 @@ export async function requireTrustedDevice(perm: string) {
   if (!cookie?.value) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "device_not_trusted", message: "Dieses Geraet ist nicht als vertraut markiert." },
         { status: 403 },
@@ -255,6 +303,8 @@ export async function requireTrustedDevice(perm: string) {
   if (rpcErr || trusted !== true) {
     return {
       user: null,
+      effectiveUserId: null,
+      isImpersonating: false,
       error: NextResponse.json(
         { success: false, error: "device_not_trusted", message: "Dieses Geraet ist nicht (mehr) als vertraut markiert." },
         { status: 403 },
@@ -269,5 +319,10 @@ export async function requireTrustedDevice(perm: string) {
     .eq("cookie_token_hash", tokenHash)
     .eq("user_id", auth.user.id);
 
-  return { user: auth.user, error: null };
+  return {
+    user: auth.user,
+    effectiveUserId: auth.effectiveUserId,
+    isImpersonating: auth.isImpersonating,
+    error: null,
+  };
 }

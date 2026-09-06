@@ -658,7 +658,8 @@ export async function GET() {
   const { data: profile, error: profErr } = await supabase
     .from("profiles")
     .select("role, full_name")
-    .eq("id", auth.user.id)
+    // dev-mode: effective user
+    .eq("id", auth.effectiveUserId)
     .single();
   if (profErr || !profile) {
     return NextResponse.json({ success: false, error: "Profil nicht gefunden" }, { status: 500 });
@@ -677,7 +678,8 @@ export async function GET() {
       admin
         .from("user_dashboard_overrides")
         .select("hidden, widget_order, widget_spans")
-        .eq("user_id", auth.user.id)
+        // dev-mode: effective user
+        .eq("user_id", auth.effectiveUserId)
         .maybeSingle(),
     ]);
 
@@ -749,9 +751,11 @@ export async function GET() {
       role === "admin" ? "all" : roleScope;
     const [adminData, maData] = await Promise.all([
       loadersNeeded.has("admin")
-        ? loadAdminData({ userId: auth.user.id, scope: effectiveScope })
+        // dev-mode: effective user
+        ? loadAdminData({ userId: auth.effectiveUserId, scope: effectiveScope })
         : Promise.resolve(null),
-      loadersNeeded.has("ma") ? loadMaData(auth.user.id) : Promise.resolve(null),
+      // dev-mode: effective user
+      loadersNeeded.has("ma") ? loadMaData(auth.effectiveUserId) : Promise.resolve(null),
     ]);
 
     const body: Record<string, unknown> = {

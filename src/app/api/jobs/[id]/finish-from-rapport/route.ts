@@ -27,7 +27,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .select("id, status, created_by")
     .eq("job_id", jobId)
     .eq("status", "abgeschlossen")
-    .eq("created_by", auth.user.id)
+    // dev-mode: effective user
+    .eq("created_by", auth.effectiveUserId)
     .limit(1)
     .maybeSingle();
   if (reportErr) return NextResponse.json({ success: false, error: reportErr.message }, { status: 500 });

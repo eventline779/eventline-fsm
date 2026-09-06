@@ -37,14 +37,17 @@ export async function GET(req: Request) {
   // Admin-Sicht (HR > Loehne > Lohnabrechnungen) muss explizit
   // profile_id=X uebergeben; fremde profile_ids verlangen Admin-Recht.
   let effectiveProfileId: string;
-  if (!profileFilter || profileFilter === auth.user.id) {
-    effectiveProfileId = auth.user.id;
+  // dev-mode: effective user
+  if (!profileFilter || profileFilter === auth.effectiveUserId) {
+    // dev-mode: effective user
+    effectiveProfileId = auth.effectiveUserId;
   } else {
     const admin = createAdminClient();
     const { data: me } = await admin
       .from("profiles")
       .select("role")
-      .eq("id", auth.user.id)
+      // dev-mode: effective user
+      .eq("id", auth.effectiveUserId)
       .maybeSingle();
     if (me?.role !== "admin") {
       return NextResponse.json({ success: false, error: "Nicht erlaubt" }, { status: 403 });

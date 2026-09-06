@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
     const { data: callerProfile } = await admin
       .from("profiles")
       .select("role, partner_location_id")
-      .eq("id", auth.user.id)
+      // dev-mode: effective user
+      .eq("id", auth.effectiveUserId)
       .maybeSingle();
     const partnerLocationId =
       callerProfile?.role === "partner" ? callerProfile.partner_location_id : null;
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
     // angezeigt wurden und ggf. komplett verschwanden (siehe gleiche Logik
     // in /partner/anfragen). Partner-Sicht ist Location-shared, nicht
     // user-shared.
-    const teamMemberIds = new Set<string>([auth.user.id]);
+    // dev-mode: effective user
+    const teamMemberIds = new Set<string>([auth.effectiveUserId]);
     if (partnerLocationId) {
       const { data: team } = await admin
         .from("profiles")

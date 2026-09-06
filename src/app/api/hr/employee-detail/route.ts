@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   const { data: callerProfile } = await admin
     .from("profiles")
     .select("role")
-    .eq("id", auth.user.id)
+    .eq("id", auth.effectiveUserId) // dev-mode: effective user
     .single();
   if (callerProfile?.role !== "admin") {
     return NextResponse.json({ success: false, error: "Nur für Administratoren" }, { status: 403 });

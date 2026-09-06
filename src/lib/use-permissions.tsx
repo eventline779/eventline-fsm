@@ -5,8 +5,20 @@
 // EIN Loader im Provider, alle Sub-Komponenten konsumieren via Hook.
 // Vorher gabs zwei Loader-Pfade (Layout selbst + dieser Provider) und
 // jeder Page-Mount hat profiles + roles doppelt geladen.
+//
+// Datenquelle: /api/me. Der Endpoint nutzt server-seitig requireUser() +
+// effectiveUserId — bei aktiver Developer-Mode-Impersonation kommt hier
+// das PROFILE + die PERMISSIONS des ZIEL-Users zurueck, sonst die des
+// echten Session-Users. Ohne Impersonation ist das Verhalten identisch
+// zum alten direkten Supabase-Query.
+//
+// Re-Load-Trigger:
+//   - Auth-Statuswechsel (Login/Logout/Refresh) via Supabase-Listener
+//   - Custom-Event "developer-mode-changed" — feuert wenn der Admin die
+//     Impersonation startet/wechselt/beendet (siehe view-as-overlay.tsx)
+//   - NICHT bei Route-Wechsel — Profile + Permissions sind stabil.
 
-import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hasPermission } from "@/lib/permissions";
 import type { Profile } from "@/types";
@@ -31,73 +43,86 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   });
   const supabase = createClient();
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (cancelled) return;
-        if (!user) {
-          setState({ profile: null, permissions: [], role: "", ready: true, loadError: null });
-          return;
-        }
-
-        const { data: profile, error: profErr } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (cancelled) return;
-        if (profErr) {
-          setState({ profile: null, permissions: [], role: "", ready: true, loadError: `Profil-Laden fehlgeschlagen: ${profErr.message}` });
-          return;
-        }
-        if (!profile) {
-          setState({ profile: null, permissions: [], role: "", ready: true, loadError: "Profil nicht gefunden für diesen User." });
-          return;
-        }
-
-        const role = (profile as Profile).role ?? "";
-        const { data: roleRow } = await supabase
-          .from("roles")
-          .select("permissions")
-          .eq("slug", role)
-          .single();
-        if (cancelled) return;
-
-        const perms = Array.isArray(roleRow?.permissions) ? (roleRow.permissions as string[]) : [];
-        setState({
-          profile: profile as Profile,
-          permissions: perms,
-          role,
-          ready: true,
-          loadError: null,
-        });
-      } catch (err) {
-        if (cancelled) return;
+  const load = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/me", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+        signal,
+      });
+      if (signal?.aborted) return;
+      if (res.status === 401) {
+        setState({ profile: null, permissions: [], role: "", ready: true, loadError: null });
+        return;
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
         setState({
           profile: null, permissions: [], role: "", ready: true,
-          loadError: err instanceof Error ? err.message : "Unbekannter Fehler beim Laden",
+          loadError: `Profil-Laden fehlgeschlagen (${res.status})${text ? `: ${text.slice(0, 200)}` : ""}`,
         });
+        return;
       }
+      const json = (await res.json()) as {
+        profile: Profile | null;
+        permissions: string[];
+        role: string;
+      };
+      if (signal?.aborted) return;
+      if (!json.profile) {
+        setState({
+          profile: null, permissions: [], role: "", ready: true,
+          loadError: "Profil nicht gefunden für diesen User.",
+        });
+        return;
+      }
+      setState({
+        profile: json.profile,
+        permissions: Array.isArray(json.permissions) ? json.permissions : [],
+        role: json.role ?? "",
+        ready: true,
+        loadError: null,
+      });
+    } catch (err) {
+      if (signal?.aborted) return;
+      // AbortError → normaler Cleanup, kein Fehler.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setState({
+        profile: null, permissions: [], role: "", ready: true,
+        loadError: err instanceof Error ? err.message : "Unbekannter Fehler beim Laden",
+      });
     }
-    load();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
 
     // Re-Load bei Auth-Wechsel (Login/Logout in anderem Tab) — verhindert
     // dass die App mit alter Profile-Sicht weiterlaeuft nachdem der User
     // sich anders eingeloggt hat.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        load();
+        void load();
       }
     });
 
+    // Re-Load bei Impersonation-Wechsel — der ViewAs-Overlay feuert dieses
+    // Event beim Start/Wechsel/Beenden. Sidebar/Overlay-Layouts reloaden
+    // die Seite sowieso, aber Sub-Komponenten die noch gemounted sind
+    // (z.B. das Overlay selbst) bekommen so eine frische Perspektive.
+    function onDevModeChange() {
+      void load();
+    }
+    window.addEventListener("developer-mode-changed", onDevModeChange);
+
     return () => {
-      cancelled = true;
+      controller.abort();
       subscription.unsubscribe();
+      window.removeEventListener("developer-mode-changed", onDevModeChange);
     };
-  }, [supabase]);
+  }, [supabase, load]);
 
   // Memo-isiertes Value damit Konsumenten nicht bei jedem Provider-Render
   // re-rendern obwohl sich nichts geaendert hat.

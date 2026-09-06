@@ -29,6 +29,7 @@ import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail, Users, Search } from "lucide-react";
+import { DeveloperModeCard } from "@/components/einstellungen/developer-mode-card";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 
@@ -445,6 +446,11 @@ export function TeamTab() {
           ))}
         </div>
       )}
+
+      {/* Developer Mode / View-As — dezent am Ende der Team-Liste. Passt
+          semantisch hier weil das Feature genau darum geht, die Perspektive
+          eines Team-Mitglieds zu simulieren. Self-renders null wenn nicht Admin. */}
+      <DeveloperModeCard />
 
       {/* Create-Modal — Email, Name, Rolle, optional Geburtsdatum + Brutto */}
       <Modal open={showCreate} onClose={() => !creating && setShowCreate(false)} title="Neuer Benutzer" size="md">

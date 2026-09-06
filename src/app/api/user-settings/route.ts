@@ -22,7 +22,8 @@ export async function GET() {
   // Vorher: der userId-Query-Param wurde ungeprueft genommen — jeder
   // authentifizierte User konnte fremde profiles.settings lesen (Audit-
   // Befund g1: fremde profile.settings lesbar).
-  const userId = auth.user.id;
+  // dev-mode: effective user
+  const userId = auth.effectiveUserId;
 
   const supabase = createAdminClient();
   const { data } = await supabase.from("profiles").select("settings").eq("id", userId).single();
@@ -38,7 +39,8 @@ export async function POST(request: NextRequest) {
   // Trust-Boundary: User darf NUR seine eigenen Settings ueberschreiben.
   // userId aus dem Body wird IGNORIERT — wir nutzen ausschliesslich
   // auth.user.id (Server-Seite ist die Quelle der Wahrheit).
-  const userId = auth.user.id;
+  // dev-mode: effective user
+  const userId = auth.effectiveUserId;
 
   const supabase = createAdminClient();
 

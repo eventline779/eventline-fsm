@@ -69,7 +69,8 @@ function zurichWallToUtcMs(y: number, m: number, d: number, h = 0, mi = 0, s = 0
 export async function GET() {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
-  const adminUserId = auth.user.id;
+  // dev-mode: effective user
+  const adminUserId = auth.effectiveUserId;
 
   try {
     const admin = createAdminClient();

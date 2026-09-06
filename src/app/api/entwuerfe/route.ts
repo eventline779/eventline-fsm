@@ -149,7 +149,8 @@ export async function POST(req: Request) {
     status: body.status ?? "aktiv",
     source: body.source ?? "direkt",
     general_notes: body.general_notes?.trim() || null,
-    created_by: auth.user.id,
+    // dev-mode: effective user
+    created_by: auth.effectiveUserId,
   };
 
   const { data, error } = await supabase

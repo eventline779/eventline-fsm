@@ -73,7 +73,8 @@ export async function GET() {
   const { data, error } = await admin
     .from("user_dashboard_overrides")
     .select("hidden, widget_order, widget_spans")
-    .eq("user_id", auth.user.id)
+    // dev-mode: effective user
+    .eq("user_id", auth.effectiveUserId)
     .maybeSingle();
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -106,7 +107,8 @@ export async function PUT(request: Request) {
     .from("user_dashboard_overrides")
     .upsert(
       {
-        user_id: auth.user.id,
+        // dev-mode: effective user
+        user_id: auth.effectiveUserId,
         hidden,
         widget_order,
         widget_spans,
@@ -127,7 +129,8 @@ export async function DELETE() {
   const { error } = await admin
     .from("user_dashboard_overrides")
     .delete()
-    .eq("user_id", auth.user.id);
+    // dev-mode: effective user
+    .eq("user_id", auth.effectiveUserId);
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

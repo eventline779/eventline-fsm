@@ -14,7 +14,8 @@ export async function POST() {
   const { error } = await admin
     .from("profiles")
     .update({ mein_konto_intro_dismissed_at: new Date().toISOString() })
-    .eq("id", auth.user.id)
+    // dev-mode: effective user
+    .eq("id", auth.effectiveUserId)
     .is("mein_konto_intro_dismissed_at", null);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

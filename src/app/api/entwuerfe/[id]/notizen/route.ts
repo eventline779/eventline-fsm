@@ -45,7 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .from("job_draft_notes")
     .insert({
       draft_id: draftId,
-      author_id: auth.user.id,
+      // dev-mode: effective user
+      author_id: auth.effectiveUserId,
       kind,
       body: text,
     })

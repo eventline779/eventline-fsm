@@ -152,7 +152,7 @@ export async function GET(req: Request) {
   } else {
     // Default = eigene (analog isOwnView im View — auch Admin sieht per Default
     // nur eigene; die Ansicht wechselt explizit via ?user=all).
-    query = query.eq("user_id", auth.user.id);
+    query = query.eq("user_id", auth.effectiveUserId); // dev-mode: effective user
   }
 
   const { data, error } = await query;

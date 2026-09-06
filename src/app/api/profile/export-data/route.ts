@@ -18,7 +18,8 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   const supabase = await createClient();
-  const userId = auth.user.id;
+  // dev-mode: effective user
+  const userId = auth.effectiveUserId;
 
   try {
     // RLS regelt was der User sehen darf — fuer Partner sind das ihre

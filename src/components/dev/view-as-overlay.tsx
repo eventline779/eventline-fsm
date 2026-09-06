@@ -1,26 +1,30 @@
 "use client";
 
 /**
- * ViewAsOverlay — schwebendes Overlay unten rechts fuer den Developer-Mode.
+ * ViewAsOverlay — dezentes, schwebendes Overlay fuer den Developer-Mode.
+ *
+ * Design-Prinzip: SCHLICHT und PROFESSIONELL. Kein knalliger Banner ueber
+ * dem Viewport (das haben wir frueher gehabt — sah nach 'in Development'
+ * aus). Stattdessen:
+ *   - Nicht impersoniert: kleiner Icon-Button unten rechts, monochrom.
+ *   - Impersoniert:       Eyebrow-Chip oben rechts + Icon-Button bekommt
+ *                         Akzent-Kontur (aktiv-Zustand). Kein Vollbreiten-
+ *                         Warnstreifen mehr.
+ *   - Beim Oeffnen:       kompaktes Panel unten rechts. Suchfeld im Header,
+ *                         Kandidaten-Liste gruppiert nach Team / Partner.
  *
  * Sichtbar nur wenn:
- *   1) Eingeloggter User ist Admin, UND
+ *   1) Eingeloggter (ECHTER) User ist Admin
  *   2) profiles.developer_mode_enabled === true
  *
- * Funktionen:
- *   - Aktuelle Impersonation anzeigen (wer wird gerade simuliert)
- *   - User-Picker zum Wechseln (gefiltert nach Rolle: Team | Partner)
- *   - Stop-Button
- *   - Warn-Banner beim Impersonieren dass Writes geblockt sind
- *
- * Nach einem Wechsel wird die Seite reloaded, damit die Server-Renders
- * die neue Perspektive liefern (RSC-Data-Fetches sowieso, Client-State
- * ist frisch dazu).
+ * Layout-agnostisch — laedt sein Admin-Profile selbst statt via
+ * usePermissions, damit es auch im /partner-Portal funktioniert (das
+ * keinen PermissionsProvider hat).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bug, ChevronUp, ChevronDown, LogOut, Loader2, Search } from "lucide-react";
+import { Eye, ChevronDown, LogOut, Loader2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Candidate {
@@ -28,7 +32,6 @@ interface Candidate {
   full_name: string;
   role: string;
 }
-
 interface CurrentState {
   active: boolean;
   target_user_id?: string;
@@ -37,10 +40,6 @@ interface CurrentState {
 
 export function ViewAsOverlay() {
   const supabase = createClient();
-  // Eigenes Profile-Load statt usePermissions — der Hook ist nicht in allen
-  // Layouts verfuegbar (z.B. /partner hat keinen PermissionsProvider). Das
-  // Overlay muss aber ueberall funktionieren, sonst kommt der impersonierende
-  // Admin aus dem Partner-Portal nie wieder raus.
   const [realUserRole, setRealUserRole] = useState<string | null>(null);
   const [realUserId, setRealUserId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -49,14 +48,9 @@ export function ViewAsOverlay() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"alle" | "team" | "partner">("alle");
   const [loading, setLoading] = useState(false);
   const isAdmin = realUserRole === "admin";
 
-  // Beim Mount: hole den ECHTEN eingeloggten User + sein role/devmode-flag.
-  // WICHTIG: hier NICHT effectiveUser — auch bei aktiver Impersonation muss
-  // das Overlay den echten Admin identifizieren, sonst wuerde bei einem
-  // impersonierten Partner das Overlay verschwinden.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -94,7 +88,12 @@ export function ViewAsOverlay() {
     }
   }, [realUserId, realUserRole, supabase]);
 
-  // Impersonation-Status beim Mount holen (falls Cookie schon gesetzt ist).
+  useEffect(() => {
+    function onChange() { void refresh(); }
+    window.addEventListener("developer-mode-changed", onChange);
+    return () => window.removeEventListener("developer-mode-changed", onChange);
+  }, [refresh]);
+
   useEffect(() => {
     if (ready && isAdmin && devModeEnabled) {
       (async () => {
@@ -104,14 +103,6 @@ export function ViewAsOverlay() {
     }
   }, [ready, isAdmin, devModeEnabled]);
 
-  // Listen for toggle-changes from settings page
-  useEffect(() => {
-    function onChange() { void refresh(); }
-    window.addEventListener("developer-mode-changed", onChange);
-    return () => window.removeEventListener("developer-mode-changed", onChange);
-  }, [refresh]);
-
-  // Load candidates when picker opens
   useEffect(() => {
     if (!open || !devModeEnabled) return;
     (async () => {
@@ -123,18 +114,16 @@ export function ViewAsOverlay() {
     })();
   }, [open, devModeEnabled]);
 
-  const filtered = useMemo(() => {
-    let list = candidates;
-    if (filter === "partner") list = list.filter((u) => u.role === "partner");
-    if (filter === "team") list = list.filter((u) => u.role !== "partner");
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (u) => u.full_name.toLowerCase().includes(q) || u.role.toLowerCase().includes(q),
-      );
-    }
-    return list;
-  }, [candidates, filter, search]);
+  // Kandidaten nach Team / Partner gruppieren — statt einer Filter-Chip-Reihe.
+  const { teamList, partnerList } = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const match = (u: Candidate) =>
+      !q || u.full_name.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+    return {
+      teamList: candidates.filter((u) => u.role !== "partner" && match(u)),
+      partnerList: candidates.filter((u) => u.role === "partner" && match(u)),
+    };
+  }, [candidates, search]);
 
   async function startImpersonation(targetId: string) {
     setLoading(true);
@@ -146,13 +135,6 @@ export function ViewAsOverlay() {
       });
       const json = await r.json();
       if (!json.success) throw new Error(json.error ?? "Fehler");
-      // Portal-Wechsel: Partner-User leben ausschliesslich im /partner-Portal
-      // (das (app)/-Portal redirected sie eh sofort weg). Wenn wir einen
-      // Partner impersonieren muss die Navigation direkt dorthin, sonst
-      // landet der Admin auf dem Firmenportal und sieht 'seine' Admin-View
-      // statt der Partner-Perspektive. Umgekehrt: wenn wir einen Nicht-
-      // Partner impersonieren und aktuell im /partner-Portal sind, zurueck
-      // zum Firmen-Dashboard.
       const targetRole = json.target?.role as string | undefined;
       const targetIsPartner = targetRole === "partner";
       const currentIsPartnerPortal = window.location.pathname.startsWith("/partner");
@@ -175,10 +157,6 @@ export function ViewAsOverlay() {
     setLoading(true);
     try {
       await fetch("/api/dev/impersonate", { method: "DELETE" });
-      // Beim Stop: wenn wir gerade im Partner-Portal sind (weil wir einen
-      // Partner impersoniert hatten), zurueck zum Firmen-Dashboard —
-      // sonst wuerde der Admin am Partner-Portal haengen bleiben ohne
-      // Berechtigung dort etwas zu tun.
       if (window.location.pathname.startsWith("/partner")) {
         window.location.href = "/dashboard";
         return;
@@ -196,170 +174,174 @@ export function ViewAsOverlay() {
 
   return (
     <>
-      {/* Warn-Streifen ganz oben — nur wenn aktiv impersonating. Nicht
-          overlay-gebunden, damit der User immer sofort sieht dass er
-          in fremder Perspektive ist (und Writes geblockt sind). */}
+      {/* Statuszeile oben rechts — schlanker Chip, kein Full-Width-Banner.
+          Nur sichtbar wenn wirklich impersoniert wird. */}
       {active && (
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1200,
-            padding: "6px 14px",
-            fontSize: 12,
-            fontWeight: 600,
-            textAlign: "center",
-            background:
-              "color-mix(in oklab, var(--accent) 85%, black)",
-            color: "white",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            top: 10,
+            right: 14,
+            zIndex: 1400,
+            pointerEvents: "none",
           }}
         >
-          👁 View-As aktiv: du siehst als {current!.target!.full_name} ({current!.target!.role}) — Schreibvorgaenge sind geblockt.
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider shadow-sm"
+            style={{
+              background: "color-mix(in oklab, var(--card) 92%, var(--accent))",
+              color: "var(--accent)",
+              border: "1px solid color-mix(in oklab, var(--accent) 45%, transparent)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <Eye className="h-3 w-3" />
+            <span>
+              als {current!.target!.full_name}
+              {current!.target!.role === "partner" ? " · Partner" : ""}
+            </span>
+          </div>
         </div>
       )}
 
+      {/* Floating Panel unten rechts. Zu = kleiner Icon-Button (kein Text
+          im idle-Zustand, damit es dezent bleibt); auf = Panel. */}
       <div
         style={{
           position: "fixed",
-          bottom: 20,
-          right: 20,
+          bottom: 16,
+          right: 16,
           zIndex: 1300,
-          fontFamily: "inherit",
         }}
       >
         {open ? (
           <div
-            className="rounded-2xl border shadow-2xl"
+            className="rounded-xl shadow-xl overflow-hidden flex flex-col"
             style={{
-              width: 340,
+              width: 320,
+              maxHeight: "min(72vh, 540px)",
               background: "var(--card)",
-              borderColor: "var(--border)",
-              display: "flex",
-              flexDirection: "column",
-              maxHeight: "70vh",
+              border: "1px solid var(--border)",
             }}
           >
+            {/* Header */}
             <div
-              className="flex items-center justify-between px-3 py-2 border-b"
+              className="flex items-center gap-2 px-3 py-2.5 border-b"
               style={{ borderColor: "var(--border)" }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <Bug className="h-4 w-4 text-purple-500 shrink-0" />
-                <span className="text-xs font-semibold truncate">Developer · View As</span>
-              </div>
+              <span
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md shrink-0"
+                style={{
+                  background: active
+                    ? "color-mix(in oklab, var(--accent) 15%, transparent)"
+                    : "color-mix(in oklab, var(--foreground) 8%, transparent)",
+                  color: active ? "var(--accent)" : "var(--muted-foreground)",
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-xs font-semibold flex-1 min-w-0">
+                View-As
+              </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="p-1 rounded hover:bg-muted/60"
                 aria-label="Schliessen"
+                className="p-1 rounded hover:bg-muted/60 text-muted-foreground"
               >
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {active && (
-              <div className="px-3 py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Aktuell</p>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{current!.target!.full_name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{current!.target!.role}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={stopImpersonation}
-                    disabled={loading}
-                    className="kasten kasten-muted shrink-0"
-                  >
-                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
-                    Beenden
-                  </button>
+            {/* Current-Status */}
+            {active ? (
+              <div
+                className="px-3 py-2.5 border-b flex items-center gap-2"
+                style={{ borderColor: "var(--border)" }}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Aktuell simuliert
+                  </p>
+                  <p className="text-sm font-medium truncate">
+                    {current!.target!.full_name}
+                    <span className="text-muted-foreground font-normal ml-1.5">
+                      · {current!.target!.role}
+                    </span>
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={stopImpersonation}
+                  disabled={loading}
+                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition-colors"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--foreground)",
+                    background: "transparent",
+                    cursor: loading ? "wait" : "pointer",
+                  }}
+                >
+                  {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
+                  Beenden
+                </button>
+              </div>
+            ) : (
+              <div
+                className="px-3 py-2 border-b text-[11px] text-muted-foreground"
+                style={{ borderColor: "var(--border)" }}
+              >
+                Wähle einen Mitarbeiter zum Simulieren.
               </div>
             )}
 
-            <div className="px-3 py-2 border-b space-y-2" style={{ borderColor: "var(--border)" }}>
+            {/* Suche */}
+            <div
+              className="px-3 py-2 border-b"
+              style={{ borderColor: "var(--border)" }}
+            >
               <div className="relative">
-                <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Suche nach Name oder Rolle…"
-                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border bg-background"
-                  style={{ borderColor: "var(--border)" }}
+                  placeholder="Suchen…"
+                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-md bg-transparent focus:outline-none focus:ring-1"
+                  style={{
+                    border: "1px solid var(--border)",
+                  }}
                 />
-              </div>
-              <div className="flex gap-1">
-                {(["alle", "team", "partner"] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFilter(f)}
-                    className={filter === f ? "kasten-active" : "kasten-toggle-off"}
-                    style={{ flex: 1, fontSize: 10 }}
-                  >
-                    {f === "alle" ? "Alle" : f === "team" ? "Team" : "Partner"}
-                  </button>
-                ))}
               </div>
             </div>
 
+            {/* Kandidaten — gruppiert nach Team / Partner */}
             <div className="overflow-y-auto flex-1">
-              {filtered.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-6 px-3">
-                  Keine User gefunden.
+              {teamList.length === 0 && partnerList.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground text-center py-8">
+                  Keine Einträge.
                 </p>
               ) : (
-                <ul className="p-1.5 space-y-0.5">
-                  {filtered.map((u) => {
-                    const isCurrent = current?.target_user_id === u.id;
-                    return (
-                      <li key={u.id}>
-                        <button
-                          type="button"
-                          disabled={loading || isCurrent}
-                          onClick={() => startImpersonation(u.id)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors"
-                          style={{
-                            background: isCurrent
-                              ? "color-mix(in oklab, var(--accent) 12%, transparent)"
-                              : "transparent",
-                            cursor: loading ? "wait" : isCurrent ? "default" : "pointer",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isCurrent && !loading) {
-                              e.currentTarget.style.background =
-                                "color-mix(in oklab, var(--foreground) 6%, transparent)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isCurrent) {
-                              e.currentTarget.style.background = "transparent";
-                            }
-                          }}
-                        >
-                          <span
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                            style={{ background: colorForRole(u.role) }}
-                          >
-                            {initials(u.full_name)}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium truncate">{u.full_name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{u.role}</p>
-                          </div>
-                          {isCurrent && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wider text-accent">aktiv</span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="py-1.5">
+                  {teamList.length > 0 && (
+                    <CandidateGroup
+                      label="Team"
+                      users={teamList}
+                      currentId={current?.target_user_id ?? null}
+                      loading={loading}
+                      onPick={startImpersonation}
+                    />
+                  )}
+                  {partnerList.length > 0 && (
+                    <CandidateGroup
+                      label="Partner"
+                      users={partnerList}
+                      currentId={current?.target_user_id ?? null}
+                      loading={loading}
+                      onPick={startImpersonation}
+                    />
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -367,24 +349,91 @@ export function ViewAsOverlay() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-full shadow-lg border transition-all hover:scale-105"
+            aria-label="View-As öffnen"
+            className="inline-flex items-center gap-2 pl-2.5 pr-3 py-2 rounded-full shadow-md transition-all hover:shadow-lg"
             style={{
-              background: active
-                ? "color-mix(in oklab, var(--accent) 85%, black)"
-                : "var(--card)",
-              borderColor: active ? "var(--accent)" : "var(--border)",
-              color: active ? "white" : "var(--foreground)",
+              background: "var(--card)",
+              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+              color: active ? "var(--accent)" : "var(--foreground)",
             }}
           >
-            <Bug className="h-3.5 w-3.5" />
-            <span className="text-xs font-semibold">
-              {active ? `View: ${current!.target!.full_name.split(" ")[0]}` : "Dev · View As"}
+            <Eye className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-medium">
+              {active ? current!.target!.full_name.split(" ")[0] : "View-As"}
             </span>
-            <ChevronUp className="h-3 w-3 opacity-60" />
           </button>
         )}
       </div>
     </>
+  );
+}
+
+function CandidateGroup({
+  label,
+  users,
+  currentId,
+  loading,
+  onPick,
+}: {
+  label: string;
+  users: Candidate[];
+  currentId: string | null;
+  loading: boolean;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <div className="pb-1">
+      <p className="px-3 py-1 text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/70">
+        {label} · {users.length}
+      </p>
+      <ul>
+        {users.map((u) => {
+          const isCurrent = currentId === u.id;
+          return (
+            <li key={u.id}>
+              <button
+                type="button"
+                disabled={loading || isCurrent}
+                onClick={() => onPick(u.id)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors"
+                style={{
+                  background: isCurrent
+                    ? "color-mix(in oklab, var(--accent) 10%, transparent)"
+                    : "transparent",
+                  cursor: loading ? "wait" : isCurrent ? "default" : "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrent && !loading) {
+                    e.currentTarget.style.background =
+                      "color-mix(in oklab, var(--foreground) 5%, transparent)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isCurrent) e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <span
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold shrink-0"
+                  style={{
+                    background: "color-mix(in oklab, var(--foreground) 10%, transparent)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  {initials(u.full_name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium truncate leading-tight">{u.full_name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">{u.role}</p>
+                </div>
+                {isCurrent && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-accent shrink-0">aktiv</span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -396,13 +445,4 @@ function initials(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
-
-function colorForRole(role: string): string {
-  const map: Record<string, string> = {
-    admin: "#dc2626",
-    partner: "#7c3aed",
-    techniker: "#0ea5e9",
-  };
-  return map[role] ?? "#6b7280";
 }
