@@ -383,7 +383,7 @@ function ZuErledigenCard({ data }: { data: AdminData["zu_erledigen"] }) {
       <div className="divide-y">
         <TodoRow
           icon={<PlaneTakeoff className="h-4 w-4" />}
-          label="Ferien-Anträge pending"
+          label="Abwesenheits-Anträge"
           count={data.ferien_pending}
           href="/hr?tab=anfragen&from=dashboard"
         />
@@ -430,7 +430,7 @@ function TeamStatusCard({ data }: { data: AdminData["team_status"] }) {
         />
         <TodoRow
           icon={<PlaneTakeoff className="h-4 w-4" />}
-          label="Heute in Ferien"
+          label="Heute abwesend"
           count={data.in_ferien_heute}
           href="/ferien?from=dashboard"
         />

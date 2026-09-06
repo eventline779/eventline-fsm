@@ -163,7 +163,7 @@ export default function HRPage() {
     { key: "anfragen",      label: "Anfragen",     icon: <Inbox className="h-4 w-4" />,          visible: canManageHR },
     { key: "stempelzeiten", label: "Stempelzeiten", icon: <Clock className="h-4 w-4" />,          visible: can("stempelzeiten:view") },
     { key: "tickets",       label: "Tickets",       icon: <TicketCheck className="h-4 w-4" />,    visible: can("tickets:view") },
-    { key: "ferien",        label: "Ferien",        icon: <Palmtree className="h-4 w-4" />,       visible: true },
+    { key: "ferien",        label: "Abwesenheit",   icon: <Palmtree className="h-4 w-4" />,       visible: true },
     { key: "loehne",        label: "Lohn",          icon: <Wallet className="h-4 w-4" />,         visible: true },
   ];
 

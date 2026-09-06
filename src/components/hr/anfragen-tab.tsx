@@ -224,7 +224,7 @@ export function AnfragenTab({ onGoto }: { onGoto: (tab: "stempelzeiten" | "ticke
           <EmptyState
             icon={Inbox}
             title="Keine offenen Anfragen"
-            description="Alle Ferienantraege und Tickets sind bearbeitet."
+            description="Alle Abwesenheiten und Tickets sind bearbeitet."
           />
         ) : (
           <div className="divide-y divide-border/60">
@@ -258,7 +258,7 @@ export function AnfragenTab({ onGoto }: { onGoto: (tab: "stempelzeiten" | "ticke
                 onClick={() => onGoto("ferien")}
                 className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
               >
-                Alle {data.ferienAntraege.length} Ferienantraege
+                Alle {data.ferienAntraege.length} Abwesenheits-Anträge
               </button>
             )}
             {data.stempelAntraege.length + data.andereTickets.length > 3 && (
