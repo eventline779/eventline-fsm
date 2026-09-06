@@ -2,14 +2,18 @@
 //
 // Ein Klick der aus einem Draft einen job-Record macht:
 //   1. Draft laden (nicht bereits umgewandelt, nicht storniert, nicht deleted).
-//   2. Passenden Job in public.jobs anlegen (status='offen', priority='normal').
-//   3. Draft-Row auf status='umgewandelt' setzen und converted_to_job_id +
+//   2. Freitext-Kunde (customer_name ohne customer_id) → neuen Customer
+//      anlegen (oder existierenden per case-insensitive Name-Match wieder-
+//      verwenden). Location-Freitext (location_name ohne location_id) wird
+//      NICHT als Location angelegt, sondern landet auf jobs.external_address.
+//   3. Passenden Job in public.jobs anlegen (status='offen', priority='normal').
+//   4. Draft-Row auf status='umgewandelt' setzen und converted_to_job_id +
 //      converted_at fuellen. Der Draft-Record BLEIBT (fuer Historie/Statistik).
 //
 // job_type-Mapping:
 //   - location_id gesetzt & customer_id NULL           -> 'location'
 //   - customer_id gesetzt (mit/ohne location_id)        -> 'extern'
-//   - beides NULL                                       -> 'extern' + external_address leer
+//   - beides NULL                                       -> 'extern'
 //     (Rueckfall-Case; UI validiert vorher dass mindestens ein Ansprechpartner-
 //      Namen existiert, sonst ist die Umwandlung nicht sinnvoll)
 //
@@ -76,9 +80,60 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ success: false, error: "Titel fehlt" }, { status: 400 });
   }
 
-  // 2) job_type ableiten
+  // 2) Freitext-Kunde bei Bedarf materialisieren:
+  //    customer_name (ohne customer_id) → Row in customers anlegen ODER
+  //    per case-insensitive Name-Match wiederverwenden. Fehler blockiert
+  //    die Umwandlung — der Draft bleibt intakt, User kann's nochmal.
+  let effectiveCustomerId: string | null = draft.customer_id ?? null;
+  let customerCreated = false;
+  if (!effectiveCustomerId && draft.customer_name?.trim()) {
+    const nameTrim = draft.customer_name.trim();
+    // 2a) Duplikat-Check (case-insensitive). Auch inaktive Kunden matchen —
+    //     einen "gleichen Namen" nochmal anzulegen ist immer falsch, egal
+    //     ob der bestehende gerade inaktiv ist.
+    const { data: existing, error: dupErr } = await admin
+      .from("customers")
+      .select("id")
+      .ilike("name", nameTrim)
+      .limit(1)
+      .maybeSingle();
+    if (dupErr) {
+      return NextResponse.json({ success: false, error: dupErr.message }, { status: 500 });
+    }
+    if (existing) {
+      effectiveCustomerId = existing.id;
+    } else {
+      const { data: newCust, error: custErr } = await admin
+        .from("customers")
+        .insert({
+          name: nameTrim,
+          type: "company",
+          email: draft.contact_email ?? null,
+          phone: draft.contact_phone ?? null,
+          notes: draft.contact_person?.trim()
+            ? `Ansprechperson: ${draft.contact_person.trim()}`
+            : null,
+        })
+        .select("id")
+        .single();
+      if (custErr || !newCust) {
+        return NextResponse.json(
+          { success: false, error: custErr?.message ?? "Kunde konnte nicht angelegt werden" },
+          { status: 500 },
+        );
+      }
+      effectiveCustomerId = newCust.id;
+      customerCreated = true;
+    }
+  }
+
+  // 3) job_type ableiten. Bei Freitext-Location (location_name ohne
+  //    location_id) fahren wir immer 'extern' — auch wenn kein Kunde da
+  //    ist. Sonst wuerden wir einen 'location'-Auftrag ohne location_id
+  //    anlegen, was semantisch falsch waere.
+  const hasLocationFreitext = !draft.location_id && draft.location_name?.trim();
   const jobType: "location" | "extern" =
-    draft.location_id && !draft.customer_id ? "location" : "extern";
+    draft.location_id && !effectiveCustomerId ? "location" : "extern";
 
   const jobPayload = {
     title: draft.title,
@@ -86,10 +141,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     status: "offen" as const,
     priority: "normal" as const,
     job_type: jobType,
-    customer_id: jobType === "extern" ? draft.customer_id : null,
+    customer_id: jobType === "extern" ? effectiveCustomerId : null,
     location_id: draft.location_id ?? null,
     room_id: draft.room_id ?? null,
-    external_address: null,
+    // Freitext-Location landet hier — es wird bewusst KEINE locations-Row
+    // erzeugt (Leo 2026-09-06). Bei ausgewaehlter Location bleibt das Feld leer.
+    external_address: hasLocationFreitext ? draft.location_name!.trim() : null,
     start_date: draft.expected_start_date ?? null,
     end_date: draft.expected_end_date ?? null,
     guest_count: draft.guest_count ?? null,
@@ -111,7 +168,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
-  // 3) Draft archivieren (status=umgewandelt + Verweis auf den neuen Job)
+  // 4) Draft archivieren (status=umgewandelt + Verweis auf den neuen Job)
   const { error: updateErr } = await admin
     .from("job_drafts")
     .update({
@@ -143,6 +200,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     success: true,
     jobId: newJob.id,
     jobNumber: newJob.job_number,
+    // Client kann eine "Kunde XY neu angelegt"-Toast zeigen wenn erwuenscht.
+    customerCreated,
     redirectUrl: `/auftraege/${newJob.id}`,
   });
 }
