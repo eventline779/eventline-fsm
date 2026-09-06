@@ -532,6 +532,9 @@ function TileVisual({
   item: PreferenceItem;
   style?: React.CSSProperties;
   className?: string;
+  /** Auge-Button (Ausblenden/Einblenden). Wird IM Content-Flow rechts
+   *  neben dem Titel gerendert, nicht absolute am Rand — sonst ragt der
+   *  Button visuell aus der Kachel raus in den Grid-Gap. */
   toggleButton?: React.ReactNode;
   /** Wenn gesetzt: erzwingt Content-Opacity (Placeholder faded auf 25%). */
   contentOpacity?: number;
@@ -540,7 +543,7 @@ function TileVisual({
     contentOpacity !== undefined ? contentOpacity : item.hidden ? 0.55 : 1;
   return (
     <div
-      className={`relative rounded-lg border select-none ${className ?? ""}`}
+      className={`relative rounded-lg border select-none overflow-hidden ${className ?? ""}`}
       style={{
         backgroundColor: item.hidden
           ? "color-mix(in oklab, var(--foreground) 4%, transparent)"
@@ -548,7 +551,6 @@ function TileVisual({
         ...style,
       }}
     >
-      {toggleButton}
       <div className="flex items-start gap-2 p-2.5 min-h-16">
         <span
           className="mt-0.5 shrink-0 text-muted-foreground/60"
@@ -565,6 +567,10 @@ function TileVisual({
           <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
           <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
         </div>
+        {/* Auge-Button IM Flow rechts neben Titel/Bars. Klar innerhalb der
+            Kachel-Grenzen, ragt nicht in den Grid-Gap. shrink-0 damit er
+            auch in schmalen Kacheln (col-span-4) sichtbar bleibt. */}
+        {toggleButton && <div className="shrink-0 -mt-0.5 -mr-0.5">{toggleButton}</div>}
       </div>
 
       {item.hidden && contentOpacity === undefined && (
@@ -667,11 +673,7 @@ function GridTile({
         e.stopPropagation();
         onToggle();
       }}
-      className={
-        item.hidden
-          ? "icon-btn absolute right-2 top-2 z-10"
-          : "icon-btn icon-btn-green absolute right-2 top-2 z-10"
-      }
+      className={item.hidden ? "icon-btn" : "icon-btn icon-btn-green"}
       aria-label={item.hidden ? "Einblenden" : "Ausblenden"}
       data-tooltip={item.hidden ? "Einblenden" : "Ausblenden"}
       style={{ cursor: "pointer" }}
@@ -680,35 +682,38 @@ function GridTile({
     </button>
   ) : null;
 
+  // WICHTIG: setNodeRef, attributes UND listeners liegen alle auf demselben
+  // outer-div (kein separater absolute Handle-Layer). Der vorherige Ansatz
+  // mit einer inneren absolute-inset-0-Layer war fragil, weil deren Parent
+  // (h-full div in einer CSS-Grid-auto-Zelle) je nach Content 0-Hoehe
+  // haben konnte → kein klickbares Feld, Drag ging gar nicht los.
+  // Der Auge-Button liegt IM Content-Flow der TileVisual und stopt seinen
+  // eigenen Pointer-Event → der Klick auf Auge triggert kein Drag.
   return (
     <div
       ref={setRefs}
       className={spanClass}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      {...attributes}
+      {...listeners}
       // view-transition-name: Browser identifiziert die Kachel ueber das
       // Reorder hinweg und animiert automatisch von old-position zu
       // new-position (moderne Chrome/Edge/Safari 18+). Fallback: kein
-      // Effekt, hartes Umschalten. Prefix widget- damit keine Kollision
-      // mit anderen VT-Names auf der Seite.
-      style={{ viewTransitionName: `widget-${item.id}` }}
+      // Effekt, hartes Umschalten.
+      style={{
+        viewTransitionName: `widget-${item.id}`,
+        cursor: isDragging ? "grabbing" : "grab",
+      }}
+      aria-label={`${item.title} verschieben`}
     >
-      <div className="relative h-full">
-        <div
-          className="absolute inset-0 rounded-lg"
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-          {...attributes}
-          {...listeners}
-          aria-label={`${item.title} verschieben`}
-          style={{ cursor: isDragging ? "grabbing" : "grab" }}
-        />
-        <TileVisual
-          item={item}
-          style={innerStyle}
-          className="h-full"
-          contentOpacity={isDragging ? 0.25 : undefined}
-          toggleButton={toggleBtn}
-        />
-      </div>
+      <TileVisual
+        item={item}
+        style={innerStyle}
+        className="h-full"
+        contentOpacity={isDragging ? 0.25 : undefined}
+        toggleButton={toggleBtn}
+      />
     </div>
   );
 }
