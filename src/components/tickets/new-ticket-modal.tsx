@@ -3,10 +3,13 @@
 /**
  * Modal zum Erstellen eines neuen Tickets.
  *
- * Phase 1: Typ-Picker — Mitarbeiter waehlt zwischen IT, Beleg,
- *          Stempel-Aenderung, Material.
- * Phase 2: Typ-spezifisches Formular mit allen Pflicht-Feldern und
- *          optionalem File-Upload (mehrere Dateien).
+ * Hero + Sekundaer: Modal oeffnet direkt im Stempel-Aenderungs-Formular,
+ * weil ~90% aller Tickets Stempel-Korrekturen sind. Oben ein schmaler
+ * Chip-Toggle (Stempel-Aenderung | IT | Beleg | Material) statt eines
+ * vollen Picker-Screens — 0 Klicks fuer den 90%-Fall, 1 Klick fuer die 10%.
+ *
+ * Wird der Modal mit initialType geoeffnet (z.B. aus /stempelzeiten Row-
+ * "Korrigieren"), entfaellt der Chip-Toggle — der Kontext ist eindeutig.
  *
  * Beim Submit:
  *   1. INSERT in tickets (mit type, title, description, priority, data)
@@ -20,14 +23,13 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/searchable-select";
-import { TypePickerCard, type TypePickerTone } from "@/components/ui/type-picker-card";
+import type { TypePickerTone } from "@/components/ui/type-picker-card";
 import { createClient } from "@/lib/supabase/client";
 import { localDateIso, localTimeHM } from "@/lib/swiss-time";
 import { toast } from "sonner";
 import { Wrench, Receipt, Clock, Package, Upload, X, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Sparkles, Plus, LogIn, LogOut, Coffee, PencilLine } from "lucide-react";
 import type { TicketType } from "@/types";
 
-type Step = "pick" | "form";
 type StempelMode = "korrektur" | "vergessen";
 /** Preset-Slots fuer Stempel-Aenderungs-Tickets — jeder Slot steuert Modus + Prefill. */
 type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
@@ -62,10 +64,12 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
-  /** Optional: Type direkt vorauswaehlen und Picker ueberspringen.
-   *  Wird z.B. von /stempelzeiten benutzt um direkt ins Stempel-
-   *  Aenderung-Form zu springen, ohne dass der User erst die Karte
-   *  klicken muss. */
+  /** Optional: Type direkt vorauswaehlen und den Chip-Toggle oben
+   *  ausblenden — der Kontext ist damit eindeutig (kein Wechsel
+   *  moeglich/gewollt). Wird z.B. von /stempelzeiten und dem Sidebar-/
+   *  Widget-"Stempelticket"-Button benutzt. Ohne initialType oeffnet
+   *  das Modal im Stempel-Aenderungs-Default (90%-Fall) und zeigt die
+   *  Typ-Chips oben zum Wechseln. */
   initialType?: TicketType;
   /** Optional: Stempel-Aenderung-Form direkt mit einem bestehenden
    *  time_entry vorbelegen (Inline-Context von /stempelzeiten aus dem
@@ -88,10 +92,22 @@ const TYPES: { id: TicketType; label: string; description: string; icon: React.C
   { id: "material",          label: "Material",         description: "Etwas einkaufen — Genehmigung",      icon: Package, tone: "red"    },
 ];
 
+/** Default-Titel je Typ — Stempel/Beleg/Material bekommen den Titel
+ *  vorbelegt, damit der User nicht jedes Mal tippen muss. IT bleibt leer,
+ *  weil der Titel dort tatsaechlich das Problem beschreibt. */
+function defaultTitleFor(t: TicketType): string {
+  if (t === "beleg") return "Beleg-Erstattung";
+  if (t === "stempel_aenderung") return "Stempelzeit-Änderung";
+  if (t === "material") return "Material-Anfrage";
+  return "";
+}
+
 export function NewTicketModal({ open, onClose, onCreated, initialType, initialData }: Props) {
   const supabase = createClient();
-  const [step, setStep] = useState<Step>(initialType ? "form" : "pick");
-  const [type, setType] = useState<TicketType | null>(initialType ?? null);
+  // Hero-Default: Stempel-Aenderung (90%-Fall). initialType, wenn gesetzt,
+  // hat Vorrang (z.B. Sidebar-/Widget-/Row-Trigger).
+  const defaultType: TicketType = initialType ?? "stempel_aenderung";
+  const [type, setType] = useState<TicketType>(defaultType);
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
 
@@ -145,20 +161,18 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
   // IT-spezifisch.
   const [device, setDevice] = useState("");
 
-  // Beim Oeffnen Reset; bei Stempel-Auswahl die letzten Stempel-Eintraege laden.
-  // Wenn initialType gesetzt ist, ueberspringen wir den Picker und landen
-  // direkt im Form fuer den Type. Wenn initialData einen time_entry mitliefert
-  // (Inline-Context von /stempelzeiten Row-"Korrigieren"), wird der
-  // Korrektur-Modus vorausgewaehlt und Start/Ende bereits mit den bestehenden
-  // Zeiten befuellt — User muss nur die falschen Minuten korrigieren und den
-  // Grund tippen.
+  // Beim Oeffnen/Schliessen Reset auf den Default-Typ (Stempel-Aenderung im
+  // generischen Fall, initialType wenn ein Kontext-Trigger den Modal aufmacht).
+  // Wenn initialData einen time_entry mitliefert (Inline-Context von
+  // /stempelzeiten Row-"Korrigieren"), wird der Korrektur-Modus vorausgewaehlt
+  // und Start/Ende bereits mit den bestehenden Zeiten befuellt — User muss nur
+  // die falschen Minuten korrigieren und den Grund tippen.
   useEffect(() => {
     if (!open) {
-      setStep(initialType ? "form" : "pick");
-      setType(initialType ?? null);
+      setType(defaultType);
       setSaving(false);
       setFiles([]);
-      setTitle("");
+      setTitle(defaultTitleFor(defaultType));
       setDescription("");
       setUrgent(false);
       setBeleg({ betrag_chf: "", kaufdatum: "", lieferant: "" });
@@ -301,13 +315,17 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
   }, [type, supabase]);
 
   function pickType(t: TicketType) {
+    if (t === type) return; // Chip auf aktivem Typ tut nichts.
     setType(t);
-    setStep("form");
-    // Default-Title je nach Typ vorbelegen damit der User nicht jedes Mal tippen muss.
-    if (t === "it") setTitle("");
-    if (t === "beleg") setTitle("Beleg-Erstattung");
-    if (t === "stempel_aenderung") setTitle("Stempelzeit-Änderung");
-    if (t === "material") setTitle("Material-Anfrage");
+    // Default-Title vorbelegen — aber nur wenn der User noch nichts eigenes
+    // getippt hat oder gerade den default eines anderen Typs stehen hat.
+    // Wir setzen bewusst hart auf den neuen Default: der Chip-Wechsel ist
+    // ein Kontext-Wechsel, das alte Titel-Feld ist meistens ohnehin nur
+    // der Auto-Default.
+    setTitle(defaultTitleFor(t));
+    // Files/Analyse-State stehen lassen — der User koennte einen Beleg
+    // hochgeladen haben und versehentlich zu 'IT' gewechselt sein; besser
+    // nicht wortlos zerstoeren.
   }
 
   /**
@@ -671,8 +689,12 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
     }
   }
 
-  const modalTitle = step === "pick" ? "Neues Ticket" : `${TYPES.find((t) => t.id === type)?.label}`;
-  const typeMeta = type ? TYPES.find((t) => t.id === type) : null;
+  // Header-Titel: bei initialType (Kontext-Trigger) den spezifischen Typ-
+  // Label zeigen, sonst neutral "Neues Ticket" — die Chips oben zeigen,
+  // welcher Typ aktiv ist.
+  const modalTitle = initialType
+    ? (TYPES.find((t) => t.id === type)?.label ?? "Neues Ticket")
+    : "Neues Ticket";
 
   // datetime-local-Strings ('YYYY-MM-DDTHH:MM') in Datum + Uhrzeit
   // splitten — fuer separate <input type=date> und <input type=time>.
@@ -769,23 +791,37 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
 
   return (
     <Modal open={open} onClose={() => !saving && onClose()} title={modalTitle} size="lg" closable={!saving}>
-      {step === "pick" && (
-        <div className="grid grid-cols-2 gap-3">
-          {TYPES.map((t) => (
-            <TypePickerCard
-              key={t.id}
-              icon={t.icon}
-              tone={t.tone}
-              label={t.label}
-              description={t.description}
-              onClick={() => pickType(t.id)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="space-y-4">
+          {/* Chip-Toggle: nur zeigen wenn der Modal generisch geoeffnet
+              wurde (nicht ueber einen Kontext-Trigger mit initialType).
+              Aktiver Typ ist visuell hervorgehoben (rote Akzent-Border),
+              Klick wechselt das Formular ohne Zwischen-Screen. */}
+          {!initialType && (
+            <div className="flex flex-wrap gap-1.5">
+              {TYPES.map((t) => {
+                const Icon = t.icon;
+                const active = type === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => pickType(t.id)}
+                    aria-pressed={active}
+                    disabled={saving}
+                    className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-medium border transition-all ${
+                      active
+                        ? "border-red-500/50 bg-red-500/[0.08] text-red-700 dark:text-red-300"
+                        : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-      {step === "form" && type && typeMeta && (
-        <div className="space-y-4">
           {/* Titel + Dringend-Toggle (gleicher Stil wie Auftrag-Form). */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -1263,19 +1299,11 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
           {type !== "beleg" && type !== "material" && fileUploadBlock}
 
           <div className="flex gap-2 pt-2">
-            {/* "Zurück" zur Type-Auswahl macht nur Sinn wenn der User
-                ueber den Picker reingekommen ist. Wenn das Modal mit
-                initialType direkt aufgerufen wurde (z.B. von /stempelzeiten),
-                dann zeigt "Zurück" auf "Abbrechen" stattdessen. */}
-            {initialType ? (
-              <button type="button" onClick={onClose} disabled={saving} className="kasten kasten-muted flex-1">
-                Abbrechen
-              </button>
-            ) : (
-              <button type="button" onClick={() => setStep("pick")} disabled={saving} className="kasten kasten-muted flex-1">
-                Zurück
-              </button>
-            )}
+            {/* Kein "Zurueck" mehr — der Chip-Toggle oben ersetzt den
+                Picker-Screen. Immer "Abbrechen". */}
+            <button type="button" onClick={onClose} disabled={saving} className="kasten kasten-muted flex-1">
+              Abbrechen
+            </button>
             <button type="button" onClick={submit} disabled={saving} className="kasten kasten-red flex-1">
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {saving
@@ -1286,7 +1314,6 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
             </button>
           </div>
         </div>
-      )}
     </Modal>
   );
 }
