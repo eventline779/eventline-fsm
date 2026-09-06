@@ -44,7 +44,16 @@ interface ClickRipple {
 export function LiveBroadcastReceiver({ userId }: Props) {
   const supabase = createClient();
   const router = useRouter();
+  const [isEmbed, setIsEmbed] = useState(false);
   const [active, setActive] = useState(false);
+
+  // Im Mobile-Preview iframe NICHT rendern — sonst wuerden Receiver-
+  // Overlays doppelt uebereinander stapeln (parent + iframe).
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.self !== window.top) {
+      setIsEmbed(true);
+    }
+  }, []);
   const [adminName, setAdminName] = useState<string>("Admin");
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [ripples, setRipples] = useState<ClickRipple[]>([]);
@@ -177,6 +186,7 @@ export function LiveBroadcastReceiver({ userId }: Props) {
     };
   }, [active]);
 
+  if (isEmbed) return null;
   if (!active) return null;
 
   return (

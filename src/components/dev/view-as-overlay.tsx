@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil, Radio } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LiveBroadcastSender } from "@/components/dev/live-broadcast-sender";
+import { MobilePreviewFrame } from "@/components/dev/mobile-preview-frame";
 
 interface Candidate {
   id: string;
@@ -49,6 +50,10 @@ export function ViewAsOverlay() {
   // Live-Uebertragung: rein clientseitiger State. Wird beim Wechseln des
   // impersonierten Users / Stop-Impersonate zurueckgesetzt.
   const [liveActive, setLiveActive] = useState(false);
+  // Mobile-Preview: rendert die aktuelle Seite in einem iframe mit
+  // Handy-Viewport-Groesse. Media-Queries greifen echt (kein Fake-Scale).
+  const [mobilePreview, setMobilePreview] = useState(false);
+  const [isEmbed, setIsEmbed] = useState(false);
   const [devModeEnabled, setDevModeEnabled] = useState<boolean | null>(null);
   const [current, setCurrent] = useState<CurrentState | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -100,6 +105,14 @@ export function ViewAsOverlay() {
       holdRafRef.current = requestAnimationFrame(tick);
     };
     holdRafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  // Wenn wir im iframe laufen (Mobile-Preview embed), NICHT rendern — sonst
+  // gaebe es doppelte Overlays und Rekursions-Verwirrung.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.self !== window.top) {
+      setIsEmbed(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -178,6 +191,7 @@ export function ViewAsOverlay() {
   }, [candidates, search]);
 
   async function startImpersonation(targetId: string) {
+    cancelHold(); // Reviewer C1: rAF weiterlaufen zu lassen waere Race
     setLoading(true);
     setLiveActive(false); // Wechsel = Live neu bewusst starten
     try {
@@ -207,6 +221,7 @@ export function ViewAsOverlay() {
   }
 
   async function stopImpersonation() {
+    cancelHold(); // Reviewer C1: mid-Hold-Complete rennt sonst gegen DELETE
     setLoading(true);
     try {
       await fetch("/api/dev/impersonate", { method: "DELETE" });
@@ -249,6 +264,7 @@ export function ViewAsOverlay() {
    *  loescht dabei auch das Impersonation-Cookie (siehe /api/dev/toggle).
    *  Danach: reload damit Overlay + evtl. Portal-Zustand sauber sind. */
   async function disableDevMode() {
+    cancelHold(); // Reviewer C1: mid-Hold gegen DevMode-Off Race
     setLoading(true);
     try {
       const res = await fetch("/api/dev/toggle", {
@@ -269,6 +285,7 @@ export function ViewAsOverlay() {
     }
   }
 
+  if (isEmbed) return null;
   if (!ready || !isAdmin || !devModeEnabled) return null;
 
   const active = current?.active === true && current?.target;
@@ -380,6 +397,57 @@ export function ViewAsOverlay() {
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
+            </div>
+
+            {/* Viewport-Toggle: Desktop | Mobile. Immer sichtbar — funktioniert
+                auch ohne Impersonation (Admin will z.B. eigene Seite mobil
+                testen). */}
+            <div
+              className="px-3 py-2 border-b flex items-center gap-2"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+                Ansicht
+              </span>
+              <div
+                className="flex items-center rounded-md border overflow-hidden ml-auto"
+                style={{ borderColor: "var(--border)" }}
+                role="group"
+                aria-label="Viewport"
+              >
+                <button
+                  type="button"
+                  onClick={() => setMobilePreview(false)}
+                  aria-pressed={!mobilePreview}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold transition-colors"
+                  style={{
+                    background: !mobilePreview
+                      ? "color-mix(in oklab, var(--foreground) 10%, transparent)"
+                      : "transparent",
+                    color: !mobilePreview ? "var(--foreground)" : "var(--muted-foreground)",
+                    cursor: "pointer",
+                    border: "none",
+                  }}
+                >
+                  Desktop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobilePreview(true)}
+                  aria-pressed={mobilePreview}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold transition-colors"
+                  style={{
+                    background: mobilePreview
+                      ? "color-mix(in oklab, var(--accent) 12%, transparent)"
+                      : "transparent",
+                    color: mobilePreview ? "var(--accent)" : "var(--muted-foreground)",
+                    cursor: "pointer",
+                    border: "none",
+                  }}
+                >
+                  Mobil
+                </button>
+              </div>
             </div>
 
             {/* Current-Status */}
@@ -675,6 +743,9 @@ export function ViewAsOverlay() {
         liveActive={liveActive}
         adminName={realUserName}
       />
+
+      {/* Mobile-Preview — Fullscreen-Overlay mit iframe im Handy-Bezel. */}
+      {mobilePreview && <MobilePreviewFrame onClose={() => setMobilePreview(false)} />}
     </>
   );
 }
