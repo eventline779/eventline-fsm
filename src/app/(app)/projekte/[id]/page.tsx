@@ -41,7 +41,6 @@ import { DocsHistoryTab } from "@/components/projekt/tabs/docs-history-tab";
 import {
   DecisionModal, CancelModal, CloseModal, AppointmentModal, AppointmentNotesModal,
 } from "@/components/projekt/modals";
-import { NewTicketModal } from "@/components/tickets/new-ticket-modal";
 import type {
   Appointment, AppointmentParticipant, AuditEntry, Child, Member, Project, TimeEntry,
 } from "@/components/projekt/types";
@@ -78,7 +77,6 @@ export default function ProjektDetailPage() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState<Appointment | "new" | null>(null);
   const [notesModalAppt, setNotesModalAppt] = useState<Appointment | null>(null);
-  const [stempelTicketOpen, setStempelTicketOpen] = useState(false);
   // Overflow-Menu fuer destruktive Aktionen (Stornieren). Halten wir hier
   // damit Klick-ausserhalb + Esc-close in einem Effect gebuendelt sind.
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -357,26 +355,6 @@ export default function ProjektDetailPage() {
           )}
         </div>
 
-        {/* Aktions-Bar im Sticky-Header. Aktuell nur ein Direkt-Trigger:
-            Stempelticket (Stempel-Korrektur/-Nacherfassung). Rendert nur,
-            wenn der User die tickets:create-Permission hat — Admins passen
-            via has_permission() automatisch durch. Der Button oeffnet den
-            NewTicketModal mit preselected type="stempel_aenderung", wie
-            in /stempelzeiten. */}
-        {can("tickets:create") && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => setStempelTicketOpen(true)}
-              className="kasten kasten-muted"
-              data-tooltip="Stempel-Aenderung oder -Nacherfassung anfragen"
-            >
-              <Clock className="h-3.5 w-3.5" />
-              Stempelticket
-            </button>
-          </div>
-        )}
-
         {/* Tab-Nav */}
         <TabsNav
           tabs={tabs}
@@ -546,21 +524,6 @@ export default function ProjektDetailPage() {
           onChanged={load}
         />
       )}
-      {/* Stempel-Aenderungs-Ticket. Type ist preselected — der Picker
-          entfaellt, User landet direkt im Form. Ticket bezieht sich in der
-          Bezeichnung auf einen Job/Auftrag (nicht auf ein Projekt) — das
-          ist eine Model-Grenze des bestehenden Ticket-Systems, kein neues
-          project_id-FK dafuer. Der Kontext "aus welchem Projekt der Klick
-          kam" ist fuer Admin per Historie nachvollziehbar. */}
-      <NewTicketModal
-        open={stempelTicketOpen}
-        onClose={() => setStempelTicketOpen(false)}
-        onCreated={() => {
-          setStempelTicketOpen(false);
-          toast.success("Ticket erstellt — Admin wurde benachrichtigt");
-        }}
-        initialType="stempel_aenderung"
-      />
       {ConfirmModalElement}
     </div>
   );
