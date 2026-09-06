@@ -508,8 +508,16 @@ export interface TicketDataStempelAenderung {
   // Beide Modi nutzen neu_start + neu_end als Ziel-Werte.
   neu_start?: string;      // ISO timestamptz
   neu_end?: string;        // ISO timestamptz
-  job_id?: string;         // optional bei Modus 2
-  beschreibung?: string;
+  // Kontext des Eintrags — steuert welches Feld darunter belegt ist:
+  //   'auftrag'       → job_id gesetzt (externer Auftrag)
+  //   'projekt'       → project_id gesetzt (internes Zeit-Budget)
+  //   'andere_arbeit' → beschreibung gesetzt (freier Text)
+  // apply_ticket (Migration 213) liest context und schreibt entsprechend
+  // in time_entries.job_id bzw. .project_id.
+  context?: "auftrag" | "projekt" | "andere_arbeit";
+  job_id?: string;         // nur bei context='auftrag'
+  project_id?: string;     // nur bei context='projekt'
+  beschreibung?: string;   // nur bei context='andere_arbeit'
   grund: string;           // Pflicht: warum die Aenderung
 }
 

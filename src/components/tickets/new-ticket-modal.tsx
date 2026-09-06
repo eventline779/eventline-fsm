@@ -36,15 +36,10 @@ type StempelPreset = "no_in" | "no_out" | "wrong_time" | "no_break";
 /** Kontext-Typ fuer den gestempelten Zeitraum: externer Auftrag, internes
  *  Projekt (Zeit-Budget), oder freie "Andere Arbeit" (kein Kontext-Objekt).
  *
- *  time_entries hat aktuell KEINE project_id-Spalte — Projekt-Zeit lebt in
- *  der separaten Tabelle project_time_entries mit anderem Schema
- *  (entry_date + minutes statt clock_in/clock_out). Fuer Tickets mit
- *  context='projekt' speichern wir project_id in tickets.data und der
- *  Admin traegt die Zeit manuell nach; automatisches Apply via
- *  apply_ticket RPC unterstuetzt (Stand jetzt) nur job_id. Follow-up:
- *  entweder time_entries.project_id-Migration oder neuer Ticket-Type
- *  `projekt_zeit_nachstempeln` mit eigenem apply-Handler auf
- *  project_time_entries. */
+ *  Seit Migration 212 traegt time_entries eine optionale project_id, und
+ *  apply_ticket (Migration 213) schreibt/updated die time_entries-Row je
+ *  nach data.context automatisch mit project_id — Admin muss nur noch
+ *  approven, keine Handarbeit mehr in project_time_entries. */
 type StempelContext = "auftrag" | "projekt" | "andere_arbeit";
 
 /** Preset-Definitionen: Icon, Label, Kurzbeschreibung. */
@@ -224,8 +219,10 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
       setStempelMode("korrektur");
       setStempelPreset("wrong_time");
       // Kontext aus dem vorbelegten Eintrag ableiten: mit job_id → Auftrag,
-      // ohne → Andere Arbeit. Projekt-Zeit-Eintraege kommen (aktuell) nicht
-      // ueber diesen Prefill-Pfad, weil sie in project_time_entries liegen.
+      // ohne → Andere Arbeit. Projekt-Zeit-Eintraege leiten wir hier
+      // absichtlich NICHT auf 'projekt' um — der Prefill-Pfad kommt vom
+      // /stempelzeiten-Row-Button und liefert nur jobId; project_id-Prefill
+      // liesse sich ergaenzen sobald der Aufrufer sie mitschickt.
       setStempelContext(initialData.jobId ? "auftrag" : "andere_arbeit");
       setStempel({
         time_entry_id: initialData.timeEntryId,
@@ -677,9 +674,9 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
         // der Approver sofort weiss ob Auftrag / Projekt / Andere Arbeit
         // gemeint war. job_id gilt nur fuer context='auftrag',
         // project_id nur fuer 'projekt', beschreibung nur fuer
-        // 'andere_arbeit'. Der apply_ticket-RPC (Migration 107) verarbeitet
-        // aktuell nur job_id — Projekt-Zeit bleibt bis auf Weiteres eine
-        // Admin-Handarbeit (siehe StempelContext-Kommentar oben).
+        // 'andere_arbeit'. Der apply_ticket-RPC (Migration 213) verarbeitet
+        // alle drei Kontexte end-to-end und schreibt project_id direkt in
+        // die time_entries-Row — keine Handarbeit mehr noetig.
         const contextFields: Record<string, unknown> = { context: stempelContext };
         if (stempelContext === "auftrag") {
           contextFields.job_id = stempel.job_id || undefined;
@@ -1067,13 +1064,11 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                   Preset-Row. Der aktive Toggle steuert welches Kontext-Feld
                   darunter erscheint:
                     - Auftrag: date-gefilterter Auftrag-Picker (bestehend)
-                    - Projekt: neuer Projekt-Picker (nur genehmigte Projekte)
+                    - Projekt: Projekt-Picker (nur genehmigte Projekte)
                     - Andere Arbeit: nur Beschreibungs-Feld (Pflicht)
-                  Projekt-Zeit landet als data.project_id im Ticket — der
-                  Admin muss die Zeit derzeit manuell in die Projekt-Detail-
-                  Seite eintragen (project_time_entries), weil time_entries
-                  keine project_id-Spalte hat. Follow-up: Migration oder
-                  neuer Ticket-Type. */}
+                  Projekt-Zeit landet als data.project_id im Ticket und wird
+                  beim Approve von apply_ticket direkt in time_entries.project_id
+                  geschrieben (Migration 212 + 213). */}
               {stempelPreset && (
                 <>
                   <div className="space-y-1">
@@ -1153,7 +1148,7 @@ export function NewTicketModal({ open, onClose, onCreated, initialType, initialD
                         />
                       )}
                       <p className="text-[10px] text-muted-foreground/60 ml-1 mt-1">
-                        Projekt-Zeit wird nach Genehmigung manuell in die Projekt-Detailseite eingetragen.
+                        Projekt-Zeit wird bei der Genehmigung automatisch als Stempeleintrag mit Projekt-Bezug angelegt.
                       </p>
                     </div>
                   )}
