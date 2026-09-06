@@ -168,18 +168,15 @@ function spanClassFor(
   return `col-span-${spanNumberFor(id, overrides, mobile)}`;
 }
 
-/** Auto-Fit-Regel: wenn dragged neben target landet und beide zusammen
- *  breiter als 12 waeren, wird target so weit verkleinert dass es passt
- *  (min 4). Rueckgabe: neuer target-span, oder null wenn kein Anpassen
- *  noetig ist (Zeile passt schon). */
-function autoFitTargetSpan(
-  draggedSpan: number,
-  targetSpan: number,
-): number | null {
-  const combined = draggedSpan + targetSpan;
-  if (combined <= 12) return null;
-  return Math.max(4, 12 - draggedSpan);
-}
+/** Erlaubte Widget-Breiten im 12-col-Grid (auch server-seitig validiert
+ *  in /api/dashboard/overrides). Reihenfolge = Anzeige-Reihenfolge im
+ *  Breiten-Selector: schmal -> breit. */
+const WIDTH_OPTIONS: { value: number; label: string }[] = [
+  { value: 4, label: "1/3" },
+  { value: 6, label: "1/2" },
+  { value: 8, label: "2/3" },
+  { value: 12, label: "Voll" },
+];
 
 /** Applies fn inside a View Transition if the browser supports it (Chromium,
  *  Safari 18+, Firefox 145+). Falls es nicht geht: fn direkt aufrufen. */
@@ -218,11 +215,6 @@ export function DashboardPreferencesModal({
     null,
   );
   const [overId, setOverId] = useState<string | null>(null);
-  // Live-Simulation: waehrend Drag wird das Grid mit diesen Werten gerendert
-  // (Auto-Fit angewendet). null wenn kein Drag laeuft → dann werden items +
-  // spanOverrides direkt gerendert.
-  const [simulatedItems, setSimulatedItems] = useState<PreferenceItem[] | null>(null);
-  const [simulatedSpans, setSimulatedSpans] = useState<Record<string, number> | null>(null);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -371,52 +363,9 @@ export function DashboardPreferencesModal({
     setDraggingCursor(true);
   }
 
-  /** Berechne die simulierte Order + Spans wenn `activeId` VOR `overId`
-   *  eingefuegt wird. Wendet die Auto-Fit-Regel an. Wird bei jedem
-   *  DragOver-Wechsel neu berechnet und rendered LIVE — der User sieht
-   *  wie das Layout wird, bevor er loslaesst. */
-  function simulate(
-    baseItems: PreferenceItem[],
-    baseSpans: Record<string, number>,
-    dragged: string,
-    over: string,
-    mobile: boolean,
-  ): { items: PreferenceItem[]; spans: Record<string, number> } {
-    if (dragged === over) return { items: baseItems, spans: baseSpans };
-    const oldIdx = baseItems.findIndex((i) => i.id === dragged);
-    const newIdx = baseItems.findIndex((i) => i.id === over);
-    if (oldIdx === -1 || newIdx === -1) return { items: baseItems, spans: baseSpans };
-    const items = [...baseItems];
-    const [moved] = items.splice(oldIdx, 1);
-    items.splice(newIdx, 0, moved);
-
-    // Auto-Fit: wenn im Mobile-Preview → keine Anpassung (alles ist eh 12).
-    if (mobile) return { items, spans: baseSpans };
-    const draggedSpan = spanNumberFor(dragged, baseSpans, false);
-    const overSpan = spanNumberFor(over, baseSpans, false);
-    const fitTarget = autoFitTargetSpan(draggedSpan, overSpan);
-    if (fitTarget === null) return { items, spans: baseSpans };
-    return { items, spans: { ...baseSpans, [over]: fitTarget } };
-  }
-
   function handleDragOver(event: DragOverEvent) {
     const over = event.over;
-    const overIdNew = over ? (over.id as string) : null;
-    setOverId(overIdNew);
-    if (activeId && overIdNew && overIdNew !== activeId) {
-      const sim = simulate(items, spanOverrides, activeId, overIdNew, mobilePreview);
-      // View-Transition wraps the simulated-state update → der Browser
-      // animiert den Layout-Wechsel weich (Kachel verkleinert sich sichtbar
-      // damit die kleine daneben passt). Ohne wuerden die Kacheln bei
-      // jedem Hover-Wechsel harten Sprung machen.
-      withViewTransition(() => {
-        setSimulatedItems(sim.items);
-        setSimulatedSpans(sim.spans);
-      });
-    } else if (!overIdNew) {
-      setSimulatedItems(null);
-      setSimulatedSpans(null);
-    }
+    setOverId(over ? (over.id as string) : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -425,21 +374,21 @@ export function DashboardPreferencesModal({
     setActiveSize(null);
     setOverId(null);
     setDraggingCursor(false);
-    if (!over || active.id === over.id) {
-      setSimulatedItems(null);
-      setSimulatedSpans(null);
-      return;
-    }
-    // Commit: die Simulation wird zum echten State. View-Transition sorgt
-    // fuer smoothen Uebergang wenn irgendwas nachanimiert werden muss
-    // (z.B. der Ghost snapshottet weg).
-    const sim = simulate(items, spanOverrides, active.id as string, over.id as string, mobilePreview);
+    if (!over || active.id === over.id) return;
+    // Reorder committen und via View-Transition sanft animieren. Widget-
+    // Breiten aendern sich NIE beim Drag — die legt der User explizit via
+    // Breiten-Selector unten in der Kachel fest.
     withViewTransition(() => {
-      setItems(sim.items);
-      setSpanOverrides(sim.spans);
-      setSimulatedItems(null);
-      setSimulatedSpans(null);
-      scheduleSave(sim.items, sim.spans);
+      setItems((prev) => {
+        const oldIdx = prev.findIndex((i) => i.id === active.id);
+        const newIdx = prev.findIndex((i) => i.id === over.id);
+        if (oldIdx === -1 || newIdx === -1) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(oldIdx, 1);
+        next.splice(newIdx, 0, moved);
+        scheduleSave(next, spanOverrides);
+        return next;
+      });
     });
   }
 
@@ -448,8 +397,24 @@ export function DashboardPreferencesModal({
     setActiveSize(null);
     setOverId(null);
     setDraggingCursor(false);
-    setSimulatedItems(null);
-    setSimulatedSpans(null);
+  }
+
+  /** Setzt die Breite eines Widgets explizit (User-Klick auf Segment). Wird
+   *  auch in View-Transition gepackt, damit die Kachel weich waechst/schrumpft
+   *  statt harten Layout-Sprung zu machen. Default-Wert (= Registry) wird als
+   *  "kein Override" gespeichert, damit spaetere Registry-Aenderungen wieder
+   *  greifen. */
+  function setWidgetSpan(id: string, span: number) {
+    const registryDefault = widgetDefaultSpan(id);
+    withViewTransition(() => {
+      setSpanOverrides((prev) => {
+        const next = { ...prev };
+        if (span === registryDefault) delete next[id];
+        else next[id] = span;
+        scheduleSave(items, next);
+        return next;
+      });
+    });
   }
 
   useEffect(() => {
@@ -499,13 +464,9 @@ export function DashboardPreferencesModal({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinatesShim }),
   );
 
-  // Beim Rendern: waehrend Drag simulated, sonst real state.
-  const renderedItems = simulatedItems ?? items;
-  const renderedSpans = simulatedSpans ?? spanOverrides;
-
   const activeItem = useMemo(
-    () => (activeId ? renderedItems.find((i) => i.id === activeId) ?? null : null),
-    [activeId, renderedItems],
+    () => (activeId ? items.find((i) => i.id === activeId) ?? null : null),
+    [activeId, items],
   );
 
   return (
@@ -553,12 +514,15 @@ export function DashboardPreferencesModal({
             }}
           >
             <div className="grid grid-cols-12 gap-2">
-              {renderedItems.map((it) => (
+              {items.map((it) => (
                 <GridTile
                   key={it.id}
                   item={it}
-                  spanClass={spanClassFor(it.id, renderedSpans, mobilePreview)}
+                  spanClass={spanClassFor(it.id, spanOverrides, mobilePreview)}
+                  currentSpan={spanNumberFor(it.id, spanOverrides, mobilePreview)}
+                  mobilePreview={mobilePreview}
                   onToggle={() => toggleHidden(it.id)}
+                  onSetSpan={(span) => setWidgetSpan(it.id, span)}
                   isDragging={activeId === it.id}
                   isOverTarget={overId === it.id && activeId !== it.id}
                   anyDragActive={activeId !== null}
@@ -620,6 +584,7 @@ function TileVisual({
   style,
   className,
   toggleButton,
+  widthSelector,
   contentOpacity,
 }: {
   item: PreferenceItem;
@@ -629,6 +594,10 @@ function TileVisual({
    *  neben dem Titel gerendert, nicht absolute am Rand — sonst ragt der
    *  Button visuell aus der Kachel raus in den Grid-Gap. */
   toggleButton?: React.ReactNode;
+  /** Breiten-Segmented-Control (1/3 · 1/2 · 2/3 · Voll). Wird als kleine
+   *  Toolbar am unteren Rand der Kachel gerendert. Optional damit der
+   *  DragOverlay-Ghost sie weglassen kann. */
+  widthSelector?: React.ReactNode;
   /** Wenn gesetzt: erzwingt Content-Opacity (Placeholder faded auf 25%). */
   contentOpacity?: number;
 }) {
@@ -644,7 +613,7 @@ function TileVisual({
         ...style,
       }}
     >
-      <div className="flex items-start gap-2 p-2.5 min-h-16">
+      <div className="flex items-start gap-2 p-2.5">
         <span
           className="mt-0.5 shrink-0 text-muted-foreground/60"
           aria-hidden
@@ -660,11 +629,9 @@ function TileVisual({
           <div className="mt-1.5 h-2 rounded bg-muted-foreground/15 w-3/4" />
           <div className="mt-1 h-2 rounded bg-muted-foreground/10 w-1/2" />
         </div>
-        {/* Auge-Button IM Flow rechts neben Titel/Bars. Klar innerhalb der
-            Kachel-Grenzen, ragt nicht in den Grid-Gap. shrink-0 damit er
-            auch in schmalen Kacheln (col-span-4) sichtbar bleibt. */}
         {toggleButton && <div className="shrink-0 -mt-0.5 -mr-0.5">{toggleButton}</div>}
       </div>
+      {widthSelector}
 
       {item.hidden && contentOpacity === undefined && (
         <div
@@ -684,6 +651,88 @@ function TileVisual({
 }
 
 // ---------------------------------------------------------------------------
+// WidthSelector — Segmented-Control zum expliziten Setzen der Widget-Breite.
+// Der User klickt 1/3, 1/2, 2/3 oder Voll und die Kachel wechselt sofort
+// (mit smoothen View-Transition beim Parent). Klicks werden stopPropagated
+// damit sie kein Drag ausloesen. Im Mobile-Preview versteckt (alles ist
+// eh voll). Waehrend Drag versteckt (kein Konflikt).
+// ---------------------------------------------------------------------------
+
+function WidthSelector({
+  current,
+  onChange,
+}: {
+  current: number;
+  onChange: (span: number) => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-1 border-t px-2 py-1.5"
+      style={{
+        borderColor:
+          "color-mix(in oklab, var(--foreground) 8%, transparent)",
+        backgroundColor:
+          "color-mix(in oklab, var(--foreground) 2%, transparent)",
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      role="group"
+      aria-label="Widget-Breite"
+    >
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground shrink-0 mr-1">
+        Breite
+      </span>
+      {WIDTH_OPTIONS.map((opt) => (
+        <WidthSegment
+          key={opt.value}
+          active={current === opt.value}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </WidthSegment>
+      ))}
+    </div>
+  );
+}
+
+function WidthSegment({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-pressed={active}
+      className="px-1.5 py-0.5 text-[10px] font-semibold rounded transition-colors"
+      style={{
+        backgroundColor: active
+          ? "color-mix(in oklab, var(--accent) 18%, transparent)"
+          : hover
+            ? "color-mix(in oklab, var(--foreground) 8%, transparent)"
+            : "transparent",
+        color: active ? "var(--accent)" : "var(--muted-foreground)",
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // GridTile — Kachel im echten col-span-Grid. Nutzt useDraggable +
 // useDroppable OHNE SortableContext → keine Auto-Reflow-Transforms
 // waehrend Drag, keine Layout-Verzerrung. Grid bleibt eingefroren bis
@@ -694,14 +743,20 @@ function TileVisual({
 function GridTile({
   item,
   spanClass,
+  currentSpan,
+  mobilePreview,
   onToggle,
+  onSetSpan,
   isDragging,
   isOverTarget,
   anyDragActive,
 }: {
   item: PreferenceItem;
   spanClass: string;
+  currentSpan: number;
+  mobilePreview: boolean;
   onToggle: () => void;
+  onSetSpan: (span: number) => void;
   isDragging: boolean;
   isOverTarget: boolean;
   anyDragActive: boolean;
@@ -806,6 +861,11 @@ function GridTile({
         className="h-full"
         contentOpacity={isDragging ? 0.25 : undefined}
         toggleButton={toggleBtn}
+        widthSelector={
+          !isDragging && !mobilePreview && !item.hidden ? (
+            <WidthSelector current={currentSpan} onChange={onSetSpan} />
+          ) : null
+        }
       />
     </div>
   );
