@@ -847,7 +847,7 @@ export function StempelzeitenView() {
               type="button"
               onClick={() => openCorrect(null)}
               className="kasten kasten-green"
-              data-tooltip="Stempel-Aenderung anfragen"
+              data-tooltip="Stempel-Änderung anfragen"
             >
               <Clock className="h-3.5 w-3.5" />
               Stempel-Änderung
