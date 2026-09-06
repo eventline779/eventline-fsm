@@ -261,7 +261,7 @@ function LohnEditorModal({ employee, defaults, onClose, onSaved }: {
     if (!wageExempt) {
       w = parseFloat(wage.replace(",", "."));
       if (!Number.isFinite(w) || w < 0) {
-        toast.error("Brutto-Stundenlohn ungueltig");
+        toast.error("Brutto-Stundenlohn ungültig");
         return;
       }
     }

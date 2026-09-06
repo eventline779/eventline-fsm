@@ -114,9 +114,9 @@ export function LohnStandardwerteCard() {
 
   async function handleDelete(row: Row) {
     const ok = await confirm({
-      title: "Geplanten Eintrag loeschen?",
-      message: `Der Eintrag "gueltig ab ${formatDate(row.effective_from)}" wird endgueltig geloescht. Dann greifen ab diesem Datum weiterhin die davor gueltigen Saetze.`,
-      confirmLabel: "Loeschen",
+      title: "Geplanten Eintrag löschen?",
+      message: `Der Eintrag "gültig ab ${formatDate(row.effective_from)}" wird endgültig gelöscht. Dann greifen ab diesem Datum weiterhin die davor gültigen Sätze.`,
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
@@ -126,7 +126,7 @@ export function LohnStandardwerteCard() {
       TOAST.errorOr(json.error);
       return;
     }
-    toast.success("Geplanter Eintrag geloescht");
+    toast.success("Geplanter Eintrag gelöscht");
     await loadAll();
   }
 
@@ -152,7 +152,7 @@ export function LohnStandardwerteCard() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold leading-tight">Lohn-Standardwerte</p>
               <p className="text-[11px] text-muted-foreground">
-                Firmenweite Defaults mit Historie. Aenderungen greifen ab dem hinterlegten Datum — alte Lohnabrechnungen bleiben stabil.
+                Firmenweite Defaults mit Historie. Änderungen greifen ab dem hinterlegten Datum — alte Lohnabrechnungen bleiben stabil.
               </p>
             </div>
           </div>
@@ -164,12 +164,12 @@ export function LohnStandardwerteCard() {
             <div className="text-[11px] px-3 py-2 rounded-lg bg-foreground/[0.04] dark:bg-foreground/[0.06] flex items-center gap-3 flex-wrap">
               <span>
                 <span className="font-semibold text-green-700 dark:text-green-400">{impact.standard}</span>
-                <span className="text-muted-foreground"> Mitarbeiter uebernehmen neue Saetze automatisch</span>
+                <span className="text-muted-foreground"> Mitarbeiter übernehmen neue Sätze automatisch</span>
               </span>
               {impact.override > 0 && (
                 <span>
                   <span className="font-semibold text-amber-700 dark:text-amber-400">{impact.override}</span>
-                  <span className="text-muted-foreground"> haben eigene Overrides und muessen manuell im Mitarbeiter-Tab angepasst werden</span>
+                  <span className="text-muted-foreground"> haben eigene Overrides und müssen manuell im Mitarbeiter-Tab angepasst werden</span>
                 </span>
               )}
             </div>
@@ -178,11 +178,11 @@ export function LohnStandardwerteCard() {
           {current && (
             <RowEditor
               row={current}
-              badge={`Aktuell gueltig — seit ${formatDate(current.effective_from)}`}
+              badge={`Aktuell gültig — seit ${formatDate(current.effective_from)}`}
               badgeTone="green"
               onSaved={loadAll}
               readonly={false}
-              editWarning='Aenderungen hier gelten AB dem urspruenglichen Datum und wirken auch auf bereits generierte Lohnabrechnungen bei Regenerate. Fuer Aenderungen ab einem NEUEN Stichtag stattdessen "Neuer Stichtag" nutzen.'
+              editWarning='Änderungen hier gelten AB dem ursprünglichen Datum und wirken auch auf bereits generierte Lohnabrechnungen bei Regenerate. Für Änderungen ab einem NEUEN Stichtag stattdessen "Neuer Stichtag" nutzen.'
               allowDelete={false}
             />
           )}
@@ -196,7 +196,7 @@ export function LohnStandardwerteCard() {
             <div className="flex items-center gap-2">
               <CalendarPlus className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Geplant fuer die Zukunft ({future.length})
+                Geplant für die Zukunft ({future.length})
               </p>
             </div>
             <button
@@ -221,7 +221,7 @@ export function LohnStandardwerteCard() {
 
           {future.length === 0 && !showNewForm && (
             <p className="text-xs text-muted-foreground italic">
-              Keine geplanten Aenderungen. Fuer neue Saetze (z.B. zum Jahreswechsel) auf "Neuer Stichtag" klicken.
+              Keine geplanten Änderungen. Für neue Sätze (z.B. zum Jahreswechsel) auf "Neuer Stichtag" klicken.
             </p>
           )}
 
@@ -259,7 +259,7 @@ export function LohnStandardwerteCard() {
                   <RowEditor
                     key={r.id}
                     row={r}
-                    badge={`gueltig ab ${formatDate(r.effective_from)}`}
+                    badge={`gültig ab ${formatDate(r.effective_from)}`}
                     badgeTone="muted"
                     onSaved={loadAll}
                     readonly={true}
@@ -313,7 +313,7 @@ function RowEditor({
     const raw = drafts[fieldKey];
     const parsed = parseFloat((raw ?? "").replace(",", "."));
     if (!Number.isFinite(parsed) || parsed < 0 || parsed > (fieldKey === "bvg_threshold_chf" ? 999999 : 100)) {
-      toast.error("Ungueltiger Wert");
+      toast.error("Ungültiger Wert");
       return;
     }
     const body: Record<string, unknown> = { id: row.id };
@@ -355,8 +355,8 @@ function RowEditor({
             type="button"
             onClick={onDelete}
             className="kasten kasten-red"
-            data-tooltip="Geplanten Eintrag loeschen"
-            aria-label="Geplanten Eintrag loeschen"
+            data-tooltip="Geplanten Eintrag löschen"
+            aria-label="Geplanten Eintrag löschen"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

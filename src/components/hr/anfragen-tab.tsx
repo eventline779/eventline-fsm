@@ -155,9 +155,9 @@ export function AnfragenTab({ onGoto }: { onGoto: (tab: "stempelzeiten" | "ticke
     try {
       let note = "";
       if (decision === "ablehnen") {
-        const input = typeof window !== "undefined" ? window.prompt("Begründung fuer Ablehnung (Pflicht):", "") : "";
+        const input = typeof window !== "undefined" ? window.prompt("Begründung für Ablehnung (Pflicht):", "") : "";
         if (!input || !input.trim()) {
-          toast.error("Ablehnung ohne Begründung nicht moeglich");
+          toast.error("Ablehnung ohne Begründung nicht möglich");
           return;
         }
         note = input.trim();

@@ -51,7 +51,7 @@ export function LohndokumenteAdmin() {
   async function rebuildAll() {
     const ok = await confirm({
       title: "ALLE Lohnabrechnungen neu erstellen?",
-      message: "Es werden ALLE bestehenden Lohnabrechnungen (auto UND manuell hochgeladene) unwiderruflich geloescht. Danach werden fuer jeden Mitarbeiter alle Monate ab dem aeltesten Lohn-Gueltig-Datum bis zum letzten abgeschlossenen Monat neu generiert. Kann einige Minuten dauern.",
+      message: "Es werden ALLE bestehenden Lohnabrechnungen (auto UND manuell hochgeladene) unwiderruflich gelöscht. Danach werden für jeden Mitarbeiter alle Monate ab dem ältesten Lohn-Gültig-Datum bis zum letzten abgeschlossenen Monat neu generiert. Kann einige Minuten dauern.",
       confirmLabel: "Alles ersetzen",
       variant: "red",
     });
@@ -64,7 +64,7 @@ export function LohndokumenteAdmin() {
       TOAST.errorOr(j.error, "Rebuild fehlgeschlagen");
       return;
     }
-    toast.success(`Fertig: ${j.total_generated} generiert / ${j.total_failed} Fehler (${j.deleted?.db ?? 0} alte geloescht)`);
+    toast.success(`Fertig: ${j.total_generated} generiert / ${j.total_failed} Fehler (${j.deleted?.db ?? 0} alte gelöscht)`);
     if (selectedEmployee) loadDocs(selectedEmployee);
   }
 
@@ -110,9 +110,9 @@ export function LohndokumenteAdmin() {
 
   async function deleteDoc(id: string) {
     const ok = await confirm({
-      title: "Lohndokument loeschen?",
-      message: "Kann nicht rueckgaengig gemacht werden.",
-      confirmLabel: "Loeschen",
+      title: "Lohndokument löschen?",
+      message: "Kann nicht rückgängig gemacht werden.",
+      confirmLabel: "Löschen",
       variant: "red",
     });
     if (!ok) return;
@@ -146,7 +146,7 @@ export function LohndokumenteAdmin() {
           onClick={rebuildAll}
           disabled={rebuilding}
           className="kasten kasten-muted shrink-0"
-          data-tooltip="Loescht ALLE bestehenden Lohnabrechnungen und generiert alle Monate ab Einstellungsdatum neu."
+          data-tooltip="Löscht ALLE bestehenden Lohnabrechnungen und generiert alle Monate ab Einstellungsdatum neu."
         >
           <RefreshCw className={`h-3.5 w-3.5 ${rebuilding ? "animate-spin" : ""}`} />
           {rebuilding ? "Baut neu…" : "Alle neu erstellen"}
