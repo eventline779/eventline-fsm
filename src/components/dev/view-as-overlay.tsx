@@ -22,7 +22,7 @@
  * keinen PermissionsProvider hat).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil, Radio } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -55,7 +55,52 @@ export function ViewAsOverlay() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  // Hold-to-activate fuer den Write-Modus: 5 Sekunden Halten statt Confirm.
+  const HOLD_MS = 5000;
+  const [holdProgress, setHoldProgress] = useState(0); // 0..1
+  const holdStartRef = useRef<number | null>(null);
+  const holdRafRef = useRef<number | null>(null);
+  const holdDoneRef = useRef(false);
   const isAdmin = realUserRole === "admin";
+
+  const cancelHold = useCallback(() => {
+    if (holdRafRef.current !== null) {
+      cancelAnimationFrame(holdRafRef.current);
+      holdRafRef.current = null;
+    }
+    holdStartRef.current = null;
+    holdDoneRef.current = false;
+    setHoldProgress(0);
+  }, []);
+
+  // Cleanup beim Unmount — kein rAF-Leak.
+  useEffect(() => {
+    return () => {
+      if (holdRafRef.current !== null) cancelAnimationFrame(holdRafRef.current);
+    };
+  }, []);
+
+  const startHold = useCallback(() => {
+    if (holdStartRef.current !== null) return; // schon aktiv
+    holdDoneRef.current = false;
+    holdStartRef.current = performance.now();
+    const tick = (now: number) => {
+      const start = holdStartRef.current;
+      if (start === null) return; // gecancelt
+      const p = Math.min(1, (now - start) / HOLD_MS);
+      setHoldProgress(p);
+      if (p >= 1) {
+        holdDoneRef.current = true;
+        holdStartRef.current = null;
+        holdRafRef.current = null;
+        setHoldProgress(0);
+        void toggleWriteMode(true);
+        return;
+      }
+      holdRafRef.current = requestAnimationFrame(tick);
+    };
+    holdRafRef.current = requestAnimationFrame(tick);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,19 +221,11 @@ export function ViewAsOverlay() {
     }
   }
 
-  /** Write-Modus fuer die aktive Impersonation ein-/ausschalten. Beim
-   *  Einschalten wird eine Bestaetigung verlangt — Aenderungen landen dann
-   *  echt in den Daten des impersonierten Users. */
+  /** Write-Modus fuer die aktive Impersonation ein-/ausschalten. Das
+   *  Einschalten erfolgt bewusst NUR ueber den 5s-Hold-Button unten, nicht
+   *  ueber einen normalen Klick — daher hier keine zusaetzliche Bestaetigung.
+   *  Das Deaktivieren bleibt ein Klick. */
   async function toggleWriteMode(next: boolean) {
-    if (next) {
-      const name = current?.target?.full_name ?? "diesen User";
-      // Simpler window.confirm — schneller Weg zum expliziten OK. Kein
-      // eigenes Modal noetig fuer diesen einen sicherheitsrelevanten Klick.
-      const ok = window.confirm(
-        `Bearbeitung aktivieren?\n\nDu machst dann echte Änderungen im Namen von ${name}. Alle Aktionen werden in der DB gespeichert und sind nicht rückgängig zu machen.`,
-      );
-      if (!ok) return;
-    }
     setLoading(true);
     try {
       const r = await fetch("/api/dev/impersonate/write", {
@@ -269,9 +306,32 @@ export function ViewAsOverlay() {
               {current!.target!.role === "partner" ? " · Partner" : ""}
               {current!.write_enabled ? " · Bearbeitung" : " · nur lesen"}
             </span>
+            {liveActive && (
+              <span
+                className="inline-flex items-center gap-1 ml-1 pl-1.5 border-l"
+                style={{ borderColor: "currentColor" }}
+              >
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: "#dc2626",
+                    animation: "view-as-live-blink 1s ease-in-out infinite",
+                    boxShadow: "0 0 6px #dc2626",
+                  }}
+                />
+                LIVE
+              </span>
+            )}
           </div>
         </div>
       )}
+      {/* Blinken-Animation fuer den Live-Punkt (kein zusaetzliches CSS-File). */}
+      <style>{`
+        @keyframes view-as-live-blink {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%      { opacity: 0.4; transform: scale(0.8); }
+        }
+      `}</style>
 
       {/* Floating Panel unten rechts. Zu = kleiner Icon-Button (kein Text
           im idle-Zustand, damit es dezent bleibt); auf = Panel. */}
@@ -357,36 +417,99 @@ export function ViewAsOverlay() {
                   </button>
                 </div>
                 {/* Read-Only vs Bearbeitung — expliziter Toggle. Default:
-                    read-only. Enable braucht Confirm. */}
+                    read-only. Aktivieren braucht 5s HALTEN (kein Confirm-
+                    Dialog); Deaktivieren ist ein normaler Klick. */}
                 <div className="px-3 pb-2 space-y-1.5">
-                  <button
-                    type="button"
-                    onClick={() => toggleWriteMode(!current!.write_enabled)}
-                    disabled={loading}
-                    className="w-full inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition-colors"
-                    style={{
-                      borderColor: current!.write_enabled
-                        ? "color-mix(in oklab, #dc2626 55%, transparent)"
-                        : "var(--border)",
-                      background: current!.write_enabled
-                        ? "color-mix(in oklab, #dc2626 10%, transparent)"
-                        : "color-mix(in oklab, var(--foreground) 3%, transparent)",
-                      color: current!.write_enabled ? "#dc2626" : "var(--foreground)",
-                      cursor: loading ? "wait" : "pointer",
-                    }}
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      {current!.write_enabled ? (
+                  {current!.write_enabled ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleWriteMode(false)}
+                      disabled={loading}
+                      className="w-full inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition-colors"
+                      style={{
+                        borderColor: "color-mix(in oklab, #dc2626 55%, transparent)",
+                        background: "color-mix(in oklab, #dc2626 10%, transparent)",
+                        color: "#dc2626",
+                        cursor: loading ? "wait" : "pointer",
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
                         <Pencil className="h-3 w-3" />
-                      ) : (
-                        <Lock className="h-3 w-3" />
-                      )}
-                      {current!.write_enabled ? "Bearbeitung aktiv" : "Nur Lesen"}
-                    </span>
-                    <span className="text-[10px] opacity-75">
-                      {current!.write_enabled ? "sperren" : "aktivieren"}
-                    </span>
-                  </button>
+                        Bearbeitung aktiv
+                      </span>
+                      <span className="text-[10px] opacity-75">sperren</span>
+                    </button>
+                  ) : (
+                    (() => {
+                      const holding = holdProgress > 0;
+                      const pct = Math.round(holdProgress * 100);
+                      const disabled = loading;
+                      return (
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onPointerDown={(e) => {
+                            if (disabled) return;
+                            // Pointer waehrend Hold behalten, damit
+                            // Leave/Up sauber feuern.
+                            e.currentTarget.setPointerCapture?.(e.pointerId);
+                            startHold();
+                          }}
+                          onPointerUp={cancelHold}
+                          onPointerLeave={cancelHold}
+                          onPointerCancel={cancelHold}
+                          onTouchStart={() => { if (!disabled) startHold(); }}
+                          onTouchEnd={cancelHold}
+                          onTouchCancel={cancelHold}
+                          onKeyDown={(e) => {
+                            if (disabled) return;
+                            if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+                              e.preventDefault();
+                              startHold();
+                            }
+                          }}
+                          onKeyUp={(e) => {
+                            if (e.key === " " || e.key === "Enter") cancelHold();
+                          }}
+                          onBlur={cancelHold}
+                          className="relative w-full overflow-hidden inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-medium select-none"
+                          style={{
+                            borderColor: holding
+                              ? "color-mix(in oklab, #dc2626 55%, transparent)"
+                              : "var(--border)",
+                            background: "color-mix(in oklab, var(--foreground) 3%, transparent)",
+                            color: holding ? "#dc2626" : "var(--foreground)",
+                            cursor: disabled ? "wait" : "pointer",
+                            touchAction: "none",
+                            WebkitUserSelect: "none",
+                            userSelect: "none",
+                          }}
+                        >
+                          {/* Fill von links nach rechts. Zeigt Fortschritt. */}
+                          <span
+                            aria-hidden
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: `${pct}%`,
+                              background: "color-mix(in oklab, #dc2626 22%, transparent)",
+                              transition: holding ? "none" : "width 160ms ease-out",
+                              pointerEvents: "none",
+                            }}
+                          />
+                          <span className="relative inline-flex items-center gap-1.5">
+                            <Lock className="h-3 w-3" />
+                            {holding ? "Halten zum Aktivieren…" : "Nur Lesen"}
+                          </span>
+                          <span className="relative text-[10px] opacity-75">
+                            {holding ? `${pct}%` : "5s halten"}
+                          </span>
+                        </button>
+                      );
+                    })()
+                  )}
                   {/* Live-Uebertragung — der User sieht in seinem Browser
                       Admins Cursor / Klicks / Eingaben, kann selbst nichts
                       tun (Input-Lock). Broadcast via Supabase Realtime. */}
@@ -510,13 +633,36 @@ export function ViewAsOverlay() {
             className="inline-flex items-center gap-2 pl-2.5 pr-3 py-2 rounded-full shadow-md transition-all hover:shadow-lg"
             style={{
               background: "var(--card)",
-              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-              color: active ? "var(--accent)" : "var(--foreground)",
+              border: `1px solid ${liveActive
+                ? "#dc2626"
+                : active
+                  ? "var(--accent)"
+                  : "var(--border)"}`,
+              color: liveActive ? "#dc2626" : active ? "var(--accent)" : "var(--foreground)",
+              // Wenn Live: doppelter Rand als Alarm-Signal auch bei ganz
+              // geschlossener UI. Der Admin soll nie vergessen dass er
+              // gerade broadcastet.
+              boxShadow: liveActive
+                ? "0 0 0 3px color-mix(in oklab, #dc2626 30%, transparent), 0 4px 12px rgba(0,0,0,0.15)"
+                : undefined,
             }}
           >
-            <Eye className="h-3.5 w-3.5" />
+            {liveActive ? (
+              <span
+                className="inline-block w-2 h-2 rounded-full shrink-0"
+                style={{
+                  background: "#dc2626",
+                  animation: "view-as-live-blink 1s ease-in-out infinite",
+                  boxShadow: "0 0 6px #dc2626",
+                }}
+                aria-label="Live"
+              />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
             <span className="text-[11px] font-medium">
               {active ? current!.target!.full_name.split(" ")[0] : "View-As"}
+              {liveActive && " · LIVE"}
             </span>
           </button>
         )}
