@@ -34,7 +34,7 @@ import { localHour } from "@/lib/swiss-time";
 import { AnwesenheitskalenderCard } from "@/components/dashboard/anwesenheit-card";
 import { OverdueJobsCard, type OverdueJobItem } from "@/components/dashboard/overdue-jobs-card";
 import { DashboardPreferencesModal } from "@/components/dashboard/dashboard-preferences-modal";
-import { widgetSpanClass } from "@/lib/dashboard-widgets";
+import { widgetEffectiveSpanClass } from "@/lib/dashboard-widgets";
 
 // ---------------------------------------------------------------------------
 // Payload-Typen (Spiegel zu /api/dashboard)
@@ -99,6 +99,9 @@ interface DashboardResponse {
   subtitle: string;
   widgets: string[];
   widget_catalog: WidgetCatalogEntry[];
+  /** User-Overrides der Widget-Breiten (col-span 4/6/8/12). Fehlende IDs
+   *  fallen im Renderer auf widgetDefaultSpan(id) zurueck. */
+  widget_spans?: Record<string, number>;
   admin?: AdminData;
   ma?: MaData;
 }
@@ -282,6 +285,7 @@ export default function DashboardPage() {
   const ctx: RenderContext = { admin: data?.admin ?? null, ma: data?.ma ?? null };
   const widgets = data?.widgets ?? [];
   const catalog = data?.widget_catalog ?? [];
+  const widgetSpans = data?.widget_spans ?? {};
   // Subtitle kommt vom Server — die Rollen-Semantik lebt dort (roles-Tabelle,
   // frei-definierbare Slugs), nicht in einem hardcoded Client-Match.
   const subtitle = data?.subtitle ?? "";
@@ -326,7 +330,7 @@ export default function DashboardPage() {
             const node = render?.(ctx);
             if (!node) return null;
             return (
-              <div key={id} className={widgetSpanClass(id)}>
+              <div key={id} className={widgetEffectiveSpanClass(id, widgetSpans[id])}>
                 {node}
               </div>
             );

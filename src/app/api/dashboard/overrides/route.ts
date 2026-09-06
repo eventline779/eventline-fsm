@@ -1,8 +1,10 @@
 // /api/dashboard/overrides — persoenliche Dashboard-Anpassungen des eingeloggten Users.
 //
-//   GET    -> { success, hidden: string[], widget_order: string[] }
+//   GET    -> { success, hidden: string[], widget_order: string[],
+//               widget_spans: Record<string, number> }
 //             leerer Default falls kein Eintrag existiert.
-//   PUT    -> body { hidden: string[], widget_order: string[] }
+//   PUT    -> body { hidden: string[], widget_order: string[],
+//                    widget_spans?: Record<string, number> }
 //             upsert (onConflict user_id). Unbekannte Widget-IDs werden
 //             STILL gedroppt — kein 400, damit eine alte Client-Version nach
 //             einem Registry-Umbau nicht plötzlich alle Speichervorgänge des
@@ -24,13 +26,11 @@ import { DASHBOARD_WIDGETS } from "@/lib/dashboard-widgets";
 export const dynamic = "force-dynamic";
 
 const KNOWN_WIDGET_IDS = new Set<string>(DASHBOARD_WIDGETS.map((w) => w.id));
+// Erlaubte col-span-Werte im 12-col-Grid. 4=1/3, 6=1/2, 8=2/3, 12=voll.
+const ALLOWED_SPANS = new Set([4, 6, 8, 12]);
 
 /** String-Array aus body herausziehen und auf Registry-bekannte IDs
- *  reduzieren. Unbekannte silently droppen — siehe Kopf-Doku.
- *  Zusaetzlich harte Laengen-Begrenzung auf die Anzahl bekannter Widget-IDs:
- *  mehr macht semantisch nie Sinn (jedes Widget kommt hoechstens einmal vor
- *  — siehe Dedup) und schuetzt vor missbrauchten Payloads mit tausenden
- *  Fake-IDs, die zwar alle gedroppt werden, aber die Iteration teuer machen. */
+ *  reduzieren. Unbekannte silently droppen — siehe Kopf-Doku. */
 function sanitizeIdList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   const out: string[] = [];
@@ -47,6 +47,24 @@ function sanitizeIdList(v: unknown): string[] {
   return out;
 }
 
+/** widget_spans-Map validieren — nur bekannte IDs, nur erlaubte span-Werte,
+ *  Anzahl-Cap. Alles ausserhalb wird silently gedroppt (gleiche Toleranz-
+ *  Regel wie bei den ID-Listen). */
+function sanitizeSpans(v: unknown): Record<string, number> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, number> = {};
+  let count = 0;
+  const cap = KNOWN_WIDGET_IDS.size;
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (!KNOWN_WIDGET_IDS.has(k)) continue;
+    if (typeof val !== "number" || !ALLOWED_SPANS.has(val)) continue;
+    out[k] = val;
+    count++;
+    if (count >= cap) break;
+  }
+  return out;
+}
+
 export async function GET() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
@@ -54,7 +72,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("user_dashboard_overrides")
-    .select("hidden, widget_order")
+    .select("hidden, widget_order, widget_spans")
     .eq("user_id", auth.user.id)
     .maybeSingle();
   if (error) {
@@ -65,6 +83,7 @@ export async function GET() {
       success: true,
       hidden: (data?.hidden ?? []) as string[],
       widget_order: (data?.widget_order ?? []) as string[],
+      widget_spans: (data?.widget_spans ?? {}) as Record<string, number>,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -80,6 +99,7 @@ export async function PUT(request: Request) {
   }
   const hidden = sanitizeIdList((body as { hidden?: unknown }).hidden);
   const widget_order = sanitizeIdList((body as { widget_order?: unknown }).widget_order);
+  const widget_spans = sanitizeSpans((body as { widget_spans?: unknown }).widget_spans);
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -89,13 +109,14 @@ export async function PUT(request: Request) {
         user_id: auth.user.id,
         hidden,
         widget_order,
+        widget_spans,
       },
       { onConflict: "user_id" },
     );
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, hidden, widget_order });
+  return NextResponse.json({ success: true, hidden, widget_order, widget_spans });
 }
 
 export async function DELETE() {

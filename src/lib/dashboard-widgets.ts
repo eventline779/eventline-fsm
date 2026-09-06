@@ -219,3 +219,28 @@ export const WIDGET_SPAN: Record<WidgetId, string> = {
 export function widgetSpanClass(id: string): string {
   return (WIDGET_SPAN as Record<string, string | undefined>)[id] ?? "col-span-12";
 }
+
+/** Numerischer Default-Span (4/6/8/12) pro Widget. Wird aus der WIDGET_SPAN-
+ *  Klasse extrahiert (letzter col-span-N-Match) und dient als Fallback wenn
+ *  der User keinen Widget-Span-Override gesetzt hat. Mobile-Verhalten bleibt
+ *  ausserhalb — die WIDGET_SPAN-Klasse liefert weiterhin die responsive
+ *  Prefixes (col-span-12 sm:col-span-4). */
+export function widgetDefaultSpan(id: string): number {
+  const cls = widgetSpanClass(id);
+  const matches = [...cls.matchAll(/col-span-(\d+)/g)];
+  if (matches.length === 0) return 12;
+  const last = matches[matches.length - 1]?.[1];
+  const n = last ? parseInt(last, 10) : 12;
+  return n === 4 || n === 6 || n === 8 || n === 12 ? n : 12;
+}
+
+/** Baut die effektive Grid-Klasse aus dem User-Override (falls vorhanden)
+ *  oder dem Registry-Default. Mobil (col-span-12) bleibt immer identisch —
+ *  Overrides gelten nur ab dem sm:-Breakpoint (echtes Dashboard-Grid). */
+export function widgetEffectiveSpanClass(
+  id: string,
+  override: number | undefined,
+): string {
+  const span = override ?? widgetDefaultSpan(id);
+  return `col-span-12 sm:col-span-${span}`;
+}

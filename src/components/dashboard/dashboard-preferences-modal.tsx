@@ -98,7 +98,7 @@ import {
 } from "@dnd-kit/core";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { widgetSpanClass } from "@/lib/dashboard-widgets";
+import { widgetDefaultSpan } from "@/lib/dashboard-widgets";
 
 interface CatalogItem {
   id: string;
@@ -146,9 +146,39 @@ function iconFor(id: string): React.ReactNode {
   return WIDGET_ICONS[id] ?? <ClipboardList className="h-4 w-4" />;
 }
 
-function spanFor(id: string, mobile: boolean): string {
-  if (mobile) return "col-span-12";
-  return widgetSpanClass(id);
+/** Numerischer Span aus State + Override + Default. Mobile-Overrides zwingen
+ *  auf 12 (volle Breite) fuer die Mobil-Vorschau. */
+function spanNumberFor(
+  id: string,
+  overrides: Record<string, number>,
+  mobile: boolean,
+): number {
+  if (mobile) return 12;
+  return overrides[id] ?? widgetDefaultSpan(id);
+}
+
+/** Fuer die Modal-Vorschau: baut die col-span-N-Klasse (ohne responsive
+ *  Prefix — das Modal ist immer Desktop-simulation, Mobile wird per
+ *  mobilePreview-Toggle erzwungen). */
+function spanClassFor(
+  id: string,
+  overrides: Record<string, number>,
+  mobile: boolean,
+): string {
+  return `col-span-${spanNumberFor(id, overrides, mobile)}`;
+}
+
+/** Auto-Fit-Regel: wenn dragged neben target landet und beide zusammen
+ *  breiter als 12 waeren, wird target so weit verkleinert dass es passt
+ *  (min 4). Rueckgabe: neuer target-span, oder null wenn kein Anpassen
+ *  noetig ist (Zeile passt schon). */
+function autoFitTargetSpan(
+  draggedSpan: number,
+  targetSpan: number,
+): number | null {
+  const combined = draggedSpan + targetSpan;
+  if (combined <= 12) return null;
+  return Math.max(4, 12 - draggedSpan);
 }
 
 /** Applies fn inside a View Transition if the browser supports it (Chromium,
@@ -176,6 +206,10 @@ export function DashboardPreferencesModal({
   visibleIds,
 }: Props) {
   const [items, setItems] = useState<PreferenceItem[]>([]);
+  // spanOverrides = user-adjusted widget widths, {id: 4|6|8|12}. Fehlende IDs
+  // fallen im Renderer auf widgetDefaultSpan(id) zurueck. Persistiert als
+  // widget_spans in user_dashboard_overrides.
+  const [spanOverrides, setSpanOverrides] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mobilePreview, setMobilePreview] = useState(false);
@@ -184,6 +218,11 @@ export function DashboardPreferencesModal({
     null,
   );
   const [overId, setOverId] = useState<string | null>(null);
+  // Live-Simulation: waehrend Drag wird das Grid mit diesen Werten gerendert
+  // (Auto-Fit angewendet). null wenn kein Drag laeuft → dann werden items +
+  // spanOverrides direkt gerendert.
+  const [simulatedItems, setSimulatedItems] = useState<PreferenceItem[] | null>(null);
+  const [simulatedSpans, setSimulatedSpans] = useState<Record<string, number> | null>(null);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -202,17 +241,20 @@ export function DashboardPreferencesModal({
           success?: boolean;
           hidden?: string[];
           widget_order?: string[];
+          widget_spans?: Record<string, number>;
           error?: string;
         };
         if (cancelled) return;
         if (!json.success) {
           toast.error(json.error ?? "Einstellungen konnten nicht geladen werden");
           setItems([]);
+          setSpanOverrides({});
           setLoaded(true);
           return;
         }
         const userHidden = new Set(json.hidden ?? []);
         const userOrder = json.widget_order ?? [];
+        setSpanOverrides(json.widget_spans ?? {});
         const catalogById = new Map(catalog.map((c) => [c.id, c]));
 
         const orderedIds: string[] = [];
@@ -259,36 +301,40 @@ export function DashboardPreferencesModal({
   // ------------------------------------------------------------------
   // Debounced Auto-Save.
   // ------------------------------------------------------------------
-  const persist = useCallback(async (payload: PreferenceItem[]) => {
-    setSaving(true);
-    try {
-      const body = {
-        hidden: payload.filter((i) => i.hidden).map((i) => i.id),
-        widget_order: payload.map((i) => i.id),
-      };
-      const res = await fetch("/api/dashboard/overrides", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = (await res.json()) as { success?: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? "Speichern fehlgeschlagen");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const persist = useCallback(
+    async (payload: PreferenceItem[], spans: Record<string, number>) => {
+      setSaving(true);
+      try {
+        const body = {
+          hidden: payload.filter((i) => i.hidden).map((i) => i.id),
+          widget_order: payload.map((i) => i.id),
+          widget_spans: spans,
+        };
+        const res = await fetch("/api/dashboard/overrides", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const json = (await res.json()) as { success?: boolean; error?: string };
+        if (!json.success) throw new Error(json.error ?? "Speichern fehlgeschlagen");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [],
+  );
 
   const scheduleSave = useCallback(
-    (next: PreferenceItem[]) => {
+    (nextItems: PreferenceItem[], nextSpans: Record<string, number>) => {
       dirtyRef.current = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveTimer.current = null;
         dirtyRef.current = false;
-        void persist(next);
+        void persist(nextItems, nextSpans);
       }, 400);
     },
     [persist],
@@ -306,7 +352,7 @@ export function DashboardPreferencesModal({
   function toggleHidden(id: string) {
     setItems((prev) => {
       const next = prev.map((it) => (it.id === id ? { ...it, hidden: !it.hidden } : it));
-      scheduleSave(next);
+      scheduleSave(next, spanOverrides);
       return next;
     });
   }
@@ -325,9 +371,52 @@ export function DashboardPreferencesModal({
     setDraggingCursor(true);
   }
 
+  /** Berechne die simulierte Order + Spans wenn `activeId` VOR `overId`
+   *  eingefuegt wird. Wendet die Auto-Fit-Regel an. Wird bei jedem
+   *  DragOver-Wechsel neu berechnet und rendered LIVE — der User sieht
+   *  wie das Layout wird, bevor er loslaesst. */
+  function simulate(
+    baseItems: PreferenceItem[],
+    baseSpans: Record<string, number>,
+    dragged: string,
+    over: string,
+    mobile: boolean,
+  ): { items: PreferenceItem[]; spans: Record<string, number> } {
+    if (dragged === over) return { items: baseItems, spans: baseSpans };
+    const oldIdx = baseItems.findIndex((i) => i.id === dragged);
+    const newIdx = baseItems.findIndex((i) => i.id === over);
+    if (oldIdx === -1 || newIdx === -1) return { items: baseItems, spans: baseSpans };
+    const items = [...baseItems];
+    const [moved] = items.splice(oldIdx, 1);
+    items.splice(newIdx, 0, moved);
+
+    // Auto-Fit: wenn im Mobile-Preview → keine Anpassung (alles ist eh 12).
+    if (mobile) return { items, spans: baseSpans };
+    const draggedSpan = spanNumberFor(dragged, baseSpans, false);
+    const overSpan = spanNumberFor(over, baseSpans, false);
+    const fitTarget = autoFitTargetSpan(draggedSpan, overSpan);
+    if (fitTarget === null) return { items, spans: baseSpans };
+    return { items, spans: { ...baseSpans, [over]: fitTarget } };
+  }
+
   function handleDragOver(event: DragOverEvent) {
     const over = event.over;
-    setOverId(over ? (over.id as string) : null);
+    const overIdNew = over ? (over.id as string) : null;
+    setOverId(overIdNew);
+    if (activeId && overIdNew && overIdNew !== activeId) {
+      const sim = simulate(items, spanOverrides, activeId, overIdNew, mobilePreview);
+      // View-Transition wraps the simulated-state update → der Browser
+      // animiert den Layout-Wechsel weich (Kachel verkleinert sich sichtbar
+      // damit die kleine daneben passt). Ohne wuerden die Kacheln bei
+      // jedem Hover-Wechsel harten Sprung machen.
+      withViewTransition(() => {
+        setSimulatedItems(sim.items);
+        setSimulatedSpans(sim.spans);
+      });
+    } else if (!overIdNew) {
+      setSimulatedItems(null);
+      setSimulatedSpans(null);
+    }
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -336,23 +425,21 @@ export function DashboardPreferencesModal({
     setActiveSize(null);
     setOverId(null);
     setDraggingCursor(false);
-    if (!over || active.id === over.id) return;
-    // View-Transition umschliesst das setState → der Browser animiert das
-    // Grid-Reorder inkl. variabler col-spans automatisch weich. Fallback:
-    // hartes Umschalten (aeltere Browser). Sowohl der Reorder als auch
-    // der scheduleSave() muessen VOR dem Ende der Transition passieren,
-    // deshalb beides innerhalb des Callbacks.
+    if (!over || active.id === over.id) {
+      setSimulatedItems(null);
+      setSimulatedSpans(null);
+      return;
+    }
+    // Commit: die Simulation wird zum echten State. View-Transition sorgt
+    // fuer smoothen Uebergang wenn irgendwas nachanimiert werden muss
+    // (z.B. der Ghost snapshottet weg).
+    const sim = simulate(items, spanOverrides, active.id as string, over.id as string, mobilePreview);
     withViewTransition(() => {
-      setItems((prev) => {
-        const oldIdx = prev.findIndex((i) => i.id === active.id);
-        const newIdx = prev.findIndex((i) => i.id === over.id);
-        if (oldIdx === -1 || newIdx === -1) return prev;
-        const next = [...prev];
-        const [moved] = next.splice(oldIdx, 1);
-        next.splice(newIdx, 0, moved);
-        scheduleSave(next);
-        return next;
-      });
+      setItems(sim.items);
+      setSpanOverrides(sim.spans);
+      setSimulatedItems(null);
+      setSimulatedSpans(null);
+      scheduleSave(sim.items, sim.spans);
     });
   }
 
@@ -361,6 +448,8 @@ export function DashboardPreferencesModal({
     setActiveSize(null);
     setOverId(null);
     setDraggingCursor(false);
+    setSimulatedItems(null);
+    setSimulatedSpans(null);
   }
 
   useEffect(() => {
@@ -399,7 +488,7 @@ export function DashboardPreferencesModal({
     }
     onClose();
     if (flush) {
-      void persist(items).then(() => onSaved());
+      void persist(items, spanOverrides).then(() => onSaved());
     } else {
       onSaved();
     }
@@ -410,9 +499,13 @@ export function DashboardPreferencesModal({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinatesShim }),
   );
 
+  // Beim Rendern: waehrend Drag simulated, sonst real state.
+  const renderedItems = simulatedItems ?? items;
+  const renderedSpans = simulatedSpans ?? spanOverrides;
+
   const activeItem = useMemo(
-    () => (activeId ? items.find((i) => i.id === activeId) ?? null : null),
-    [activeId, items],
+    () => (activeId ? renderedItems.find((i) => i.id === activeId) ?? null : null),
+    [activeId, renderedItems],
   );
 
   return (
@@ -460,11 +553,11 @@ export function DashboardPreferencesModal({
             }}
           >
             <div className="grid grid-cols-12 gap-2">
-              {items.map((it) => (
+              {renderedItems.map((it) => (
                 <GridTile
                   key={it.id}
                   item={it}
-                  spanClass={spanFor(it.id, mobilePreview)}
+                  spanClass={spanClassFor(it.id, renderedSpans, mobilePreview)}
                   onToggle={() => toggleHidden(it.id)}
                   isDragging={activeId === it.id}
                   isOverTarget={overId === it.id && activeId !== it.id}

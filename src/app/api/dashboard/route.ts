@@ -676,7 +676,7 @@ export async function GET() {
         .maybeSingle(),
       admin
         .from("user_dashboard_overrides")
-        .select("hidden, widget_order")
+        .select("hidden, widget_order, widget_spans")
         .eq("user_id", auth.user.id)
         .maybeSingle(),
     ]);
@@ -707,6 +707,19 @@ export async function GET() {
           widget_order: (overrideRes.data.widget_order ?? []) as string[],
         }
       : null;
+    // widget_spans wird separat durchgereicht (nicht Teil von resolveVisibleWidgets,
+    // weil die Breite nur die Darstellung beeinflusst, nicht die Sichtbarkeit).
+    const userWidgetSpans: Record<string, number> = (() => {
+      const raw = overrideRes.data?.widget_spans as unknown;
+      if (!raw || typeof raw !== "object") return {};
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof v === "number" && (v === 4 || v === 6 || v === 8 || v === 12)) {
+          out[k] = v;
+        }
+      }
+      return out;
+    })();
 
     // 1) Rolle+User mergen (deterministisch).
     const merged = resolveVisibleWidgets({ role, roleOverride, userOverride });
@@ -748,6 +761,9 @@ export async function GET() {
       subtitle: subtitleForRole(role),
       widgets,
       widget_catalog: WIDGET_CATALOG,
+      // Nur Overrides — Frontend faellt auf widgetDefaultSpan(id) zurueck
+      // wenn eine ID fehlt. Leere Map == keine Overrides.
+      widget_spans: userWidgetSpans,
     };
     if (adminData) body.admin = adminData;
     if (maData) body.ma = maData;
