@@ -87,20 +87,48 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   // Wird via has_permission('admin:activity') gegated, Admin durch.
 ];
 
-// Partnerportal-Module — separater Permission-Namespace fuer Locations-
-// partner. Die zwei Portale (Firmenportal / Partnerportal) sind
-// eigenstaendige Welten, sollen aber das gleiche Permission-Format teilen
-// damit ein zukuenftiges has_permission()-Check beide Seiten gleich
-// behandelt. Slugs sind dashed ("partner-anfragen"), das Action-Trennzeichen
-// bleibt ":" wie im Firmenportal.
+// Partnerportal-Module — eigener Permission-Namespace `partner:*`.
 //
-// Aktuell hat die partner-Rolle keine Granularitaet (Partnerportal-Layout
-// gated nur ueber role='partner'). Diese Module bereiten die Partner-
-// Sub-Rollen-Hierarchie vor (Partner-Admin vs Partner-Mitarbeiter), bei
-// der ein Partner seine eigenen Mitarbeiter mit reduzierten Rechten anlegt.
+// Format: "partner:<modul>:<action>". Alle Slugs beginnen mit `partner:`
+// damit
+//   - ein Berechtigungs-Check nie versehentlich internes `kalender:view`
+//     mit dem Partner-Belegungsplan verwechselt,
+//   - Partner-Sub-Rollen (Partner-Admin vs Partner-Mitarbeiter — siehe
+//     MEMORY.project_partner_role_hierarchy) sauber Subsets vergeben,
+//   - has_permission() denselben Prefix-Match bekommt wie fuer interne
+//     Slugs (keine Sonderfaelle im UI-Guard).
+//
+// RLS-Semantik: die Location-Scope-Klausel (partner_location_id) bleibt
+// die Autoritaet fuer WELCHE Zeilen ein Partner sieht — die partner:*-
+// Permission gated nur OB.
+//
+// GRACE-PERIOD (Migration 216): waehrend der Umstellung akzeptieren die
+// RLS-Policies parallel die alten dashed Slugs `partner-anfragen:*` und
+// `partner-belegungsplan:*` (Migration 099). Beide Familien sind unten
+// aufgelistet — die dashed Eintraege werden entfernt sobald die App-Seite
+// verifiziert auf den neuen Namespace umgestellt ist.
 export const PARTNER_PERMISSION_MODULES: PermissionModule[] = [
-  { slug: "partner-anfragen",      label: "Anfragen",      paths: ["/partner/anfragen"],      actions: ["view", "create", "edit", "delete"] },
-  { slug: "partner-belegungsplan", label: "Belegungsplan", paths: ["/partner/belegungsplan"], actions: ["view"] },
+  // NEU: partner:*-Namespace
+  { slug: "partner:anfragen",      label: "Partner-Anfragen",      paths: ["/partner/anfragen"],      actions: ["view", "create", "edit", "delete"] },
+  { slug: "partner:belegungsplan", label: "Partner-Belegungsplan", paths: ["/partner/belegungsplan"], actions: ["view"] },
+  // Auftraege = bestaetigte Anfragen (partner_anfrage -> offen). Partner
+  // sieht sie read-only im Kalender; RLS scoped auf partner_location_id.
+  { slug: "partner:auftraege",     label: "Partner-Auftraege",     paths: [],                         actions: ["view"] },
+  // LEGACY (Migration 099) — bleiben waehrend Grace-Period parseable.
+  // Werden von Migration 216-Nachfolger entfernt.
+  { slug: "partner-anfragen",      label: "Anfragen (legacy)",     paths: ["/partner/anfragen"],      actions: ["view", "create", "edit", "delete"] },
+  { slug: "partner-belegungsplan", label: "Belegungsplan (legacy)", paths: ["/partner/belegungsplan"], actions: ["view"] },
+];
+
+/**
+ * Neuer partner:*-Namespace hat neben CRUD auf Anfragen zusaetzlich eine
+ * `respond`-Action fuer Antworten im Anfrage-Thread (z.B. auf Rueckfragen
+ * / Ablehnungen von EVENTLINE-Admins reagieren). Wird als Feature-Slug
+ * gefuehrt statt als PermissionAction, damit "respond" nicht in andere
+ * Module wie kunden/vertrieb sickert wo es semantisch nichts bedeutet.
+ */
+export const PARTNER_EXTRA_PERMISSIONS: readonly string[] = [
+  "partner:anfragen:respond",
 ];
 
 /** Pfade die fuer alle eingeloggten User erreichbar sind, unabhaengig von der Rolle.
@@ -189,6 +217,7 @@ export function allKnownPermissions(): string[] {
   for (const m of PARTNER_PERMISSION_MODULES) {
     for (const a of m.actions) out.push(`${m.slug}:${a}`);
   }
+  for (const p of PARTNER_EXTRA_PERMISSIONS) out.push(p);
   for (const f of PERMISSION_FEATURES) out.push(f.key);
   return out;
 }
