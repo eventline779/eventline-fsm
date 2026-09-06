@@ -9,6 +9,7 @@ import { StempelWidget } from "@/components/stempel/stempel-widget";
 import { Toaster } from "@/components/ui/sonner";
 import { VersionWatcher } from "@/components/version-watcher";
 import { ViewAsOverlay } from "@/components/dev/view-as-overlay";
+import { LiveBroadcastReceiver } from "@/components/dev/live-broadcast-receiver";
 import { NAV_GROUPS, ADMIN_NAV_GROUP } from "@/lib/constants";
 import { isPathAllowed } from "@/lib/permissions";
 import Link from "next/link";
@@ -369,6 +370,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Developer-Mode / View-As Overlay — nur sichtbar wenn der aktive
           User Admin ist und developer_mode_enabled=true in profiles. */}
       <ViewAsOverlay />
+      {/* Live-Broadcast Receiver — lauscht global auf live:<own_user_id>
+          und blendet Overlay + Admin-Cursor ein sobald ein Admin eine
+          Live-Session zu diesem User startet. */}
+      <LiveBroadcastReceiver userId={profile?.id ?? null} />
 
       {/* Mobile Menu Sheet — flex-col layout:
           Header (shrink-0) -> Nav (flex-1, scrollable) -> Footer (shrink-0).

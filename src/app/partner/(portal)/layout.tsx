@@ -14,6 +14,7 @@ import { Sun, Moon, LogOut, FileText, Calendar, User } from "lucide-react";
 import { DatenschutzAcceptModal } from "@/components/datenschutz-accept-modal";
 import { DATENSCHUTZ_VERSION } from "@/lib/datenschutz";
 import { ViewAsOverlay } from "@/components/dev/view-as-overlay";
+import { LiveBroadcastReceiver } from "@/components/dev/live-broadcast-receiver";
 
 // Partner-Portal-Layout: minimal Topbar, KEINE Sidebar, KEINE Eve.
 // Auth-Guard: nur eingeloggte 'partner'-Profile mit partner_location_id
@@ -238,6 +239,9 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
           impersonierender Admin hier wieder rauskommt oder zwischen Partnern
           wechseln kann. Self-renders null wenn kein Admin / kein DevMode. */}
       <ViewAsOverlay />
+      {/* Live-Broadcast Receiver — Partner sieht Admins Cursor + Overlay
+          wenn Admin gerade eine Live-Session zu diesem Partner faehrt. */}
+      <LiveBroadcastReceiver userId={profile?.id ?? null} />
     </div>
   );
 }

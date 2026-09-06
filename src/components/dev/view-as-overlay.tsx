@@ -24,8 +24,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil } from "lucide-react";
+import { Eye, ChevronDown, LogOut, Loader2, Search, Power, Lock, Pencil, Radio } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { LiveBroadcastSender } from "@/components/dev/live-broadcast-sender";
 
 interface Candidate {
   id: string;
@@ -43,7 +44,11 @@ export function ViewAsOverlay() {
   const supabase = createClient();
   const [realUserRole, setRealUserRole] = useState<string | null>(null);
   const [realUserId, setRealUserId] = useState<string | null>(null);
+  const [realUserName, setRealUserName] = useState<string>("Admin");
   const [ready, setReady] = useState(false);
+  // Live-Uebertragung: rein clientseitiger State. Wird beim Wechseln des
+  // impersonierten Users / Stop-Impersonate zurueckgesetzt.
+  const [liveActive, setLiveActive] = useState(false);
   const [devModeEnabled, setDevModeEnabled] = useState<boolean | null>(null);
   const [current, setCurrent] = useState<CurrentState | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -61,11 +66,12 @@ export function ViewAsOverlay() {
       setRealUserId(user.id);
       const { data } = await supabase
         .from("profiles")
-        .select("role, developer_mode_enabled")
+        .select("role, developer_mode_enabled, full_name")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
       setRealUserRole((data?.role as string) ?? null);
+      setRealUserName((data?.full_name as string) ?? "Admin");
       setDevModeEnabled(Boolean(data?.developer_mode_enabled));
       setReady(true);
     })();
@@ -128,6 +134,7 @@ export function ViewAsOverlay() {
 
   async function startImpersonation(targetId: string) {
     setLoading(true);
+    setLiveActive(false); // Wechsel = Live neu bewusst starten
     try {
       const r = await fetch("/api/dev/impersonate", {
         method: "POST",
@@ -351,7 +358,7 @@ export function ViewAsOverlay() {
                 </div>
                 {/* Read-Only vs Bearbeitung — expliziter Toggle. Default:
                     read-only. Enable braucht Confirm. */}
-                <div className="px-3 pb-2.5">
+                <div className="px-3 pb-2 space-y-1.5">
                   <button
                     type="button"
                     onClick={() => toggleWriteMode(!current!.write_enabled)}
@@ -378,6 +385,32 @@ export function ViewAsOverlay() {
                     </span>
                     <span className="text-[10px] opacity-75">
                       {current!.write_enabled ? "sperren" : "aktivieren"}
+                    </span>
+                  </button>
+                  {/* Live-Uebertragung — der User sieht in seinem Browser
+                      Admins Cursor / Klicks / Eingaben, kann selbst nichts
+                      tun (Input-Lock). Broadcast via Supabase Realtime. */}
+                  <button
+                    type="button"
+                    onClick={() => setLiveActive((v) => !v)}
+                    className="w-full inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition-colors"
+                    style={{
+                      borderColor: liveActive
+                        ? "color-mix(in oklab, #dc2626 55%, transparent)"
+                        : "var(--border)",
+                      background: liveActive
+                        ? "color-mix(in oklab, #dc2626 10%, transparent)"
+                        : "color-mix(in oklab, var(--foreground) 3%, transparent)",
+                      color: liveActive ? "#dc2626" : "var(--foreground)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Radio className={`h-3 w-3 ${liveActive ? "animate-pulse" : ""}`} />
+                      {liveActive ? "Live-Übertragung läuft" : "Live-Übertragung"}
+                    </span>
+                    <span className="text-[10px] opacity-75">
+                      {liveActive ? "beenden" : "starten"}
                     </span>
                   </button>
                 </div>
@@ -488,6 +521,14 @@ export function ViewAsOverlay() {
           </button>
         )}
       </div>
+
+      {/* Sender — nur mounted wenn Impersonation + Live-Mode aktiv.
+          Broadcast an live:<target_user_id>. */}
+      <LiveBroadcastSender
+        targetUserId={active && liveActive ? (current!.target_user_id ?? null) : null}
+        liveActive={liveActive}
+        adminName={realUserName}
+      />
     </>
   );
 }
