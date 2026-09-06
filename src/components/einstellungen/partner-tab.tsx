@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
+import { DeleteUserConfirmModal } from "@/components/einstellungen/delete-user-confirm-modal";
 import { Plus, Building2, KeyRound, Pencil, UserX, UserCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
@@ -46,6 +47,8 @@ export function PartnerTab() {
   const [edit, setEdit] = useState<EditState>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** Aktiv im Delete-Modal — Impact-basierte Bestaetigung. */
+  const [deletingUser, setDeletingUser] = useState<PartnerProfileRow | null>(null);
   const { confirm, ConfirmModalElement } = useConfirm();
 
   async function load() {
@@ -195,25 +198,9 @@ export function PartnerTab() {
     load();
   }
 
-  async function hardDelete(p: PartnerProfileRow) {
-    const ok = await confirm({
-      title: "Endgültig löschen?",
-      message: `${p.full_name} wird unwiderruflich aus dem System entfernt. Anfragen, die der Partner erstellt hat, bleiben bestehen (Ersteller wird auf "—" gesetzt). Diese Aktion kann nicht rückgängig gemacht werden.`,
-      confirmLabel: "Endgültig löschen",
-      variant: "red",
-    });
-    if (!ok) return;
-    setBusyId(p.id);
-    const res = await fetch(`/api/admin/users/${p.id}`, { method: "DELETE" });
-    const json = await res.json();
-    setBusyId(null);
-    if (!json.success) {
-      TOAST.errorOr(json.error);
-      return;
-    }
-    toast.success(`${p.full_name} endgültig gelöscht`);
-    load();
-  }
+  // Delete-Flow lebt jetzt in <DeleteUserConfirmModal /> — der Trash2-Button
+  // oeffnet nur noch das Modal via setDeletingUser(p). Kein Dossier fuer
+  // Partner (kein Payroll-Kontext).
 
   return (
     <div className="space-y-4">
@@ -288,7 +275,7 @@ export function PartnerTab() {
                   {!p.is_active && (
                     <button
                       type="button"
-                      onClick={() => hardDelete(p)}
+                      onClick={() => setDeletingUser(p)}
                       disabled={busyId === p.id}
                       className="kasten kasten-red"
                       data-tooltip="Endgültig löschen"
@@ -388,6 +375,14 @@ export function PartnerTab() {
           </div>
         </form>
       </Modal>
+
+      {/* Delete-Flow — Impact-basierte Bestaetigung (ohne Dossier bei Partnern). */}
+      <DeleteUserConfirmModal
+        open={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        user={deletingUser ? { id: deletingUser.id, full_name: deletingUser.full_name, role: "Partner" } : null}
+        onDeleted={() => { setDeletingUser(null); load(); }}
+      />
 
       {ConfirmModalElement}
     </div>

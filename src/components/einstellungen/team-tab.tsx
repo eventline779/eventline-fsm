@@ -30,6 +30,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { SearchableSelect } from "@/components/searchable-select";
 import { Plus, KeyRound, Pencil, UserX, UserCheck, Trash2, Mail, Users, Search } from "lucide-react";
 import { DeveloperModeCard } from "@/components/einstellungen/developer-mode-card";
+import { DeleteUserConfirmModal } from "@/components/einstellungen/delete-user-confirm-modal";
 import { toast } from "sonner";
 import { TOAST } from "@/lib/messages";
 
@@ -75,6 +76,9 @@ export function TeamTab() {
   /** Suchfeld ueber der Team-Mitglieder-Checkbox-Liste im Edit-Modal. */
   const [memberSearch, setMemberSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** Aktiv im Delete-Modal — steuert Impact-basierte Delete-Bestaetigung.
+   *  null = Modal zu. */
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
   const { confirm, ConfirmModalElement } = useConfirm();
 
   async function load() {
@@ -260,55 +264,10 @@ export function TeamTab() {
     toast.success(`Reset-Mail an ${p.email} verschickt`);
   }
 
-  async function hardDelete(p: Profile) {
-    const ok = await confirm({
-      title: "Dossier erstellen + endgültig löschen?",
-      message: `Bevor ${p.full_name} gelöscht wird, packen wir alle Daten (Stempel, Rapporte, Lohndokumente, Notifications, hochgeladene Dateien) in ein ZIP-Dossier zum Download. Dann wird der Benutzer aus dem System entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
-      confirmLabel: "Dossier + löschen",
-      variant: "red",
-    });
-    if (!ok) return;
-    setBusyId(p.id);
-    let dossierUrl: string | null = null;
-    try {
-      const dossierRes = await fetch(`/api/admin/users/${p.id}/dossier`, { method: "POST" });
-      const dossierJson = await dossierRes.json();
-      if (!dossierJson.success) {
-        setBusyId(null);
-        TOAST.errorOr(dossierJson.error || "Dossier konnte nicht erstellt werden — Benutzer NICHT gelöscht");
-        return;
-      }
-      dossierUrl = dossierJson.download_url ?? null;
-    } catch (err) {
-      setBusyId(null);
-      toast.error("Dossier-Fehler: " + (err instanceof Error ? err.message : "Netzwerk") + " — Benutzer NICHT gelöscht");
-      return;
-    }
-    const res = await fetch(`/api/admin/users/${p.id}`, { method: "DELETE" });
-    const json = await res.json();
-    setBusyId(null);
-    if (!json.success) { TOAST.errorOr(json.error); return; }
-    if (dossierUrl) {
-      toast.success(`${p.full_name} gelöscht — Dossier verfügbar`, {
-        action: {
-          label: "Download",
-          onClick: () => {
-            const a = document.createElement("a");
-            a.href = dossierUrl!;
-            a.download = `dossier_${p.full_name}.zip`;
-            a.target = "_blank";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          },
-        },
-        duration: 60000,
-      });
-    } else {
-      toast.success(`${p.full_name} endgültig gelöscht`);
-    }
-    load();
-  }
+  // Delete-Flow lebt jetzt in <DeleteUserConfirmModal /> — dieser Button
+  // oeffnet nur noch das Modal via setDeletingUser(p). Das Modal zeigt die
+  // Impact-Analyse (unwiderrufliche Cascades + SET-NULL-Preserves), bietet
+  // ggf. Owner-Transfer und macht dann selbst Dossier + DELETE.
 
   async function toggleActive(p: Profile) {
     const ok = await confirm({
@@ -433,7 +392,7 @@ export function TeamTab() {
                   {!p.is_active && (
                     <button
                       type="button"
-                      onClick={() => hardDelete(p)}
+                      onClick={() => setDeletingUser(p)}
                       disabled={busyId === p.id}
                       className="kasten kasten-muted"
                       data-tooltip="Endgültig löschen (mit Dossier-Backup)"
@@ -766,6 +725,15 @@ export function TeamTab() {
           </form>
         )}
       </Modal>
+
+      {/* Delete-Flow — Impact-basierte Bestaetigung + Dossier-Backup + Delete. */}
+      <DeleteUserConfirmModal
+        open={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        user={deletingUser ? { id: deletingUser.id, full_name: deletingUser.full_name, role: roleLabel(deletingUser.role) } : null}
+        onDeleted={() => { setDeletingUser(null); load(); }}
+        withDossier
+      />
 
       {ConfirmModalElement}
     </div>
