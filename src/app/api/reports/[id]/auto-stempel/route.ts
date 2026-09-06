@@ -137,6 +137,26 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       errors.push(`Negative Dauer ${tr.date} ${tr.start}-${tr.end}`);
       continue;
     }
+
+    // Abrechnungs-Lock (siehe Migration 214): sobald der 5. des Folgemonats
+    // in Europe/Zurich erreicht ist, darf niemand mehr time_entries in
+    // diesem Zeitraum anlegen — auch nicht per Auto-Stempel. Der Admin-
+    // Client umgeht RLS, deshalb hier explizit ueber die SQL-Function
+    // pruefen.
+    const { data: locked, error: lockErr } = await admin.rpc("is_time_entry_locked", {
+      p_clock_in: clockIn.toISOString(),
+    });
+    if (lockErr) {
+      errors.push(`${tr.date}: Lock-Pruefung fehlgeschlagen (${lockErr.message})`);
+      logError("reports.auto-stempel.lock-check", lockErr, { reportId, range: tr });
+      continue;
+    }
+    if (locked === true) {
+      errors.push(`${tr.date}: Zeitraum bereits abgerechnet — Auto-Stempel nicht mehr moeglich.`);
+      skipped++;
+      continue;
+    }
+
     const pauseMin = Number(tr.pause ?? 0) || 0;
 
     // Idempotenz + Dedup gegen echten Stempel: hat dieser User fuer
